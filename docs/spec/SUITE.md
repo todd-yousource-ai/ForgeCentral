@@ -9,6 +9,12 @@ Four non-negotiable rules govern every TRD in this suite: **no UI stubs** (every
 to real Crucible/Torch/Forge data), **no second database**, **<= 3 clicks to any task**, and
 **near-instant** feel. They are formalized as invariants in `TRD-CONSOLE-00`.
 
+## Build order
+
+The suite is sequenced into gated phases -- foundation first, then the surfaces in dependency order --
+by [`../implementation-plans/IP-CONSOLE-ROADMAP.md`](../implementation-plans/IP-CONSOLE-ROADMAP.md),
+which also names the cross-surface Crucible/Torch/Forge work (`INV-CROSS`) each surface depends on.
+
 ## Documents
 
 | TRD | Title | Status |
