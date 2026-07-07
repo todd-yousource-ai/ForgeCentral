@@ -15,17 +15,17 @@ to real Crucible/Torch/Forge data), **no second database**, **<= 3 clicks to any
 |-----|-------|--------|
 | CONSOLE-00 | Platform and Architecture (foundation: BFF-over-Crucible, design system, IA, data contract, auth, performance, invariants) | DRAFT |
 | CONSOLE-01 | Overview -- the live connectivity graph (home) | DRAFT |
-| CONSOLE-02 | Virtual Trust Zones | planned |
-| CONSOLE-03 | Dashboards | planned |
-| CONSOLE-04 | Users and Identity (principals + External IDAM) | planned |
-| CONSOLE-05 | Policies | planned |
-| CONSOLE-06 | TrustFlow (brokered egress / inference plane) | planned |
-| CONSOLE-07 | AIOps (command center: Reflex, Oversight, Incidents, Decision Stream, Governance, Containment, Workflows, Rewind, Simulations) | planned |
-| CONSOLE-08 | Reports | planned |
-| CONSOLE-09 | Logs (decision / audit stream -- the LOG) | planned |
-| CONSOLE-10 | Objects (protected resources) | planned |
-| CONSOLE-11 | Settings (HA/DR, KeyLock, Federation, Security, FIPS, RBAC, Observability, Policy) | planned |
-| CONSOLE-12 | Entity drawer (shared detail + quick-actions pattern) | planned |
+| CONSOLE-02 | Virtual Trust Zones | DRAFT |
+| CONSOLE-03 | Dashboards | DRAFT |
+| CONSOLE-04 | Users and Identity (principals + External IDAM) | DRAFT |
+| CONSOLE-05 | Policies | DRAFT |
+| CONSOLE-06 | TrustFlow (brokered egress / inference plane) | DRAFT |
+| CONSOLE-07 | AIOps (command center: Reflex, Oversight, Incidents, Decision Stream, Governance, Containment, Workflows, Rewind, Simulations) | DRAFT |
+| CONSOLE-08 | Reports | DRAFT |
+| CONSOLE-09 | Logs (decision / audit stream -- the LOG) | DRAFT |
+| CONSOLE-10 | Objects (protected resources) | DRAFT |
+| CONSOLE-11 | Settings (HA/DR, KeyLock, Federation, Security, FIPS, RBAC, Observability, Policy) | DRAFT |
+| CONSOLE-12 | Entity drawer (shared detail + quick-actions pattern) | DRAFT |
 
 ## Terminology (trust-era mock -> AI-native platform)
 
