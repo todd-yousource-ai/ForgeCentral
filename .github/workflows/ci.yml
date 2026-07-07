@@ -17,6 +17,10 @@ on:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    # Hoist the optional secret into env: the `secrets` context is not allowed in an `if:` expression,
+    # but `env` is. Absent the secret this is an empty string and the mapping step below is skipped.
+    env:
+      CRUCIBLE_TOKEN: ${{ secrets.CRUCIBLE_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,8 +33,8 @@ jobs:
         run: corepack enable
 
       - name: Map the engine contract dep to the token (if configured)
-        if: ${{ secrets.CRUCIBLE_TOKEN != '' }}
-        run: git config --global url."https://x-access-token:${{ secrets.CRUCIBLE_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        if: ${{ env.CRUCIBLE_TOKEN != '' }}
+        run: git config --global url."https://x-access-token:${CRUCIBLE_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Run the gate
         run: bash scripts/ci.sh
