@@ -56,23 +56,22 @@ until its bindings resolve to real engine operations.
 
 ## Build and test invocation (the per-PR gate)
 
-The gate is the full quality suite (`TypeScript_Dev_Rules.md` Section 14):
+The single entry point is **`scripts/ci.sh`** -- the same script runs locally and in CI
+(`.github/workflows/ci.yml`). It runs the full quality suite in order (`TypeScript_Dev_Rules.md`
+Section 14): repo hygiene (incl. the no-em-dash rule) -> typecheck -> lint -> format -> test ->
+contract -> e2e -> audit -> licenses -> build.
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm tsc --noEmit            # strict type check
-pnpm eslint . --max-warnings 0
-pnpm prettier --check .
-pnpm test                    # unit + integration
-pnpm test:contract           # the no-stub binding + client/OpenAPI drift check
-pnpm test:e2e                # the <=3-click canonical tasks on a seeded engine
-pnpm audit --audit-level=high
-pnpm build
+scripts/ci.sh              # full gate
+scripts/ci.sh --skip-net   # skip the networked dependency audit + the live-engine e2e
+scripts/ci.sh --skip-e2e   # skip only the Playwright e2e stage
 ```
 
-Run the **full** gate before every push; **never** mask a check's exit. The lockfile is committed and
-must stay consistent; a new dependency is justified, pinned, audited, and license-checked, and flagged at
-review.
+Until the first implementation PR lands the TypeScript workspace (a member package under `packages/` or
+`apps/`), the gate runs the repo-hygiene checks and reports the workspace as pending. Run the **full**
+gate before every push; **never** mask a check's exit. The lockfile (`pnpm-lock.yaml`) is committed and
+consistent; a new dependency is justified, pinned, audited, and license-allowlisted
+(`DEPENDENCY-POLICY.md`), and flagged at review. The full contribution workflow is in `CONTRIBUTING.md`.
 
 ## Per-PR workflow conventions (local + GitHub)
 

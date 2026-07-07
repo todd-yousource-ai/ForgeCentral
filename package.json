@@ -1,0 +1,30 @@
+{
+  "name": "@forge/console",
+  "version": "0.0.0",
+  "private": true,
+  "description": "YouSource Console (ForgeCentral): the operator pane of glass over Crucible, Torch, and Forge.",
+  "license": "LicenseRef-YouSource-Proprietary",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22 <23",
+    "pnpm": ">=9 <10"
+  },
+  "scripts": {
+    "gate": "bash scripts/ci.sh",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "lint": "pnpm -r --if-present run lint",
+    "test": "pnpm -r --if-present run test",
+    "test:contract": "pnpm -r --if-present run test:contract",
+    "test:e2e": "pnpm -r --if-present run test:e2e",
+    "build": "pnpm -r --if-present run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:licenses": "node scripts/check-licenses.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "prettier": "^3.4.2",
+    "eslint": "^9.17.0",
+    "typescript-eslint": "^8.19.0"
+  }
+}
