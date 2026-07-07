@@ -53,6 +53,16 @@ workflow.
 - **BFF:** TypeScript on Node LTS -- a stateless, OpenAPI-first gateway over the platform wire protocols.
 - **Shared:** `@forge/contracts` -- generated engine DTO + BFF OpenAPI types, imported by both tiers.
 
+## Design reference (ground yourself here before building UI)
+
+The canonical Console mockups live in [`docs/ui-examples/`](docs/ui-examples/README.md) -- 14
+annotated screenshots of every primary surface (the visual realization of `TRD-CONSOLE-00`
+Section 6). They are the visual ground truth for look, information architecture, the shared
+component library, and the interaction model. Read them before designing or implementing any
+surface, and check your output against them: if a surface does not look like it belongs in that
+set, it is wrong. They are grounding, not a second source of truth -- where a pixel and the spec
+disagree, `TRD-CONSOLE-00` Section 6 and the surface TRD win.
+
 ## Brand assets
 
 Canonical in [`docs/assets/`](docs/assets/): the YouSource logo (`.png`/`.gif`) and the honeycomb
