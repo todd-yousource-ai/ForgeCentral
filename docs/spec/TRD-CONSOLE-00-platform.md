@@ -352,9 +352,17 @@ UI. Its requirements are fixed here and inherited by every admin surface TRD.
   connecting to that server directly; remote administration is by reaching that node's address (over the
   operator's secured network / jump path), never by exposing the plane on an untrusted interface. The
   bind address is the installed node's IP; a config that would widen it fails startup (fail-closed).
-- **Port 8443.** The admin plane is served on **TCP 8443**, separate from the general Console port. (The
-  engine's own loopback admin plane, e.g. the crdb admin socket, remains as-is behind it; 8443 is the
-  Console admin plane's TLS listener on the node IP.)
+- **Port 8443 is the direct-user leg only.** 8443 is the **browser -> Console admin UI** listener (on
+  the node IP), separate from the general Console port. It governs how a human operator's browser reaches
+  the admin surfaces -- nothing else.
+- **Engine access is always mTLS :7878, unchanged.** The 8443 plane does NOT change how the Console
+  reaches the platform. Every read/command the Console makes to **Crucible and to Torch/Forge** goes over
+  the **BFF's mutually-authenticated `:7878` seam** (Section 2), exactly as on the general plane. There
+  are two distinct legs and they never merge: (1) browser <-> Console over 8443 (node-IP-pinned, hybrid
+  PQC + CNSA 1.0 fallback), and (2) Console BFF <-> Crucible/Torch/Forge over mTLS `:7878`. Serving admin
+  on 8443 hardens the *user* leg; it never bypasses or replaces the mTLS engine leg, and no admin action
+  reaches the engine except over `:7878` under the Console's enrolled mTLS identity + the operator
+  Principal.
 - **Quantum-resistant hybrid key exchange, with a CNSA 1.0 classical fallback.** The admin plane's TLS
   negotiates a **hybrid post-quantum key exchange** (a classical + ML-KEM hybrid group, e.g.
   X25519+ML-KEM-768 / P-384+ML-KEM, the CNSA 2.0 direction) so the session key is protected against
@@ -407,10 +415,12 @@ the platform's CNSA 2.0 / FIPS posture.
   statement wherever CrucibleQL can serve it (shaping/paging/`AS OF`/`EXPLAIN`/authz-in-candidate-gen
   pushed into the engine); a bespoke DTO/wire read is used only where CrucibleQL cannot express the need,
   and that choice is noted on the binding.
-- **INV-CONSOLE-ADMIN-PLANE.** Console administration is served on a plane bound to the installed node's
-  own IP on TCP 8443, negotiating a hybrid post-quantum key exchange with a strong classical CNSA-1.0
-  fallback (never a downgrade below CNSA 1.0); a config that would widen the bind or weaken the floor
-  fails startup.
+- **INV-CONSOLE-ADMIN-PLANE.** The direct-user admin leg (browser -> Console) is served on a plane bound
+  to the installed node's own IP on TCP 8443, negotiating a hybrid post-quantum key exchange with a
+  strong classical CNSA-1.0 fallback (never a downgrade below CNSA 1.0); a config that would widen the
+  bind or weaken the floor fails startup. Engine access (Console BFF -> Crucible and Torch/Forge) is
+  unaffected: it is always the mTLS `:7878` seam; the two legs never merge and 8443 never carries an
+  engine call.
 - **INV-CONSOLE-NO-2ND-DB.** The Console persists no durable domain state; Crucible is the sole system
   of record; any cache is ephemeral, version-tagged, invalidatable, and never authoritative or on a
   write path.
