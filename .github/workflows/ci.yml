@@ -1,0 +1,36 @@
+# ForgeCentral (YouSource Console) CI. The full TypeScript/Node quality gate runs via scripts/ci.sh
+# (hygiene -> typecheck -> lint -> format -> test -> contract -> e2e -> audit -> licenses -> build).
+# The gate self-detects the scaffold stage: until the workspace has member packages it runs the
+# repo-hygiene checks only; once code lands it runs the full gate.
+#
+# The Console consumes the platform's typed contracts (@forge/contracts, generated from the engine DTO
+# + the BFF OpenAPI). If contract generation needs read access to a private engine repo, add a
+# CRUCIBLE_TOKEN repository secret; the workspace-install step maps it. Absent the secret the gate still
+# runs everything that does not need it.
+name: console-quality-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node (pinned by .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Enable corepack (pnpm, pinned in package.json)
+        run: corepack enable
+
+      - name: Map the engine contract dep to the token (if configured)
+        if: ${{ secrets.CRUCIBLE_TOKEN != '' }}
+        run: git config --global url."https://x-access-token:${{ secrets.CRUCIBLE_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Run the gate
+        run: bash scripts/ci.sh
