@@ -25,9 +25,16 @@ quality (the Crafted standards), and completeness (every PR is a complete, worki
 
 - **Be definitive.** When the TRD is silent on a detail, make the best engineering decision and
   implement it; no TODOs, stubs, or placeholders.
-- **No stubs, ever.** This is the product's defining rule: every value and control binds to a real
-  Crucible/Torch/Forge operation. If the backing operation does not exist yet, the honest move is to say
-  so and stop -- never fabricate data or a mock that could ship.
+- **No stubs, ever -- but build toward the vision.** Every value and control binds to a real
+  Crucible/Torch/Forge operation. This does NOT cap the UI at today's backend: it is legitimate to design
+  a surface the UX calls for and define a binding whose engine operation does not exist yet. When that
+  happens, the honest move is to mark the binding `PENDING` and make the surface's IP enumerate the
+  concrete cross-surface work -- the CrucibleQL read, the DTO/wire field, the Torch/Forge command -- as
+  named tasks with owning repo + TRD, with the engine work landing first or in lockstep (`INV-CROSS`).
+  Never fabricate data or a mock that could ship, and never ship a `PENDING` binding.
+- **Prefer CrucibleQL for reads.** CrucibleQL was built as a strong UI query surface; express a read's
+  data need as a parameterized CrucibleQL statement wherever it can serve it (shaping/paging/`AS OF`/
+  `EXPLAIN` pushed into the engine), and prefer extending CrucibleQL over adding a one-off BFF endpoint.
 - **No second source of truth.** The Console stores no durable domain data; a write is an engine command.
 - **Security defaults win.** In doubt, the more restrictive choice.
 - **Do not over-engineer.** Build what the TRD requires.

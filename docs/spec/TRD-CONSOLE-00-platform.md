@@ -155,18 +155,55 @@ map is normative -- surfaces use the right-hand column, and the left-hand terms 
 The defining rule: **every datum the Console renders and every action it exposes is bound to a real
 platform operation.** This is enforced structurally, not by convention.
 
+**This does NOT mean the UI is capped by what the backend supports today.** The product may design and
+plan any surface the user experience calls for, even when Crucible, Torch, or Forge cannot yet satisfy
+its data contract. The rule is about *shipping* and about *planning*, not about ambition:
+
+- **We build toward the intended UX.** A surface's contract expresses what the operator needs, and it is
+  legitimate to define a binding whose backing engine operation does not exist yet.
+- **The implementation plan owns the cross-surface work.** When a surface needs data or an action that
+  Crucible/Torch/Forge does not yet provide, the surface's IP MUST enumerate the concrete work on those
+  other surfaces to make the contract real -- the CrucibleQL read to add, the DTO/wire field to expose,
+  the Torch/Forge command to implement -- each as a named, sequenced task with its owning repo and TRD.
+  A binding is never left dangling in the plan: it is either satisfied by an existing engine operation or
+  paired with the engine work (and the engine PR lands first or in lockstep). This is the `INV-CROSS`
+  invariant (Section 10).
+- **What ships is real.** Only when a binding's backing operation exists does the surface ship it. Until
+  then the surface is not "stubbed with fake data"; it is *not yet built*, and its IP tracks the gating
+  engine work. No mock/synthesized datum ever reaches a release build.
+
+So the sequence is: UX-driven contract -> IP that covers the engine work -> engine work lands -> the
+surface ships against real data. The no-stub rule bites at build/ship time; the cross-surface-coverage
+rule bites at plan time.
+
 ### 4.1 The binding registry
 
 Each surface declares, in a typed **binding manifest**, every read and every command it uses:
 
-- A **read binding** names a BFF query resolver, which names the concrete Crucible read (a CrucibleQL
-  statement or DTO call) or Torch/Forge read it issues, and the view-model shape it returns.
+- A **read binding** names a BFF query resolver, which names the concrete Crucible read (**a CrucibleQL
+  statement preferred** -- see below) or Torch/Forge read it issues, and the view-model shape it returns.
 - A **command binding** names a BFF command handler, which names the concrete Crucible/Torch/Forge
   mutating operation it invokes (e.g. publish policy, isolate entity, rotate key), its authorization
   requirement, and its audited effect.
+- A binding whose backing operation does not exist yet is marked `PENDING` and names the gating engine
+  task (repo + TRD/IP step); a `PENDING` binding cannot ship (the contract test fails a release build
+  that references one) but is a legitimate, tracked plan artifact.
 
 A UI control with no binding cannot be built: the component API requires a binding id, and the build
 fails on a dangling or absent binding.
+
+### 4.1a CrucibleQL is the preferred read surface
+
+CrucibleQL was developed deliberately as a strong query surface for the UI layer, so **read bindings
+express their data need as a CrucibleQL statement wherever CrucibleQL can serve it**, rather than a
+bespoke DTO endpoint. Benefits: the shaping/filtering/aggregation/pagination the UI needs is pushed into
+the engine (one round trip, server-paged, `AS OF`-capable for Rewind), `EXPLAIN` gives the Rationale
+surfaces their real rationale, and authorization + classification redaction happen inside candidate
+generation (TRD-04) rather than in the BFF. Values bind as parameters -- literals are never interpolated
+(`TypeScript_Dev_Rules.md` Section 9.3). A DTO/wire call is used only where CrucibleQL genuinely cannot
+express the need (a Torch/Forge command, a control-plane action); that choice is noted on the binding.
+When a needed read is *almost* expressible in CrucibleQL, the preferred cross-surface work (Section 4
+above) is to extend CrucibleQL, not to add a one-off BFF endpoint.
 
 ### 4.2 Contract enforcement
 
@@ -303,6 +340,40 @@ implementing TRD attaches the profile):
   specific internal reason.
 - **RBAC** for Console operators is configured on `Settings -> RBAC` and enforced by the engine.
 
+### 8.5 The admin access plane (INV-CONSOLE-ADMIN-PLANE)
+
+Administration of the Console -- the operator surfaces that configure the platform itself (all of
+`Settings`, and any privileged action that mutates platform posture: KeyLock rotation, DR/HA, FIPS, RBAC,
+Federation) -- is served on a **separate, hardened access plane**, distinct from the general read/observe
+UI. Its requirements are fixed here and inherited by every admin surface TRD.
+
+- **Bound to the server's own IP.** The admin plane listens **only on the IP address of the node it is
+  installed on** (the host's own address), not a wildcard bind and not a public address. It is reached by
+  connecting to that server directly; remote administration is by reaching that node's address (over the
+  operator's secured network / jump path), never by exposing the plane on an untrusted interface. The
+  bind address is the installed node's IP; a config that would widen it fails startup (fail-closed).
+- **Port 8443.** The admin plane is served on **TCP 8443**, separate from the general Console port. (The
+  engine's own loopback admin plane, e.g. the crdb admin socket, remains as-is behind it; 8443 is the
+  Console admin plane's TLS listener on the node IP.)
+- **Quantum-resistant hybrid key exchange, with a CNSA 1.0 classical fallback.** The admin plane's TLS
+  negotiates a **hybrid post-quantum key exchange** (a classical + ML-KEM hybrid group, e.g.
+  X25519+ML-KEM-768 / P-384+ML-KEM, the CNSA 2.0 direction) so the session key is protected against
+  harvest-now-decrypt-later. **If the operator's browser does not support the hybrid group, the plane
+  falls back to a strong classical suite meeting CNSA 1.0** (ECDSA P-384 or RSA-3072+ certificate,
+  AES-256-GCM, SHA-384; TLS 1.3, TLS 1.2 floor). The fallback is a *strength floor*, never a downgrade to
+  a weak suite: a browser that offers only sub-CNSA-1.0 crypto is refused. The server certificate is
+  CNSA-1.0-grade at minimum (the hybrid protects the key exchange; the certificate/signature remains a
+  strong classical or, where supported end-to-end, a PQC signature).
+- **Admin authentication is at least as strong as the general plane** (federated OIDC + engine-side
+  authorization + the Admin/SecurityAudit EXPLAIN tier), and admin actions are the audited,
+  confirm-gated, engine-committed operations of Section 9. Serving admin on the node-pinned 8443 plane is
+  an *additional* boundary, not a replacement for engine-side authorization.
+
+The installer provisions the admin plane's node-IP bind, the 8443 listener, the hybrid+fallback TLS
+configuration, and the certificate; these are operator-visible config, not hardcoded. The exact hybrid
+group and the certificate profile are pinned by the admin surface TRD (`TRD-CONSOLE-11 Settings`) against
+the platform's CNSA 2.0 / FIPS posture.
+
 ---
 
 ## 9. Cross-cutting behavior
@@ -327,6 +398,19 @@ implementing TRD attaches the profile):
 - **INV-CONSOLE-NO-STUB.** Every rendered datum and every interactive control resolves to a registered
   binding whose backend operation exists in the real Crucible/Torch/Forge surface; no mock/synthesized
   data or unbound control ships in a release build (build-time contract test + no prod mock provider).
+- **INV-CROSS.** Where a surface's contract needs data or an action the engine does not yet provide, the
+  surface's IP enumerates the concrete cross-surface work (the CrucibleQL read, the DTO/wire field, the
+  Torch/Forge command) as named tasks with owning repo + TRD, and the binding is marked `PENDING` until
+  the engine work lands; a `PENDING` binding never ships but is a legitimate, tracked plan artifact (the
+  UI drives the vision; the plan owns the backend work).
+- **INV-CONSOLE-CRUCIBLEQL-FIRST.** A read binding expresses its data need as a parameterized CrucibleQL
+  statement wherever CrucibleQL can serve it (shaping/paging/`AS OF`/`EXPLAIN`/authz-in-candidate-gen
+  pushed into the engine); a bespoke DTO/wire read is used only where CrucibleQL cannot express the need,
+  and that choice is noted on the binding.
+- **INV-CONSOLE-ADMIN-PLANE.** Console administration is served on a plane bound to the installed node's
+  own IP on TCP 8443, negotiating a hybrid post-quantum key exchange with a strong classical CNSA-1.0
+  fallback (never a downgrade below CNSA 1.0); a config that would widen the bind or weaken the floor
+  fails startup.
 - **INV-CONSOLE-NO-2ND-DB.** The Console persists no durable domain state; Crucible is the sole system
   of record; any cache is ephemeral, version-tagged, invalidatable, and never authoritative or on a
   write path.

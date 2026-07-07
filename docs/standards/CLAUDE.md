@@ -87,15 +87,24 @@ every numeric threshold, timeout, cache TTL, or budget not fixed by a TRD.
 
 ---
 
-## The three product invariants (never violate)
+## The product invariants (never violate)
 
 - **`INV-CONSOLE-NO-STUB`.** Every rendered value and every control binds to a real Crucible/Torch/Forge
   operation. No mock/synthesized data or unbound control ships. Enforced by `test:contract` + no prod
   mock provider (`TypeScript_Dev_Rules.md` Section 17).
+- **`INV-CROSS`.** No-stub does not cap the UI at today's backend: build toward the intended UX, mark a
+  binding whose engine operation does not yet exist as `PENDING`, and make the surface's IP enumerate the
+  cross-surface work (the CrucibleQL read, the DTO/wire field, the Torch/Forge command) as named tasks
+  with owning repo + TRD; the engine work lands first or in lockstep, and a `PENDING` binding never ships.
+- **`INV-CONSOLE-CRUCIBLEQL-FIRST`.** Read bindings express their data need as parameterized CrucibleQL
+  wherever it can serve it; a bespoke DTO/wire read only where CrucibleQL cannot, noted on the binding.
 - **`INV-CONSOLE-NO-2ND-DB`.** The Console persists no durable domain data; Crucible is the sole system
   of record; any cache is ephemeral and never authoritative (Section 18).
 - **`INV-CONSOLE-3-CLICKS`.** Every operator task is reachable in <= 3 clicks from the Overview graph;
   proven by an E2E test.
+- **`INV-CONSOLE-ADMIN-PLANE`.** Administration is served on the installed node's own IP on TCP 8443 with
+  a hybrid post-quantum key exchange and a strong classical CNSA-1.0 fallback (never below CNSA 1.0);
+  see `TRD-CONSOLE-00` Section 8.5.
 
 Additional platform invariants (`ENGINE-AUTHZ`, `LIVE`, `AUDITED`) are defined in `TRD-CONSOLE-00`
 Section 10 and are equally binding.
