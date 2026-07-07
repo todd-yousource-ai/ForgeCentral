@@ -33,6 +33,19 @@ second database**), the **no-stub** data contract, the design system + brand, th
 architecture + **<= 3-click** rule, auth, streaming/performance, and the invariants. Build no surface
 until its bindings resolve to real engine operations.
 
+## Design grounding (read before building or restyling any surface)
+
+`docs/ui-examples/` holds the canonical Console mockups -- 14 annotated screenshots of every primary
+surface, with a `README.md` cataloging each and distilling the design language. They are the **visual
+ground truth** (the realization of `TRD-CONSOLE-00` Section 6): look, information architecture, the
+shared component library (flow graph, score ring, KPI card, data table, tab strip, right drawer,
+chip, timeline scrubber, charts), and the select-then-act interaction model. Before you design or
+implement a surface, find its screenshot and match its density, hierarchy, and component choices;
+reuse the shared components rather than inventing new patterns; use semantic color for meaning, never
+a hand-picked hex. "Does this look like it belongs in that set?" is an expected review question. The
+mockups are grounding, not a source of truth: where a pixel and the spec disagree, `TRD-CONSOLE-00`
+Section 6 and the surface TRD win, and `docs/assets/` is canonical for the exact logo/honeycomb.
+
 ## Product invariants (never violate)
 
 - **`INV-CONSOLE-NO-STUB`** -- every value + control binds to a real Crucible/Torch/Forge operation; no
