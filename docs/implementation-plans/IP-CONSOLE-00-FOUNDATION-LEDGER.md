@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN end to end) COMPLETE; F0.4 next.** (BFF is a live Crucible engine client: /readyz green vs :7878.)
+Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5 (auth) next.**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
