@@ -5,3 +5,5 @@
 // CBOR payload codec, the handshake, and the mTLS connection follow (F0.3b-2/3b-3).
 
 export * from './frame.js';
+export * from './cbor.js';
+export * from './payload.js';
