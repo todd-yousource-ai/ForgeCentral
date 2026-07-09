@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a + F0.2b + F0.3 (core) + F0.3b-1 (wire frame codec) COMPLETE; F0.3b-2 (CBOR) next, then 3b-3 (handshake+mTLS+live), then F0.4.** (The node is live locally on `:7878`, so F0.3b is being built now, before F0.4.)
+Status: **F0.1 + SC + F0.2a + F0.2b + F0.3 (core) + F0.3b-1 (frame) + F0.3b-2 (CBOR) COMPLETE; F0.3b-3 (handshake+mTLS+live) next, then F0.4.** (The node is live locally on `:7878`, so F0.3b is being built now, before F0.4.)
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -15,7 +15,7 @@ Status: **F0.1 + SC + F0.2a + F0.2b + F0.3 (core) + F0.3b-1 (wire frame codec) C
 | F0.2c | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | OPEN | -- | Remaining shells: right drawer, confirm dialog, data table, flow-graph host, charts, timeline scrubber (data-bound ones may land with their surface). |
 | F0.3 | INV-CONSOLE-NO-2ND-DB | LANDED (review) | c36528b | Stateless BFF core (`@forge/bff`): config/log/cache/seam/HTTP; no domain store. |
 | F0.3b-1 | INV-CONSOLE-WIRE-FRAME | LANDED (review) | e3c7e6f | `@forge/wire` frame codec (16-byte header + FrameType), byte-exact to crdb. |
-| F0.3b-2 | INV-CONSOLE-WIRE-CBOR | OPEN | -- | CBOR payload codec for `WireRequest`/`WireReply`, vs vectors from crdb (ciborium). |
+| F0.3b-2 | INV-CONSOLE-WIRE-CBOR | LANDED (review) | c0078f2 | Hand-rolled CBOR codec + typed `WireRequest`/`WireReply` payloads, byte-exact to crdb ciborium. |
 | F0.3b-3 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Handshake (`Hello->Ready`) + mTLS connect + correlation + a LIVE round-trip vs the local node; needs the BFF's enrolled cert (a decision). |
 | F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
@@ -43,8 +43,24 @@ dependencies**. `INV-CONSOLE-WIRE-FRAME`: 9 tests including the **exact-byte** h
 crdb's own frame test (`0x0100 / Ready / stream 7 / END_STREAM / len 3`), so the two implementations cannot
 drift. Full `scripts/ci.sh` green.
 
-**Next:** F0.3b-2 (the CBOR payload codec for `WireRequest`/`WireReply`, tested against ciborium vectors
-from crdb) and F0.3b-3 (handshake + mTLS + a live round-trip; the cert decision).
+### F0.3b-2 -- CBOR payload codec
+
+The wire payloads are CBOR (ciborium on the node). Rather than add a third-party CBOR library to the
+critical wire path, this lands a **hand-rolled, zero-dependency** codec (`src/cbor.ts`) over the exact
+subset the wire uses, plus the typed `WireRequest`/`WireReply` layer (`src/payload.ts`). `INV-CONSOLE-
+WIRE-CBOR`, proven by **byte-exact conformance to golden vectors generated from crdb's ciborium** (a
+throwaway `cdb-wire` test, since removed): 22 tests covering externally-tagged enums (single-key maps),
+struct field order, `Vec<u8>` as a CBOR array (not a byte string), 32-byte handles as int arrays, unit
+variants as bare strings, and float handling (ciborium emits minimal-form floats; the decoder accepts
+f16/f32/f64, the encoder emits f64 which the node widens). `wireValueToCbor` forces the float-typed
+`WireValue` variants (`Float`/`Vector`) to encode as floats. The write-path request variants throw a clear
+error rather than emit a wrong shape (no fabrication). `@forge/contracts` enters as a type-only dependency
+(paths for typecheck, dist for build). 31 wire tests total. Full `scripts/ci.sh` green; still zero runtime
+deps in `@forge/wire`.
+
+**Next:** F0.3b-3 -- the handshake (`Hello -> Negotiate -> Authenticate -> Ready`), the `node:tls` mTLS
+connection, `stream_id` request/reply correlation, and a **live round-trip** against the local node. This
+is where the BFF's engine identity (cert) is decided.
 
 ## F0.3 -- stateless BFF core (`@forge/bff`)
 

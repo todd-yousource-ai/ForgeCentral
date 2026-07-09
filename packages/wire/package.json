@@ -22,6 +22,9 @@
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"
   },
+  "dependencies": {
+    "@forge/contracts": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",

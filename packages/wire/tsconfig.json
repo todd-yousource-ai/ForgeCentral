@@ -1,15 +1,16 @@
 {
-  "//": "Typecheck config for @forge/wire. NodeNext ESM; DOM libs not needed. tsconfig.build.json emits dist from src.",
+  "//": "Typecheck config for @forge/wire. NodeNext ESM. @forge/contracts resolves to its source via paths (type-only import) so typecheck does not depend on build order; tsconfig.build.json resolves it from dist.",
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
     "lib": ["ES2022"],
-    "outDir": "dist",
-    "rootDir": ".",
-    "declaration": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@forge/contracts": ["../contracts/src/index.ts"]
+    }
   },
   "include": ["src", "test"]
 }
