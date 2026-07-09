@@ -25,13 +25,13 @@ import {
 const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');
 const COLOR_TOKEN_FILE = join('tokens', 'color.ts');
 
-/** Every `.ts` file under src/, as paths relative to src/. */
+/** Every `.ts`/`.tsx` file under src/, as paths relative to src/. */
 function srcFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       srcFiles(full, acc);
-    } else if (entry.name.endsWith('.ts')) {
+    } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
       acc.push(relative(srcDir, full));
     }
   }

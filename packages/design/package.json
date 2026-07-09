@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Console design system: semantic design tokens, CSS-variable theme, and WCAG contrast tooling (component shells in F0.2b).",
+  "description": "Console design system: semantic design tokens, CSS-variable theme, WCAG tooling, and React component shells.",
   "license": "LicenseRef-YouSource-Proprietary",
   "exports": {
     ".": {
@@ -22,8 +22,19 @@
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"
   },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@types/node": "^22.10.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "happy-dom": "^20.8.9",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "typescript": "^5.7.2",
     "vitest": "^3.2.6"
   }
