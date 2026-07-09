@@ -1,0 +1,12 @@
+{
+  "//": "Build config: emit dist/ from src only; @forge/contracts is type-only (erased), so no runtime dep.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "paths": {}
+  },
+  "include": ["src"]
+}
