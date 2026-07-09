@@ -10,3 +10,4 @@ export * from './payload.js';
 export * from './transport.js';
 export * from './handshake.js';
 export * from './socket-transport.js';
+export * from './dispatch.js';
