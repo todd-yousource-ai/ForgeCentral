@@ -17,6 +17,38 @@ Status: **F0.1 COMPLETE; F0.2 next.**
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
 | F0.8 | INV-CONSOLE-SHELL-3-CLICK-FRAME | OPEN | -- | SPA shell: nav + IA + drawer host + empty/loading/error/stale. |
+| SC | INV-CONSOLE-SUPPLYCHAIN-HARDENED | LANDED (review) | 734e145 | Supply-chain hardening of the gate. See the note below. |
+
+## Supply-chain hardening (SC) -- malicious-package defense on the gate
+
+A cross-cutting hardening of the now-active gate, done right after F0.1 while the tree is smallest (178
+packages, exactly one with an install script). It implements `TRD-CONSOLE-00`'s supply-chain posture and
+the AI Quality Guide Section 9 controls, hermetically (no external service in the local gate).
+
+**Delivered:**
+
+- **Install-script lockdown (deny-by-default)** -- `package.json > pnpm.onlyBuiltDependencies = ["esbuild"]`
+  so pnpm runs a lifecycle script (preinstall/install/postinstall) only for esbuild; every other package
+  is blocked (verified: emptying the allowlist makes pnpm report the ignored script). `scripts/
+  check-supply-chain.mjs` enforces the allowlist in the gate and **fails loudly** the moment any
+  non-allowlisted package in the tree carries a script (verified by a negative test: it names esbuild and
+  exits 1). This is the control that stops the recent worm-class attacks.
+- **Source pinning** -- `.npmrc` pins the registry to `registry.npmjs.org` + `verify-store-integrity=true`;
+  `check-supply-chain.mjs` additionally refuses any off-registry tarball or git/VCS source in the lockfile
+  (dependency substitution), and asserts SHA-512 integrity hashes are present. CI stays `--frozen-lockfile`.
+- **SBOM per build** -- `scripts/sbom.mjs` emits `sbom.cdx.json` (CycloneDX 1.5, 205 components) each gate
+  run from `pnpm list`; generated, not committed (gitignored, derivable from the lockfile).
+- **Policy of record** -- `DEPENDENCY-POLICY.md` gains a "Supply-chain hardening" section (threat model +
+  the controls + the runtime-containment last layer).
+
+The gate step [9] is now `audit + install-script lockdown + source pinning + licenses + SBOM`; full
+`scripts/ci.sh` green (10 steps, incl. the networked audit: no known vulnerabilities).
+
+**Recommended fast-follow (own PR):** a **release-age cooldown** (pnpm 10.4+ `minimumReleaseAge`) so a
+compromised publish is not auto-pulled before the ecosystem yanks it. It rides on a pnpm 9 -> 10 major
+bump (which also makes deny-by-default the default), so it is its own focused, verified PR rather than a
+rider here. Networked scanners (OSV-Scanner, Socket) are a CI-side addition, not part of the hermetic
+local gate.
 
 ## F0.1 -- `@forge/contracts` + workspace bring-up
 
