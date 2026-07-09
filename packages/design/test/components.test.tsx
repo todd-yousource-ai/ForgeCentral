@@ -1,0 +1,86 @@
+// packages/design/test/components.test.tsx -- F0.2b render + a11y tests for the component shells.
+//
+// Accessibility is verified through Testing Library's role/name queries and jest-dom matchers (name,
+// role, value, keyboard) rather than an axe audit: axe-core is MPL-2.0, outside the dependency allowlist
+// (DEPENDENCY-POLICY.md). Role-based assertions still enforce the ARIA contract of each shell.
+
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import { Badge, KpiCard, ScoreRing, TabStrip, scoreBand } from '../src/index.js';
+
+describe('Badge', () => {
+  it('renders its label so meaning is never conveyed by color alone', () => {
+    render(<Badge variant="critical">Deny</Badge>);
+    expect(screen.getByText('Deny')).toBeInTheDocument();
+  });
+
+  it('reflects the semantic variant as a token class (not a hex)', () => {
+    render(<Badge variant="good">Permit</Badge>);
+    expect(screen.getByText('Permit')).toHaveClass('fc-badge', 'fc-badge--good');
+  });
+});
+
+describe('ScoreRing', () => {
+  it('exposes the numeric score in its accessible name (not color alone)', () => {
+    render(<ScoreRing score={82} label="AIAgents.Trusted" />);
+    expect(screen.getByRole('img')).toHaveAccessibleName('AIAgents.Trusted: trust score 82 of 100');
+  });
+
+  it('clamps and rounds the score', () => {
+    render(<ScoreRing score={128.6} />);
+    expect(screen.getByRole('img')).toHaveAccessibleName('trust score 100 of 100');
+  });
+
+  it('bands scores by threshold (mockup: 82 good, 75 caution)', () => {
+    expect(scoreBand(82)).toBe('good');
+    expect(scoreBand(75)).toBe('caution');
+    expect(scoreBand(40)).toBe('critical');
+  });
+});
+
+describe('KpiCard', () => {
+  it('renders the label, value, and optional badge', () => {
+    render(<KpiCard label="Active VTZs" value="12" badge={{ text: 'Live', variant: 'good' }} />);
+    expect(screen.getByRole('region', { name: 'Active VTZs' })).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('Live')).toHaveClass('fc-badge--good');
+  });
+});
+
+describe('TabStrip', () => {
+  const tabs = [
+    { id: 'reflex', label: 'Trust Reflex' },
+    { id: 'oversight', label: 'Operator Oversight' },
+    { id: 'incidents', label: 'Incidents' },
+  ];
+
+  it('implements the ARIA tablist pattern with a roving tabindex', () => {
+    render(
+      <TabStrip tabs={tabs} activeId="oversight" onChange={vi.fn()} ariaLabel="AIOps sections" />,
+    );
+    expect(screen.getByRole('tablist', { name: 'AIOps sections' })).toBeInTheDocument();
+    const selected = screen.getByRole('tab', { selected: true });
+    expect(selected).toHaveAccessibleName('Operator Oversight');
+    expect(selected).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tab', { name: 'Trust Reflex' })).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('changes the active tab on click', () => {
+    const onChange = vi.fn();
+    render(
+      <TabStrip tabs={tabs} activeId="reflex" onChange={onChange} ariaLabel="AIOps sections" />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Incidents' }));
+    expect(onChange).toHaveBeenCalledWith('incidents');
+  });
+
+  it('moves selection with the Right arrow (WCAG 2.1.1), wrapping at the end', () => {
+    const onChange = vi.fn();
+    render(
+      <TabStrip tabs={tabs} activeId="incidents" onChange={onChange} ariaLabel="AIOps sections" />,
+    );
+    fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' });
+    expect(onChange).toHaveBeenCalledWith('reflex');
+  });
+});

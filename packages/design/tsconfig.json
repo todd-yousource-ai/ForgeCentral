@@ -1,15 +1,16 @@
 {
-  "//": "Typecheck config for @forge/design. Extends the strict base; NodeNext ESM. tsconfig.build.json emits dist from src.",
+  "//": "Typecheck config for @forge/design. Extends the strict base; NodeNext ESM; React JSX + DOM libs for the component shells. tsconfig.build.json emits dist from src.",
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "outDir": "dist",
     "rootDir": ".",
     "declaration": true,
     "noEmit": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "vitest.config.ts"]
 }
