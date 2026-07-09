@@ -19,7 +19,9 @@
     "build": "pnpm -r --if-present run build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check:licenses": "node scripts/check-licenses.mjs"
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "check:supply-chain": "node scripts/check-supply-chain.mjs",
+    "sbom": "node scripts/sbom.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
@@ -28,10 +30,14 @@
     "typescript-eslint": "^8.19.0"
   },
   "pnpm": {
-    "//": "Force patched transitive dev deps so `pnpm audit --audit-level=high` is clean. vitest 3.2's default resolution keeps an older vite (<=6.4.2) which carries the server.fs.deny bypass (GHSA-fx2h-pf6j-xcff) and pulls a vulnerable esbuild; vite >=6.4.3 depends on esbuild >=0.25. Dev-only (never in dist/). Revisit when vitest bumps its bundled vite.",
+    "//overrides": "Force patched transitive dev deps so `pnpm audit --audit-level=high` is clean. vitest 3.2's default resolution keeps an older vite (<=6.4.2) which carries the server.fs.deny bypass (GHSA-fx2h-pf6j-xcff) and pulls a vulnerable esbuild; vite >=6.4.3 depends on esbuild >=0.25. Dev-only (never in dist/). Revisit when vitest bumps its bundled vite.",
     "overrides": {
       "vite": "^6.4.3",
       "esbuild": "^0.25.0"
-    }
+    },
+    "//onlyBuiltDependencies": "Install-script lockdown (deny-by-default): ONLY these packages may run lifecycle scripts (preinstall/install/postinstall); pnpm blocks every other package. esbuild needs its postinstall to link the platform binary. check-supply-chain.mjs fails the gate if any non-listed package introduces a script. See DEPENDENCY-POLICY.md.",
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
