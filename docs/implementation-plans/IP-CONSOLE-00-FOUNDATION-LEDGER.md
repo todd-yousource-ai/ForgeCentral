@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a/b + F0.3 (core) + F0.3b-1/-2 + F0.3b-3a (handshake) COMPLETE; F0.3b-3b (mTLS socket + cert + live) next, then F0.4.** (The node is live locally on `:7878`, so F0.3b is being built now, before F0.4.)
+Status: **F0.1 + SC + F0.2a/b + F0.3 (core) + F0.3b-1/-2/-3a + F0.3b-3b (mTLS socket transport) COMPLETE; F0.3b-3c (cert + operation dispatch + LIVE round-trip) next, then F0.4.** (The node is live locally on `:7878`; the wire CA key is located, so the live capstone is unblocked.)
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -17,7 +17,8 @@ Status: **F0.1 + SC + F0.2a/b + F0.3 (core) + F0.3b-1/-2 + F0.3b-3a (handshake) 
 | F0.3b-1 | INV-CONSOLE-WIRE-FRAME | LANDED (review) | e3c7e6f | `@forge/wire` frame codec (16-byte header + FrameType), byte-exact to crdb. |
 | F0.3b-2 | INV-CONSOLE-WIRE-CBOR | LANDED (review) | c0078f2 | Hand-rolled CBOR codec + typed `WireRequest`/`WireReply` payloads, byte-exact to crdb ciborium. |
 | F0.3b-3a | INV-CONSOLE-WIRE-HANDSHAKE | LANDED (review) | ade2424 | Client handshake (`Hello->Negotiate->Authenticate->Ready`) over a frame-transport abstraction, byte-exact to crdb. |
-| F0.3b-3b | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | `node:tls` mTLS transport + `stream_id` correlation + minted BFF cert + static grant + a LIVE round-trip vs the local node. |
+| F0.3b-3b | INV-CONSOLE-WIRE-TRANSPORT | LANDED (review) | e1e73dd | `StreamFrameTransport` (frame reassembly over a duplex) + `connectTls` mTLS dial; handshake proven over the real framed transport. |
+| F0.3b-3c | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Operation dispatch (`QuerySubmit`/`QueryResult` + `stream_id` correlation) + minted `console-bff` cert + static grant + a LIVE round-trip vs the local node, wired behind the BFF seam. |
 | F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
@@ -70,11 +71,23 @@ Hello then Authenticate in order and to reject an out-of-order frame (5 tests; 3
 converted `FrameType` from a TS `enum` to a `const` object + union type (idiomatic; avoids the numeric-
 enum comparison pitfall when matching a raw decoded opcode). Full `scripts/ci.sh` green.
 
-**Next:** F0.3b-3b -- the concrete `node:tls` mTLS transport implementing `FrameTransport` (frame framing
-over the socket + `stream_id` request/reply correlation), the minted `console-bff` client cert + its static
-`config.agents` grant (the interim path, product-owner-approved), and a **live round-trip** against the
-local `:7878` node (`Hello -> Ready -> QuerySubmit -> real QueryRows`), then wired behind the BFF seam so
-`/readyz` goes green. Proves `INV-CONSOLE-ENGINE-AUTHZ`.
+### F0.3b-3b -- mTLS socket transport
+
+The concrete `FrameTransport` over a Node duplex byte stream (`src/socket-transport.ts`):
+`StreamFrameTransport` buffers inbound bytes and **reassembles whole frames across chunk boundaries**
+(16-byte header then `payloadLen` bytes), serializes outbound frames, and exposes the async `recv()` queue;
+`connectTls` dials the engine over mutually-authenticated TLS (`node:tls`, `rejectUnauthorized` always on).
+`INV-CONSOLE-WIRE-TRANSPORT`: 4 tests -- split-frame reassembly, two-frames-in-one-chunk, outbound
+serialization, and the **full `clientHandshake` driven end to end over the real framed transport** (an
+in-memory duplex pair). 40 wire tests total. Built-in modules only (`node:tls`/`node:stream`); still zero
+runtime deps. Full `scripts/ci.sh` green.
+
+**Next:** F0.3b-3c -- the live capstone. Operation dispatch (`QuerySubmit`/`QueryResult` over `stream_id`
+correlation); the minted `console-bff` client cert (the **wire CA key is located at `/etc/cdb/mtls/ca.key`**,
+so this is unblocked) + its static `config.agents` grant (single-tenant for the transport proof, per the
+product-owner sequencing; device-wide identity is F0.5); a **live round-trip** against the local `:7878`
+node (`Hello -> Ready -> QuerySubmit -> real QueryRows`); then wire the transport behind the BFF's
+`CrucibleClient` seam so `/readyz` goes green. Proves `INV-CONSOLE-ENGINE-AUTHZ`.
 
 ## F0.3 -- stateless BFF core (`@forge/bff`)
 
