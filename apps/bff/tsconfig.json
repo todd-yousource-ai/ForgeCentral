@@ -1,0 +1,16 @@
+{
+  "//": "Typecheck config for @forge/bff. NodeNext ESM. @forge/contracts resolves to its source via paths so typecheck/test do not depend on build order (the app imports contracts as types only in F0.3).",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@forge/contracts": ["../../packages/contracts/src/index.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}
