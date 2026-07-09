@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a/b + F0.3 (core) + F0.3b-1/-2/-3a + F0.3b-3b (mTLS socket transport) COMPLETE; F0.3b-3c (cert + operation dispatch + LIVE round-trip) next, then F0.4.** (The node is live locally on `:7878`; the wire CA key is located, so the live capstone is unblocked.)
+Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN end to end) COMPLETE; F0.4 next.** (BFF is a live Crucible engine client: /readyz green vs :7878.)
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -19,7 +19,7 @@ Status: **F0.1 + SC + F0.2a/b + F0.3 (core) + F0.3b-1/-2/-3a + F0.3b-3b (mTLS so
 | F0.3b-3a | INV-CONSOLE-WIRE-HANDSHAKE | LANDED (review) | ade2424 | Client handshake (`Hello->Negotiate->Authenticate->Ready`) over a frame-transport abstraction, byte-exact to crdb. |
 | F0.3b-3b | INV-CONSOLE-WIRE-TRANSPORT | LANDED (review) | e1e73dd | `StreamFrameTransport` (frame reassembly over a duplex) + `connectTls` mTLS dial; handshake proven over the real framed transport. |
 | F0.3b-3c | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | b7b49ee | Operation dispatch + `wireHandshake` (reactor `Hello->Ready`) + a **real round-trip against the live `:7878` node** (mTLS -> handshake -> QuerySubmit -> decoded WireReply). |
-| F0.3b-3d | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Wire the real transport behind the BFF `CrucibleClient` seam so `/readyz` goes green (monorepo runtime-dep plumbing + TLS servername config). |
+| F0.3b-3d | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 9d0736d | `WireCrucibleClient` over `@forge/wire` behind the BFF seam; the **real BFF `/readyz` returns `{ready:true}` against the live `:7878` node**. |
 | F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
