@@ -1,0 +1,25 @@
+{
+  "name": "@forge/bff",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ForgeCentral BFF: the stateless Console backend-for-frontend over the Crucible engine (mTLS :7878). Owns no domain data.",
+  "license": "LicenseRef-YouSource-Proprietary",
+  "main": "./dist/index.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@forge/contracts": "workspace:*",
+    "pino": "^9.5.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.6"
+  }
+}
