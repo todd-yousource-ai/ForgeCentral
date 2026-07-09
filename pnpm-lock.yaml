@@ -30,6 +30,9 @@ importers:
       '@forge/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@forge/wire':
+        specifier: workspace:*
+        version: link:../../packages/wire
       pino:
         specifier: ^9.5.0
         version: 9.14.0

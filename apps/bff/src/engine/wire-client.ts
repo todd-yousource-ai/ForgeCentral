@@ -1,61 +1,127 @@
-// apps/bff/src/engine/wire-client.ts -- the enrolled mTLS :7878 transport (PENDING, F0.3b).
+// apps/bff/src/engine/wire-client.ts -- the real mTLS :7878 transport (F0.3b-3d).
 //
-// This is the production `CrucibleClient`: a native TypeScript client of the Crucible wire protocol over
-// mTLS on :7878 (framing + CBOR + request/reply correlation), exactly as Torch enrolls. It is NOT yet
-// implemented: it needs (1) the crdb FRAME wire-format vendored the way the DTO payload schema was
-// vendored for @forge/contracts (an IP-CONSOLE-READINESS follow-on), (2) the BFF's own enrolled client
-// certificate (a service Principal), and (3) a live node to validate against. Those are tracked as F0.3b
-// / INV-CROSS.
-//
-// Until then the transport FAILS CLOSED: every operation throws `EngineTransportPending` -- it never
-// fabricates a result (INV-CONSOLE-NO-STUB). The BFF still runs (liveness is up); `/readyz` reports
-// not-ready because `ping` throws, which is the truthful state of a BFF with no wired transport.
+// The production `CrucibleClient`: a native client of the Crucible wire protocol over mTLS on :7878,
+// built on @forge/wire (the frame/CBOR/handshake/transport stack proven byte-exact against crdb and live
+// against the running node). It connects lazily (on the first call), completes the reactor handshake, and
+// dispatches operations; `ping` is the readiness probe (a live connection + handshake means reachable).
+
+import { readFileSync } from 'node:fs';
+
+import { type FrameTransport, connectTls, dispatch, wireHandshake } from '@forge/wire';
+import type { WireError, WireQueryRows, WireReply } from '@forge/contracts';
 
 import type { BffConfig } from '../config.js';
 import type { CrucibleClient, EngineCallOptions, EngineHandle } from './client.js';
 
-/** Thrown by the placeholder transport until the mTLS wire client lands (F0.3b). */
-export class EngineTransportPending extends Error {
-  constructor() {
-    super(
-      'engine mTLS wire transport not implemented yet (F0.3b: vendor the crdb frame format, enroll the BFF cert)',
+/** Thrown when the engine refuses an operation (a decoded `WireReply::Refused`). */
+export class EngineRefusedError extends Error {
+  constructor(readonly wireError: WireError) {
+    super(`engine refused the operation (${wireError.class}, code ${String(wireError.code)})`);
+    this.name = 'EngineRefusedError';
+  }
+}
+
+/** Establish a ready (post-handshake) transport to the engine. Injectable for tests. */
+export type EngineConnector = (config: BffConfig) => Promise<FrameTransport>;
+
+/** The production connector: mTLS dial + the reactor `Hello -> Ready` handshake. */
+async function connectEngine(config: BffConfig): Promise<FrameTransport> {
+  const transport = await connectTls({
+    host: config.engineHost,
+    port: config.enginePort,
+    ca: readFileSync(config.tlsCaPath),
+    cert: readFileSync(config.tlsCertPath),
+    key: readFileSync(config.tlsKeyPath),
+    servername: config.engineServername ?? config.engineHost,
+  });
+  await wireHandshake(transport);
+  return transport;
+}
+
+/** Map an engine `WireReply` to `WireQueryRows`, throwing a typed error on a refusal or other reply. */
+export function replyToQueryRows(reply: WireReply): WireQueryRows {
+  if (typeof reply === 'object' && 'QueryRows' in reply) return reply.QueryRows;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a query');
+}
+
+/** Reject `op` if it does not settle within `ms` (a per-call bound; every engine call is bounded). */
+async function withTimeout<T>(op: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error('engine call timed out'));
+    }, ms);
+  });
+  try {
+    return await Promise.race([op, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export class WireCrucibleClient implements CrucibleClient {
+  private transport: FrameTransport | null = null;
+
+  constructor(
+    private readonly config: BffConfig,
+    private readonly connect: EngineConnector = connectEngine,
+  ) {}
+
+  private async ensure(): Promise<FrameTransport> {
+    this.transport ??= await this.connect(this.config);
+    return this.transport;
+  }
+
+  private timeoutFor(opts?: EngineCallOptions): number {
+    return opts?.timeoutMs ?? this.config.requestTimeoutMs;
+  }
+
+  async ping(opts?: EngineCallOptions): Promise<void> {
+    // Establishing the transport completes the mTLS handshake + the wire handshake; that IS reachability.
+    await withTimeout(this.ensure(), this.timeoutFor(opts));
+  }
+
+  async querySubmit(
+    request: Parameters<CrucibleClient['querySubmit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireQueryRows> {
+    const transport = await this.ensure();
+    const reply = await withTimeout(
+      dispatch(transport, { QuerySubmit: request }),
+      this.timeoutFor(opts),
     );
-    this.name = 'EngineTransportPending';
+    return replyToQueryRows(reply);
+  }
+
+  async cursorFetch(handle: EngineHandle, opts?: EngineCallOptions): Promise<WireQueryRows> {
+    const transport = await this.ensure();
+    const reply = await withTimeout(
+      dispatch(transport, { CursorFetch: { handle: [...handle] } }),
+      this.timeoutFor(opts),
+    );
+    return replyToQueryRows(reply);
+  }
+
+  async cursorClose(handle: EngineHandle, opts?: EngineCallOptions): Promise<void> {
+    const transport = await this.ensure();
+    await withTimeout(
+      dispatch(transport, { CursorClose: { handle: [...handle] } }),
+      this.timeoutFor(opts),
+    );
+  }
+
+  async close(): Promise<void> {
+    if (this.transport) {
+      const transport = this.transport;
+      this.transport = null;
+      await transport.close();
+    }
   }
 }
 
-/** The placeholder transport: fail-closed on every call. Replaced by the real wire client in F0.3b. */
-export class PendingWireClient implements CrucibleClient {
-  // The config is retained so the F0.3b implementation swaps in without changing the construction site.
-  constructor(private readonly config: BffConfig) {}
-
-  ping(_opts?: EngineCallOptions): Promise<void> {
-    return Promise.reject(new EngineTransportPending());
-  }
-
-  querySubmit(_request: unknown, _opts?: EngineCallOptions): Promise<never> {
-    return Promise.reject(new EngineTransportPending());
-  }
-
-  cursorFetch(_handle: EngineHandle, _opts?: EngineCallOptions): Promise<never> {
-    return Promise.reject(new EngineTransportPending());
-  }
-
-  cursorClose(_handle: EngineHandle, _opts?: EngineCallOptions): Promise<never> {
-    return Promise.reject(new EngineTransportPending());
-  }
-
-  close(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  /** The engine host:port this transport will connect to once implemented (F0.3b). */
-  endpoint(): string {
-    return `${this.config.engineHost}:${String(this.config.enginePort)}`;
-  }
-}
-
-/** Construct the engine client from config. Returns the F0.3b transport (currently the pending one). */
+/** Construct the engine client from config (the real mTLS wire transport). */
 export function createEngineClient(config: BffConfig): CrucibleClient {
-  return new PendingWireClient(config);
+  return new WireCrucibleClient(config);
 }
