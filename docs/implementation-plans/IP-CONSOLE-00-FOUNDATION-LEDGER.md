@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a + F0.2b COMPLETE; F0.3 next (F0.2c carries the remaining shells).**
+Status: **F0.1 + SC + F0.2a + F0.2b + F0.3 (core) COMPLETE; F0.4 next (F0.3b transport + F0.2c shells tracked).**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -13,13 +13,48 @@ Status: **F0.1 + SC + F0.2a + F0.2b COMPLETE; F0.3 next (F0.2c carries the remai
 | F0.2a | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | LANDED (review) | f42331d | Design-token foundation (`@forge/design`): tokens + CSS theme + WCAG contrast tests. |
 | F0.2b | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | LANDED (review) | 8ca5ff6 | React harness + core primitives (Badge/ScoreRing/KpiCard/TabStrip). |
 | F0.2c | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | OPEN | -- | Remaining shells: right drawer, confirm dialog, data table, flow-graph host, charts, timeline scrubber (data-bound ones may land with their surface). |
-| F0.3 | INV-CONSOLE-NO-2ND-DB | OPEN | -- | Stateless BFF core over mTLS `:7878`; no domain store. |
+| F0.3 | INV-CONSOLE-NO-2ND-DB | LANDED (review) | c36528b | Stateless BFF core (`@forge/bff`): config/log/cache/seam/HTTP; no domain store. |
+| F0.3b | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | The enrolled mTLS `:7878` wire transport (frame codec + CBOR + cert); needs vendored crdb frame spec + a live node. |
 | F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
 | F0.8 | INV-CONSOLE-SHELL-3-CLICK-FRAME | OPEN | -- | SPA shell: nav + IA + drawer host + empty/loading/error/stale. |
 | SC | INV-CONSOLE-SUPPLYCHAIN-HARDENED | LANDED (review) | 734e145 | Supply-chain hardening of the gate. See the note below. |
+
+## F0.3 -- stateless BFF core (`@forge/bff`)
+
+The first `apps/` deployable: the stateless backend-for-frontend that will broker the Console's reads and
+commands to Crucible over mTLS `:7878`. It owns **no domain data** (INV-CONSOLE-NO-2ND-DB). This PR is the
+transport-agnostic core; the concrete wire transport is F0.3b.
+
+**Delivered:**
+
+- **Config** (`src/config.ts`) -- validated at startup with **zod**, **fail-closed**; the mTLS material
+  (CA + enrolled client cert + key) is required. Errors name the offending field, never the value.
+- **Logging** (`src/log.ts`) -- **pino** structured JSON with central secret redaction (tokens / keys /
+  passwords / authorization always censored).
+- **Engine seam** (`src/engine/client.ts`) -- the typed `CrucibleClient` boundary over `@forge/contracts`;
+  every call takes a timeout / `AbortSignal`. Handlers and tests depend on the interface, not a transport.
+- **Ephemeral cache** (`src/cache.ts`) -- in-memory, **version-tagged** (a newer engine version
+  invalidates), **bounded** (oldest evicted), short TTL; a `Clock` is injected for deterministic tests.
+- **HTTP surface** (`src/server.ts`, `node:http`) -- `/healthz`, `/readyz` (probes the engine through the
+  seam under the timeout), `/openapi.json` (the OpenAPI 3.1 skeleton). Constructed from injected deps, so
+  it is unit-testable over a mock seam.
+
+**Invariant `INV-CONSOLE-NO-2ND-DB`** proven structurally: the BFF declares no database / ORM / external-
+store dependency and ships no migrations (a test enforces both); its only state is the ephemeral cache.
+18 tests (config fail-closed, cache TTL/version/bound, HTTP surface over a mock seam, secret redaction,
+no-2nd-DB). Full `scripts/ci.sh` green (audit clean; zod/pino carry no install scripts). The monorepo type
+resolution: the app resolves `@forge/contracts` from its source for typecheck (paths, no build-order
+dependency; the import is type-only) and from its built dist for the emit (pnpm `-r` builds contracts first).
+
+**Deferred -- F0.3b, the mTLS `:7878` wire transport (INV-CROSS).** `src/engine/wire-client.ts` is a
+fail-closed placeholder: every call rejects with `EngineTransportPending` (it never fabricates a result,
+INV-CONSOLE-NO-STUB), so `/readyz` truthfully reports not-ready. The real transport needs (1) the crdb
+**frame** wire-format vendored the way the DTO payload schema already is in `@forge/contracts` (an
+IP-CONSOLE-READINESS follow-on), (2) the BFF's **enrolled client certificate** (a service Principal), and
+(3) a **live node** to validate. It carries `INV-CONSOLE-ENGINE-AUTHZ` (the brokered, authorized seam).
 
 ## F0.2b -- React component shells (harness + core primitives)
 
