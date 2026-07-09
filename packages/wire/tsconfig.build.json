@@ -1,0 +1,10 @@
+{
+  "//": "Build config: emit dist/ from src only; tests excluded.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,15 @@
+{
+  "//": "Typecheck config for @forge/wire. NodeNext ESM; DOM libs not needed. tsconfig.build.json emits dist from src.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "outDir": "dist",
+    "rootDir": ".",
+    "declaration": true,
+    "noEmit": true
+  },
+  "include": ["src", "test"]
+}
