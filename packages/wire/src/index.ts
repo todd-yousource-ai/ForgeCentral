@@ -9,3 +9,4 @@ export * from './cbor.js';
 export * from './payload.js';
 export * from './transport.js';
 export * from './handshake.js';
+export * from './socket-transport.js';
