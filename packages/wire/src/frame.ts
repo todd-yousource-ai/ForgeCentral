@@ -30,43 +30,50 @@ export const Flags = {
 /** The mask of flags this implementation understands; any other bit set is a framing error. */
 export const KNOWN_FLAGS = Flags.END_STREAM | Flags.MORE | Flags.COMPRESSED;
 
-/** Frame opcodes, matching `cdb-wire` `FrameType` (crates/cdb-wire/src/frame.rs) exactly. */
-export enum FrameType {
-  Hello = 0x0001,
-  Negotiate = 0x0002,
-  Authenticate = 0x0003,
-  Ready = 0x0004,
-  Ping = 0x0005,
-  Pong = 0x0006,
-  FlowCredit = 0x0007,
-  ResetStream = 0x0008,
-  GoAway = 0x0009,
-  Error = 0x000a,
-  QuerySubmit = 0x0010,
-  QueryResult = 0x0011,
-  CursorFetch = 0x0012,
-  CursorClose = 0x0013,
-  TxnBegin = 0x0014,
-  TxnCommit = 0x0015,
-  TxnAbort = 0x0016,
-  CommitStatus = 0x0017,
-  AgentRequest = 0x0020,
-  AgentResponse = 0x0021,
-  SecuritySearchSubmit = 0x0022,
-  SecuritySearchResult = 0x0023,
-  FindingFetch = 0x0024,
-  FindingResult = 0x0025,
-  CognitionRequest = 0x0026,
-  CognitionResponse = 0x0027,
-  OtlpExport = 0x0028,
-  OtlpAck = 0x0029,
-  EnrollSubmit = 0x002a,
-  EnrollResult = 0x002b,
-  EnrollIdentityOffer = 0x002c,
-  EnrollIdentityResult = 0x002d,
-  StreamSubscribe = 0x0030,
-  StreamEvent = 0x0031,
-}
+/**
+ * Frame opcodes, matching `cdb-wire` `FrameType` (crates/cdb-wire/src/frame.rs) exactly. A `const`
+ * object (not a TS `enum`) so a raw decoded wire opcode (a `number`) can be compared to an opcode without
+ * the unsafe-enum-comparison pitfalls of numeric enums.
+ */
+export const FrameType = {
+  Hello: 0x0001,
+  Negotiate: 0x0002,
+  Authenticate: 0x0003,
+  Ready: 0x0004,
+  Ping: 0x0005,
+  Pong: 0x0006,
+  FlowCredit: 0x0007,
+  ResetStream: 0x0008,
+  GoAway: 0x0009,
+  Error: 0x000a,
+  QuerySubmit: 0x0010,
+  QueryResult: 0x0011,
+  CursorFetch: 0x0012,
+  CursorClose: 0x0013,
+  TxnBegin: 0x0014,
+  TxnCommit: 0x0015,
+  TxnAbort: 0x0016,
+  CommitStatus: 0x0017,
+  AgentRequest: 0x0020,
+  AgentResponse: 0x0021,
+  SecuritySearchSubmit: 0x0022,
+  SecuritySearchResult: 0x0023,
+  FindingFetch: 0x0024,
+  FindingResult: 0x0025,
+  CognitionRequest: 0x0026,
+  CognitionResponse: 0x0027,
+  OtlpExport: 0x0028,
+  OtlpAck: 0x0029,
+  EnrollSubmit: 0x002a,
+  EnrollResult: 0x002b,
+  EnrollIdentityOffer: 0x002c,
+  EnrollIdentityResult: 0x002d,
+  StreamSubscribe: 0x0030,
+  StreamEvent: 0x0031,
+} as const;
+
+/** A frame opcode value (one of the `FrameType` constants). */
+export type FrameType = (typeof FrameType)[keyof typeof FrameType];
 
 /** The parsed wire header. `reserved` is always 0 on the wire; it is not part of the friendly API. */
 export interface FrameHeader {
