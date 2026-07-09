@@ -2,5 +2,5 @@
 #   packages/*  -- shared libraries (e.g. @forge/contracts, the design system, the query layer)
 #   apps/*      -- the deployables (the BFF, the web SPA)
 packages:
-  - "packages/*"
-  - "apps/*"
+  - 'packages/*'
+  - 'apps/*'
