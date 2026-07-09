@@ -29,3 +29,6 @@ test-results/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# generated build artifacts
+sbom.cdx.json

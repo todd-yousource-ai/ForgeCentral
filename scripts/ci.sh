@@ -80,13 +80,15 @@ else
     echo "==> [8] e2e SKIPPED (--skip-e2e / --skip-net)"
 fi
 
-echo "==> [9] supply chain (dependency audit + license allowlist)"
+echo "==> [9] supply chain (audit + install-script lockdown + source pinning + licenses + SBOM)"
 if [ "$skip_net" = "false" ]; then
     pnpm audit --audit-level=high
 else
     echo "    dependency audit skipped (--skip-net; the advisory DB needs network)"
 fi
+pnpm run check:supply-chain
 pnpm run check:licenses
+pnpm run sbom
 
 echo "==> [10] build"
 pnpm run build

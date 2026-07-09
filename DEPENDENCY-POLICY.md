@@ -34,7 +34,44 @@ new license requires an explicit, reviewed addition to both.
 DB). High/critical advisories fail the gate. Remediation deadlines follow CRAFTED standards: Critical
 24h, High 7 days, Medium 30 days.
 
+## Supply-chain hardening (malicious-package defense)
+
+`pnpm audit` catches _disclosed_ CVEs; it does nothing against a _malicious_ package (a typosquat, a
+compromised maintainer release, a self-replicating install-script worm). Those need a different layer.
+The controlling principle: **you cannot prove 100+ transitive packages safe -- you shrink what must be
+trusted, block what code may run, pin every source, and make compromise detectable.**
+
+- **Near-zero runtime surface.** The Console _ships_ only its own code: `dependencies` is empty across the
+  workspace; every third-party package is a `devDependency` (build/test tooling) that never runs in the
+  deployed BFF or SPA (`dist/` is our code only). Keep it that way -- every new runtime `dependencies`
+  entry is a review event. This is the single biggest lever: a compromised dev tool can poison a build,
+  but it is not code running in production.
+- **Install-script lockdown (deny-by-default).** Lifecycle scripts (preinstall/install/postinstall) are
+  the primary worm vector. pnpm runs a lifecycle script only for packages listed in
+  `package.json > pnpm.onlyBuiltDependencies`; every other package is blocked. The allowlist is currently
+  `["esbuild"]` (it links its platform binary). `scripts/check-supply-chain.mjs` fails the gate the moment
+  any non-allowlisted package in the tree carries a script, so a poisoned update cannot smuggle an install
+  payload in. Extend the allowlist only after reviewing why the tool needs to execute on install.
+- **Source pinning + integrity.** `.npmrc` pins the registry to `https://registry.npmjs.org/` and sets
+  `verify-store-integrity=true`; the committed lockfile carries a SHA-512 content hash per package and CI
+  installs `--frozen-lockfile`. `check-supply-chain.mjs` additionally refuses any off-registry tarball or
+  git/VCS dependency source in the lockfile (dependency-substitution defense).
+- **SBOM per build.** `scripts/sbom.mjs` emits `sbom.cdx.json` (CycloneDX 1.5) from the installed tree
+  each gate run, so a newly disclosed CVE maps to "are we affected?" immediately. It is generated, not
+  committed (derivable from the lockfile).
+
+**Recommended next hardening (own PR): a release-age cooldown.** The recent worms were auto-pulled within
+hours of a compromised publish. pnpm 10.4+ `minimumReleaseAge` refuses to install a version newer than N
+days, so the ecosystem yanks a bad release before it reaches us. This rides on a pnpm 9 -> 10 major bump
+(which also makes install-script deny-by-default the default) and belongs in its own focused, verified PR.
+
+Networked scanners beyond `pnpm audit` (OSV-Scanner for broad advisory coverage; a behavioral scanner
+such as Socket for obfuscation / unexpected network+filesystem / typosquat detection) are a CI-side
+addition; they are not wired into the hermetic local gate.
+
 ## SBOM and signing (from the first release build)
 
-An SBOM (CycloneDX) is produced per release artifact and stored with it; release artifacts are signed and
-verified at deploy. Container images do not run as root and bake no secrets.
+An SBOM (CycloneDX) is produced per build (`scripts/sbom.mjs`, above) and per release artifact and stored
+with it; release artifacts are signed and verified at deploy. Container images do not run as root and bake
+no secrets. Runtime containment (the deployed BFF reaches only `:7878` mTLS, the IdP, and the browser;
+unexpected egress is blocked) is the last layer, owned by the deploy + admin-plane work.
