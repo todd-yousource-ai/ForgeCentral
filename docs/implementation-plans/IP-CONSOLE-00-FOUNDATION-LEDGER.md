@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a + F0.2b + F0.3 (core) + F0.3b-1 (frame) + F0.3b-2 (CBOR) COMPLETE; F0.3b-3 (handshake+mTLS+live) next, then F0.4.** (The node is live locally on `:7878`, so F0.3b is being built now, before F0.4.)
+Status: **F0.1 + SC + F0.2a/b + F0.3 (core) + F0.3b-1/-2 + F0.3b-3a (handshake) COMPLETE; F0.3b-3b (mTLS socket + cert + live) next, then F0.4.** (The node is live locally on `:7878`, so F0.3b is being built now, before F0.4.)
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -16,7 +16,8 @@ Status: **F0.1 + SC + F0.2a + F0.2b + F0.3 (core) + F0.3b-1 (frame) + F0.3b-2 (C
 | F0.3 | INV-CONSOLE-NO-2ND-DB | LANDED (review) | c36528b | Stateless BFF core (`@forge/bff`): config/log/cache/seam/HTTP; no domain store. |
 | F0.3b-1 | INV-CONSOLE-WIRE-FRAME | LANDED (review) | e3c7e6f | `@forge/wire` frame codec (16-byte header + FrameType), byte-exact to crdb. |
 | F0.3b-2 | INV-CONSOLE-WIRE-CBOR | LANDED (review) | c0078f2 | Hand-rolled CBOR codec + typed `WireRequest`/`WireReply` payloads, byte-exact to crdb ciborium. |
-| F0.3b-3 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Handshake (`Hello->Ready`) + mTLS connect + correlation + a LIVE round-trip vs the local node; needs the BFF's enrolled cert (a decision). |
+| F0.3b-3a | INV-CONSOLE-WIRE-HANDSHAKE | LANDED (review) | ade2424 | Client handshake (`Hello->Negotiate->Authenticate->Ready`) over a frame-transport abstraction, byte-exact to crdb. |
+| F0.3b-3b | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | `node:tls` mTLS transport + `stream_id` correlation + minted BFF cert + static grant + a LIVE round-trip vs the local node. |
 | F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
@@ -58,9 +59,22 @@ error rather than emit a wrong shape (no fabrication). `@forge/contracts` enters
 (paths for typecheck, dist for build). 31 wire tests total. Full `scripts/ci.sh` green; still zero runtime
 deps in `@forge/wire`.
 
-**Next:** F0.3b-3 -- the handshake (`Hello -> Negotiate -> Authenticate -> Ready`), the `node:tls` mTLS
-connection, `stream_id` request/reply correlation, and a **live round-trip** against the local node. This
-is where the BFF's engine identity (cert) is decided.
+### F0.3b-3a -- client handshake
+
+The client handshake, a faithful port of crdb `cdb_agent::client_handshake`: `Hello (CBOR ClientHello) ->
+recv Negotiate (CBOR Negotiated) -> Authenticate (empty payload; the identity is the mTLS cert, not a
+field) -> recv Ready`. Written over a `FrameTransport` abstraction (`src/transport.ts`) so the handshake
+logic is unit-tested over an in-memory transport, no socket required. `INV-CONSOLE-WIRE-HANDSHAKE`: the
+`ClientHello`/`Negotiated` CBOR is byte-exact to crdb ciborium vectors, and the driver is proven to send
+Hello then Authenticate in order and to reject an out-of-order frame (5 tests; 36 wire tests total). Also
+converted `FrameType` from a TS `enum` to a `const` object + union type (idiomatic; avoids the numeric-
+enum comparison pitfall when matching a raw decoded opcode). Full `scripts/ci.sh` green.
+
+**Next:** F0.3b-3b -- the concrete `node:tls` mTLS transport implementing `FrameTransport` (frame framing
+over the socket + `stream_id` request/reply correlation), the minted `console-bff` client cert + its static
+`config.agents` grant (the interim path, product-owner-approved), and a **live round-trip** against the
+local `:7878` node (`Hello -> Ready -> QuerySubmit -> real QueryRows`), then wired behind the BFF seam so
+`/readyz` goes green. Proves `INV-CONSOLE-ENGINE-AUTHZ`.
 
 ## F0.3 -- stateless BFF core (`@forge/bff`)
 

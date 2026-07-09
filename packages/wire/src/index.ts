@@ -7,3 +7,5 @@
 export * from './frame.js';
 export * from './cbor.js';
 export * from './payload.js';
+export * from './transport.js';
+export * from './handshake.js';
