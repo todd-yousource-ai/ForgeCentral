@@ -19,6 +19,8 @@ const ConfigSchema = z.object({
   tlsCertPath: z.string().min(1),
   /** Path to the BFF client private key. */
   tlsKeyPath: z.string().min(1),
+  /** The name to verify in the engine's server certificate (defaults to the engine host). */
+  engineServername: z.string().min(1).optional(),
   /** The port the BFF's own HTTP surface listens on. */
   httpPort: z.coerce.number().int().positive().default(8787),
   /** Log level. */
@@ -50,6 +52,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     tlsCaPath: env['FC_TLS_CA'],
     tlsCertPath: env['FC_TLS_CERT'],
     tlsKeyPath: env['FC_TLS_KEY'],
+    engineServername: env['FC_ENGINE_SERVERNAME'],
     httpPort: env['FC_HTTP_PORT'],
     logLevel: env['FC_LOG_LEVEL'],
     cacheTtlMs: env['FC_CACHE_TTL_MS'],

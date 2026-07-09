@@ -9,8 +9,9 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@forge/contracts": ["../../packages/contracts/src/index.ts"]
+      "@forge/contracts": ["../../packages/contracts/src/index.ts"],
+      "@forge/wire": ["../../packages/wire/src/index.ts"]
     }
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "vitest.config.ts"]
 }
