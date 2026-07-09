@@ -5,12 +5,13 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 COMPLETE; F0.2 next.**
+Status: **F0.1 + SC + F0.2a COMPLETE; F0.2b next.**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
 | F0.1 | INV-CONSOLE-CONTRACTS-SINGLE-SOURCE | LANDED (review) | a738517 | `@forge/contracts` + the workspace bring-up. See the note below. |
-| F0.2 | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | OPEN | -- | Design-system package (tokens + component shells). |
+| F0.2a | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | LANDED (review) | f42331d | Design-token foundation (`@forge/design`): tokens + CSS theme + WCAG contrast tests. |
+| F0.2b | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | OPEN | -- | React component shells built on the tokens (isolated-render + a11y). |
 | F0.3 | INV-CONSOLE-NO-2ND-DB | OPEN | -- | Stateless BFF core over mTLS `:7878`; no domain store. |
 | F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
@@ -18,6 +19,29 @@ Status: **F0.1 COMPLETE; F0.2 next.**
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
 | F0.8 | INV-CONSOLE-SHELL-3-CLICK-FRAME | OPEN | -- | SPA shell: nav + IA + drawer host + empty/loading/error/stale. |
 | SC | INV-CONSOLE-SUPPLYCHAIN-HARDENED | LANDED (review) | 734e145 | Supply-chain hardening of the gate. See the note below. |
+
+## F0.2a -- design-token foundation (`@forge/design`)
+
+The first half of the design system (`TRD-CONSOLE-00` Section 6), split from F0.2 so it lands without
+introducing React (that arrives with the component shells in F0.2b). Pure TypeScript, **zero runtime
+dependencies** (the Console still ships only its own code).
+
+**Delivered:**
+
+- **Semantic color tokens** (`src/tokens/color.ts`) -- surfaces, brand, flow lanes, score/status, and
+  text, keyed by MEANING and reproducing Section 6.1's dark-theme palette. This is the ONE file permitted
+  to hold a color hex literal.
+- **Scale tokens** (`src/tokens/scale.ts`) -- spacing (4px base), radius, typography, elevation, motion.
+- **CSS-variable theme** (`src/css.ts`) -- `tokensToCss()` projects the tokens to a `:root { --fc-...: ; }`
+  block, so styles bind `var(--fc-color-status-good)` rather than a value (the token module stays the
+  single source, same generate-from-one-source discipline as the wire codegen).
+- **WCAG contrast tooling** (`src/contrast.ts`) -- the WCAG 2.1 contrast ratio, making Section 6.4's
+  accessibility claim testable.
+
+**Invariant `INV-CONSOLE-DESIGN-SEMANTIC-COLOR`**, proven by 4 tier-1 tests: a hex scan asserting no
+`src/` file other than the color token module contains a color hex literal (a hand-picked hex in a
+component will fail it); the WCAG assertions (primary/muted text >= 4.5:1 on every surface, each
+flow/status accent >= 3:1 on the canvas); and CSS-variable generation. Full `scripts/ci.sh` green.
 
 ## Supply-chain hardening (SC) -- malicious-package defense on the gate
 

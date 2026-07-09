@@ -37,6 +37,18 @@ importers:
         specifier: ^3.2.6
         version: 3.2.7(@types/node@22.20.1)
 
+  packages/design:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.7(@types/node@22.20.1)
+
 packages:
 
   '@esbuild/aix-ppc64@0.25.12':
