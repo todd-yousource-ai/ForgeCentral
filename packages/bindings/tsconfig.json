@@ -1,0 +1,16 @@
+{
+  "//": "Typecheck config for @forge/bindings. NodeNext ESM. @forge/contracts resolves to source via paths (type-only import) so typecheck does not depend on build order.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@forge/contracts": ["../contracts/src/index.ts"]
+    }
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

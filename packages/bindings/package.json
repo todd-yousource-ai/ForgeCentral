@@ -1,0 +1,32 @@
+{
+  "name": "@forge/bindings",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Console binding registry (the no-stub contract) + its enforcement (INV-CONSOLE-NO-STUB).",
+  "license": "LicenseRef-YouSource-Proprietary",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:contract": "vitest run",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@forge/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.6"
+  }
+}

@@ -50,6 +50,19 @@ importers:
         specifier: ^3.2.6
         version: 3.2.7(@types/node@22.20.1)(happy-dom@20.10.6)
 
+  packages/bindings:
+    dependencies:
+      '@forge/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.7(@types/node@22.20.1)(happy-dom@20.10.6)
+
   packages/contracts:
     devDependencies:
       '@types/node':
