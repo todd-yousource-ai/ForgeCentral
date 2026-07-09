@@ -5,13 +5,14 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a COMPLETE; F0.2b next.**
+Status: **F0.1 + SC + F0.2a + F0.2b COMPLETE; F0.3 next (F0.2c carries the remaining shells).**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
 | F0.1 | INV-CONSOLE-CONTRACTS-SINGLE-SOURCE | LANDED (review) | a738517 | `@forge/contracts` + the workspace bring-up. See the note below. |
 | F0.2a | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | LANDED (review) | f42331d | Design-token foundation (`@forge/design`): tokens + CSS theme + WCAG contrast tests. |
-| F0.2b | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | OPEN | -- | React component shells built on the tokens (isolated-render + a11y). |
+| F0.2b | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | LANDED (review) | 8ca5ff6 | React harness + core primitives (Badge/ScoreRing/KpiCard/TabStrip). |
+| F0.2c | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | OPEN | -- | Remaining shells: right drawer, confirm dialog, data table, flow-graph host, charts, timeline scrubber (data-bound ones may land with their surface). |
 | F0.3 | INV-CONSOLE-NO-2ND-DB | OPEN | -- | Stateless BFF core over mTLS `:7878`; no domain store. |
 | F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
@@ -19,6 +20,39 @@ Status: **F0.1 + SC + F0.2a COMPLETE; F0.2b next.**
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
 | F0.8 | INV-CONSOLE-SHELL-3-CLICK-FRAME | OPEN | -- | SPA shell: nav + IA + drawer host + empty/loading/error/stale. |
 | SC | INV-CONSOLE-SUPPLYCHAIN-HARDENED | LANDED (review) | 734e145 | Supply-chain hardening of the gate. See the note below. |
+
+## F0.2b -- React component shells (harness + core primitives)
+
+The second half of the design system: the React rendering + accessibility test harness, and the core
+presentational primitives built on the F0.2a tokens.
+
+**Delivered:**
+
+- **First runtime dependency**: React enters as a **peerDependency** of `@forge/design` (react /
+  react-dom `^19`); the SPA app (F0.8) declares the concrete runtime dep. The build now compiles `.tsx`.
+- **Test harness**: Vitest + **happy-dom** + **Testing Library** (`vitest.config.ts` env + `test/setup.ts`
+  jest-dom matchers + auto-cleanup). All MIT.
+- **Core primitives** (`src/components/`): `Badge` (status/chip, color by semantic variant, label always
+  present so meaning is never color-alone), `ScoreRing` (0-100 trust score banded green/amber/red via SVG,
+  score in the accessible name), `KpiCard` (dashboard metric + optional badge), `TabStrip` (ARIA tablist:
+  `role`, `aria-selected`, roving `tabindex`, Left/Right/Home/End keys).
+- **Component stylesheet** (`src/styles.ts`, `componentStyles()`) -- the components' look as a CSS string
+  over the `--fc-*` variables; **no color literal in any component or the stylesheet** (the hex-scan test
+  now covers `.tsx` too), so INV-CONSOLE-DESIGN-SEMANTIC-COLOR holds across the components.
+
+**Tests:** 13 (4 token + 9 component). Accessibility is verified via Testing Library role/name/keyboard
+assertions. Full `scripts/ci.sh` green; `happy-dom` pinned to `^20.8.9` (16.x carried a critical
+VM-escape RCE, GHSA; dev-only but the audit gate flagged it).
+
+**Scope decisions (recorded honestly):**
+
+- **a11y via role-based assertions, not axe.** `axe-core` is MPL-2.0, outside the dependency allowlist
+  (DEPENDENCY-POLICY.md). Testing Library's role/name/value queries enforce each shell's ARIA contract; a
+  full axe audit is deferred unless the license position changes.
+- **Remaining shells deferred to F0.2c / their surface.** The data-bound and complex components (virtualized
+  data table, flow-graph host, chart primitives, timeline scrubber) are best built with the real data
+  contract of their first consuming surface; the remaining overlays (right drawer, confirm dialog) follow in
+  F0.2c. Building them speculatively now would be shells without a consumer.
 
 ## F0.2a -- design-token foundation (`@forge/design`)
 
