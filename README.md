@@ -32,6 +32,15 @@ The design is a TRD suite in [`docs/spec/`](docs/spec/SUITE.md):
 - [`TRD-CONSOLE-01`](docs/spec/TRD-CONSOLE-01-overview.md) -- the live connectivity graph (home).
 - `TRD-CONSOLE-02..12` -- the remaining surfaces (see the suite index).
 
+## Implementation plans
+
+Plans live in [`docs/implementation-plans/`](docs/implementation-plans/). **An IP is named for the TRD it
+implements**: an IP for `TRD-CONSOLE-NN` is `IP-CONSOLE-NN-<slug>.md`, so every plan traces to its spec
+(e.g. [`IP-CONSOLE-00-FOUNDATION`](docs/implementation-plans/IP-CONSOLE-00-FOUNDATION.md) implements
+`TRD-CONSOLE-00`). The suite roadmap
+[`IP-CONSOLE-ROADMAP`](docs/implementation-plans/IP-CONSOLE-ROADMAP.md) is the one exception -- it indexes
+the whole suite, not a single TRD.
+
 ## Engineering standards
 
 TypeScript/Node standards live in [`docs/standards/`](docs/standards/) -- the counterparts of the engine

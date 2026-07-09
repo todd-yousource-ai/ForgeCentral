@@ -113,6 +113,14 @@ Larger efforts are organized as implementation plans (IPs) under `docs/implement
 when the first one lands), mirroring the engine repos. Deferred work is recorded honestly with the
 gating dependency named, never as a silent stub.
 
+**IP file names MUST start with the number of the TRD they implement**, so every plan traces to its spec
+and the IP-to-TRD mapping is unambiguous. An IP that implements `TRD-CONSOLE-NN` is named
+`IP-CONSOLE-NN-<slug>.md`, and its landing ledger is `IP-CONSOLE-NN-<slug>-LEDGER.md` (e.g.
+`IP-CONSOLE-00-FOUNDATION.md` implements `TRD-CONSOLE-00`). A TRD may have more than one IP; they all
+share the `IP-CONSOLE-NN-` prefix. The **only** exception is the suite roadmap `IP-CONSOLE-ROADMAP.md`,
+which indexes the whole TRD suite rather than a single TRD. A cross-repo pre-req IP that lives in another
+repo (e.g. a crdb engine IP the Console depends on) follows that repo's naming, not this rule.
+
 ## Commit message format
 
 `<type>(<scope>): <imperative summary>` (types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`,
