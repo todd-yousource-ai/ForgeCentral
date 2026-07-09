@@ -18,7 +18,8 @@ Status: **F0.1 + SC + F0.2a/b + F0.3 (core) + F0.3b-1/-2/-3a + F0.3b-3b (mTLS so
 | F0.3b-2 | INV-CONSOLE-WIRE-CBOR | LANDED (review) | c0078f2 | Hand-rolled CBOR codec + typed `WireRequest`/`WireReply` payloads, byte-exact to crdb ciborium. |
 | F0.3b-3a | INV-CONSOLE-WIRE-HANDSHAKE | LANDED (review) | ade2424 | Client handshake (`Hello->Negotiate->Authenticate->Ready`) over a frame-transport abstraction, byte-exact to crdb. |
 | F0.3b-3b | INV-CONSOLE-WIRE-TRANSPORT | LANDED (review) | e1e73dd | `StreamFrameTransport` (frame reassembly over a duplex) + `connectTls` mTLS dial; handshake proven over the real framed transport. |
-| F0.3b-3c | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Operation dispatch (`QuerySubmit`/`QueryResult` + `stream_id` correlation) + minted `console-bff` cert + static grant + a LIVE round-trip vs the local node, wired behind the BFF seam. |
+| F0.3b-3c | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | b7b49ee | Operation dispatch + `wireHandshake` (reactor `Hello->Ready`) + a **real round-trip against the live `:7878` node** (mTLS -> handshake -> QuerySubmit -> decoded WireReply). |
+| F0.3b-3d | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Wire the real transport behind the BFF `CrucibleClient` seam so `/readyz` goes green (monorepo runtime-dep plumbing + TLS servername config). |
 | F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
