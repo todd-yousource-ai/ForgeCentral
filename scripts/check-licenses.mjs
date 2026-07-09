@@ -39,12 +39,16 @@ function normalize(license) {
 
 let raw;
 try {
-  raw = execFileSync('pnpm', ['licenses', 'list', '--json', '--prod', '--dev'], {
+  // `pnpm licenses list --json` already covers prod + dev; the explicit `--prod --dev` pair confuses
+  // pnpm 9.15 into "No licenses in packages found" (non-JSON), so do not pass them.
+  raw = execFileSync('pnpm', ['licenses', 'list', '--json'], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'inherit'],
   });
 } catch (err) {
-  console.error('check-licenses: failed to read `pnpm licenses list --json`. Run `pnpm install` first.');
+  console.error(
+    'check-licenses: failed to read `pnpm licenses list --json`. Run `pnpm install` first.',
+  );
   process.exit(1);
 }
 
@@ -69,8 +73,12 @@ if (offenders.length > 0) {
   for (const o of offenders) {
     console.error(`  ${o.license}: ${o.names}`);
   }
-  console.error('Only Apache-2.0/MIT/BSD/ISC/Unicode-family are permitted; AGPL/GPL are prohibited.');
-  console.error('See DEPENDENCY-POLICY.md. Replace the dependency or add a reviewed allowlist entry.');
+  console.error(
+    'Only Apache-2.0/MIT/BSD/ISC/Unicode-family are permitted; AGPL/GPL are prohibited.',
+  );
+  console.error(
+    'See DEPENDENCY-POLICY.md. Replace the dependency or add a reviewed allowlist entry.',
+  );
   process.exit(1);
 }
 

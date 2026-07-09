@@ -12,7 +12,7 @@
   "scripts": {
     "gate": "bash scripts/ci.sh",
     "typecheck": "pnpm -r --if-present run typecheck",
-    "lint": "pnpm -r --if-present run lint",
+    "lint": "eslint \"packages/**/*.{ts,tsx}\" \"apps/**/*.{ts,tsx}\" --no-error-on-unmatched-pattern --max-warnings 0",
     "test": "pnpm -r --if-present run test",
     "test:contract": "pnpm -r --if-present run test:contract",
     "test:e2e": "pnpm -r --if-present run test:e2e",
@@ -26,5 +26,12 @@
     "prettier": "^3.4.2",
     "eslint": "^9.17.0",
     "typescript-eslint": "^8.19.0"
+  },
+  "pnpm": {
+    "//": "Force patched transitive dev deps so `pnpm audit --audit-level=high` is clean. vitest 3.2's default resolution keeps an older vite (<=6.4.2) which carries the server.fs.deny bypass (GHSA-fx2h-pf6j-xcff) and pulls a vulnerable esbuild; vite >=6.4.3 depends on esbuild >=0.25. Dev-only (never in dist/). Revisit when vitest bumps its bundled vite.",
+    "overrides": {
+      "vite": "^6.4.3",
+      "esbuild": "^0.25.0"
+    }
   }
 }

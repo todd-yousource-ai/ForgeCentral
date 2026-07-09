@@ -3,3 +3,14 @@ build/
 coverage/
 *.tsbuildinfo
 node_modules/
+
+# Vendored engine artifact: kept byte-identical to the crdb committed schema (do not reformat).
+packages/contracts/schema/**
+# Generated code: the emitter (scripts/generate.mjs) is the sole authority on its format.
+packages/contracts/src/generated/**
+
+# pnpm-managed lockfile (not prettier-owned).
+pnpm-lock.yaml
+# Authored specification + standards prose (Markdown): governed by the no-em-dash hygiene check (the
+# gate's step 1), not reflowed by prettier. Package-level READMEs under packages/ are still formatted.
+docs/**

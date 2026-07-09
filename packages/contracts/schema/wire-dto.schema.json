@@ -1,0 +1,949 @@
+{
+  "$defs": {
+    "RetryClass": {
+      "enum": [
+        "Never",
+        "SafeSameRequest",
+        "SafeAfterRefresh",
+        "CallerDecision"
+      ]
+    },
+    "StreamKind": {
+      "enum": [
+        "Decision",
+        "Audit"
+      ]
+    },
+    "WireAuditEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "commit_version": {
+          "type": "integer"
+        },
+        "effect": {
+          "type": "string"
+        },
+        "principal_id": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "seq": {
+          "type": "integer"
+        },
+        "timestamp": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seq",
+        "commit_version",
+        "timestamp",
+        "principal_id",
+        "action",
+        "resource",
+        "effect"
+      ],
+      "type": "object"
+    },
+    "WireDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "finding": {
+          "type": "string"
+        },
+        "recommended_action": {
+          "type": "string"
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "source_subjects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tactics": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "decision_id",
+        "rule_id",
+        "anchor",
+        "tactics",
+        "finding",
+        "source_subjects",
+        "confidence",
+        "recommended_action",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "WireDriftTrigger": {
+      "enum": [
+        "Schema",
+        "Policy",
+        "Statistics",
+        "Model",
+        "AsOf",
+        "Workspace"
+      ]
+    },
+    "WireError": {
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "$ref": "#/$defs/WireErrorClass"
+        },
+        "code": {
+          "type": "integer"
+        },
+        "correlation_id": {
+          "type": "integer"
+        },
+        "retry": {
+          "$ref": "#/$defs/RetryClass"
+        }
+      },
+      "required": [
+        "class",
+        "code",
+        "retry",
+        "correlation_id"
+      ],
+      "type": "object"
+    },
+    "WireErrorClass": {
+      "enum": [
+        "Unauthenticated",
+        "Denied",
+        "VersionUnsupported",
+        "Conflict",
+        "IdempotencyConflict",
+        "AsOfUnavailable",
+        "StorageUnavailable",
+        "AuditFailure",
+        "IntegrityFailure",
+        "LimitExceeded",
+        "Framing",
+        "Internal"
+      ]
+    },
+    "WireQueryRows": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "oneOf": [
+            {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 32,
+              "minItems": 32,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "redacted_fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/WireValue"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "rows",
+        "redacted_fields",
+        "cursor"
+      ],
+      "type": "object"
+    },
+    "WireQuerySubmit": {
+      "additionalProperties": false,
+      "properties": {
+        "params": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/WireValue"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "text",
+        "params"
+      ],
+      "type": "object"
+    },
+    "WireReply": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "QueryRows": {
+              "$ref": "#/$defs/WireQueryRows"
+            }
+          },
+          "required": [
+            "QueryRows"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "CursorClosed"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "TxnBegun": {
+              "additionalProperties": false,
+              "properties": {
+                "txn": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "txn"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "TxnBegun"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Staged": {
+              "additionalProperties": false,
+              "properties": {
+                "affected": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "affected"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Staged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "TxnCommitted": {
+              "additionalProperties": false,
+              "properties": {
+                "version": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "version"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "TxnCommitted"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "TxnAborted"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "WorkspaceForked": {
+              "additionalProperties": false,
+              "properties": {
+                "txn": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "txn"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WorkspaceForked"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "WorkspacePromoted": {
+              "additionalProperties": false,
+              "properties": {
+                "version": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "version"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WorkspacePromoted"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Remembered": {
+              "additionalProperties": false,
+              "properties": {
+                "memory_id": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "memory_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Remembered"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Prepared": {
+              "additionalProperties": false,
+              "properties": {
+                "handle": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                },
+                "plan_id": {
+                  "type": "string"
+                },
+                "statement_hash": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "handle",
+                "statement_hash",
+                "plan_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Prepared"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ReprepareRequired": {
+              "additionalProperties": false,
+              "properties": {
+                "trigger": {
+                  "$ref": "#/$defs/WireDriftTrigger"
+                }
+              },
+              "required": [
+                "trigger"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "ReprepareRequired"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "NotYetWired": {
+              "additionalProperties": false,
+              "properties": {
+                "verb": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "verb"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "NotYetWired"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Refused": {
+              "additionalProperties": false,
+              "properties": {
+                "error": {
+                  "$ref": "#/$defs/WireError"
+                }
+              },
+              "required": [
+                "error"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Refused"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WireRequest": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "QuerySubmit": {
+              "$ref": "#/$defs/WireQuerySubmit"
+            }
+          },
+          "required": [
+            "QuerySubmit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Prepare": {
+              "additionalProperties": false,
+              "properties": {
+                "params": {
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/WireValue"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "params"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Prepare"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ExecutePrepared": {
+              "additionalProperties": false,
+              "properties": {
+                "handle": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                },
+                "params": {
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/WireValue"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "handle",
+                "params"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "ExecutePrepared"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "CursorFetch": {
+              "additionalProperties": false,
+              "properties": {
+                "handle": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "handle"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CursorFetch"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "CursorClose": {
+              "additionalProperties": false,
+              "properties": {
+                "handle": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "handle"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CursorClose"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "TxnBegin"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "TxnWrite": {
+              "additionalProperties": false,
+              "properties": {
+                "params": {
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/WireValue"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "txn": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "txn",
+                "text",
+                "params"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "TxnWrite"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "TxnCommit": {
+              "additionalProperties": false,
+              "properties": {
+                "request_id": {
+                  "type": "integer"
+                },
+                "txn": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "txn",
+                "request_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "TxnCommit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "TxnAbort": {
+              "additionalProperties": false,
+              "properties": {
+                "txn": {
+                  "items": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxItems": 32,
+                  "minItems": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "txn"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "TxnAbort"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SubmitMemoryWrite": {
+              "$ref": "#/$defs/WireQuerySubmit"
+            }
+          },
+          "required": [
+            "SubmitMemoryWrite"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WireStreamDelta": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Decision": {
+              "$ref": "#/$defs/WireDecision"
+            }
+          },
+          "required": [
+            "Decision"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Audit": {
+              "$ref": "#/$defs/WireAuditEntry"
+            }
+          },
+          "required": [
+            "Audit"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WireStreamEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "delta": {
+          "$ref": "#/$defs/WireStreamDelta"
+        },
+        "watermark": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "watermark",
+        "delta"
+      ],
+      "type": "object"
+    },
+    "WireStreamSubscribe": {
+      "additionalProperties": false,
+      "properties": {
+        "from_watermark": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kinds": {
+          "items": {
+            "$ref": "#/$defs/StreamKind"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kinds",
+        "from_watermark"
+      ],
+      "type": "object"
+    },
+    "WireValue": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Bool": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "Bool"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Int": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Int"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Float": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "Float"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Text"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Bytes": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "Bytes"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Timestamp": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Timestamp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Vector": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "Vector"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://schema.yousource.ai/crucible/wire/dto/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CrucibleDB wire DTO contract (TRD-04a Section 6)"
+}
