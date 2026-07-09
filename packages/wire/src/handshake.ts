@@ -34,6 +34,14 @@ export interface Negotiated {
   readonly enabled: readonly string[];
 }
 
+/** The READY reply of the wire (reactor) plane handshake. */
+export interface WireReady {
+  readonly major: number;
+  readonly minor: number;
+  readonly enabled: readonly string[];
+  readonly leaseTtlSecs: number;
+}
+
 /** A minimal v1.0 hello with no capability requirements. */
 export const DEFAULT_HELLO: ClientHello = { major: 1, maxMinor: 0, required: [], optional: [] };
 
@@ -94,4 +102,44 @@ export async function clientHandshake(
     );
   }
   return negotiated;
+}
+
+/**
+ * Drive the WIRE (reactor) plane handshake -- the direct CrucibleQL surface on `:7878`. Unlike the
+ * agent-plane handshake it is a single round trip: the client sends HELLO and the reactor derives the
+ * session inline and replies READY (no NEGOTIATE / AUTHENTICATE frames). Returns the READY profile.
+ */
+export async function wireHandshake(
+  transport: FrameTransport,
+  hello: ClientHello = DEFAULT_HELLO,
+): Promise<WireReady> {
+  await transport.send({
+    frameType: FrameType.Hello,
+    protocolVersion: packVersion(hello.major, hello.maxMinor),
+    flags: Flags.END_STREAM,
+    payload: encodeClientHello(hello),
+  });
+
+  const readyFrame = await transport.recv();
+  if (readyFrame.header.frameType !== FrameType.Ready) {
+    throw new WireProtocolError(
+      `wire handshake: expected Ready, got frame 0x${readyFrame.header.frameType.toString(16)}`,
+    );
+  }
+  // The READY frame may carry a WireReady profile (or be empty on some paths); decode best-effort.
+  if (readyFrame.payload.length === 0) {
+    return { major: hello.major, minor: hello.maxMinor, enabled: [], leaseTtlSecs: 0 };
+  }
+  const raw = decode(readyFrame.payload) as {
+    major?: number;
+    minor?: number;
+    enabled?: string[];
+    lease_ttl_secs?: number;
+  };
+  return {
+    major: raw.major ?? hello.major,
+    minor: raw.minor ?? hello.maxMinor,
+    enabled: raw.enabled ?? [],
+    leaseTtlSecs: raw.lease_ttl_secs ?? 0,
+  };
 }

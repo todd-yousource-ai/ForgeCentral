@@ -13,7 +13,9 @@ import {
   WireProtocolError,
   clientHandshake,
   decodeNegotiated,
+  encode,
   encodeClientHello,
+  wireHandshake,
 } from '../src/index.js';
 
 const hex = (bytes: Uint8Array): string =>
@@ -110,5 +112,28 @@ describe('clientHandshake', () => {
   it('rejects an out-of-order frame (Ready before Negotiate)', async () => {
     const transport = new MockTransport([frame(FrameType.Ready, new Uint8Array(0))]);
     await expect(clientHandshake(transport)).rejects.toBeInstanceOf(WireProtocolError);
+  });
+});
+
+describe('wireHandshake (the reactor plane: Hello -> Ready)', () => {
+  it('sends Hello and returns the READY profile (single round trip)', async () => {
+    const readyPayload = encode({ major: 1, minor: 0, enabled: [], lease_ttl_secs: 3600 });
+    const transport = new MockTransport([frame(FrameType.Ready, readyPayload)]);
+
+    const ready = await wireHandshake(transport);
+
+    expect(ready).toEqual({ major: 1, minor: 0, enabled: [], leaseTtlSecs: 3600 });
+    expect(transport.sent.map((f) => f.frameType)).toEqual([FrameType.Hello]);
+  });
+
+  it('handles an empty READY payload', async () => {
+    const transport = new MockTransport([frame(FrameType.Ready, new Uint8Array(0))]);
+    const ready = await wireHandshake(transport);
+    expect(ready.leaseTtlSecs).toBe(0);
+  });
+
+  it('rejects a non-Ready reply', async () => {
+    const transport = new MockTransport([frame(FrameType.Negotiate, new Uint8Array(0))]);
+    await expect(wireHandshake(transport)).rejects.toBeInstanceOf(WireProtocolError);
   });
 });
