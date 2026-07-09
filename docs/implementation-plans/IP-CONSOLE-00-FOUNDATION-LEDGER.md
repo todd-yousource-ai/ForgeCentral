@@ -20,7 +20,7 @@ Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN
 | F0.3b-3b | INV-CONSOLE-WIRE-TRANSPORT | LANDED (review) | e1e73dd | `StreamFrameTransport` (frame reassembly over a duplex) + `connectTls` mTLS dial; handshake proven over the real framed transport. |
 | F0.3b-3c | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | b7b49ee | Operation dispatch + `wireHandshake` (reactor `Hello->Ready`) + a **real round-trip against the live `:7878` node** (mTLS -> handshake -> QuerySubmit -> decoded WireReply). |
 | F0.3b-3d | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 9d0736d | `WireCrucibleClient` over `@forge/wire` behind the BFF seam; the **real BFF `/readyz` returns `{ready:true}` against the live `:7878` node**. |
-| F0.4 | INV-CONSOLE-NO-STUB | OPEN | -- | Binding registry + the `test:contract` no-stub gate. |
+| F0.4 | INV-CONSOLE-NO-STUB | LANDED (review) | 375b164 | `@forge/bindings` registry + no-stub enforcement (`validateManifest` / `assertReleaseReady`), wired into the gate's `test:contract` step. |
 | F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
