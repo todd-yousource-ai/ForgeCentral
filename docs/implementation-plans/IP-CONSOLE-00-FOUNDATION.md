@@ -1,4 +1,4 @@
-# IP-CONSOLE-FOUNDATION -- Phase 0: the platform foundation (TRD-CONSOLE-00)
+# IP-CONSOLE-00-FOUNDATION -- Phase 0: the platform foundation (TRD-CONSOLE-00)
 
 **Status:** OPEN (authored 2026-07-09). The first per-IP plan under `IP-CONSOLE-ROADMAP.md`, and the
 implementation of the foundational TRD **`TRD-CONSOLE-00`**. It builds the platform layer that makes the
@@ -147,7 +147,7 @@ No fabricated data in the interim.
 
 One PR at a time, branch-per-PR off local `main` -> code + test -> full gate -> **review with the
 maintainer** -> no-ff merge -> push local + GitHub (`github-forgecentral`), delete branch. No em dashes;
-scoped commits (code separate from docs). A landing ledger (`IP-CONSOLE-FOUNDATION-LEDGER.md`) is created
+scoped commits (code separate from docs). A landing ledger (`IP-CONSOLE-00-FOUNDATION-LEDGER.md`) is created
 when F0.1 starts building and tracks each step (step, invariant, status, commit).
 
 ## 8. What this IP deliberately does NOT do
