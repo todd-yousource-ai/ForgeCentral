@@ -3,8 +3,9 @@
 // The BFF reads its configuration from the environment and validates it with zod at the process boundary
 // (TypeScript_Dev_Rules: zod at every trust boundary). Validation is FAIL-CLOSED: a missing or malformed
 // value throws `ConfigError` before the service serves anything, rather than starting in a half-configured
-// state. The mTLS material (CA + client cert + key paths) is REQUIRED -- the BFF has no non-mTLS path to
-// the engine (TRD-CONSOLE-00 Section 8).
+// state. The BFF holds NO TLS material -- it speaks plaintext over a LOOPBACK socket to the AWS-LC crypto
+// sidecar, which originates the engine mTLS (IP-CONSOLE-00-CRYPTO-SIDECAR; INV-CONSOLE-CRYPTO-AWSLC). The
+// engine endpoint is therefore the sidecar egress and must be loopback (guarded below).
 //
 // Operator auth (F0.5a-2) is configured as an OPTIONAL block: when `FC_OIDC_ISSUER` is present the auth
 // router mounts (the operator login endpoints), and the issuer additionally requires a client id + role
@@ -30,18 +31,10 @@ const RbacConfigSchema = z.object({
 });
 
 const ConfigSchema = z.object({
-  /** The engine host the BFF connects to over mTLS. */
-  engineHost: z.string().min(1),
-  /** The engine wire port (the mTLS gateway). */
-  enginePort: z.coerce.number().int().positive().default(7878),
-  /** Path to the CA bundle that signs the engine's server cert. */
-  tlsCaPath: z.string().min(1),
-  /** Path to the BFF's own enrolled client certificate (the service Principal). */
-  tlsCertPath: z.string().min(1),
-  /** Path to the BFF client private key. */
-  tlsKeyPath: z.string().min(1),
-  /** The name to verify in the engine's server certificate (defaults to the engine host). */
-  engineServername: z.string().min(1).optional(),
+  /** The loopback host of the crypto sidecar's egress the BFF dials (must be loopback; guarded below). */
+  engineHost: z.string().min(1).default('127.0.0.1'),
+  /** The crypto sidecar's egress port (the BFF speaks plaintext wire to it; the sidecar owns the mTLS). */
+  enginePort: z.coerce.number().int().positive().default(8789),
   /** The port the BFF's own HTTP surface listens on. */
   httpPort: z.coerce.number().int().positive().default(8787),
   /** Log level. */
@@ -94,10 +87,6 @@ export interface SessionSettings {
 export interface BffConfig {
   readonly engineHost: string;
   readonly enginePort: number;
-  readonly tlsCaPath: string;
-  readonly tlsCertPath: string;
-  readonly tlsKeyPath: string;
-  readonly engineServername?: string;
   readonly httpPort: number;
   readonly logLevel: RawConfig['logLevel'];
   readonly cacheTtlMs: number;
@@ -178,10 +167,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
   const parsed = ConfigSchema.safeParse({
     engineHost: env['FC_ENGINE_HOST'],
     enginePort: env['FC_ENGINE_PORT'],
-    tlsCaPath: env['FC_TLS_CA'],
-    tlsCertPath: env['FC_TLS_CERT'],
-    tlsKeyPath: env['FC_TLS_KEY'],
-    engineServername: env['FC_ENGINE_SERVERNAME'],
     httpPort: env['FC_HTTP_PORT'],
     logLevel: env['FC_LOG_LEVEL'],
     cacheTtlMs: env['FC_CACHE_TTL_MS'],
@@ -206,13 +191,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     throw new ConfigError(`invalid BFF configuration: check ${fields}`);
   }
   const raw = parsed.data;
+  // The BFF may only reach the engine through a LOOPBACK sidecar egress (it speaks plaintext wire; the
+  // sidecar owns the mTLS). A routable engine host would mean unencrypted wire traffic on the wire --
+  // refuse it fail-closed (INV-CONSOLE-CRYPTO-AWSLC).
+  if (!isLoopbackHost(raw.engineHost)) {
+    throw new ConfigError(
+      `FC_ENGINE_HOST must be loopback (the crypto sidecar egress), not a routable host: ${raw.engineHost}`,
+    );
+  }
   const oidc = resolveOidc(raw);
   return {
     engineHost: raw.engineHost,
     enginePort: raw.enginePort,
-    tlsCaPath: raw.tlsCaPath,
-    tlsCertPath: raw.tlsCertPath,
-    tlsKeyPath: raw.tlsKeyPath,
     httpPort: raw.httpPort,
     logLevel: raw.logLevel,
     cacheTtlMs: raw.cacheTtlMs,
@@ -226,7 +216,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
       maxPendingLogins: raw.loginMax,
     },
     rbac: resolveRbac(env),
-    ...(raw.engineServername !== undefined ? { engineServername: raw.engineServername } : {}),
     ...(oidc !== undefined ? { oidc } : {}),
   };
+}
+
+/** True when `host` names the local loopback (the only interface the sidecar egress is reached on). */
+function isLoopbackHost(host: string): boolean {
+  return host === 'localhost' || host === '::1' || host === '127.0.0.1' || host.startsWith('127.');
 }

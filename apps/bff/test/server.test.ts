@@ -12,9 +12,6 @@ import { createServer, type ServerLogger } from '../src/server.js';
 const config: BffConfig = {
   engineHost: 'engine.internal',
   enginePort: 7878,
-  tlsCaPath: '/ca',
-  tlsCertPath: '/cert',
-  tlsKeyPath: '/key',
   httpPort: 0,
   logLevel: 'error',
   cacheTtlMs: 2000,

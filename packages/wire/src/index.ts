@@ -1,8 +1,8 @@
 // packages/wire/src/index.ts -- the @forge/wire barrel (F0.3b-1).
 //
-// @forge/wire is the native TypeScript client of the Crucible wire protocol (the BFF's transport to the
-// engine over mTLS :7878), ported faithfully from crdb `cdb-wire`. F0.3b-1 lands the frame codec; the
-// CBOR payload codec, the handshake, and the mTLS connection follow (F0.3b-2/3b-3).
+// @forge/wire is the native TypeScript client of the Crucible wire protocol, ported faithfully from crdb
+// `cdb-wire`. The BFF carries these frames over a plaintext LOOPBACK socket to the AWS-LC crypto sidecar,
+// which originates the engine mTLS on :7878 (CS.4; Node performs no TLS, INV-CONSOLE-CRYPTO-AWSLC).
 
 export * from './frame.js';
 export * from './cbor.js';
