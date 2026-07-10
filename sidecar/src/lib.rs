@@ -14,4 +14,5 @@
 pub mod admin;
 pub mod bind;
 pub mod config;
+pub mod engine;
 pub mod tls;

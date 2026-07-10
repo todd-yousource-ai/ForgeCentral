@@ -24,8 +24,10 @@ pub struct SidecarConfig {
     pub admin_port: u16,
     /// The loopback `ip:port` of the BFF's admin HTTP listener the terminator forwards decrypted bytes to.
     pub admin_upstream: String,
-    /// The engine wire gateway `host:port` the sidecar originates mTLS to (validated when dialing, CS.3).
+    /// The engine wire gateway `host:port` the sidecar originates mTLS to.
     pub engine_addr: String,
+    /// The name to verify in the engine's server certificate (its SAN, e.g. `wire.localhost`).
+    pub engine_servername: String,
     /// Path to the CA bundle that signs the engine's server certificate (the wire CA).
     pub engine_ca: PathBuf,
     /// Path to the sidecar's enrolled client certificate presented to the engine (the service Principal).
@@ -90,6 +92,7 @@ mod tests {
             "admin_port": 8443,
             "admin_upstream": "127.0.0.1:8788",
             "engine_addr": "engine.internal:7878",
+            "engine_servername": "wire.localhost",
             "engine_ca": "/etc/console/engine-ca.pem",
             "engine_cert": "/etc/console/bff-cert.pem",
             "engine_key": "/etc/console/bff-key.pem",
