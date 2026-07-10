@@ -88,6 +88,34 @@ options (crdb facts: the installer's `50-config.sh` enrolls wire peers via `cdb-
 Recommendation: **A (ZTP)** as the north star (identity + rotation the platform way), with **C** as the
 pragmatic Day-2 bridge so the Console can be added to a running node now. B is the minimal fallback.
 
+### Decision (product owner, 2026-07-10): **A -- ZTP enrollment.**
+
+The Console acquires its wire identity through the platform enrollment service, exactly like a torch edge
+device: it gets a ZTP-CA-chained leaf (+ rotation), and the engine admits it on `:7878` via the existing
+`admit_wire_peer` path (an enrolled device is admitted by ZTP-CA chain, not a static `wire.peers` entry).
+
+Grounded scope (from the torch ZTP program + crdb enrolled-device grant, `[[torch-ztp-enrollment]]`):
+
+- **D.3a -- the Console enrollment client.** The `console-bff` (or its provisioner) runs the enrollment
+  flow (device key + operator MFA + attestation + node-established binding + step-ca mint), yielding a
+  ZTP-CA-chained wire cert the sidecar presents on the engine leg. Reuses the torch enrollment stack as the
+  reference; the Console is a co-located service, so the device-identity story (TPM vs a service key) is the
+  first sub-decision to pin.
+- **D.3b -- the engine grants the enrolled Console `[Data, Delegation]` (crdb, INV-CROSS).** An enrolled
+  device today gets the `wire.enrolled_device_grant` policy grant, default `[Data, Agent, Cognition, Otlp]`
+  -- **not** `Delegation`. The Console needs `[Data, Delegation]` (and no Agent/Cognition/Otlp). So this is
+  a real crdb change: a per-enrolled-identity grant (or a Console-role enrolled grant) that includes the
+  `Delegation` plane, so the F0.5c delegated-read path works for the ZTP-enrolled Console. This is where the
+  `Delegation` plane meets the enrolled-device model; it must stay least-privilege (never widen every
+  enrolled device to `Delegation`).
+- **D.3c -- live proof, productionized.** The installer runs the enrollment during provisioning; the
+  sidecar's `engine_cert`/`engine_key` point at the enrolled material; the CS.N engine-leg round-trip passes
+  with the ZTP identity (replacing the F0.3b hand-minted `console-bff` cert), and rotation is wired.
+
+D.3 is therefore a multi-PR sub-program spanning ForgeCentral (the enrollment client + sidecar wiring) and
+crdb (the `Delegation`-capable enrolled grant). It is sequenced after D.2 and pinned by the device-identity
+sub-decision in D.3a.
+
 ## 5. Cadence
 
 One PR at a time, branch-per-PR through `scripts/ci.sh`, no-ff merge, docs separate from code. D.1 and D.2
