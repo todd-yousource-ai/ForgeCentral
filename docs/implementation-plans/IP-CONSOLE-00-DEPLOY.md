@@ -97,17 +97,24 @@ device: it gets a ZTP-CA-chained leaf (+ rotation), and the engine admits it on 
 Grounded scope (from the torch ZTP program + crdb enrolled-device grant, `[[torch-ztp-enrollment]]`):
 
 - **D.3a -- the Console enrollment client.** The `console-bff` (or its provisioner) runs the enrollment
-  flow (device key + operator MFA + attestation + node-established binding + step-ca mint), yielding a
-  ZTP-CA-chained wire cert the sidecar presents on the engine leg. Reuses the torch enrollment stack as the
-  reference; the Console is a co-located service, so the device-identity story (TPM vs a service key) is the
-  first sub-decision to pin.
-- **D.3b -- the engine grants the enrolled Console `[Data, Delegation]` (crdb, INV-CROSS).** An enrolled
-  device today gets the `wire.enrolled_device_grant` policy grant, default `[Data, Agent, Cognition, Otlp]`
-  -- **not** `Delegation`. The Console needs `[Data, Delegation]` (and no Agent/Cognition/Otlp). So this is
-  a real crdb change: a per-enrolled-identity grant (or a Console-role enrolled grant) that includes the
-  `Delegation` plane, so the F0.5c delegated-read path works for the ZTP-enrolled Console. This is where the
-  `Delegation` plane meets the enrolled-device model; it must stay least-privilege (never widen every
-  enrolled device to `Delegation`).
+  flow, yielding a ZTP-CA-chained wire cert the sidecar presents on the engine leg. **Device-identity
+  decision (product owner, 2026-07-10): full TPM attestation (torch-style)** -- the Console enrolls with a
+  real vTPM device key + operator MFA + hardware attestation + node-established binding + step-ca mint,
+  exactly like a torch edge device. **Reuse, do not reimplement:** the torch installer's `30-enroll.sh`
+  already drives `torch-enroll` interactively (operator MFA device code) with a `TORCH_PROPOSED_FQDN` + EK
+  cert against the bootstrap addr, producing `device.pem` (the ZTP-CA identity). D.3a is a Console enroll
+  step that invokes that same client with a distinct `console-bff` FQDN, producing the wire cert the sidecar
+  points `engine_cert`/`engine_key` at. The live enrollment is **operator-MFA-gated** (a human step, as in
+  the F0.5a / ZTP capstones).
+- **D.3b -- the engine grants the enrolled Console `[Data, Delegation]` (crdb, INV-CROSS).** Grounded
+  finding: `wire.enrolled_device_grant` (`config.rs`, `default_enrolled_device_grant`) is a **single global
+  default** applied to *every* admitted enrolled device (today `[Data, Agent, Cognition, Otlp]`). Flipping
+  it to `[Data, Delegation]` is wrong twice over -- it would strip torch's planes AND widen `Delegation` to
+  every enrolled device. So D.3b is a real, security-sensitive crdb change: a **per-identity (or enrolled-
+  role) grant override** so the `console-bff` fingerprint/FQDN resolves to `[Data, Delegation]` while every
+  other enrolled device keeps the global default. Least-privilege, fail-closed, minimal-change, reviewed
+  with the maintainer (the crdb min-change + never-weaken rules). Buildable + hermetically testable without
+  live MFA; it is the crux cross-repo PR (crdb repo, its own naming/gate).
 - **D.3c -- live proof, productionized.** The installer runs the enrollment during provisioning; the
   sidecar's `engine_cert`/`engine_key` point at the enrolled material; the CS.N engine-leg round-trip passes
   with the ZTP identity (replacing the F0.3b hand-minted `console-bff` cert), and rotation is wired.
