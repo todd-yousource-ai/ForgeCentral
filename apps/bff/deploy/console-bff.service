@@ -1,0 +1,42 @@
+# console-bff.service -- systemd unit for the Console BFF (IP-CONSOLE-00-DEPLOY D.1).
+#
+# Installer-provisioned. The BFF is the stateless Node backend-for-frontend. It performs NO TLS: it dials
+# the crypto sidecar's egress over plaintext loopback (the sidecar owns the engine mTLS) and its own admin
+# HTTP is fronted by the sidecar's :8443 terminator. It owns no durable data (INV-CONSOLE-NO-2ND-DB), so it
+# runs read-only with a private tmp. Pair it with console-crypto-sidecar.service.
+
+[Unit]
+Description=Console BFF (stateless backend-for-frontend over the crypto sidecar)
+Documentation=https://github.com/todd-yousource-ai/ForgeCentral/blob/main/docs/implementation-plans/IP-CONSOLE-00-DEPLOY.md
+# The BFF reaches the engine only through the sidecar egress; prefer the sidecar up first.
+After=network-online.target console-crypto-sidecar.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=console-bff
+Group=console-bff
+# The installer lays the built BFF (dist + node_modules) here; node is the platform runtime.
+EnvironmentFile=/etc/console-bff/config.env
+# node is provisioned at /usr/local/bin (the platform convention on these nodes, matching the engine box).
+ExecStart=/usr/local/bin/node /usr/local/lib/console-bff/index.js
+Restart=on-failure
+RestartSec=2
+
+# Hardening: no privileges, no writes outside a private tmp, minimal address families.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+# The config (and any OIDC/RBAC key material referenced by it) is read-only, owned by the service user.
+ReadOnlyPaths=/etc/console-bff
+
+[Install]
+WantedBy=multi-user.target
