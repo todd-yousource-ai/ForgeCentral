@@ -4,8 +4,9 @@ Per-PR landing record for `IP-CONSOLE-00-SIDECAR-TPM.md` (the crypto sidecar pre
 TPM-resident engine identity). One PR per roster row, a named slice of `INV-CONSOLE-SIDECAR-TPM-KEY`, the
 full gate (+ the sidecar Rust gate) green, branch-per-PR, no-ff merge, review before merge.
 
-Status: **OPEN. T.1 (TPM signer) next -- sidecar-local, unit-tested on the box vTPM. T.2 (cdb-mtls seam) is
-the paired crdb change. T.3 composes them; T.N is the MFA-gated live capstone.**
+Status: **PARKED (2026-07-10) -- superseded by service-key ZTP (`IP-CONSOLE-00-DEPLOY` D.3a-console): full
+ZTP with a software P-384 key the sidecar reads as a PEM (no TPM key, no sidecar signer). Retained as the
+future hardware-hardening option; nothing was built (plan only). None of T.1-T.N landed.**
 
 Product-owner decisions (2026-07-10): the Console engine identity is ZTP + full TPM attestation
 (`IP-CONSOLE-00-DEPLOY` D.3a); full-TPM keeps the key in the TPM, but the AWS-LC sidecar reads a PEM key,
