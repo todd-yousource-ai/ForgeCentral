@@ -21,10 +21,12 @@ cd "$repo_root"
 
 skip_net=false
 skip_e2e=false
+skip_sidecar=false
 for arg in "$@"; do
     case "$arg" in
         --skip-net) skip_net=true ;;
         --skip-e2e) skip_e2e=true ;;
+        --skip-sidecar) skip_sidecar=true ;;
         *) echo "unknown arg: $arg" >&2; exit 2 ;;
     esac
 done
@@ -92,5 +94,25 @@ pnpm run sbom
 
 echo "==> [10] build"
 pnpm run build
+
+# ---- [11] the crypto sidecar (Rust: fmt + clippy -D warnings + test) -------------------------------
+# The Console-owned AWS-LC crypto sidecar is a standalone Cargo project under sidecar/ (not the pnpm
+# workspace). Its own Rust gate mirrors the engine repos'. Under --skip-net it runs --offline against the
+# cargo cache (CS.3 adds a cdb-mtls git dep that a fresh offline machine must have vendored/cached).
+echo "==> [11] sidecar (Rust: fmt + clippy + test)"
+if [ "$skip_sidecar" = "true" ]; then
+    echo "    sidecar gate SKIPPED (--skip-sidecar)"
+elif ! command -v cargo >/dev/null 2>&1; then
+    echo "    sidecar gate SKIPPED (cargo not found)"
+else
+    offline=""
+    [ "$skip_net" = "true" ] && offline="--offline"
+    (
+        cd sidecar
+        cargo fmt --check
+        cargo clippy --all-targets ${offline} -- -D warnings
+        cargo test ${offline}
+    )
+fi
 
 echo "==> ALL GATES PASSED"
