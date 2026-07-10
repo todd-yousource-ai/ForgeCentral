@@ -11,5 +11,7 @@
 //! The Node BFF speaks plaintext loopback to this sidecar in both directions; nothing that leaves the host
 //! is unencrypted.
 
+pub mod admin;
 pub mod bind;
 pub mod config;
+pub mod tls;

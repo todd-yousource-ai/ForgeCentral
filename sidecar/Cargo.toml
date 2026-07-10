@@ -22,6 +22,14 @@ path = "src/main.rs"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "macros", "signal", "sync", "time"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["aws-lc-rs"] }
+rustls-pki-types = { version = "1", features = ["std"] }
+
+[dev-dependencies]
+# Test-only: mint a throwaway P-384 leaf so the terminator's floor can be proven against real rustls
+# clients. The runtime crate never mints certs (the installer provisions the admin leaf).
+rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
 
 # The workspace-wide lint policy (mirrors the engine repos' Rust_Dev_Rules Section 13). Inlined here
 # because this crate is a standalone Cargo project, not a member of a lint-bearing workspace.

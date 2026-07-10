@@ -18,6 +18,12 @@ pub enum SidecarError {
     /// A required configuration value is missing or malformed.
     #[error("invalid configuration: {0}")]
     Config(String),
+    /// A listener could not bind or accept.
+    #[error("listen: {0}")]
+    Listen(String),
+    /// A connection could not be terminated, forwarded, or tunnelled.
+    #[error("serve: {0}")]
+    Serve(String),
 }
 
 /// Assert `host` is the node's own IP literal, or return [`SidecarError::WidenedBind`].
