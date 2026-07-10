@@ -128,6 +128,40 @@ D.3 is therefore a multi-PR sub-program spanning ForgeCentral (the enrollment cl
 crdb (the `Delegation`-capable enrolled grant). It is sequenced after D.2 and pinned by the device-identity
 sub-decision in D.3a.
 
+### D.3a-console: the enrollment wire protocol + sub-roster (mapped from the code)
+
+The Console client is a **Console-owned** Rust crate (`enroll/`, no torch dependency); it consumes the
+enrollment wire contract, which lives in the **shareable git-dep crates** `cdb-wire` + `cdb-types` (not
+torch-private). The protocol, grounded in `crdb/crates/cdb-server/src/enroll.rs`, `cdb-enroll/`, and the
+`torch-core` reference client:
+
+- **Transport.** A one-shot request/reply per TCP connection over the **bootstrap** TLS (server-auth-only,
+  TLS 1.3, `X25519MLKEM768`/`X25519`, pins the enroll-CA root). No mTLS, no Hello/Negotiate handshake.
+  Framing = the 16-byte big-endian `cdb-wire` header + CBOR (ciborium).
+- **Messages** (`cdb-wire::handshake`, frame types `EnrollIdentityOffer=0x2C`/`Result=0x2D`,
+  `EnrollSubmit=0x2A`/`Result=0x2B`): pre-flight `WireIdentityRequest{token, attestation}` ->
+  `WireIdentityOffer::{Offered{fqdn}, Refused}`; then `WireEnrollRequest{token, csr_der, attestation}` ->
+  `WireEnrollResponse::{Issued{certificate_der, serial, not_after}, Refused}`. Only the **leaf** cert comes
+  back; the client must already hold the wire-CA PEM.
+- **MFA.** The client talks to the IdP directly (RFC 8628 device-authorization grant); the node does not
+  broker it. The verified token (opaque JWS) is sent in the `token` field and re-verified server-side.
+- **THE HARD CONSTRAINT (why torch cannot do this).** A **software** key enrolls only via the
+  **`TokenAsserted`** binding: the IdP token must carry `cnf.jkt == jwk_thumbprint(the software key)`, which
+  requires the client to present an **RFC 9449 DPoP proof** at the token endpoint. Then, with the issuance
+  policy's default `require_attestation = false`, attestation is **never verified** and a dummy
+  `DeviceAttestation` is accepted (only its `ek_cert_der` bytes are used, unverified, as the stable device
+  anchor). The torch client uses a *bare* token (no `cnf`) -> the `NodeEstablished` binding -> which
+  **forces a verified TPM attestation regardless of the flag** -> a software key is refused. So the Console
+  client's one novel behavior over torch is **DPoP**; everything else (framing, CSR, device-grant) is
+  key-agnostic and portable.
+
+**Sub-roster (D.3a-console).** `.1` LANDED (software keystore: P-384 keygen + CSR + PEM). **`.2a` LANDED**
+(the keystore signs: raw ECDSA-P384 fixed `r||s` for DPoP + the public point for the `jkt`, on AWS-LC).
+`.2b` = the DPoP `cnf`-bound token (device-grant to the IdP + the DPoP proof; the load-bearing novel piece).
+`.2c` = the bootstrap-TLS wire client (offer -> submit -> receive the leaf) over `cdb-wire`. `.3` = the
+provisioning wrapper (writes `engine_cert`/`engine_key` for the sidecar). D.3c = the MFA-gated live
+capstone.
+
 ## 5. Cadence
 
 One PR at a time, branch-per-PR through `scripts/ci.sh`, no-ff merge, docs separate from code. D.1 and D.2
