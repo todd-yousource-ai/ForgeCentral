@@ -9,5 +9,7 @@
 //! client (device-code MFA + CSR submit + cert receive) and the provisioning wrapper are D.3a-console.2/.3.
 
 pub mod keystore;
+pub mod token_binding;
 
 pub use keystore::{EnrollError, SoftwareKeystore};
+pub use token_binding::{access_token_hash, canonical_ec_jwk, dpop_proof, jwk_thumbprint};

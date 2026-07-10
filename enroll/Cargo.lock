@@ -64,6 +64,7 @@ name = "console-enroll"
 version = "0.0.0"
 dependencies = [
  "aws-lc-rs",
+ "base64",
  "rcgen",
  "thiserror",
 ]
