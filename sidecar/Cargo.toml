@@ -1,0 +1,41 @@
+# sidecar/Cargo.toml -- the Console AWS-LC crypto sidecar (IP-CONSOLE-00-CRYPTO-SIDECAR).
+#
+# A standalone Rust crate (NOT in the pnpm workspace): the small Console-owned process that terminates the
+# admin-plane TLS and originates the engine mTLS on the platform's AWS-LC module, so the Node BFF performs
+# no TLS. CS.1 lands the scaffold + the fail-closed config + node-IP bind guard; the aws-lc-rs listeners
+# (cdb-mtls git dep) arrive in CS.2/CS.3. Deps are pinned and minimal (Rust_Dev_Rules Section 8).
+
+[package]
+name = "console-crypto-sidecar"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.96.0"
+license = "LicenseRef-YouSource-Proprietary"
+publish = false
+description = "Console AWS-LC crypto sidecar: terminates admin TLS + originates engine mTLS so Node performs no TLS."
+
+[[bin]]
+name = "console-crypto-sidecar"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+# The workspace-wide lint policy (mirrors the engine repos' Rust_Dev_Rules Section 13). Inlined here
+# because this crate is a standalone Cargo project, not a member of a lint-bearing workspace.
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+wildcard_imports = "deny"
+await_holding_lock = "deny"
+
+[lints.rust]
+unsafe_code = "forbid"

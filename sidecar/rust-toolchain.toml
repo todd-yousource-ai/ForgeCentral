@@ -1,0 +1,5 @@
+# Pin the toolchain to match the engine repos (crdb/torch) so the shared cdb-mtls git dep (added in CS.3)
+# builds identically and clippy lints are version-stable. Bump deliberately, in lockstep with CI.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
