@@ -18,12 +18,20 @@ export function wireValueToCbor(value: WireValue): unknown {
 }
 
 function submitToCbor(submit: WireQuerySubmit): unknown {
-  // Field order matches the Rust struct (request_id, text, params) so the CBOR map is byte-identical.
-  return {
+  // Field order matches the Rust struct (request_id, text, params, operator) so the CBOR map is
+  // byte-identical.
+  const out: Record<string, unknown> = {
     request_id: submit.request_id,
     text: submit.text,
     params: submit.params.map(([key, value]) => [key, wireValueToCbor(value)]),
   };
+  // Operator delegation (F0.5c): emitted only when present, so a non-delegated read is byte-identical to
+  // a pre-delegation client -- matching crdb's `#[serde(default, skip_serializing_if = "Option::is_none")]`.
+  // The engine honors it only under the peer's Delegation grant; the ids are hyphenated UUID strings.
+  if (submit.operator != null) {
+    out['operator'] = { principal: submit.operator.principal, tenant: submit.operator.tenant };
+  }
+  return out;
 }
 
 /**

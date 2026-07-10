@@ -7,6 +7,11 @@
 // A codegen round-trip test asserts this file equals the emitter output, so an un-regenerated wire
 // change fails the gate. Edit the schema (upstream, in crdb), not this file.
 
+export interface OperatorDelegation {
+  principal: string;
+  tenant: string;
+}
+
 export type RetryClass = 'Never' | 'SafeSameRequest' | 'SafeAfterRefresh' | 'CallerDecision';
 
 export type StreamKind = 'Decision' | 'Audit';
@@ -51,6 +56,7 @@ export interface WireQueryRows {
 }
 
 export interface WireQuerySubmit {
+  operator?: OperatorDelegation | null;
   params: Array<[string, WireValue]>;
   request_id: number;
   text: string;
