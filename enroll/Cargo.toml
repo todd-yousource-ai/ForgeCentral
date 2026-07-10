@@ -31,3 +31,6 @@ rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "
 # needs, and later the wire-plane TLS handshake). AWS-LC keeps the crypto posture; one key material
 # (PKCS#8 DER) drives both rcgen (CSR/PEM) and aws-lc-rs (raw sign).
 aws-lc-rs = "1"
+# base64url (no-pad) for the JOSE/JWK encoding of the DPoP proof + the RFC 7638 JWK thumbprint (`jkt`). The
+# canonical JWK + the JWT header/claims are hand-built (format!) so no JSON dependency is pulled in.
+base64 = "0.22"
