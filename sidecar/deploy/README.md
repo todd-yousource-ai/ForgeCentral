@@ -42,6 +42,34 @@ systemctl enable --now console-crypto-sidecar
 The unit runs unprivileged (8443 and the loopback ports are all unprivileged), read-only, with an empty
 capability set. See `console-crypto-sidecar.service`.
 
+## Verifying it live (the CS.N capstone)
+
+With the node running on `:7878`, the built sidecar, and the built BFF, both legs are checkable end to
+end. This is the exact CS.N proof.
+
+Engine leg (Node does no TLS):
+
+```bash
+# BFF dials the sidecar egress (loopback) with NO TLS material; the sidecar owns the mTLS to :7878.
+FC_HTTP_PORT=8799 FC_ENGINE_HOST=127.0.0.1 FC_ENGINE_PORT=8789 node apps/bff/dist/index.js &
+curl -s http://127.0.0.1:8799/readyz            # -> {"ready":true}  (BFF -> sidecar -> mTLS :7878)
+```
+
+Admin leg on the node IP (`admin_bind_ip:8443`); the floor is enforced by construction:
+
+```bash
+# Classical P-384 floor: handshake succeeds and tunnels to the BFF admin upstream.
+printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' \
+  | openssl s_client -connect <node-ip>:8443 -groups secp384r1 -tls1_3 -quiet   # -> 200 {"status":"ok"}
+
+# Sub-floor (X25519, P-256) shares no group with the sidecar and is refused.
+echo | openssl s_client -connect <node-ip>:8443 -groups X25519:prime256v1 -tls1_3   # -> handshake_failure
+```
+
+The hybrid PQC group `X25519MLKEM768` is not in OpenSSL 3.0; prove it with any `rustls` + `aws-lc-rs`
+client that offers only that group (a successful handshake proves the group by construction). The Console
+gate's in-process CS.2 test also covers hybrid-admitted / sub-floor-refused.
+
 ## Local-capture posture
 
 The BFF <-> sidecar loopback hops are cleartext but on-box only (`127.0.0.1`, never a routable interface),
