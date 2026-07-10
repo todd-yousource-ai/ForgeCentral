@@ -1,12 +1,13 @@
 // packages/wire/src/socket-transport.ts -- the stream/mTLS frame transport (F0.3b-3b).
 //
-// `StreamFrameTransport` carries wire frames over any Node duplex byte stream (a `tls.TLSSocket`, a
-// `net.Socket`, or an in-memory duplex in tests). It buffers inbound bytes and reassembles whole frames
-// across chunk boundaries (a 16-byte header then `payloadLen` bytes), and serializes outbound frames.
-// `connectTls` dials the engine over mutually-authenticated TLS and returns a ready transport. This is the
-// concrete `FrameTransport` behind the handshake and the (F0.3b-3b-live) operation dispatch.
+// `StreamFrameTransport` carries wire frames over any Node duplex byte stream (a `net.Socket` or an
+// in-memory duplex in tests). It buffers inbound bytes and reassembles whole frames across chunk
+// boundaries (a 16-byte header then `payloadLen` bytes), and serializes outbound frames. `connectLoopback`
+// dials the AWS-LC crypto sidecar's egress over a plaintext LOOPBACK socket and returns a ready transport;
+// the sidecar originates the mTLS to the engine (IP-CONSOLE-00-CRYPTO-SIDECAR). Node performs no TLS
+// (INV-CONSOLE-CRYPTO-AWSLC). This is the concrete `FrameTransport` behind the handshake and dispatch.
 
-import { connect as tlsConnect } from 'node:tls';
+import { connect as netConnect } from 'node:net';
 import type { Duplex } from 'node:stream';
 
 import { HEADER_LEN, decodeHeader, encodeFrame } from './frame.js';
@@ -100,40 +101,25 @@ export class StreamFrameTransport implements FrameTransport {
   }
 }
 
-/** mTLS dial options for the engine wire port. */
-export interface WireTlsOptions {
+/** Loopback dial options for the AWS-LC sidecar's egress port. */
+export interface WireLoopbackOptions {
+  /** The loopback host of the sidecar egress (`127.0.0.1`/`::1`). */
   readonly host: string;
+  /** The sidecar egress port. */
   readonly port: number;
-  /** The CA that signs the engine's server certificate (the wire CA). */
-  readonly ca: string | Buffer;
-  /** The BFF's own enrolled client certificate (presented for mutual auth). */
-  readonly cert: string | Buffer;
-  /** The BFF client private key. */
-  readonly key: string | Buffer;
-  /** The name to verify in the server certificate (defaults to `host`). */
-  readonly servername?: string;
 }
 
 /**
- * Dial the engine over mutually-authenticated TLS and return a ready `StreamFrameTransport`. The server
- * is verified against `ca` (never disabled); the client presents `cert`/`key` for mutual auth.
+ * Dial the crypto sidecar's egress over a plaintext loopback socket and return a ready
+ * `StreamFrameTransport`. The sidecar originates the mTLS to the engine on `:7878` (the Console performs no
+ * TLS in Node; INV-CONSOLE-CRYPTO-AWSLC). The hop is loopback only, never a routable interface, so no
+ * plaintext wire traffic leaves the host.
  */
-export function connectTls(options: WireTlsOptions): Promise<StreamFrameTransport> {
+export function connectLoopback(options: WireLoopbackOptions): Promise<StreamFrameTransport> {
   return new Promise((resolve, reject) => {
-    const socket = tlsConnect(
-      {
-        host: options.host,
-        port: options.port,
-        ca: options.ca,
-        cert: options.cert,
-        key: options.key,
-        servername: options.servername ?? options.host,
-        rejectUnauthorized: true,
-      },
-      () => {
-        resolve(new StreamFrameTransport(socket));
-      },
-    );
+    const socket = netConnect({ host: options.host, port: options.port }, () => {
+      resolve(new StreamFrameTransport(socket));
+    });
     socket.once('error', reject);
   });
 }

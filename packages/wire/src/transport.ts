@@ -2,8 +2,8 @@
 //
 // A `FrameTransport` carries whole wire frames (a header + payload) over some byte stream. The handshake
 // and the operation dispatch are written against this interface, so their logic is unit-testable over an
-// in-memory transport without a real socket; the concrete `node:tls` mTLS transport implements it in
-// F0.3b-3b.
+// in-memory transport without a real socket; the concrete loopback-socket transport (to the AWS-LC crypto
+// sidecar) implements it in `socket-transport.ts`.
 
 import { Flags, type FrameHeader, type FrameType, PROTOCOL_V1_0 } from './frame.js';
 

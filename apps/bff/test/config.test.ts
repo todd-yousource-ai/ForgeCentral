@@ -4,18 +4,14 @@ import { describe, expect, it } from 'vitest';
 
 import { ConfigError, loadConfig } from '../src/config.js';
 
-const complete = {
-  FC_ENGINE_HOST: 'engine.internal',
-  FC_TLS_CA: '/etc/forge/ca.pem',
-  FC_TLS_CERT: '/etc/forge/bff.crt',
-  FC_TLS_KEY: '/etc/forge/bff.key',
-} satisfies NodeJS.ProcessEnv;
+// The BFF holds no TLS material now (the sidecar owns mTLS); the engine host defaults to loopback.
+const complete = {} satisfies NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {
   it('accepts a complete environment and applies defaults', () => {
     const config = loadConfig(complete);
-    expect(config.engineHost).toBe('engine.internal');
-    expect(config.enginePort).toBe(7878);
+    expect(config.engineHost).toBe('127.0.0.1');
+    expect(config.enginePort).toBe(8789);
     expect(config.httpPort).toBe(8787);
     expect(config.logLevel).toBe('info');
     expect(config.requestTimeoutMs).toBe(5000);
@@ -27,9 +23,10 @@ describe('loadConfig', () => {
     expect(config.cacheTtlMs).toBe(500);
   });
 
-  it('fails closed when a required mTLS path is missing', () => {
-    const { FC_TLS_KEY: _omitted, ...withoutKey } = complete;
-    expect(() => loadConfig(withoutKey)).toThrow(ConfigError);
+  it('fails closed on a routable (non-loopback) engine host', () => {
+    expect(() => loadConfig({ ...complete, FC_ENGINE_HOST: 'engine.public.example' })).toThrow(
+      ConfigError,
+    );
   });
 
   it('fails closed on a non-numeric port', () => {
@@ -38,11 +35,11 @@ describe('loadConfig', () => {
 
   it('names the offending field, never the value, in the error', () => {
     try {
-      loadConfig({ ...complete, FC_ENGINE_HOST: undefined });
+      loadConfig({ ...complete, FC_HTTP_PORT: 'not-a-number' });
       expect.unreachable('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(ConfigError);
-      expect((err as ConfigError).message).toContain('engineHost');
+      expect((err as ConfigError).message).toContain('httpPort');
     }
   });
 

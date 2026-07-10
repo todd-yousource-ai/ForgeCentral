@@ -20,7 +20,6 @@ const REDACT_PATHS = [
   '*.authorization',
   'req.headers.authorization',
   'tls.key',
-  'tlsKeyPath',
 ];
 
 /** Create the BFF logger at the given level, with secret redaction always on. */

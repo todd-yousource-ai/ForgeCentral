@@ -1,13 +1,13 @@
-// apps/bff/src/engine/wire-client.ts -- the real mTLS :7878 transport (F0.3b-3d).
+// apps/bff/src/engine/wire-client.ts -- the engine wire client over the crypto sidecar (F0.3b, revised CS.4).
 //
-// The production `CrucibleClient`: a native client of the Crucible wire protocol over mTLS on :7878,
-// built on @forge/wire (the frame/CBOR/handshake/transport stack proven byte-exact against crdb and live
-// against the running node). It connects lazily (on the first call), completes the reactor handshake, and
-// dispatches operations; `ping` is the readiness probe (a live connection + handshake means reachable).
+// The production `CrucibleClient`: a native client of the Crucible wire protocol, built on @forge/wire (the
+// frame/CBOR/handshake/transport stack proven byte-exact against crdb). It dials the AWS-LC crypto sidecar
+// over a plaintext LOOPBACK socket; the sidecar originates the mTLS to the engine on :7878, so Node performs
+// no TLS (INV-CONSOLE-CRYPTO-AWSLC). It connects lazily (on the first call), completes the reactor
+// handshake, and dispatches operations; `ping` is the readiness probe (a live connection + handshake means
+// the sidecar and engine are reachable).
 
-import { readFileSync } from 'node:fs';
-
-import { type FrameTransport, connectTls, dispatch, wireHandshake } from '@forge/wire';
+import { type FrameTransport, connectLoopback, dispatch, wireHandshake } from '@forge/wire';
 import type { WireError, WireQueryRows, WireReply } from '@forge/contracts';
 
 import type { BffConfig } from '../config.js';
@@ -24,15 +24,12 @@ export class EngineRefusedError extends Error {
 /** Establish a ready (post-handshake) transport to the engine. Injectable for tests. */
 export type EngineConnector = (config: BffConfig) => Promise<FrameTransport>;
 
-/** The production connector: mTLS dial + the reactor `Hello -> Ready` handshake. */
+/** The production connector: a plaintext loopback dial to the sidecar egress + the reactor handshake. The
+ * sidecar originates the mTLS to the engine on :7878 (Node performs no TLS; INV-CONSOLE-CRYPTO-AWSLC). */
 async function connectEngine(config: BffConfig): Promise<FrameTransport> {
-  const transport = await connectTls({
+  const transport = await connectLoopback({
     host: config.engineHost,
     port: config.enginePort,
-    ca: readFileSync(config.tlsCaPath),
-    cert: readFileSync(config.tlsCertPath),
-    key: readFileSync(config.tlsKeyPath),
-    servername: config.engineServername ?? config.engineHost,
   });
   await wireHandshake(transport);
   return transport;
