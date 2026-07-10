@@ -1,0 +1,38 @@
+{
+  "name": "@forge/console-spa",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The YouSource Console SPA shell (F0.8): left-rail IA, routing, the drawer host, the query + live-store layer, error boundaries, and the explicit empty/loading/error/stale states. Renders @forge/design; no surface data.",
+  "license": "LicenseRef-YouSource-Proprietary",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "vitest run",
+    "test:contract": "vitest run --dir src/test/contract",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@forge/bindings": "workspace:*",
+    "@forge/contracts": "workspace:*",
+    "@forge/design": "workspace:*",
+    "@tanstack/react-query": "^5.62.7",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "happy-dom": "^20.8.9",
+    "typescript": "^5.7.2",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.6"
+  }
+}

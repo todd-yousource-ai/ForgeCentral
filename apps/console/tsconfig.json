@@ -1,0 +1,20 @@
+{
+  "//": "Typecheck config for @forge/console-spa. A browser bundle (Vite), so Bundler resolution. The @forge/* workspace packages resolve to their source via paths so typecheck/test do not depend on build order (the same pattern as apps/bff). noEmit: Vite owns the build.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@forge/design": ["../../packages/design/src/index.ts"],
+      "@forge/contracts": ["../../packages/contracts/src/index.ts"],
+      "@forge/bindings": ["../../packages/bindings/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "vitest.config.ts"]
+}
