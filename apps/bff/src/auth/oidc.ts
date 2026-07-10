@@ -8,6 +8,8 @@
 
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 
+import { operatorPrincipalId } from './operator-id.js';
+import { resolveAuthority, type RbacConfig } from './rbac.js';
 import { type OperatorIdentity } from './session.js';
 import { deriveTier } from './tier.js';
 
@@ -113,15 +115,27 @@ export async function verifyIdToken(config: OidcConfig, idToken: string): Promis
 }
 
 /** Derive the operator identity (subject/email/tier) from verified id_token claims. */
-export function operatorFromClaims(payload: JWTPayload, roleClaim: string): OperatorIdentity {
+export function operatorFromClaims(
+  payload: JWTPayload,
+  roleClaim: string,
+  rbac: RbacConfig,
+): OperatorIdentity | undefined {
   const email = typeof payload['email'] === 'string' ? payload['email'] : undefined;
   const rawRoles = payload[roleClaim];
-  const roles = Array.isArray(rawRoles)
+  const groups = Array.isArray(rawRoles)
     ? rawRoles.filter((r): r is string => typeof r === 'string')
     : [];
+  const subject = String(payload.sub ?? '');
+  // The Console's RBAC resolves the operator's tenant + role (F0.5c). Fail-closed: an operator with no
+  // resolvable authority has no tenant and cannot be delegated, so the login is refused (undefined).
+  const authority = resolveAuthority(subject, groups, rbac);
+  if (authority === undefined) return undefined;
   return {
-    subject: String(payload.sub ?? ''),
-    tier: deriveTier(roles),
+    subject,
+    tier: deriveTier(groups),
+    principalId: operatorPrincipalId(subject),
+    tenant: authority.activeTenant,
+    role: authority.role,
     ...(email !== undefined ? { email } : {}),
   };
 }

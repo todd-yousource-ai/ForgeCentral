@@ -28,6 +28,7 @@ const config: BffConfig = {
     maxSessions: 4096,
     maxPendingLogins: 256,
   },
+  rbac: { groupRoles: {}, localRbac: {} },
 };
 
 /** A transport whose recv() returns a single scripted reply frame (a dispatch reply). */

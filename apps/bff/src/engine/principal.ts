@@ -22,14 +22,18 @@ export interface OperatorPrincipal {
   readonly subject: string;
   /** The operator's Crucible EXPLAIN tier (bounds what the engine reveals). */
   readonly tier: ExplainTier;
-  /**
-   * The operator's resolved tenant, when known. Unset today: the tenant is resolved engine-side under the
-   * operator delegation (F0.5c). Present here once that delegation carries it.
-   */
-  readonly tenant?: string;
+  /** The stable engine `PrincipalId` (a UUID) the delegation asserts the read runs as (F0.5c). */
+  readonly principalId: string;
+  /** The tenant the read is scoped to (resolved by the Console's RBAC, F0.5c). */
+  readonly tenant: string;
 }
 
 /** Derive the Principal from a live operator session. */
 export function principalFromSession(session: OperatorSession): OperatorPrincipal {
-  return { subject: session.subject, tier: session.tier };
+  return {
+    subject: session.subject,
+    tier: session.tier,
+    principalId: session.principalId,
+    tenant: session.tenant,
+  };
 }

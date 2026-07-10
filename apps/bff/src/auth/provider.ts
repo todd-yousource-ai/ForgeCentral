@@ -7,6 +7,7 @@
 
 import type { OidcConfig, DeviceCode, PollResult } from './oidc.js';
 import { requestDeviceCode, pollToken, verifyIdToken, operatorFromClaims } from './oidc.js';
+import type { RbacConfig } from './rbac.js';
 import type { OperatorIdentity } from './session.js';
 
 /** The IdP operations the auth router needs. */
@@ -15,18 +16,22 @@ export interface OidcProvider {
   requestDeviceCode(): Promise<DeviceCode>;
   /** Poll the token endpoint once for a device code. */
   pollToken(deviceCode: string): Promise<PollResult>;
-  /** Verify an id_token and derive the operator identity (throws if the token is not valid). */
-  verifyLogin(idToken: string): Promise<OperatorIdentity>;
+  /**
+   * Verify an id_token and resolve the operator identity. Throws if the token is not valid; returns
+   * `undefined` when the token is valid but the operator has no resolvable authority (no tenant -> the
+   * login is refused, F0.5c).
+   */
+  verifyLogin(idToken: string): Promise<OperatorIdentity | undefined>;
 }
 
-/** Build the real provider over an `OidcConfig` (binds the oidc.ts device-flow functions). */
-export function createOidcProvider(config: OidcConfig): OidcProvider {
+/** Build the real provider over an `OidcConfig` + the Console RBAC (binds the oidc.ts device-flow). */
+export function createOidcProvider(config: OidcConfig, rbac: RbacConfig): OidcProvider {
   return {
     requestDeviceCode: () => requestDeviceCode(config),
     pollToken: (deviceCode) => pollToken(config, deviceCode),
     verifyLogin: async (idToken) => {
       const claims = await verifyIdToken(config, idToken);
-      return operatorFromClaims(claims, config.roleClaim);
+      return operatorFromClaims(claims, config.roleClaim, rbac);
     },
   };
 }
