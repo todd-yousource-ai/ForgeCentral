@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a operator OIDC auth + F0.5a-2 login endpoints LIVE-PROVEN against Auth0; F0.5b (session -> Principal) next.**
+Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a operator OIDC auth + F0.5a-2 login endpoints LIVE-PROVEN against Auth0; F0.5b operator Principal + engine facade LANDED; F0.5c (crdb INV-CROSS: operator delegation on the wire) next.**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -23,12 +23,50 @@ Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN
 | F0.4 | INV-CONSOLE-NO-STUB | LANDED (review) | 375b164 | `@forge/bindings` registry + no-stub enforcement (`validateManifest` / `assertReleaseReady`), wired into the gate's `test:contract` step. |
 | F0.5a | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 9e7f014 | Operator OIDC device-flow login + id_token verify + EXPLAIN tier + session store; proven end-to-end against Auth0 (MFA). |
 | F0.5a-2 | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 1b468df | `/auth/login` + `/auth/login/poll` + `/auth/logout` + `/auth/me` mounted; OIDC config in `BffConfig`; hardened session cookie; **the real BFF drove a live Auth0 MFA login through its own endpoints**. |
-| F0.5b | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Session -> Crucible Principal mapping (subject + tier -> engine authz). |
-| F0.5c | INV-CROSS (crdb) | OPEN | -- | crdb admin-scope read path + delegation broker (device-wide envelope under the operator). |
+| F0.5b | INV-CONSOLE-ENGINE-AUTHZ | LANDED (review) | 49da0c1 | Operator `Principal` + authenticated engine facade: every brokered read names the operator (type-level) + records the delegation. Engine-side per-operator authz is PENDING F0.5c. |
+| F0.5c | INV-CROSS (crdb) | OPEN | -- | crdb: operator delegation on the wire (operator identity + target tenant on `WireQuerySubmit`) + admin-scope read path + operator in the engine audit stream. |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
 | F0.8 | INV-CONSOLE-SHELL-3-CLICK-FRAME | OPEN | -- | SPA shell: nav + IA + drawer host + empty/loading/error/stale. |
 | SC | INV-CONSOLE-SUPPLYCHAIN-HARDENED | LANDED (review) | 734e145 | Supply-chain hardening of the gate. See the note below. |
+
+## F0.5b -- the operator Principal + authenticated engine facade (`@forge/bff` engine seam)
+
+Bridges the authenticated operator (F0.5a/F0.5a-2) to the engine seam. The result is a hard rule the
+type system enforces: **the BFF cannot broker an engine read without naming the operator it is for.**
+
+- **`engine/principal.ts`** -- `OperatorPrincipal { subject, tier, tenant? }` + `principalFromSession`.
+  The subject + EXPLAIN tier come from the verified session; the operator's **tenant is intentionally not
+  set yet** (it is resolved engine-side under the operator delegation, F0.5c).
+- **`engine/operator-engine.ts`** -- `OperatorEngine`, a facade over `CrucibleClient` whose every method
+  (`querySubmit` / `cursorFetch` / `cursorClose`) **requires an `OperatorPrincipal`**. Each call records a
+  delegation -- `{ operator, tier, action, requestId?, tenant? }` -- **before** it runs, so even a refused
+  attempt is traced. The default `DelegationSink` writes a structured `engine delegation` line to the
+  logger.
+
+**The honest boundary (INV-CROSS, why this is F0.5b and not the whole of engine authz).** The wire cannot
+carry the operator today: `WireQuerySubmit` is `{ params, request_id, text }` -- no operator identity, no
+target tenant, no scope. The engine authorizes the **transport** by the BFF's one device-wide service
+cert (F0.3b), so it cannot yet re-authorize per operator. Therefore F0.5b lands the BFF's mandatory
+**delegation boundary + trace** (which is real, and testable), and the following are explicitly **PENDING
+in crdb F0.5c**: (1) the operator identity + resolved target tenant on the wire so the engine
+re-authorizes under the operator (the device-wide envelope: a signed-in admin is scoped to their own
+tenant); (2) the CrucibleQL read path accepting an admin scope + explicit target tenant (it refuses
+`Scope::Admin` today); (3) the operator written into the engine's authoritative audit stream
+(`WireAuditEntry.principal_id`). The `OperatorPrincipal` this facade records is exactly the value F0.5c
+serializes onto the new wire field -- no rework, just a wider wire.
+
+**How a surface wires it (the consumer contract).** A surface handler resolves the session on the inbound
+request (`authRouter.resolveSession(req)`, F0.5a-2), maps it (`principalFromSession`), and calls
+`operatorEngine.querySubmit(principal, ...)`. The facade is exported from the engine barrel and
+constructed as `createOperatorEngine(client, loggerDelegationSink(log))`; it is not yet wired into a route
+(no operator surface exists at the foundation), the same way F0.4 shipped the no-stub enforcement with an
+empty binding manifest.
+
+**Test tier:** 2. 6 assertions: `principalFromSession` mapping; delegate-and-record for each operation;
+the attempt is recorded before the call so a refusal is still traced (and the error propagates); the
+tenant is carried when the Principal has one; the logger sink emits the structured line. Full
+`scripts/ci.sh` green.
 
 ## F0.5a-2 -- the operator login endpoints (`@forge/bff` auth router)
 
