@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5 (auth) next.**
+Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a operator OIDC auth LIVE-PROVEN against Auth0; F0.5a-2 (login endpoints) next.**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -21,11 +21,56 @@ Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN
 | F0.3b-3c | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | b7b49ee | Operation dispatch + `wireHandshake` (reactor `Hello->Ready`) + a **real round-trip against the live `:7878` node** (mTLS -> handshake -> QuerySubmit -> decoded WireReply). |
 | F0.3b-3d | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 9d0736d | `WireCrucibleClient` over `@forge/wire` behind the BFF seam; the **real BFF `/readyz` returns `{ready:true}` against the live `:7878` node**. |
 | F0.4 | INV-CONSOLE-NO-STUB | LANDED (review) | 375b164 | `@forge/bindings` registry + no-stub enforcement (`validateManifest` / `assertReleaseReady`), wired into the gate's `test:contract` step. |
-| F0.5 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | OIDC -> Principal + EXPLAIN tier; engine-side authz. |
+| F0.5a | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 9e7f014 | Operator OIDC device-flow login + id_token verify + EXPLAIN tier + session store; proven end-to-end against Auth0 (MFA). |
+| F0.5a-2 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Login/logout/callback endpoints + OIDC config in `BffConfig`; session cookie + middleware. |
+| F0.5b | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Session -> Crucible Principal mapping (subject + tier -> engine authz). |
+| F0.5c | INV-CROSS (crdb) | OPEN | -- | crdb admin-scope read path + delegation broker (device-wide envelope under the operator). |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
 | F0.8 | INV-CONSOLE-SHELL-3-CLICK-FRAME | OPEN | -- | SPA shell: nav + IA + drawer host + empty/loading/error/stale. |
 | SC | INV-CONSOLE-SUPPLYCHAIN-HARDENED | LANDED (review) | 734e145 | Supply-chain hardening of the gate. See the note below. |
+
+## F0.5a -- operator OIDC device-flow auth (`@forge/bff` auth module)
+
+The operator login for the Console. The BFF runs headless (no browser, no public redirect on the node),
+so a redirect-based Authorization Code flow does not fit; the operator authenticates with the **OAuth 2.0
+Device Authorization Grant (RFC 8628, `TRD-CONSOLE-00` auth section)**: the BFF requests a device code,
+the operator completes login **and MFA on their own device**, and the BFF polls for the tokens. The
+`id_token` is **verified, never trusted** -- signature against the IdP JWKS, plus issuer / audience /
+expiry -- and the operator identity + EXPLAIN tier are derived from its claims.
+
+- **`auth/oidc.ts`** -- `requestDeviceCode` / `pollToken` (grant `urn:ietf:params:oauth:grant-type:
+  device_code`; `pending` on `authorization_pending`/`slow_down`, throws on a real error) /
+  `verifyIdToken` (jose `createRemoteJWKSet` + `jwtVerify` with `issuer` + `audience`; one cached JWKS per
+  uri) / `operatorFromClaims`.
+- **`auth/tier.ts`** -- `deriveTier(roles)`; maps the console roles to the four Crucible EXPLAIN tiers
+  (`User` < `Developer` < `Admin` < `SecurityAudit`), picks the highest, and **fails closed to `User`**
+  for absent/unknown/non-string roles.
+- **`auth/session.ts`** -- `OperatorSession` (opaque random 32-byte session id = the cookie value, never
+  derived from the subject) + `SessionStore`: in-memory, bounded (oldest-evicted), TTL, fail-closed
+  `get` on expiry. **No durable state** (INV-CONSOLE-NO-2ND-DB): a session is operational, not domain
+  data.
+
+**Live proof (against the pinned Auth0 dev tenant, real MFA).** The compiled module ran the full path on
+a real login: device code issued -> operator logged in + completed MFA -> `verifyIdToken` fetched the
+live JWKS and verified the RS256 signature + `iss` (`https://dev-6rcwumbp1tsae8me.us.auth0.com/`) + `aud`
+(the client id) + expiry -> `operatorFromClaims` derived `{subject: auth0|..., email: todd@yousource.ai,
+tier: User}` (the token's `https://crucibledb/groups: ["dev.agents"]` is not a console role, so the tier
+correctly fails closed to `User`) -> `SessionStore` minted + resolved a session. A token with one
+signature byte flipped was **rejected** (`ERR_JWS_SIGNATURE_VERIFICATION_FAILED`). This is
+INV-CONSOLE-ENGINE-AUTHZ's operator half proven end-to-end, no mocks.
+
+**Test tier:** 1 + live. 22 hermetic assertions (`deriveTier` mapping + case-insensitivity +
+fail-closed; `SessionStore` create/expire/evict/destroy/unique-id; `operatorFromClaims` claim mapping +
+fail-closed) plus the live Auth0 round-trip above. Full `scripts/ci.sh` green (all 10 steps; `jose`
+^5.9.6, MIT, zero install scripts, audit + license clean).
+
+**Deferred (named honestly, INV-CROSS):** the **login/logout/callback HTTP endpoints** + OIDC config in
+`BffConfig` + the session cookie/middleware are **F0.5a-2**; the **session -> Crucible Principal**
+mapping is **F0.5b**; and the **device-wide envelope** (an admin signing in is scoped to their tenant,
+but ForgeCentral holds a device-wide service cert) needs the **crdb admin-scope read path + delegation
+broker** -- **F0.5c**, a cross-repo crdb IP (crdb's read path today refuses `Scope::Admin` with
+`AuthzError::AdminScopeUnsupported`). F0.5a lands the verified-identity core those build on.
 
 ## F0.3b -- the native wire transport (`@forge/wire`), built now (node is live locally)
 
