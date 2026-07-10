@@ -205,7 +205,16 @@ built with `git insteadOf` -> `github-crucible` and `CRUCIBLE_TOKEN` in CI.
 - **Two-process deployment:** the Console is now BFF + sidecar. The installer provisions the sidecar binary,
   its config, the CNSA admin leaf, and the loopback wiring. Documented as a deploy concern (matches the
   spec's "installer provisions the admin plane").
-- **Loopback trust:** plaintext hops are `127.0.0.1` only (never a routable interface); the sidecar and BFF
-  co-reside on the node. A future hardening (a loopback authenticator) is out of scope; noted, not stubbed.
+- **Local capture on the cleartext hops (decision: TCP loopback accepted).** Terminating TLS in a separate
+  process necessarily hands cleartext across the BFF <-> sidecar boundary; that is inherent to any
+  TLS-terminating proxy (encrypting the hop would require the BFF to decrypt it, i.e. Node doing TLS again on
+  OpenSSL, defeating `INV-CONSOLE-CRYPTO-AWSLC`). Bounded as follows: the hops are `127.0.0.1` only, never a
+  routable interface, so there is **no off-host exposure** -- everything that leaves the host is
+  aws-lc-rs-encrypted. On-host, sniffing loopback requires `root`/`CAP_NET_RAW`, and an adversary at that
+  level already owns the BFF/sidecar process memory (same cleartext) and the sidecar's TLS private keys, so
+  the hop does not widen the trust boundary beyond "root on the node." A Unix-domain-socket variant (0600 +
+  a dedicated service user, closing the passive `tcpdump` vector) was considered and **declined for v1** in
+  favor of TCP loopback (product-owner decision 2026-07-10); it remains available as future hardening,
+  alongside a loopback authenticator. Noted, not stubbed.
 - **CNSA classical floor has no library flag:** realized via `kx_groups` + the CNSA leaf and proven
   behaviorally (Section 7). If a future `rustls`/`aws-lc-rs` exposes an explicit floor knob, adopt it.
