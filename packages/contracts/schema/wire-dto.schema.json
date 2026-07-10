@@ -1,5 +1,21 @@
 {
   "$defs": {
+    "OperatorDelegation": {
+      "additionalProperties": false,
+      "properties": {
+        "principal": {
+          "type": "string"
+        },
+        "tenant": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "principal",
+        "tenant"
+      ],
+      "type": "object"
+    },
     "RetryClass": {
       "enum": [
         "Never",
@@ -206,6 +222,16 @@
     "WireQuerySubmit": {
       "additionalProperties": false,
       "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "params": {
           "items": {
             "maxItems": 2,

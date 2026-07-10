@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a operator OIDC auth + F0.5a-2 login endpoints LIVE-PROVEN against Auth0; F0.5b operator Principal + engine facade LANDED; F0.5c (crdb INV-CROSS: operator delegation on the wire) next.**
+Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a/F0.5a-2 OIDC auth LIVE-PROVEN; F0.5b operator Principal + engine facade LANDED; F0.5c IN PROGRESS -- crdb CD.1/CD.1a delegation consume-side LANDED + LIVE-PROVEN (crdb `6746ce8f`), ForgeCentral wire encoder LANDED; F0.5c producer (resolve operator tenant + inject) next.**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -24,7 +24,10 @@ Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN
 | F0.5a | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 9e7f014 | Operator OIDC device-flow login + id_token verify + EXPLAIN tier + session store; proven end-to-end against Auth0 (MFA). |
 | F0.5a-2 | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 1b468df | `/auth/login` + `/auth/login/poll` + `/auth/logout` + `/auth/me` mounted; OIDC config in `BffConfig`; hardened session cookie; **the real BFF drove a live Auth0 MFA login through its own endpoints**. |
 | F0.5b | INV-CONSOLE-ENGINE-AUTHZ | LANDED (review) | 49da0c1 | Operator `Principal` + authenticated engine facade: every brokered read names the operator (type-level) + records the delegation. Engine-side per-operator authz is PENDING F0.5c. |
-| F0.5c | INV-CROSS (crdb) | OPEN | -- | crdb: operator delegation on the wire (operator identity + target tenant on `WireQuerySubmit`) + admin-scope read path + operator in the engine audit stream. |
+| F0.5c-crdb | INV-WIRE-OPERATOR-DELEGATION (crdb) | LANDED + LIVE-PROVEN | crdb `6746ce8f` | crdb CD.1/CD.1a: `WirePlane::Delegation` + `WireQuerySubmit.operator` (UUID-string ids) consumed on the read path; a `Delegation`-granted peer's read runs in the operator's tenant (proven over live mTLS). crdb is a consumer of identity, not an RBAC authority (product-owner decision). See crdb `IP-CONSOLE-DELEGATION`. |
+| F0.5c-wire | INV-CONSOLE-ENGINE-AUTHZ | LANDED (review) | 9ef0431 | ForgeCentral: re-vendor the crdb schema + regenerate `@forge/contracts` (`OperatorDelegation`, `WireQuerySubmit.operator`); `@forge/wire` emits the operator on QuerySubmit, byte-exact to a crdb golden, omitted when absent. |
+| F0.5c-producer | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Resolve the operator's tenant + `PrincipalId` (ForgeCentral RBAC / customer IDAM group ids) and inject the delegation via the OperatorEngine facade; live end-to-end (operator login -> tenant-scoped engine read). |
+| F0.5c-audit | INV-AUDIT-DELEGATING-PRINCIPAL (crdb) | OPEN | -- | crdb CD.2: `AuditEntry.delegating_principal` + operator attribution in read telemetry. |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
 | F0.8 | INV-CONSOLE-SHELL-3-CLICK-FRAME | OPEN | -- | SPA shell: nav + IA + drawer host + empty/loading/error/stale. |

@@ -23,6 +23,35 @@ describe('encodeWireRequest', () => {
     );
   });
 
+  it('encodes a delegated QuerySubmit (operator) byte-identically to ciborium (F0.5c)', () => {
+    const request: WireRequest = {
+      QuerySubmit: {
+        request_id: 42,
+        text: 'FIND person',
+        params: [['min', { Int: 30 }]],
+        operator: {
+          principal: '00000000-0000-0000-0000-000000000007',
+          tenant: '00000000-0000-0000-0000-000000000002',
+        },
+      },
+    };
+    // crdb golden `req_submit_delegated` (the operator key is appended after params, matching the Rust
+    // struct field order; ids are hyphenated UUID strings).
+    expect(hex(encodeWireRequest(request))).toBe(
+      'a16b51756572795375626d6974a46a726571756573745f6964182a64746578746b46494e4420706572736f6e66706172616d738182636d696ea163496e74181e686f70657261746f72a2697072696e636970616c782430303030303030302d303030302d303030302d303030302d3030303030303030303030376674656e616e74782430303030303030302d303030302d303030302d303030302d303030303030303030303032',
+    );
+  });
+
+  it('omits the operator key when absent (byte-identical to a pre-delegation client)', () => {
+    const withUndefined: WireRequest = {
+      QuerySubmit: { request_id: 42, text: 'FIND person', params: [['min', { Int: 30 }]] },
+    };
+    // No operator -> the same bytes as the base golden above (the a3 three-key map).
+    expect(hex(encodeWireRequest(withUndefined))).toBe(
+      'a16b51756572795375626d6974a36a726571756573745f6964182a64746578746b46494e4420706572736f6e66706172616d738182636d696ea163496e74181e',
+    );
+  });
+
   it('throws on an unsupported (write-path) variant rather than emitting a wrong shape', () => {
     const request = { TxnCommit: { txn: [], request_id: 1 } } as unknown as WireRequest;
     expect(() => encodeWireRequest(request)).toThrow(/not yet supported/);
