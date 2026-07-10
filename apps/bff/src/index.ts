@@ -5,6 +5,10 @@
 // transport. This module is the only one with process-level side effects; the unit tests exercise the
 // pieces directly.
 
+import { createAuthRouter, type AuthRouter } from './auth/router.js';
+import { createOidcProvider } from './auth/provider.js';
+import { PendingLoginStore } from './auth/login-store.js';
+import { SessionStore } from './auth/session.js';
 import { EphemeralCache } from './cache.js';
 import { loadConfig } from './config.js';
 import { createEngineClient } from './engine/index.js';
@@ -16,7 +20,30 @@ async function main(): Promise<void> {
   const log = createLogger(config.logLevel);
   const cache = new EphemeralCache<unknown>(config.cacheTtlMs, config.cacheMaxEntries);
   const client = createEngineClient(config);
-  const server = createServer({ config, log, cache, client });
+
+  // Operator auth mounts only when OIDC is configured (F0.5a-2); otherwise /auth/* is not served.
+  let authRouter: AuthRouter | undefined;
+  if (config.oidc !== undefined) {
+    authRouter = createAuthRouter({
+      oidc: createOidcProvider(config.oidc),
+      sessions: new SessionStore(config.session.maxSessions),
+      pending: new PendingLoginStore(config.session.maxPendingLogins),
+      log,
+      sessionTtlMs: config.session.ttlMs,
+      cookie: { name: config.session.cookieName, secure: config.session.cookieSecure },
+    });
+    log.info({}, 'operator auth enabled (OIDC device flow)');
+  } else {
+    log.warn({}, 'operator auth DISABLED (FC_OIDC_ISSUER not set)');
+  }
+
+  const server = createServer({
+    config,
+    log,
+    cache,
+    client,
+    ...(authRouter !== undefined ? { authRouter } : {}),
+  });
 
   await new Promise<void>((resolve) => {
     server.listen(config.httpPort, () => {

@@ -1,12 +1,19 @@
-// apps/bff/src/config.ts -- BFF configuration, validated at startup (F0.3).
+// apps/bff/src/config.ts -- BFF configuration, validated at startup (F0.3 + F0.5a-2 auth).
 //
 // The BFF reads its configuration from the environment and validates it with zod at the process boundary
 // (TypeScript_Dev_Rules: zod at every trust boundary). Validation is FAIL-CLOSED: a missing or malformed
 // value throws `ConfigError` before the service serves anything, rather than starting in a half-configured
 // state. The mTLS material (CA + client cert + key paths) is REQUIRED -- the BFF has no non-mTLS path to
 // the engine (TRD-CONSOLE-00 Section 8).
+//
+// Operator auth (F0.5a-2) is configured as an OPTIONAL block: when `FC_OIDC_ISSUER` is present the auth
+// router mounts (the operator login endpoints), and the issuer additionally requires a client id + role
+// claim (fail-closed if half-specified). When absent, the BFF boots without operator login -- honest for
+// the incremental foundation; a release build enables it (a note the release gate will enforce).
 
 import { z } from 'zod';
+
+import type { OidcConfig } from './auth/oidc.js';
 
 const ConfigSchema = z.object({
   /** The engine host the BFF connects to over mTLS. */
@@ -31,10 +38,61 @@ const ConfigSchema = z.object({
   cacheMaxEntries: z.coerce.number().int().positive().default(1000),
   /** Default per-call engine timeout in ms (every engine call is bounded). */
   requestTimeoutMs: z.coerce.number().int().positive().default(5000),
+
+  // -- Operator session settings (used only when auth is enabled) --------------------------------
+  /** Operator session lifetime in ms. */
+  sessionTtlMs: z.coerce.number().int().positive().default(3_600_000),
+  /** The session cookie name. */
+  sessionCookieName: z.string().min(1).default('fc_session'),
+  /** Whether the session cookie carries `Secure` (true in production; false only for local plain-HTTP). */
+  // Explicit true/false parse: `z.coerce.boolean()` would treat the string "false" as truthy.
+  sessionCookieSecure: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  /** Max concurrent operator sessions held in memory (bounded). */
+  sessionMax: z.coerce.number().int().positive().default(4096),
+  /** Max concurrent in-flight device logins held in memory (bounded). */
+  loginMax: z.coerce.number().int().positive().default(256),
+
+  // -- OIDC (optional block; see loadConfig post-processing) --------------------------------------
+  oidcIssuer: z.string().url().optional(),
+  oidcClientId: z.string().min(1).optional(),
+  oidcRoleClaim: z.string().min(1).optional(),
+  oidcScope: z.string().min(1).default('openid profile email'),
+  oidcJwksUri: z.string().url().optional(),
+  oidcDeviceCodeEndpoint: z.string().url().optional(),
+  oidcTokenEndpoint: z.string().url().optional(),
 });
 
+type RawConfig = z.infer<typeof ConfigSchema>;
+
+/** The operator session + cookie settings. */
+export interface SessionSettings {
+  readonly ttlMs: number;
+  readonly cookieName: string;
+  readonly cookieSecure: boolean;
+  readonly maxSessions: number;
+  readonly maxPendingLogins: number;
+}
+
 /** The validated BFF configuration. */
-export type BffConfig = z.infer<typeof ConfigSchema>;
+export interface BffConfig {
+  readonly engineHost: string;
+  readonly enginePort: number;
+  readonly tlsCaPath: string;
+  readonly tlsCertPath: string;
+  readonly tlsKeyPath: string;
+  readonly engineServername?: string;
+  readonly httpPort: number;
+  readonly logLevel: RawConfig['logLevel'];
+  readonly cacheTtlMs: number;
+  readonly cacheMaxEntries: number;
+  readonly requestTimeoutMs: number;
+  readonly session: SessionSettings;
+  /** The OIDC login config, present only when `FC_OIDC_ISSUER` is set (auth enabled). */
+  readonly oidc?: OidcConfig;
+}
 
 /** Thrown when configuration is missing or invalid. Carries field paths, never secret values. */
 export class ConfigError extends Error {
@@ -42,6 +100,38 @@ export class ConfigError extends Error {
     super(message);
     this.name = 'ConfigError';
   }
+}
+
+/** Trim exactly one trailing slash (Auth0 issuers carry one; endpoint paths must not double it). */
+function trimTrailingSlash(url: string): string {
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+
+/**
+ * Assemble the OIDC config from the raw env, deriving the standard Auth0 endpoints from the issuer when
+ * they are not overridden. Returns `undefined` when auth is disabled (no issuer). Fail-closed: an issuer
+ * without a client id + role claim is a misconfiguration, not a silent half-auth.
+ */
+function resolveOidc(raw: RawConfig): OidcConfig | undefined {
+  if (raw.oidcIssuer === undefined) return undefined;
+  const missing: string[] = [];
+  if (raw.oidcClientId === undefined) missing.push('FC_OIDC_CLIENT_ID');
+  if (raw.oidcRoleClaim === undefined) missing.push('FC_OIDC_ROLE_CLAIM');
+  if (missing.length > 0) {
+    throw new ConfigError(
+      `FC_OIDC_ISSUER is set but auth is incomplete: set ${missing.join(', ')}`,
+    );
+  }
+  const base = trimTrailingSlash(raw.oidcIssuer);
+  return {
+    issuer: raw.oidcIssuer,
+    clientId: raw.oidcClientId as string,
+    roleClaim: raw.oidcRoleClaim as string,
+    scope: raw.oidcScope,
+    jwksUri: raw.oidcJwksUri ?? `${base}/.well-known/jwks.json`,
+    deviceCodeEndpoint: raw.oidcDeviceCodeEndpoint ?? `${base}/oauth/device/code`,
+    tokenEndpoint: raw.oidcTokenEndpoint ?? `${base}/oauth/token`,
+  };
 }
 
 /** Load and validate configuration from an environment map. Fail-closed. */
@@ -58,11 +148,45 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     cacheTtlMs: env['FC_CACHE_TTL_MS'],
     cacheMaxEntries: env['FC_CACHE_MAX_ENTRIES'],
     requestTimeoutMs: env['FC_REQUEST_TIMEOUT_MS'],
+    sessionTtlMs: env['FC_SESSION_TTL_MS'],
+    sessionCookieName: env['FC_SESSION_COOKIE'],
+    sessionCookieSecure: env['FC_SESSION_COOKIE_SECURE'],
+    sessionMax: env['FC_SESSION_MAX'],
+    loginMax: env['FC_LOGIN_MAX'],
+    oidcIssuer: env['FC_OIDC_ISSUER'],
+    oidcClientId: env['FC_OIDC_CLIENT_ID'],
+    oidcRoleClaim: env['FC_OIDC_ROLE_CLAIM'],
+    oidcScope: env['FC_OIDC_SCOPE'],
+    oidcJwksUri: env['FC_OIDC_JWKS_URI'],
+    oidcDeviceCodeEndpoint: env['FC_OIDC_DEVICE_ENDPOINT'],
+    oidcTokenEndpoint: env['FC_OIDC_TOKEN_ENDPOINT'],
   });
   if (!parsed.success) {
     // Report the offending field paths only -- never echo the (possibly sensitive) values.
     const fields = parsed.error.issues.map((issue) => issue.path.join('.') || '(root)').join(', ');
     throw new ConfigError(`invalid BFF configuration: check ${fields}`);
   }
-  return parsed.data;
+  const raw = parsed.data;
+  const oidc = resolveOidc(raw);
+  return {
+    engineHost: raw.engineHost,
+    enginePort: raw.enginePort,
+    tlsCaPath: raw.tlsCaPath,
+    tlsCertPath: raw.tlsCertPath,
+    tlsKeyPath: raw.tlsKeyPath,
+    httpPort: raw.httpPort,
+    logLevel: raw.logLevel,
+    cacheTtlMs: raw.cacheTtlMs,
+    cacheMaxEntries: raw.cacheMaxEntries,
+    requestTimeoutMs: raw.requestTimeoutMs,
+    session: {
+      ttlMs: raw.sessionTtlMs,
+      cookieName: raw.sessionCookieName,
+      cookieSecure: raw.sessionCookieSecure,
+      maxSessions: raw.sessionMax,
+      maxPendingLogins: raw.loginMax,
+    },
+    ...(raw.engineServername !== undefined ? { engineServername: raw.engineServername } : {}),
+    ...(oidc !== undefined ? { oidc } : {}),
+  };
 }
