@@ -73,5 +73,25 @@ addition; they are not wired into the hermetic local gate.
 
 An SBOM (CycloneDX) is produced per build (`scripts/sbom.mjs`, above) and per release artifact and stored
 with it; release artifacts are signed and verified at deploy. Container images do not run as root and bake
-no secrets. Runtime containment (the deployed BFF reaches only `:7878` mTLS, the IdP, and the browser;
-unexpected egress is blocked) is the last layer, owned by the deploy + admin-plane work.
+no secrets. Runtime containment (the deployed BFF reaches only the loopback sidecar, the IdP, and the
+browser; unexpected egress is blocked) is the last layer, owned by the deploy + admin-plane work.
+
+## The Rust crypto sidecar (`sidecar/`)
+
+The AWS-LC crypto sidecar (`IP-CONSOLE-00-CRYPTO-SIDECAR`) is a standalone Rust crate, **not** an npm
+dependency and **not** in the pnpm workspace, so it never enters the Node supply chain (the empty-runtime
+`dependencies` rule and the install-script lockdown above are unaffected). It is provisioned as an
+installer-built binary (`sidecar/deploy/`).
+
+Its own supply chain mirrors the engine repos' Rust policy:
+
+- **Pinned, committed lockfile** (`sidecar/Cargo.lock`) -- the exact dependency set and the SBOM source for
+  the binary. Deps are pinned, minimal, and feature-scoped.
+- **License allowlist + bans + sources** enforced by `sidecar/deny.toml` (`cargo deny check`) -- the same
+  allowlist as the Console's npm policy (AGPL/GPL/LGPL denied), plus `OpenSSL` for the `aws-lc` FIPS module.
+  The **only** allowed git source is the pinned CrucibleDB repo (the `cdb-mtls` contract crate); every other
+  git source and any crates.io `*` version fails the gate.
+- **Advisories** via `cargo audit` (RustSec).
+- Both run as the `scripts/ci.sh` `[11] sidecar` leg (network-gated, like the npm audit); CI provisions
+  `cargo-deny`/`cargo-audit`. A release build emits the sidecar's CycloneDX SBOM (`cargo-cyclonedx`)
+  alongside the npm SBOM.
