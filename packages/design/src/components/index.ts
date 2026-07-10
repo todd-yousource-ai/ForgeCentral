@@ -4,3 +4,5 @@ export * from './Badge.js';
 export * from './ScoreRing.js';
 export * from './KpiCard.js';
 export * from './TabStrip.js';
+export * from './Drawer.js';
+export * from './ConfirmDialog.js';

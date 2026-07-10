@@ -7,7 +7,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Badge, KpiCard, ScoreRing, TabStrip, scoreBand } from '../src/index.js';
+import {
+  Badge,
+  ConfirmDialog,
+  Drawer,
+  KpiCard,
+  ScoreRing,
+  TabStrip,
+  scoreBand,
+} from '../src/index.js';
 
 describe('Badge', () => {
   it('renders its label so meaning is never conveyed by color alone', () => {
@@ -82,5 +90,97 @@ describe('TabStrip', () => {
     );
     fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' });
     expect(onChange).toHaveBeenCalledWith('reflex');
+  });
+});
+
+describe('Drawer', () => {
+  it('renders nothing when closed (no hidden panel in the DOM)', () => {
+    render(
+      <Drawer open={false} title="Agent detail" onClose={vi.fn()}>
+        <p>body</p>
+      </Drawer>,
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('body')).not.toBeInTheDocument();
+  });
+
+  it('is a modal dialog named by its title, with its body content', () => {
+    render(
+      <Drawer open title="Agent detail" onClose={vi.fn()}>
+        <p>host content</p>
+      </Drawer>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Agent detail' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByText('host content')).toBeInTheDocument();
+  });
+
+  it('closes on Escape and on the close button (WCAG 2.1.2, no keyboard trap)', () => {
+    const onClose = vi.fn();
+    render(
+      <Drawer open title="Agent detail" onClose={onClose}>
+        <p>body</p>
+      </Drawer>,
+    );
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('ConfirmDialog', () => {
+  it('is an alertdialog named + described, guarding a consequential act', () => {
+    render(
+      <ConfirmDialog
+        open
+        title="Quarantine agent?"
+        description="Its egress is cut until released."
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const dialog = screen.getByRole('alertdialog', { name: 'Quarantine agent?' });
+    expect(dialog).toHaveAccessibleDescription('Its egress is cut until released.');
+  });
+
+  it('confirms and cancels through its buttons', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        title="Revoke grant?"
+        confirmLabel="Revoke"
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps Escape to cancel (the safe default)', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    render(<ConfirmDialog open title="Revoke grant?" onConfirm={onConfirm} onCancel={onCancel} />);
+    fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('marks a destructive confirm with the critical token class (not color alone)', () => {
+    render(
+      <ConfirmDialog
+        open
+        title="Delete?"
+        confirmLabel="Delete"
+        tone="critical"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('fc-btn--critical');
   });
 });
