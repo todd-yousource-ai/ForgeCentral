@@ -5,14 +5,14 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a/F0.5a-2 OIDC auth LIVE-PROVEN; F0.5b operator Principal + engine facade LANDED; F0.5c IN PROGRESS -- crdb CD.1/CD.1a delegation consume-side LANDED + LIVE-PROVEN (crdb `6746ce8f`), ForgeCentral wire encoder LANDED; F0.5c producer (resolve operator tenant + inject) next.**
+Status: **F0.1 + SC + F0.2a/b + F0.2c (drawer + confirm shells) + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a/F0.5a-2 OIDC auth LIVE-PROVEN; F0.5b operator Principal + engine facade LANDED; F0.5c wire + producer LANDED (crdb CD.1/CD.1a consume-side LANDED + LIVE-PROVEN, crdb `6746ce8f`) -- its live end-to-end join is batched into the Phase 0 exit capstone. F0.6 DEFERRED (product owner). Finishing F0: F0.7 (admin plane) + F0.8 (SPA shell), then the full live run.**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
 | F0.1 | INV-CONSOLE-CONTRACTS-SINGLE-SOURCE | LANDED (review) | a738517 | `@forge/contracts` + the workspace bring-up. See the note below. |
 | F0.2a | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | LANDED (review) | f42331d | Design-token foundation (`@forge/design`): tokens + CSS theme + WCAG contrast tests. |
 | F0.2b | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | LANDED (review) | 8ca5ff6 | React harness + core primitives (Badge/ScoreRing/KpiCard/TabStrip). |
-| F0.2c | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | OPEN | -- | Remaining shells: right drawer, confirm dialog, data table, flow-graph host, charts, timeline scrubber (data-bound ones may land with their surface). |
+| F0.2c | INV-CONSOLE-DESIGN-SEMANTIC-COLOR | LANDED (review) | 86985fc | The two non-data-bound shells the SPA shell (F0.8) needs: `Drawer` (right slide-over host -- `role=dialog`/`aria-modal`, titled, Escape + close + scrim dismiss, initial focus in-panel, no hidden DOM when closed) + `ConfirmDialog` (`role=alertdialog`, labelled/described, Escape=cancel, initial focus on cancel, `critical` tone). Token-only styles (no hex), reduced-motion honored, render + a11y tests. **Deferred to their Phase 1 surface** (per the F0.2 roster note, data-bound): data table, flow-graph host, charts, timeline scrubber. |
 | F0.3 | INV-CONSOLE-NO-2ND-DB | LANDED (review) | c36528b | Stateless BFF core (`@forge/bff`): config/log/cache/seam/HTTP; no domain store. |
 | F0.3b-1 | INV-CONSOLE-WIRE-FRAME | LANDED (review) | e3c7e6f | `@forge/wire` frame codec (16-byte header + FrameType), byte-exact to crdb. |
 | F0.3b-2 | INV-CONSOLE-WIRE-CBOR | LANDED (review) | c0078f2 | Hand-rolled CBOR codec + typed `WireRequest`/`WireReply` payloads, byte-exact to crdb ciborium. |
