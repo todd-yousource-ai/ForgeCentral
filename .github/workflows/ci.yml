@@ -36,5 +36,13 @@ jobs:
         if: ${{ env.CRUCIBLE_TOKEN != '' }}
         run: git config --global url."https://x-access-token:${CRUCIBLE_TOKEN}@github.com/".insteadOf "https://github.com/"
 
+      - name: Provision Playwright (browser + OS libraries) for the e2e stage
+        # The runner has no browser or its shared libraries; --with-deps apt-installs them (needs the
+        # runner's sudo, so it lives here, not in the shared scripts/ci.sh). The gate's e2e stage then
+        # reuses the cached browser. Idempotent; the frozen install makes the playwright binary present.
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @forge/console-spa exec playwright install --with-deps chromium
+
       - name: Run the gate
         run: bash scripts/ci.sh

@@ -35,7 +35,7 @@
       "vite": "^6.4.3",
       "esbuild": "^0.25.0"
     },
-    "//onlyBuiltDependencies": "Install-script lockdown (deny-by-default): ONLY these packages may run lifecycle scripts (preinstall/install/postinstall); pnpm blocks every other package. esbuild needs its postinstall to link the platform binary. check-supply-chain.mjs fails the gate if any non-listed package introduces a script. See DEPENDENCY-POLICY.md.",
+    "//onlyBuiltDependencies": "Install-script lockdown (deny-by-default): ONLY these packages may run lifecycle scripts (preinstall/install/postinstall); pnpm blocks every other package. esbuild needs its postinstall to link the platform binary. (Playwright 1.49 carries NO install script; its browser binary is fetched by an explicit `playwright install chromium` in the e2e stage, not on npm install, so it needs no entry here.) check-supply-chain.mjs fails the gate if any non-listed package introduces a script. See DEPENDENCY-POLICY.md.",
     "onlyBuiltDependencies": [
       "esbuild"
     ]
