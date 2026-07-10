@@ -1,0 +1,13 @@
+{
+  "admin_bind_ip": "10.0.0.5",
+  "admin_port": 8443,
+  "admin_upstream": "127.0.0.1:8787",
+  "engine_addr": "127.0.0.1:7878",
+  "engine_servername": "wire.localhost",
+  "engine_ca": "/etc/console-sidecar/engine-ca.pem",
+  "engine_cert": "/etc/console-sidecar/engine-client.pem",
+  "engine_key": "/etc/console-sidecar/engine-client.key",
+  "egress_addr": "127.0.0.1:8789",
+  "admin_cert": "/etc/console-sidecar/admin-cert.pem",
+  "admin_key": "/etc/console-sidecar/admin-key.pem"
+}
