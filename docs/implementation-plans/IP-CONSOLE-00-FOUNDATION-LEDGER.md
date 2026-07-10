@@ -5,7 +5,7 @@ Per-PR landing record for `IP-CONSOLE-00-FOUNDATION.md` (Phase 0, the platform f
 `scripts/ci.sh` green before merge, branch-per-PR off local `main`, no-ff merge, push to `origin`,
 scoped commits (code separate from docs), no em dashes. Reviewed with the maintainer before each merge.
 
-Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a operator OIDC auth LIVE-PROVEN against Auth0; F0.5a-2 (login endpoints) next.**
+Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN) + F0.4 (no-stub gate) COMPLETE; F0.5a operator OIDC auth + F0.5a-2 login endpoints LIVE-PROVEN against Auth0; F0.5b (session -> Principal) next.**
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
@@ -22,13 +22,64 @@ Status: **F0.1 + SC + F0.2a/b + F0.3 (+ F0.3b native wire transport, LIVE-PROVEN
 | F0.3b-3d | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 9d0736d | `WireCrucibleClient` over `@forge/wire` behind the BFF seam; the **real BFF `/readyz` returns `{ready:true}` against the live `:7878` node**. |
 | F0.4 | INV-CONSOLE-NO-STUB | LANDED (review) | 375b164 | `@forge/bindings` registry + no-stub enforcement (`validateManifest` / `assertReleaseReady`), wired into the gate's `test:contract` step. |
 | F0.5a | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 9e7f014 | Operator OIDC device-flow login + id_token verify + EXPLAIN tier + session store; proven end-to-end against Auth0 (MFA). |
-| F0.5a-2 | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Login/logout/callback endpoints + OIDC config in `BffConfig`; session cookie + middleware. |
+| F0.5a-2 | INV-CONSOLE-ENGINE-AUTHZ | LIVE-PROVEN (review) | 1b468df | `/auth/login` + `/auth/login/poll` + `/auth/logout` + `/auth/me` mounted; OIDC config in `BffConfig`; hardened session cookie; **the real BFF drove a live Auth0 MFA login through its own endpoints**. |
 | F0.5b | INV-CONSOLE-ENGINE-AUTHZ | OPEN | -- | Session -> Crucible Principal mapping (subject + tier -> engine authz). |
 | F0.5c | INV-CROSS (crdb) | OPEN | -- | crdb admin-scope read path + delegation broker (device-wide envelope under the operator). |
 | F0.6 | INV-CONSOLE-LIVE | OPEN | -- | Live-feel channel (v1: short-interval CrucibleQL polling). |
 | F0.7 | INV-CONSOLE-ADMIN-PLANE | OPEN | -- | 8443 node-IP admin listener; hybrid-PQC + CNSA-1.0 floor. |
 | F0.8 | INV-CONSOLE-SHELL-3-CLICK-FRAME | OPEN | -- | SPA shell: nav + IA + drawer host + empty/loading/error/stale. |
 | SC | INV-CONSOLE-SUPPLYCHAIN-HARDENED | LANDED (review) | 734e145 | Supply-chain hardening of the gate. See the note below. |
+
+## F0.5a-2 -- the operator login endpoints (`@forge/bff` auth router)
+
+Wires the F0.5a auth module into the running BFF as a real HTTP surface. The headless device flow becomes
+four endpoints, plus the config + cookie + storage they need:
+
+- **`POST /auth/login`** -- start a device login: the BFF requests a device code from the IdP, stores the
+  bearer-grade `device_code` **server-side** (in `PendingLoginStore`, keyed by an opaque `loginId`), and
+  returns `{ loginId, userCode, verificationUri, verificationUriComplete, expiresInSecs, intervalSecs }`.
+  The device code is **never** sent to the browser.
+- **`POST /auth/login/poll`** (`{ loginId }`) -- poll once: `{ status: 'pending' }` until the operator
+  finishes login + MFA, then the BFF **verifies the id_token** (F0.5a `verifyLogin`), mints a session, and
+  returns `{ status: 'complete', operator }` with a `Set-Cookie`. A terminal device-flow error or a failed
+  verification kills the login (fail-closed) and no session is minted.
+- **`POST /auth/logout`** -- destroy the session + clear the cookie.
+- **`GET /auth/me`** -- the current operator `{ subject, email?, tier }` from the session cookie, or 401.
+
+- **`auth/cookie.ts`** -- the hardened session cookie: `HttpOnly` (no script access), `SameSite=Strict`
+  (CSRF defense), `Path=/`, a bounded `Max-Age`, and `Secure` in production (only over TLS) -- plus a
+  tolerant `Cookie` parser.
+- **`auth/login-store.ts`** -- `PendingLoginStore`: in-memory, bounded, TTL'd (same discipline as the
+  session store); holds the device code only for the life of the login. No durable state
+  (INV-CONSOLE-NO-2ND-DB).
+- **`auth/provider.ts`** -- the `OidcProvider` seam over `oidc.ts` (verify + derive folded into one
+  `verifyLogin`), so the router is testable without a network.
+- **`config.ts`** -- an **optional** OIDC block: auth mounts only when `FC_OIDC_ISSUER` is set (so the
+  foundation still boots without it, honestly logged), the Auth0 endpoints are derived from the issuer
+  (overridable), and a set issuer without a client id + role claim is a **fail-closed** misconfiguration.
+  Also the session/cookie settings. Fixed a real trap: `z.coerce.boolean()` treats the string `"false"`
+  as truthy, so the `Secure` flag is parsed with an explicit `true`/`false` enum.
+- **`server.ts` / `index.ts`** -- the request handler delegates `/auth/*` to the router before the
+  operational routes; `index.ts` builds the router (provider + both stores) when OIDC is configured.
+
+**Live proof (the real BFF, its own endpoints, real Auth0 MFA).** The built BFF (`node
+apps/bff/dist/index.js`, OIDC configured for the dev tenant, engine mTLS to the live `:7878` node) served
+a full login through its HTTP surface: `POST /auth/login` returned a `loginId` + user code with the device
+code held server-side (verified absent from the response); the operator completed login + MFA; `POST
+/auth/login/poll` went `pending` -> `complete` with a hardened `Set-Cookie`; and `GET /auth/me` with that
+cookie returned the operator identity the BFF resolved from the session. This is F0.5a-2 proven end-to-end
+against the real IdP, no mocks.
+
+**Test tier:** 2 + live. 24 hermetic assertions: the full login lifecycle (login -> pending -> complete
+-> me -> logout) and every failure path (unknown/expired login, malformed body, terminal device-flow
+error, id_token-verification failure with no session minted, unauthenticated `/auth/me`, wrong method)
+driven through the real `node:http` server over a scripted `OidcProvider`; the cookie parse/serialize
+hardening; the login store bounds; and the config OIDC derivation + fail-closed cases -- plus the live
+round-trip above. Full `scripts/ci.sh` green.
+
+**Deferred (unchanged, INV-CROSS):** **F0.5b** = session -> Crucible Principal mapping; **F0.5c** = the
+crdb admin-scope read path + delegation broker for the device-wide envelope. The endpoints now hold a
+verified operator identity + tier; F0.5b carries it into each engine call.
 
 ## F0.5a -- operator OIDC device-flow auth (`@forge/bff` auth module)
 
