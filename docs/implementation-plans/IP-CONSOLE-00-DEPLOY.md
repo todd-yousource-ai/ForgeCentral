@@ -96,16 +96,21 @@ device: it gets a ZTP-CA-chained leaf (+ rotation), and the engine admits it on 
 
 Grounded scope (from the torch ZTP program + crdb enrolled-device grant, `[[torch-ztp-enrollment]]`):
 
-- **D.3a -- the Console enrollment client.** The `console-bff` (or its provisioner) runs the enrollment
-  flow, yielding a ZTP-CA-chained wire cert the sidecar presents on the engine leg. **Device-identity
-  decision (product owner, 2026-07-10): full TPM attestation (torch-style)** -- the Console enrolls with a
-  real vTPM device key + operator MFA + hardware attestation + node-established binding + step-ca mint,
-  exactly like a torch edge device. **Reuse, do not reimplement:** the torch installer's `30-enroll.sh`
-  already drives `torch-enroll` interactively (operator MFA device code) with a `TORCH_PROPOSED_FQDN` + EK
-  cert against the bootstrap addr, producing `device.pem` (the ZTP-CA identity). D.3a is a Console enroll
-  step that invokes that same client with a distinct `console-bff` FQDN, producing the wire cert the sidecar
-  points `engine_cert`/`engine_key` at. The live enrollment is **operator-MFA-gated** (a human step, as in
-  the F0.5a / ZTP capstones).
+- **D.3a -- the Console enrollment client (SERVICE-KEY ZTP).** The `console-bff` (or its provisioner) runs
+  the ZTP enrollment flow, yielding a ZTP-CA-chained wire cert the sidecar presents on the engine leg.
+  **Device-identity decision (product owner, 2026-07-10, REVISED): service-key ZTP.** ZTP is required (the
+  enrolled-role permissions key off the AIG enrollment record `admit_wire_peer` reads, NOT static
+  `node.cbor` config), but TPM key custody is not: the Console enrolls with a **software P-384 key** (still
+  operator MFA + step-ca mint + **AIG registration**), the sidecar reads it as a PEM (`engine_cert` /
+  `engine_key`), and the AWS-LC posture is unchanged. The full-TPM path was dropped after it hit two walls
+  (the `role:` capability was unreachable -- fixed by mapping from `AdminRole`; and the sidecar cannot use a
+  TPM-resident key -- so `IP-CONSOLE-00-SIDECAR-TPM` is PARKED as a future hardening option). `torch-enroll`
+  is TPM-only and refuses software keys, so the Console builds its **own** small enroll client (a software
+  `KeystoreBackend` + the enroll protocol; `require_attestation` is a per-policy bool, default false, so
+  attestation-less issuance is supported). The client runs against the enrollment service for a distinct
+  `console-bff` FQDN; the operator's IdP group maps to the `operator` role (D.3b -> `[Data, Delegation]`).
+  The live enrollment is **operator-MFA-gated** (a human step); the client code is buildable + testable
+  without MFA.
 - **D.3b -- the engine grants the enrolled Console `[Data, Delegation]` (crdb, INV-CROSS).** Grounded
   finding: `wire.enrolled_device_grant` (`config.rs`, `default_enrolled_device_grant`) is a **single global
   default** applied to *every* admitted enrolled device (today `[Data, Agent, Cognition, Otlp]`). Flipping

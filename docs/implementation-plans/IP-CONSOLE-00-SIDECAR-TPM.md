@@ -1,6 +1,17 @@
 # IP-CONSOLE-00-SIDECAR-TPM -- the crypto sidecar presents the TPM-resident engine identity
 
-**Status:** OPEN (authored 2026-07-10). A fourth implementation plan under `TRD-CONSOLE-00` (with
+**Status:** PARKED (2026-07-10, superseded by the service-key ZTP decision). The Console's engine identity
+is now a **software-key ZTP enrollment** (`IP-CONSOLE-00-DEPLOY` D.3a-console): full ZTP (MFA + step-ca +
+AIG registration, so the enrolled-role permissions work) with a **software** P-384 key the sidecar reads as
+a PEM -- no TPM key, so no sidecar TPM signer. The product owner confirmed ZTP is required (permissions key
+off AIG enrollment, not static config) but TPM custody is not. This IP is retained as the **future hardware-
+hardening option**: if the Console identity should later become hardware-bound, this is the plan to present
+the TPM-resident key. Nothing was built here (plan only), so nothing unwinds. The D.3b role-grant machinery
+(landed) serves both the software-key and the TPM path unchanged.
+
+---
+
+**Original plan (retained for the hardening option).** A fourth implementation plan under `TRD-CONSOLE-00` (with
 `IP-CONSOLE-00-FOUNDATION`, `IP-CONSOLE-00-CRYPTO-SIDECAR`, `IP-CONSOLE-00-DEPLOY`). It makes the AWS-LC
 crypto sidecar present the Console's **TPM-resident** wire identity on the engine leg, so a full-TPM
 enrolled Console (`IP-CONSOLE-00-DEPLOY` D.3a, device-identity = full TPM attestation) can actually connect
