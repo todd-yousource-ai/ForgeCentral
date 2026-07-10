@@ -45,4 +45,50 @@ describe('loadConfig', () => {
       expect((err as ConfigError).message).toContain('engineHost');
     }
   });
+
+  it('leaves auth disabled (no oidc) when no issuer is set', () => {
+    expect(loadConfig(complete).oidc).toBeUndefined();
+  });
+
+  it('derives the Auth0 endpoints from the issuer when auth is enabled', () => {
+    const config = loadConfig({
+      ...complete,
+      FC_OIDC_ISSUER: 'https://tenant.us.auth0.com/',
+      FC_OIDC_CLIENT_ID: 'abc123',
+      FC_OIDC_ROLE_CLAIM: 'https://crucibledb/groups',
+    });
+    expect(config.oidc).toEqual({
+      issuer: 'https://tenant.us.auth0.com/',
+      clientId: 'abc123',
+      roleClaim: 'https://crucibledb/groups',
+      scope: 'openid profile email',
+      jwksUri: 'https://tenant.us.auth0.com/.well-known/jwks.json',
+      deviceCodeEndpoint: 'https://tenant.us.auth0.com/oauth/device/code',
+      tokenEndpoint: 'https://tenant.us.auth0.com/oauth/token',
+    });
+  });
+
+  it('honors explicit endpoint overrides', () => {
+    const config = loadConfig({
+      ...complete,
+      FC_OIDC_ISSUER: 'https://tenant.us.auth0.com/',
+      FC_OIDC_CLIENT_ID: 'abc123',
+      FC_OIDC_ROLE_CLAIM: 'roles',
+      FC_OIDC_TOKEN_ENDPOINT: 'https://proxy.internal/token',
+    });
+    expect(config.oidc?.tokenEndpoint).toBe('https://proxy.internal/token');
+  });
+
+  it('fails closed when the issuer is set but the client id / role claim are not', () => {
+    expect(() =>
+      loadConfig({ ...complete, FC_OIDC_ISSUER: 'https://tenant.us.auth0.com/' }),
+    ).toThrow(ConfigError);
+  });
+
+  it('parses the secure-cookie flag exactly (the string "false" is false, not truthy)', () => {
+    expect(
+      loadConfig({ ...complete, FC_SESSION_COOKIE_SECURE: 'false' }).session.cookieSecure,
+    ).toBe(false);
+    expect(loadConfig(complete).session.cookieSecure).toBe(true);
+  });
 });

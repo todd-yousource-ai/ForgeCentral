@@ -21,6 +21,13 @@ const config: BffConfig = {
   cacheTtlMs: 2000,
   cacheMaxEntries: 100,
   requestTimeoutMs: 1000,
+  session: {
+    ttlMs: 3_600_000,
+    cookieName: 'fc_session',
+    cookieSecure: true,
+    maxSessions: 4096,
+    maxPendingLogins: 256,
+  },
 };
 
 /** A transport whose recv() returns a single scripted reply frame (a dispatch reply). */

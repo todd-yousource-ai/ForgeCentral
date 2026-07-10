@@ -39,6 +39,46 @@ export function openApiDocument(): Record<string, unknown> {
           responses: { '200': { description: 'The BFF OpenAPI 3.1 document.' } },
         },
       },
+      '/auth/login': {
+        post: {
+          summary: 'Start an operator device login (RFC 8628)',
+          responses: {
+            '200': {
+              description: 'Device code issued: { loginId, userCode, verificationUri... }.',
+            },
+            '502': { description: 'The identity provider is unavailable.' },
+          },
+        },
+      },
+      '/auth/login/poll': {
+        post: {
+          summary: 'Poll a device login for completion',
+          responses: {
+            '200': {
+              description:
+                'Either { status: "pending" } or { status: "complete", operator } + session cookie.',
+            },
+            '400': { description: 'Malformed request body.' },
+            '401': { description: 'The login failed or the token could not be verified.' },
+            '404': { description: 'Unknown or expired loginId.' },
+          },
+        },
+      },
+      '/auth/logout': {
+        post: {
+          summary: 'End the operator session',
+          responses: { '200': { description: 'Session destroyed and cookie cleared.' } },
+        },
+      },
+      '/auth/me': {
+        get: {
+          summary: 'The current operator identity',
+          responses: {
+            '200': { description: 'The authenticated operator { subject, email?, tier }.' },
+            '401': { description: 'No valid session.' },
+          },
+        },
+      },
     },
   };
 }

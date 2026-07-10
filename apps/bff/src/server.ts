@@ -14,6 +14,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 
+import type { AuthRouter } from './auth/router.js';
 import type { BffConfig } from './config.js';
 import type { CrucibleClient } from './engine/client.js';
 import type { EphemeralCache } from './cache.js';
@@ -31,6 +32,8 @@ export interface ServerDeps {
   readonly log: ServerLogger;
   readonly cache: EphemeralCache<unknown>;
   readonly client: CrucibleClient;
+  /** The operator auth router (F0.5a-2). Absent when auth is not configured; /auth/* then 404s. */
+  readonly authRouter?: AuthRouter;
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -81,8 +84,13 @@ export function createRequestHandler(
   return (req, res) => {
     const method = req.method ?? 'GET';
     const path = (req.url ?? '/').split('?')[0] ?? '/';
-    // route() handles all of its own errors and never rejects; the void is intentional.
-    void route(deps, method, path, res).catch((err: unknown) => {
+    // Try the auth router first (it owns /auth/*); if it did not claim the request, fall through to the
+    // operational routes. Both paths handle their own errors; the outer catch is the last-resort guard.
+    const dispatch = async (): Promise<void> => {
+      if (deps.authRouter && (await deps.authRouter.handle(req, res))) return;
+      await route(deps, method, path, res);
+    };
+    void dispatch().catch((err: unknown) => {
       deps.log.error(
         { err: err instanceof Error ? err.name : 'unknown' },
         'unhandled request error',
