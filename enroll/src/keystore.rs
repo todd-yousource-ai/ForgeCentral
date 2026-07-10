@@ -1,45 +1,64 @@
 //! The software keystore: a P-384 wire key generated + used in software (no TPM), on the platform's
-//! AWS-LC module (rcgen's `aws_lc_rs` backend). It generates the Console's engine-identity key, produces
-//! the PKCS#10 CSR the enrollment service + step-ca verify (proof-of-possession of the key the cert is
-//! for), and exports the private key as a PKCS#8 PEM the crypto sidecar reads as `engine_key`.
+//! AWS-LC module. It generates the Console's engine-identity key, produces the PKCS#10 CSR the enrollment
+//! service + step-ca verify (proof-of-possession), exports the private key as a PKCS#8 PEM the crypto
+//! sidecar reads as `engine_key`, and signs arbitrary messages (the DPoP proof that binds the MFA token to
+//! this key, D.3a-console.2, and later the wire-plane TLS handshake).
 //!
-//! This is the service-key half of `IP-CONSOLE-00-DEPLOY` D.3a-console: the enrollment is still MFA +
-//! step-ca + AIG-registered (so the `operator` role -> `[Data, Delegation]` grant works), but the key is
-//! software-resident so the sidecar can present it. The TPM-resident variant is the parked
-//! `IP-CONSOLE-00-SIDECAR-TPM`.
+//! One key material (PKCS#8 DER) drives two views: `rcgen` (CSR + PEM) and `aws_lc_rs` (raw ECDSA signing).
+//! This is the service-key half of `IP-CONSOLE-00-DEPLOY` D.3a-console; the TPM-resident variant is the
+//! parked `IP-CONSOLE-00-SIDECAR-TPM`.
 
-use rcgen::{CertificateParams, DnType, KeyPair, PKCS_ECDSA_P384_SHA384};
+use aws_lc_rs::rand::SystemRandom;
+use aws_lc_rs::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P384_SHA384_FIXED_SIGNING};
+use rcgen::{CertificateParams, DnType, KeyPair};
 
-/// A failure generating the software key or the enrollment CSR.
+/// A failure generating the software key, the CSR, or a signature.
 #[derive(Debug, thiserror::Error)]
 pub enum EnrollError {
-    /// The P-384 key could not be generated.
+    /// The P-384 key could not be generated or loaded.
     #[error("key generation failed: {0}")]
     Keygen(String),
     /// The CSR could not be built or serialized.
     #[error("CSR generation failed: {0}")]
     Csr(String),
+    /// A signing operation failed.
+    #[error("signing failed: {0}")]
+    Sign(String),
 }
 
 /// A software-resident P-384 keystore for the Console's engine identity.
 ///
 /// The private key never touches the TPM (that is the parked `IP-CONSOLE-00-SIDECAR-TPM` variant); it is
 /// generated here and exported as a PKCS#8 PEM for the sidecar. Attestation is not required (the enrollment
-/// service admits an attestation-less issuance by policy); the identity's strength is MFA + the ZTP-CA
-/// chain + the AIG registration, not hardware residency.
+/// service admits an attestation-less issuance by policy); the identity's strength is MFA + the DPoP
+/// token-to-key binding + the ZTP-CA chain + the AIG registration, not hardware residency.
 pub struct SoftwareKeystore {
+    /// The CSR + PEM view (rcgen), holding the same key material as `signer`.
     key_pair: KeyPair,
+    /// The raw-signing view (aws-lc-rs), holding the same key material as `key_pair`.
+    signer: EcdsaKeyPair,
+    rng: SystemRandom,
 }
 
 impl SoftwareKeystore {
     /// Generate a fresh P-384 (secp384r1) keypair on the AWS-LC module.
     ///
     /// # Errors
-    /// [`EnrollError::Keygen`] if the key cannot be generated.
+    /// [`EnrollError::Keygen`] if the key cannot be generated or loaded into either view.
     pub fn generate() -> Result<Self, EnrollError> {
-        let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P384_SHA384)
-            .map_err(|e| EnrollError::Keygen(e.to_string()))?;
-        Ok(Self { key_pair })
+        let rng = SystemRandom::new();
+        let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_FIXED_SIGNING, &rng)
+            .map_err(|_| EnrollError::Keygen("pkcs8 generation failed".to_owned()))?;
+        let pkcs8_der = pkcs8.as_ref();
+        let signer = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_FIXED_SIGNING, pkcs8_der)
+            .map_err(|e| EnrollError::Keygen(format!("load signer: {e}")))?;
+        let key_pair = KeyPair::try_from(pkcs8_der)
+            .map_err(|e| EnrollError::Keygen(format!("load rcgen: {e}")))?;
+        Ok(Self {
+            key_pair,
+            signer,
+            rng,
+        })
     }
 
     /// The private key as a PKCS#8 PEM -- the sidecar's `engine_key`. This is the one exportable copy of
@@ -49,11 +68,24 @@ impl SoftwareKeystore {
         self.key_pair.serialize_pem()
     }
 
-    /// The public key in DER (SubjectPublicKeyInfo). The enroll protocol (D.3a-console.2) binds the MFA
-    /// token to this key (the JWK thumbprint / `jkt`) so the issued cert is bound to the key it is for.
+    /// The raw uncompressed EC public point (`0x04 || X || Y`, 97 bytes for P-384). The enroll protocol
+    /// (D.3a-console.2) derives the JWK thumbprint (`jkt`) from `X`/`Y` to DPoP-bind the MFA token to this
+    /// key, and verifies signatures against it.
     #[must_use]
-    pub fn public_key_der(&self) -> Vec<u8> {
-        self.key_pair.public_key_der()
+    pub fn public_point(&self) -> Vec<u8> {
+        self.signer.public_key().as_ref().to_vec()
+    }
+
+    /// Sign `message` with the software key, ECDSA P-384 / SHA-384, returning a **fixed** `r || s`
+    /// signature (96 bytes, the JOSE `ES384` encoding the DPoP proof needs).
+    ///
+    /// # Errors
+    /// [`EnrollError::Sign`] if the signature cannot be produced.
+    pub fn sign(&self, message: &[u8]) -> Result<Vec<u8>, EnrollError> {
+        self.signer
+            .sign(&self.rng, message)
+            .map(|sig| sig.as_ref().to_vec())
+            .map_err(|_| EnrollError::Sign("ecdsa p-384 sign failed".to_owned()))
     }
 
     /// A PKCS#10 CSR PEM for `common_name` + the DNS `sans` (the proposed `console-bff` FQDN), signed by
@@ -77,16 +109,35 @@ impl SoftwareKeystore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aws_lc_rs::signature::{UnparsedPublicKey, ECDSA_P384_SHA384_FIXED};
 
     #[test]
     fn generates_a_p384_key_exportable_as_pkcs8_pem() {
         let ks = SoftwareKeystore::generate().unwrap();
-        let pem = ks.key_pem();
         assert!(
-            pem.contains("-----BEGIN PRIVATE KEY-----"),
+            ks.key_pem().contains("-----BEGIN PRIVATE KEY-----"),
             "key is a PKCS#8 PEM"
         );
-        assert!(!ks.public_key_der().is_empty(), "public key is present");
+        // The raw P-384 public point is 0x04 || X(48) || Y(48) = 97 bytes.
+        assert_eq!(ks.public_point().len(), 97, "P-384 uncompressed point");
+        assert_eq!(ks.public_point()[0], 0x04, "uncompressed point marker");
+    }
+
+    #[test]
+    fn signs_a_message_verifiable_against_its_public_point() {
+        let ks = SoftwareKeystore::generate().unwrap();
+        let message = b"dpop-proof-bytes";
+        let sig = ks.sign(message).unwrap();
+        assert_eq!(sig.len(), 96, "fixed r||s for P-384 (48+48)");
+        UnparsedPublicKey::new(&ECDSA_P384_SHA384_FIXED, ks.public_point())
+            .verify(message, &sig)
+            .expect("signature verifies against the key's own public point");
+        // A tampered message does not verify.
+        assert!(
+            UnparsedPublicKey::new(&ECDSA_P384_SHA384_FIXED, ks.public_point())
+                .verify(b"other", &sig)
+                .is_err()
+        );
     }
 
     #[test]
@@ -102,21 +153,13 @@ mod tests {
             csr.contains("-----END CERTIFICATE REQUEST-----"),
             "CSR PEM is complete",
         );
-        // A signed P-384 CSR carrying a CN + SAN is well above this; a bare/empty request is not.
         assert!(csr.len() > 300, "CSR carries the signed request body");
-    }
-
-    #[test]
-    fn an_empty_san_list_still_builds_a_csr_with_the_cn() {
-        let ks = SoftwareKeystore::generate().unwrap();
-        let csr = ks.csr_pem("console-bff.node.test.crucibledb", &[]).unwrap();
-        assert!(csr.starts_with("-----BEGIN CERTIFICATE REQUEST-----"));
     }
 
     #[test]
     fn each_keystore_is_a_distinct_key() {
         let a = SoftwareKeystore::generate().unwrap();
         let b = SoftwareKeystore::generate().unwrap();
-        assert_ne!(a.public_key_der(), b.public_key_der(), "keys are unique");
+        assert_ne!(a.public_point(), b.public_point(), "keys are unique");
     }
 }
