@@ -14,18 +14,26 @@ import {
 } from '../src/engine/index.js';
 
 const rows: WireQueryRows = { cursor: null, redacted_fields: [], rows: [] };
-const admin: OperatorPrincipal = { subject: 'auth0|op', tier: 'Admin' };
+const admin: OperatorPrincipal = {
+  subject: 'auth0|op',
+  tier: 'Admin',
+  principalId: 'principal-op',
+  tenant: 'tenant-op',
+};
 
-/** A CrucibleClient that records its calls and returns scripted results. */
+/** A CrucibleClient that records its calls (and the querySubmit requests) and returns scripted results. */
 function recordingClient(overrides: Partial<CrucibleClient> = {}): {
   client: CrucibleClient;
   calls: string[];
+  requests: WireQuerySubmit[];
 } {
   const calls: string[] = [];
+  const requests: WireQuerySubmit[] = [];
   const client: CrucibleClient = {
     ping: () => Promise.resolve(),
     querySubmit: (req) => {
       calls.push(`querySubmit:${String(req.request_id)}`);
+      requests.push(req);
       return Promise.resolve(rows);
     },
     cursorFetch: () => {
@@ -39,7 +47,7 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
     close: () => Promise.resolve(),
     ...overrides,
   };
-  return { client, calls };
+  return { client, calls, requests };
 }
 
 /** A delegation sink that captures what it recorded. */
@@ -52,30 +60,46 @@ function capturingSink(): {
 }
 
 describe('principalFromSession', () => {
-  it('carries the subject + tier (no tenant yet)', () => {
+  it('carries the subject + tier + principalId + tenant', () => {
     const session: OperatorSession = {
       sessionId: 'x',
       subject: 'auth0|op',
       tier: 'Developer',
+      principalId: 'principal-op',
+      tenant: 'tenant-op',
+      role: 'tenant-admin',
       expiresAt: 1,
     };
-    expect(principalFromSession(session)).toEqual({ subject: 'auth0|op', tier: 'Developer' });
+    expect(principalFromSession(session)).toEqual({
+      subject: 'auth0|op',
+      tier: 'Developer',
+      principalId: 'principal-op',
+      tenant: 'tenant-op',
+    });
   });
 });
 
 describe('createOperatorEngine', () => {
   const submit: WireQuerySubmit = { request_id: 7, text: 'SELECT 1', params: [] };
 
-  it('records the delegation and delegates querySubmit to the client', async () => {
-    const { client, calls } = recordingClient();
+  it('records the delegation, injects the operator, and delegates querySubmit', async () => {
+    const { client, calls, requests } = recordingClient();
     const { sink, recorded } = capturingSink();
     const engine = createOperatorEngine(client, sink);
 
     const out = await engine.querySubmit(admin, submit);
     expect(out).toBe(rows);
     expect(calls).toEqual(['querySubmit:7']);
+    // The engine injects the operator delegation onto the request sent to the client (F0.5c).
+    expect(requests[0]?.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
     expect(recorded).toEqual([
-      { operator: 'auth0|op', tier: 'Admin', action: 'querySubmit', requestId: 7 },
+      {
+        operator: 'auth0|op',
+        tier: 'Admin',
+        action: 'querySubmit',
+        requestId: 7,
+        tenant: 'tenant-op',
+      },
     ]);
   });
 
@@ -102,13 +126,17 @@ describe('createOperatorEngine', () => {
     expect(recorded[0]?.operator).toBe('auth0|op');
   });
 
-  it('includes the tenant in the delegation when the Principal carries one', async () => {
-    const { client } = recordingClient();
+  it('carries the tenant into both the delegation record and the injected request', async () => {
+    const { client, requests } = recordingClient();
     const { sink, recorded } = capturingSink();
     const engine = createOperatorEngine(client, sink);
 
-    await engine.querySubmit({ subject: 's', tier: 'User', tenant: 't-1' }, submit);
+    await engine.querySubmit(
+      { subject: 's', tier: 'User', principalId: 'principal-s', tenant: 't-1' },
+      submit,
+    );
     expect(recorded[0]?.tenant).toBe('t-1');
+    expect(requests[0]?.operator).toEqual({ principal: 'principal-s', tenant: 't-1' });
   });
 });
 

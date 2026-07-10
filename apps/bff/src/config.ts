@@ -14,6 +14,20 @@
 import { z } from 'zod';
 
 import type { OidcConfig } from './auth/oidc.js';
+import type { RbacConfig } from './auth/rbac.js';
+
+/** A single RBAC grant (a Console role + optional tenant), validated at the config boundary. */
+const RoleGrantSchema = z.object({
+  role: z.enum(['global-admin', 'tenant-admin', 'tenant-user']),
+  tenant: z.string().min(1).optional(),
+});
+
+/** The Console RBAC v1 (F0.5c): group->grant + local subject->grant + a global-admin default tenant. */
+const RbacConfigSchema = z.object({
+  groupRoles: z.record(RoleGrantSchema).default({}),
+  localRbac: z.record(RoleGrantSchema).default({}),
+  defaultTenant: z.string().min(1).optional(),
+});
 
 const ConfigSchema = z.object({
   /** The engine host the BFF connects to over mTLS. */
@@ -92,6 +106,8 @@ export interface BffConfig {
   readonly session: SessionSettings;
   /** The OIDC login config, present only when `FC_OIDC_ISSUER` is set (auth enabled). */
   readonly oidc?: OidcConfig;
+  /** The Console RBAC (F0.5c): resolves an operator's tenant + role. Empty (fail-closed) by default. */
+  readonly rbac: RbacConfig;
 }
 
 /** Thrown when configuration is missing or invalid. Carries field paths, never secret values. */
@@ -132,6 +148,29 @@ function resolveOidc(raw: RawConfig): OidcConfig | undefined {
     deviceCodeEndpoint: raw.oidcDeviceCodeEndpoint ?? `${base}/oauth/device/code`,
     tokenEndpoint: raw.oidcTokenEndpoint ?? `${base}/oauth/token`,
   };
+}
+
+/**
+ * Parse the Console RBAC from `FC_RBAC_CONFIG` (a JSON object). Absent or empty -> a fail-closed empty
+ * RBAC (every operator resolves to no authority, so logins are refused until it is configured). Malformed
+ * JSON or a schema violation is a `ConfigError` (never a silent half-config).
+ */
+function resolveRbac(env: NodeJS.ProcessEnv): RbacConfig {
+  const raw = env['FC_RBAC_CONFIG'];
+  if (raw === undefined || raw.trim() === '') return { groupRoles: {}, localRbac: {} };
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new ConfigError('FC_RBAC_CONFIG is not valid JSON');
+  }
+  const parsed = RbacConfigSchema.safeParse(json);
+  if (!parsed.success) {
+    const fields = parsed.error.issues.map((issue) => issue.path.join('.') || '(root)').join(', ');
+    throw new ConfigError(`invalid FC_RBAC_CONFIG: check ${fields}`);
+  }
+  // zod renders optional fields as `T | undefined`; the domain `RbacConfig` uses `?:` (exactOptional).
+  return parsed.data as RbacConfig;
 }
 
 /** Load and validate configuration from an environment map. Fail-closed. */
@@ -186,6 +225,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
       maxSessions: raw.sessionMax,
       maxPendingLogins: raw.loginMax,
     },
+    rbac: resolveRbac(env),
     ...(raw.engineServername !== undefined ? { engineServername: raw.engineServername } : {}),
     ...(oidc !== undefined ? { oidc } : {}),
   };

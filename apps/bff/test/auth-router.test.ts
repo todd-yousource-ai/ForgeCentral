@@ -36,6 +36,7 @@ const config: BffConfig = {
     maxSessions: 4096,
     maxPendingLogins: 256,
   },
+  rbac: { groupRoles: {}, localRbac: {} },
 };
 
 const silentLog: ServerLogger = { info: () => {}, warn: () => {}, error: () => {} };
@@ -51,14 +52,22 @@ const unusedClient: CrucibleClient = {
 interface Scripted extends OidcProvider {
   deviceCode: string;
   pollQueue: Array<{ kind: 'pending' } | { kind: 'complete'; idToken: string } | { kind: 'throw' }>;
-  verify: (idToken: string) => Promise<OperatorIdentity>;
+  verify: (idToken: string) => Promise<OperatorIdentity | undefined>;
 }
 
 function scriptedProvider(): Scripted {
   const p: Scripted = {
     deviceCode: 'DEV-SECRET-CODE',
     pollQueue: [],
-    verify: () => Promise.resolve({ subject: 'auth0|op', email: 'op@x.io', tier: 'Admin' }),
+    verify: () =>
+      Promise.resolve({
+        subject: 'auth0|op',
+        email: 'op@x.io',
+        tier: 'Admin',
+        principalId: 'p-op',
+        tenant: 'tenant-op',
+        role: 'tenant-admin',
+      }),
     requestDeviceCode: () =>
       Promise.resolve({
         deviceCode: p.deviceCode,

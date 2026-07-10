@@ -95,7 +95,14 @@ export function createOperatorEngine(
   return {
     querySubmit: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'querySubmit', request.request_id));
-      return client.querySubmit(request, opts);
+      // Inject the operator delegation (F0.5c): the engine runs this read as the operator, in the
+      // operator's tenant, honored under the peer's Delegation grant. Overrides any operator already on
+      // the request -- the BFF, not the caller, is the authority on who the read is for.
+      const delegated: WireQuerySubmit = {
+        ...request,
+        operator: { principal: principal.principalId, tenant: principal.tenant },
+      };
+      return client.querySubmit(delegated, opts);
     },
     cursorFetch: (principal, handle, opts) => {
       delegation.record(delegationFor(principal, 'cursorFetch'));

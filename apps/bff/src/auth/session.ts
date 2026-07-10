@@ -7,6 +7,7 @@
 
 import { randomBytes } from 'node:crypto';
 
+import type { OperatorRole } from './rbac.js';
 import type { ExplainTier } from './tier.js';
 
 /** A logged-in operator's session. */
@@ -19,6 +20,12 @@ export interface OperatorSession {
   readonly email?: string;
   /** The derived Crucible EXPLAIN tier. */
   readonly tier: ExplainTier;
+  /** The stable engine `PrincipalId` (a UUID) the BFF asserts for this operator (F0.5c). */
+  readonly principalId: string;
+  /** The tenant this operator acts in (resolved by the Console's RBAC, F0.5c). */
+  readonly tenant: string;
+  /** The operator's Console role (RBAC, F0.5c). */
+  readonly role: OperatorRole;
   /** Absolute expiry (ms since epoch); the session is invalid at/after this. */
   readonly expiresAt: number;
 }
@@ -28,6 +35,12 @@ export interface OperatorIdentity {
   readonly subject: string;
   readonly email?: string;
   readonly tier: ExplainTier;
+  /** The stable engine `PrincipalId` (a UUID) derived from the subject (F0.5c). */
+  readonly principalId: string;
+  /** The tenant the operator acts in, resolved by the Console's RBAC (F0.5c). */
+  readonly tenant: string;
+  /** The operator's Console role (F0.5c). */
+  readonly role: OperatorRole;
 }
 
 /** An injectable clock (for deterministic tests). */
@@ -53,6 +66,9 @@ export class SessionStore {
       sessionId,
       subject: identity.subject,
       tier: identity.tier,
+      principalId: identity.principalId,
+      tenant: identity.tenant,
+      role: identity.role,
       expiresAt: this.now() + ttlMs,
       ...(identity.email !== undefined ? { email: identity.email } : {}),
     };

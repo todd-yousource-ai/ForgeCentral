@@ -27,6 +27,7 @@ const config: BffConfig = {
     maxSessions: 4096,
     maxPendingLogins: 256,
   },
+  rbac: { groupRoles: {}, localRbac: {} },
 };
 
 const silentLog: ServerLogger = { info: () => {}, warn: () => {}, error: () => {} };

@@ -181,6 +181,14 @@ export function createAuthRouter(deps: AuthRouterDeps): AuthRouter {
       sendJson(res, 401, { status: 'error', error: 'token_invalid' });
       return;
     }
+    // A valid token whose operator has no resolvable authority (no tenant) is refused: forbidden, not a
+    // token error (F0.5c fail-closed).
+    if (identity === undefined) {
+      pending.destroy(loginId);
+      log.warn({}, 'login refused: operator has no resolvable authority');
+      sendJson(res, 403, { status: 'error', error: 'no_authority' });
+      return;
+    }
     const session = sessions.create(identity, sessionTtlMs);
     pending.destroy(loginId);
     const setCookie = serializeSessionCookie(

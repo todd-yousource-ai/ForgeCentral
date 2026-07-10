@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   let authRouter: AuthRouter | undefined;
   if (config.oidc !== undefined) {
     authRouter = createAuthRouter({
-      oidc: createOidcProvider(config.oidc),
+      oidc: createOidcProvider(config.oidc, config.rbac),
       sessions: new SessionStore(config.session.maxSessions),
       pending: new PendingLoginStore(config.session.maxPendingLogins),
       log,
