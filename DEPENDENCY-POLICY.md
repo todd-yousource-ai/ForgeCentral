@@ -84,22 +84,24 @@ with it; release artifacts are signed and verified at deploy. Container images d
 no secrets. Runtime containment (the deployed BFF reaches only the loopback sidecar, the IdP, and the
 browser; unexpected egress is blocked) is the last layer, owned by the deploy + admin-plane work.
 
-## The Rust crypto sidecar (`sidecar/`)
+## The Console-owned Rust projects (`sidecar/`, `enroll/`)
 
-The AWS-LC crypto sidecar (`IP-CONSOLE-00-CRYPTO-SIDECAR`) is a standalone Rust crate, **not** an npm
-dependency and **not** in the pnpm workspace, so it never enters the Node supply chain (the empty-runtime
-`dependencies` rule and the install-script lockdown above are unaffected). It is provisioned as an
-installer-built binary (`sidecar/deploy/`).
+The AWS-LC crypto sidecar (`IP-CONSOLE-00-CRYPTO-SIDECAR`) and the ZTP enrollment client (`enroll/`,
+`IP-CONSOLE-00-DEPLOY` D.3a-console) are standalone Rust crates, **not** npm dependencies and **not** in the
+pnpm workspace, so they never enter the Node supply chain (the empty-runtime `dependencies` rule and the
+install-script lockdown above are unaffected). Each is an installer-provisioned binary (`sidecar/deploy/`;
+the enroll client is run once at provisioning).
 
-Its own supply chain mirrors the engine repos' Rust policy:
+Each mirrors the engine repos' Rust policy:
 
-- **Pinned, committed lockfile** (`sidecar/Cargo.lock`) -- the exact dependency set and the SBOM source for
-  the binary. Deps are pinned, minimal, and feature-scoped.
-- **License allowlist + bans + sources** enforced by `sidecar/deny.toml` (`cargo deny check`) -- the same
-  allowlist as the Console's npm policy (AGPL/GPL/LGPL denied), plus `OpenSSL` for the `aws-lc` FIPS module.
-  The **only** allowed git source is the pinned CrucibleDB repo (the `cdb-mtls` contract crate); every other
-  git source and any crates.io `*` version fails the gate.
+- **Pinned, committed lockfile** (`sidecar/Cargo.lock`, `enroll/Cargo.lock`) -- the exact dependency set and
+  the SBOM source. Deps are pinned, minimal, and feature-scoped (e.g. `rcgen` is forced onto its `aws_lc_rs`
+  backend so the enroll client stays on AWS-LC, not `ring`).
+- **License allowlist + bans + sources** enforced by each project's `deny.toml` (`cargo deny check`) -- the
+  same allowlist as the Console's npm policy (AGPL/GPL/LGPL denied), plus `OpenSSL` for the `aws-lc` FIPS
+  module. The **only** allowed git source is the pinned CrucibleDB repo (the sidecar's `cdb-mtls` contract
+  crate; the enroll client has none); every other git source and any crates.io `*` version fails the gate.
 - **Advisories** via `cargo audit` (RustSec).
-- Both run as the `scripts/ci.sh` `[11] sidecar` leg (network-gated, like the npm audit); CI provisions
-  `cargo-deny`/`cargo-audit`. A release build emits the sidecar's CycloneDX SBOM (`cargo-cyclonedx`)
+- All run as the `scripts/ci.sh` `[11] Rust projects` leg (network-gated, like the npm audit); CI provisions
+  `cargo-deny`/`cargo-audit`. A release build emits each project's CycloneDX SBOM (`cargo-cyclonedx`)
   alongside the npm SBOM.
