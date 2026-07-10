@@ -1,0 +1,40 @@
+# console-crypto-sidecar.service -- systemd unit for the Console AWS-LC crypto sidecar (CS.5).
+#
+# Installer-provisioned. The sidecar runs as a dedicated non-root user, terminates the admin-plane TLS on
+# node-IP:8443 and originates the engine mTLS on :7878, forwarding to/from the BFF over plaintext loopback.
+# It needs no privileges: 8443 and the loopback ports are all unprivileged, and it writes nothing.
+
+[Unit]
+Description=Console AWS-LC crypto sidecar (admin TLS termination + engine mTLS origination)
+Documentation=https://github.com/todd-yousource-ai/ForgeCentral/blob/main/docs/implementation-plans/IP-CONSOLE-00-CRYPTO-SIDECAR.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=console-sidecar
+Group=console-sidecar
+ExecStart=/usr/local/bin/console-crypto-sidecar /etc/console-sidecar/config.json
+Restart=on-failure
+RestartSec=2
+
+# Hardening: no privileges, no writes, minimal syscall/address-family surface.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+# The admin leaf + the engine client identity are read-only, owned by the service user.
+ReadOnlyPaths=/etc/console-sidecar
+
+[Install]
+WantedBy=multi-user.target

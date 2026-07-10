@@ -112,6 +112,14 @@ else
         cargo fmt --check
         cargo clippy --all-targets ${offline} -- -D warnings
         cargo test ${offline}
+        # Supply chain (network: cargo-deny's advisory DB + cargo-audit both need it). Never mask a
+        # real failure -- run the tool directly when present so a violation fails the gate.
+        if [ "$skip_net" = "false" ]; then
+            if command -v cargo-deny >/dev/null 2>&1; then cargo deny check; else echo "    (cargo-deny not installed; CI enforces sidecar/deny.toml)"; fi
+            if command -v cargo-audit >/dev/null 2>&1; then cargo audit; else echo "    (cargo-audit not installed)"; fi
+        else
+            echo "    sidecar supply-chain (deny + audit) skipped (--skip-net)"
+        fi
     )
 fi
 
