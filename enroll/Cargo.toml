@@ -1,0 +1,29 @@
+# enroll/Cargo.toml -- the Console-owned ZTP enrollment client (IP-CONSOLE-00-DEPLOY D.3a-console).
+#
+# A standalone Rust crate (NOT in the pnpm workspace), like sidecar/. It enrolls the Console's engine
+# identity via service-key ZTP: a SOFTWARE P-384 key (torch-enroll is TPM-only and refuses software keys,
+# so the Console owns this small client), operator MFA + step-ca mint + AIG registration, yielding the
+# cert + key PEM the crypto sidecar presents on the engine leg. Uses the platform's AWS-LC crypto (rcgen's
+# aws_lc_rs backend); no TPM. D.3a-console.1 lands the software keystore (keygen + CSR + PEM); the enroll
+# protocol client + the provisioning wrapper are D.3a-console.2/.3.
+
+[package]
+name = "console-enroll"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.96.0"
+license = "LicenseRef-YouSource-Proprietary"
+publish = false
+description = "Console service-key ZTP enrollment client: a software-key identity for the crypto sidecar's engine leg."
+
+[lib]
+name = "console_enroll"
+path = "src/lib.rs"
+
+[dependencies]
+thiserror = "1.0"
+# P-384 keygen + PKCS#10 CSR generation. Force the AWS-LC backend (rcgen defaults to `ring`); the Console's
+# software wire key is generated + the enrollment CSR signed on the platform's AWS-LC module, no TPM. `pem`
+# for the CSR/key PEM export. (No x509-parser: it drags in a conflicting time pin, and D.3a-console.2 will
+# verify the CSR end to end against the real enrollment service.)
+rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }

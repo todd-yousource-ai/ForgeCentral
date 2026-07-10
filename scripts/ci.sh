@@ -95,32 +95,36 @@ pnpm run sbom
 echo "==> [10] build"
 pnpm run build
 
-# ---- [11] the crypto sidecar (Rust: fmt + clippy -D warnings + test) -------------------------------
-# The Console-owned AWS-LC crypto sidecar is a standalone Cargo project under sidecar/ (not the pnpm
-# workspace). Its own Rust gate mirrors the engine repos'. Under --skip-net it runs --offline against the
-# cargo cache (CS.3 adds a cdb-mtls git dep that a fresh offline machine must have vendored/cached).
-echo "==> [11] sidecar (Rust: fmt + clippy + test)"
+# ---- [11] the Console-owned Rust projects (fmt + clippy -D warnings + test + supply chain) ----------
+# The AWS-LC crypto sidecar (sidecar/) and the ZTP enrollment client (enroll/) are standalone Cargo
+# projects (NOT the pnpm workspace), each with its own Rust gate mirroring the engine repos'. Under
+# --skip-net they run --offline against the cargo cache (the sidecar's cdb-mtls git dep + the enroll
+# client's crates.io deps must be vendored/cached on a fresh offline machine).
+echo "==> [11] Rust projects (sidecar + enroll: fmt + clippy + test)"
 if [ "$skip_sidecar" = "true" ]; then
-    echo "    sidecar gate SKIPPED (--skip-sidecar)"
+    echo "    Rust gate SKIPPED (--skip-sidecar)"
 elif ! command -v cargo >/dev/null 2>&1; then
-    echo "    sidecar gate SKIPPED (cargo not found)"
+    echo "    Rust gate SKIPPED (cargo not found)"
 else
     offline=""
     [ "$skip_net" = "true" ] && offline="--offline"
-    (
-        cd sidecar
-        cargo fmt --check
-        cargo clippy --all-targets ${offline} -- -D warnings
-        cargo test ${offline}
-        # Supply chain (network: cargo-deny's advisory DB + cargo-audit both need it). Never mask a
-        # real failure -- run the tool directly when present so a violation fails the gate.
-        if [ "$skip_net" = "false" ]; then
-            if command -v cargo-deny >/dev/null 2>&1; then cargo deny check; else echo "    (cargo-deny not installed; CI enforces sidecar/deny.toml)"; fi
-            if command -v cargo-audit >/dev/null 2>&1; then cargo audit; else echo "    (cargo-audit not installed)"; fi
-        else
-            echo "    sidecar supply-chain (deny + audit) skipped (--skip-net)"
-        fi
-    )
+    for rust_project in sidecar enroll; do
+        echo "    -- ${rust_project} --"
+        (
+            cd "${rust_project}"
+            cargo fmt --check
+            cargo clippy --all-targets ${offline} -- -D warnings
+            cargo test ${offline}
+            # Supply chain (network: cargo-deny's advisory DB + cargo-audit both need it). Never mask a
+            # real failure -- run the tool directly when present so a violation fails the gate.
+            if [ "$skip_net" = "false" ]; then
+                if command -v cargo-deny >/dev/null 2>&1; then cargo deny check; else echo "    (cargo-deny not installed; CI enforces ${rust_project}/deny.toml)"; fi
+                if command -v cargo-audit >/dev/null 2>&1; then cargo audit; else echo "    (cargo-audit not installed)"; fi
+            else
+                echo "    ${rust_project} supply-chain (deny + audit) skipped (--skip-net)"
+            fi
+        )
+    done
 fi
 
 echo "==> ALL GATES PASSED"
