@@ -1,0 +1,400 @@
+/*
+ * The Console shell layout. It styles only the shell frame (rail, top bar, surface region, and the four
+ * cross-cutting states); the design-system components bring their own rules via componentStyles(). Every
+ * value binds to a --fc-* design token (INV-CONSOLE-DESIGN-SEMANTIC-COLOR); there are no hand-picked
+ * colors here. Reduced motion is honored. Narrow viewports collapse the rail to its glyph column.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--fc-color-surface-canvas);
+  color: var(--fc-color-text-primary);
+  font-family: var(--fc-font-fontFamily-sans);
+  font-size: var(--fc-font-size-md);
+  line-height: var(--fc-font-lineHeight-normal);
+}
+
+.fcx-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- shell grid ---------------------------------------------------------- */
+
+.fcx-shell {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+}
+
+.fcx-shell__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fcx-shell__content {
+  flex: 1;
+  padding: var(--fc-space-xl);
+  min-width: 0;
+}
+
+/* ---- left rail ----------------------------------------------------------- */
+
+.fcx-rail {
+  background: var(--fc-color-surface-panel);
+  border-right: 1px solid var(--fc-color-surface-border);
+  padding: var(--fc-space-md) var(--fc-space-sm);
+}
+
+.fcx-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-xs);
+}
+
+.fcx-rail__item {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  padding: var(--fc-space-sm) var(--fc-space-md);
+  border-radius: var(--fc-radius-md);
+  color: var(--fc-color-text-muted);
+  text-decoration: none;
+  font-weight: var(--fc-font-weight-medium);
+}
+
+.fcx-rail__item:hover {
+  background: var(--fc-color-surface-card);
+  color: var(--fc-color-text-primary);
+}
+
+.fcx-rail__item--active {
+  background: var(--fc-color-surface-card);
+  color: var(--fc-color-text-primary);
+  box-shadow: inset 3px 0 0 0 var(--fc-color-brand-primary);
+}
+
+.fcx-rail__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--fc-radius-sm);
+  background: var(--fc-color-surface-canvas);
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-xs);
+  font-weight: var(--fc-font-weight-semibold);
+  flex: none;
+}
+
+.fcx-rail__item--active .fcx-rail__glyph {
+  color: var(--fc-color-brand-primary);
+}
+
+/* ---- top bar ------------------------------------------------------------- */
+
+.fcx-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-lg);
+  padding: var(--fc-space-md) var(--fc-space-xl);
+  background: var(--fc-color-surface-panel);
+  border-bottom: 1px solid var(--fc-color-surface-border);
+}
+
+.fcx-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-topbar__wordmark {
+  font-weight: var(--fc-font-weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.fcx-topbar__title {
+  font-size: var(--fc-font-size-lg);
+  font-weight: var(--fc-font-weight-semibold);
+  margin: 0;
+}
+
+.fcx-topbar__right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-md);
+}
+
+/* ---- account menu -------------------------------------------------------- */
+
+.fcx-account {
+  position: relative;
+}
+
+.fcx-account__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  background: transparent;
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-pill);
+  padding: var(--fc-space-xs) var(--fc-space-md);
+  color: var(--fc-color-text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.fcx-account__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--fc-space-xs));
+  min-width: 200px;
+  background: var(--fc-color-surface-card);
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-md);
+  box-shadow: var(--fc-elevation-popover);
+  padding: var(--fc-space-sm);
+  z-index: 20;
+}
+
+.fcx-account__meta {
+  margin: 0 0 var(--fc-space-xs);
+  padding: var(--fc-space-xs) var(--fc-space-sm);
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-xs);
+  word-break: break-all;
+}
+
+.fcx-account__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--fc-radius-sm);
+  padding: var(--fc-space-sm);
+  color: var(--fc-color-text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.fcx-account__item:hover {
+  background: var(--fc-color-surface-panel);
+}
+
+/* ---- surface region ------------------------------------------------------ */
+
+.fcx-surface__heading {
+  font-size: var(--fc-font-size-xl);
+  font-weight: var(--fc-font-weight-semibold);
+  margin: 0 0 var(--fc-space-lg);
+}
+
+/* ---- the four states ----------------------------------------------------- */
+
+.fcx-state {
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-lg);
+  background: var(--fc-color-surface-card);
+  padding: var(--fc-space-xl);
+}
+
+.fcx-state__title {
+  margin: 0 0 var(--fc-space-sm);
+  font-weight: var(--fc-font-weight-semibold);
+}
+
+.fcx-state__hint {
+  margin: 0;
+  color: var(--fc-color-text-muted);
+  max-width: 60ch;
+}
+
+.fcx-state__action {
+  margin-top: var(--fc-space-lg);
+}
+
+.fcx-state--error {
+  border-color: var(--fc-color-status-critical);
+}
+
+.fcx-state__meta {
+  display: flex;
+  gap: var(--fc-space-md);
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-xs);
+  font-family: var(--fc-font-fontFamily-mono);
+  margin: var(--fc-space-sm) 0 0;
+}
+
+.fcx-skeleton {
+  background: var(--fc-color-surface-panel);
+  border-radius: var(--fc-radius-sm);
+  animation: fcx-pulse var(--fc-motion-duration-slow) ease-in-out infinite alternate;
+}
+
+.fcx-skeleton--line {
+  height: 12px;
+  margin-bottom: var(--fc-space-sm);
+}
+
+.fcx-skeleton--block {
+  height: 96px;
+  margin-top: var(--fc-space-md);
+}
+
+@keyframes fcx-pulse {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- staleness marker ---------------------------------------------------- */
+
+.fcx-stale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  padding: var(--fc-space-xs) var(--fc-space-md);
+  border-radius: var(--fc-radius-pill);
+  background: var(--fc-color-surface-panel);
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-xs);
+  margin-bottom: var(--fc-space-md);
+}
+
+.fcx-stale__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--fc-radius-pill);
+  background: var(--fc-color-status-caution);
+  flex: none;
+}
+
+/* ---- buttons ------------------------------------------------------------- */
+
+.fcx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fc-space-sm);
+  padding: var(--fc-space-sm) var(--fc-space-lg);
+  border-radius: var(--fc-radius-md);
+  border: 1px solid var(--fc-color-surface-border);
+  background: var(--fc-color-surface-panel);
+  color: var(--fc-color-text-primary);
+  font: inherit;
+  font-weight: var(--fc-font-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.fcx-btn:hover {
+  border-color: var(--fc-color-brand-primary);
+}
+
+.fcx-btn--primary {
+  background: var(--fc-color-brand-primary);
+  color: var(--fc-color-text-onBrand);
+  border-color: var(--fc-color-brand-primary);
+}
+
+.fcx-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---- login + boot -------------------------------------------------------- */
+
+.fcx-boot,
+.fcx-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fc-space-xl);
+}
+
+.fcx-login__card {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  background: var(--fc-color-surface-card);
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-lg);
+  padding: var(--fc-space-3xl) var(--fc-space-xl);
+  box-shadow: var(--fc-elevation-drawer);
+}
+
+.fcx-login__title {
+  font-size: var(--fc-font-size-2xl);
+  margin: var(--fc-space-md) 0 var(--fc-space-sm);
+}
+
+.fcx-login__lead,
+.fcx-login__hint {
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-login__code {
+  font-family: var(--fc-font-fontFamily-mono);
+  font-size: var(--fc-font-size-2xl);
+  letter-spacing: 0.15em;
+  margin: var(--fc-space-md) 0 var(--fc-space-lg);
+}
+
+.fcx-login__error {
+  color: var(--fc-color-status-critical);
+  margin-bottom: var(--fc-space-md);
+}
+
+.fcx-login__start,
+.fcx-login__await {
+  margin-top: var(--fc-space-xl);
+}
+
+.fcx-drawer__empty {
+  color: var(--fc-color-text-muted);
+}
+
+/* ---- responsive: collapse the rail to glyphs ----------------------------- */
+
+@media (max-width: 900px) {
+  .fcx-shell {
+    grid-template-columns: 64px 1fr;
+  }
+
+  .fcx-rail__label {
+    display: none;
+  }
+
+  .fcx-rail__item {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fcx-skeleton {
+    animation: none;
+  }
+}

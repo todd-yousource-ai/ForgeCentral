@@ -16,6 +16,14 @@ only via its allowlisted option.
 The allowlist in `scripts/check-licenses.mjs` is authoritative for enforcement; keep the two in sync. A
 new license requires an explicit, reviewed addition to both.
 
+Reviewed per-package exceptions (`PACKAGE_EXCEPTIONS` in `scripts/check-licenses.mjs`): a package that is
+**dev-only and data-only** may sit outside the code allowlist when it ships no code into `dist/`. A
+prohibited family (GPL/AGPL/...) is never exceptable. Current entries:
+
+- **`caniuse-lite` (CC-BY-4.0)** -- browser-compatibility data, dev-only (build-time, pulled by
+  `browserslist` under `@babel/core` under `@vitejs/plugin-react`). It is a data table, not code, and is
+  never bundled into a release artifact. Permitted as a reviewed exception.
+
 ## Versions and provenance
 
 - **Pin exact versions** for runtime dependencies; no `*`/`x`/`latest`. Dev tooling may use caret ranges,

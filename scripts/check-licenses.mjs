@@ -28,6 +28,17 @@ const ALLOW = new Set([
 // Never permitted, called out explicitly for a clear message.
 const FORBIDDEN_SUBSTRINGS = ['GPL', 'AGPL', 'LGPL', 'SSPL', 'BUSL', 'CC-BY-NC'];
 
+// Reviewed per-package exceptions (keep in sync with DEPENDENCY-POLICY.md). A package here is dev-only
+// and DATA-only: its license sits outside the code allowlist but it ships no code into dist/. Keyed by
+// package name with the justification. A FORBIDDEN family (GPL/AGPL/...) is never exceptable here, so an
+// exception can only ever clear a permissive-but-unlisted license (e.g. CC-BY for a data table).
+const PACKAGE_EXCEPTIONS = new Map([
+  [
+    'caniuse-lite',
+    'CC-BY-4.0 browser-compatibility DATA, dev-only (build-time via browserslist <- @babel/core <- @vitejs/plugin-react); no code ships in dist/.',
+  ],
+]);
+
 function normalize(license) {
   // pnpm may report "MIT", "(MIT OR Apache-2.0)", or "Unknown". Split on OR/AND/parens.
   return String(license)
@@ -63,7 +74,13 @@ for (const [license, packages] of Object.entries(byLicense)) {
   // the license string itself is an explicitly forbidden family with no allowlisted alternative.
   const hasAllowed = parts.some((p) => ALLOW.has(p));
   if (!hasAllowed || (forbidden && !parts.some((p) => ALLOW.has(p)))) {
-    const names = (Array.isArray(packages) ? packages : []).map((p) => p.name ?? p).join(', ');
+    // Drop reviewed per-package exceptions, but only when the license is not a forbidden family.
+    const flagged = (Array.isArray(packages) ? packages : []).filter((p) => {
+      const name = p.name ?? p;
+      return forbidden || !PACKAGE_EXCEPTIONS.has(name);
+    });
+    if (flagged.length === 0) continue;
+    const names = flagged.map((p) => p.name ?? p).join(', ');
     offenders.push({ license, names });
   }
 }
