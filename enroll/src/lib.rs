@@ -8,6 +8,7 @@
 //! D.3a-console.1 (this): the [`keystore`] -- P-384 keygen + PKCS#10 CSR + PEM export. The enroll protocol
 //! client (device-code MFA + CSR submit + cert receive) and the provisioning wrapper are D.3a-console.2/.3.
 
+pub mod device_grant;
 pub mod keystore;
 pub mod token_binding;
 

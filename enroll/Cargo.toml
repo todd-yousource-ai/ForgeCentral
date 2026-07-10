@@ -32,5 +32,9 @@ rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "
 # (PKCS#8 DER) drives both rcgen (CSR/PEM) and aws-lc-rs (raw sign).
 aws-lc-rs = "1"
 # base64url (no-pad) for the JOSE/JWK encoding of the DPoP proof + the RFC 7638 JWK thumbprint (`jkt`). The
-# canonical JWK + the JWT header/claims are hand-built (format!) so no JSON dependency is pulled in.
+# canonical JWK + the JWT header/claims are hand-built (format!) so no JSON dependency is pulled in there.
 base64 = "0.22"
+# Parse the IdP's device-authorization + token JSON responses (RFC 8628). serde_json is the standard,
+# minimal choice; the request bodies are hand-built form-urlencoded (no extra dep).
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
