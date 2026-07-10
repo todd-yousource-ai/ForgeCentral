@@ -27,3 +27,7 @@ thiserror = "1.0"
 # for the CSR/key PEM export. (No x509-parser: it drags in a conflicting time pin, and D.3a-console.2 will
 # verify the CSR end to end against the real enrollment service.)
 rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
+# Raw ECDSA-P384 signing over the SAME key (the DPoP proof that gets the cnf-bound token D.3a-console.2
+# needs, and later the wire-plane TLS handshake). AWS-LC keeps the crypto posture; one key material
+# (PKCS#8 DER) drives both rcgen (CSR/PEM) and aws-lc-rs (raw sign).
+aws-lc-rs = "1"
