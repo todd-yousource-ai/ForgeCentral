@@ -1,19 +1,19 @@
-//! The device-grant orchestrator (`IP-CONSOLE-00-DEPLOY` D.3a-console.2c): the RFC 8628 poll state
-//! machine that drives the IdP calls to a `cnf`-bound access token.
+//! The device-grant orchestrator: the RFC 8628 poll state machine that drives the IdP calls to a
+//! federated access token (operator MFA).
 //!
-//! It composes the pure pieces -- the device-grant message modeling ([`crate::device_grant`]), the DPoP
-//! proof ([`crate::token_binding`]), and the HTTP codec ([`crate::http`]) -- over a [`PostTransport`] seam.
-//! The seam keeps the valuable logic (the poll loop, a fresh DPoP proof per token request, the
-//! pending/slow-down/approved/denied handling) testable with a mock; the real TLS transport (D.3a-
-//! console.2c-3) is a thin `PostTransport` impl over `tokio-rustls`/AWS-LC (or blocking rustls).
+//! It composes the pure pieces -- the device-grant message modeling ([`crate::device_grant`]) and the
+//! HTTP codec ([`crate::http`]) -- over a [`PostTransport`] seam. The token is a BARE bearer token (no
+//! DPoP): the node establishes the token-to-key binding itself from the attested CSR key at submit
+//! (the NodeEstablished path), so the enrolling key never binds the token. The seam keeps the poll
+//! logic (pending/slow-down/approved/denied) testable with a mock; the real TLS transport is a thin
+//! `PostTransport` impl over blocking rustls/AWS-LC.
 
 use crate::device_grant::{
     device_authorization_form, parse_device_authorization, parse_token_poll, token_poll_form,
     DeviceAuthorization, PollOutcome,
 };
+use crate::error::EnrollError;
 use crate::http::HttpResponse;
-use crate::keystore::{EnrollError, SoftwareKeystore};
-use crate::token_binding::dpop_proof;
 
 /// The federated IdP endpoints + client the device grant runs against (host + paths, not full URLs, so no
 /// URL-parsing dependency).
@@ -51,8 +51,6 @@ pub trait PostTransport {
 /// Hooks the orchestrator needs from its environment, injected so the state machine stays deterministic +
 /// testable (the real impls are `SystemTime`, `thread::sleep`, and a `println!` prompt).
 pub struct DeviceFlowEnv<'a> {
-    /// Current unix time in seconds (the DPoP `iat`).
-    pub now: &'a dyn Fn() -> u64,
     /// Sleep for `seconds` between polls.
     pub sleep: &'a dyn Fn(u64),
     /// Show the operator the code + verification URI to approve (MFA).
@@ -61,16 +59,15 @@ pub struct DeviceFlowEnv<'a> {
     pub max_polls: u32,
 }
 
-/// Run the device-authorization grant to a `cnf`-bound access token.
+/// Run the device-authorization grant to a federated access token (operator MFA).
 ///
-/// Requests device authorization, prompts the operator, then polls the token endpoint -- each poll carries
-/// a fresh DPoP proof so the IdP mints a token bound to this key's `jkt`. Returns the access token on
-/// approval; fails closed on a terminal OAuth error or timeout.
+/// Requests device authorization, prompts the operator, then polls the token endpoint until approval.
+/// The token is a bare bearer token (no DPoP proof): the node binds it to the attested CSR key itself.
+/// Fails closed on a terminal OAuth error or timeout.
 ///
 /// # Errors
 /// [`EnrollError`] on a transport failure, a terminal OAuth denial, or a poll timeout.
 pub fn run_device_grant<T: PostTransport>(
-    keystore: &SoftwareKeystore,
     idp: &IdpConfig,
     transport: &mut T,
     env: &DeviceFlowEnv<'_>,
@@ -92,19 +89,12 @@ pub fn run_device_grant<T: PostTransport>(
     let authorization = parse_device_authorization(&auth_resp.body)?;
     (env.prompt)(&authorization);
 
-    // 2. Poll the token endpoint until the operator approves (each poll DPoP-bound to this key).
-    let token_htu = format!("https://{}{}", idp.host, idp.token_path);
+    // 2. Poll the token endpoint until the operator approves (a bare bearer token; no DPoP).
     let mut interval = authorization.interval;
     for _ in 0..env.max_polls {
         (env.sleep)(interval);
-        let dpop = dpop_proof(keystore, "POST", &token_htu, (env.now)(), None)?;
         let poll_body = token_poll_form(&idp.client_id, &authorization.device_code);
-        let resp = transport.post(
-            &idp.host,
-            &idp.token_path,
-            &[("DPoP", &dpop)],
-            poll_body.as_bytes(),
-        )?;
+        let resp = transport.post(&idp.host, &idp.token_path, &[], poll_body.as_bytes())?;
         match parse_token_poll(resp.is_success(), &resp.body)? {
             PollOutcome::Approved(token) => return Ok(token.access_token),
             PollOutcome::Pending => {}
@@ -122,7 +112,8 @@ mod tests {
     use super::*;
     use crate::http::parse_response;
 
-    /// A scripted transport: returns the next queued raw HTTP response per call, recording requests.
+    /// A scripted transport: returns the next queued raw HTTP response per call, recording whether any
+    /// request carried a DPoP header (the bare-token flow never does).
     struct MockTransport {
         responses: Vec<Vec<u8>>,
         seen_dpop: Vec<bool>,
@@ -170,32 +161,29 @@ mod tests {
 
     #[test]
     fn polls_through_pending_then_returns_the_approved_token() {
-        let ks = SoftwareKeystore::generate().unwrap();
         let mut transport = MockTransport {
             responses: vec![
                 ok(
                     r#"{"device_code":"DC","user_code":"WXYZ","verification_uri":"https://idp/act","expires_in":600,"interval":1}"#,
                 ),
                 err(r#"{"error":"authorization_pending"}"#),
-                ok(r#"{"access_token":"the.jws.token","token_type":"DPoP"}"#),
+                ok(r#"{"access_token":"the.jws.token","token_type":"Bearer"}"#),
             ],
             seen_dpop: Vec::new(),
         };
         let env = DeviceFlowEnv {
-            now: &|| 1_700_000_000,
             sleep: &|_| {},
             prompt: &|_| {},
             max_polls: 5,
         };
-        let token = run_device_grant(&ks, &idp(), &mut transport, &env).unwrap();
+        let token = run_device_grant(&idp(), &mut transport, &env).unwrap();
         assert_eq!(token, "the.jws.token");
-        // The device-authorization request carried no DPoP; every token poll did.
-        assert_eq!(transport.seen_dpop, vec![false, true, true]);
+        // The bare-token flow carries NO DPoP on any request (auth request + polls).
+        assert_eq!(transport.seen_dpop, vec![false, false, false]);
     }
 
     #[test]
     fn a_terminal_denial_fails_closed() {
-        let ks = SoftwareKeystore::generate().unwrap();
         let mut transport = MockTransport {
             responses: vec![
                 ok(
@@ -206,12 +194,11 @@ mod tests {
             seen_dpop: Vec::new(),
         };
         let env = DeviceFlowEnv {
-            now: &|| 1_700_000_000,
             sleep: &|_| {},
             prompt: &|_| {},
             max_polls: 5,
         };
-        let outcome = run_device_grant(&ks, &idp(), &mut transport, &env);
+        let outcome = run_device_grant(&idp(), &mut transport, &env);
         assert!(outcome.is_err(), "access_denied fails closed");
     }
 }

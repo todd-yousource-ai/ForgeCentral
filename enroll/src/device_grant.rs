@@ -9,7 +9,7 @@
 
 use serde::Deserialize;
 
-use crate::keystore::EnrollError;
+use crate::error::EnrollError;
 
 /// The device-authorization response (RFC 8628 §3.2): what the operator approves + how to poll.
 #[derive(Debug, Clone, Deserialize)]

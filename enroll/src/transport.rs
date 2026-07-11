@@ -15,8 +15,8 @@ use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
 
 use crate::device_flow::PostTransport;
+use crate::error::EnrollError;
 use crate::http::{build_post, parse_response, HttpResponse};
-use crate::keystore::EnrollError;
 
 /// A TLS POST transport that trusts the public web PKI (for the IdP host), on the AWS-LC provider.
 pub struct WebPkiPostTransport {

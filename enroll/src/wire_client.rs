@@ -1,15 +1,20 @@
-//! The bootstrap-TLS enrollment wire client (`IP-CONSOLE-00-DEPLOY` D.3a-console.2c-3).
+//! The bootstrap-TLS enrollment wire client.
 //!
 //! Connects to the node's enrollment service over the **bootstrap** TLS (server-auth-only, TLS 1.3, the
-//! `X25519MLKEM768`/`X25519` hybrid KX, pinning the enroll-CA root -- byte-identical to the torch client's
-//! `bootstrap_client_config`), then exchanges one enroll frame: send `EnrollSubmit` carrying a CBOR
-//! [`WireEnrollRequest`] (the `cnf`-bound token + the CSR DER + the attestation), read `EnrollResult`
-//! carrying a [`WireEnrollResponse`], and return the minted leaf on `Issued`.
+//! `X25519MLKEM768`/`X25519` hybrid KX, pinning the enroll-CA root -- byte-identical to the torch
+//! client's `bootstrap_client_config`) and exchanges one frame per call:
+//!
+//! - [`request_identity_offer`]: send `EnrollIdentityOffer` carrying a [`WireIdentityRequest`] (the
+//!   token + the TPM attestation), read `EnrollIdentityResult` carrying a [`WireIdentityOffer`] -- the
+//!   FQDN bound to this device's attested identity, or an invitation to propose one (first enrollment).
+//! - [`submit_enrollment`]: send `EnrollSubmit` carrying a [`WireEnrollRequest`] (the token + the CSR
+//!   DER + the attestation), read `EnrollResult` carrying a [`WireEnrollResponse`], return the minted
+//!   leaf on `Issued`.
 //!
 //! The wire contract (the frame header + the messages) is the `cdb-wire`/`cdb-types` git deps, so it is
 //! byte-exact to the engine. `cdb-wire`'s async `read_frame`/`write_frame` are `io`-gated (tokio); this
-//! blocking client hand-rolls the 16-byte header + CBOR framing over the rustls stream. Integration glue,
-//! exercised against the live node at D.3c, not the offline gate.
+//! blocking client hand-rolls the 16-byte header + CBOR framing over the rustls stream. Integration
+//! glue, exercised against the live node at D.3c, not the offline gate.
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -17,11 +22,13 @@ use std::sync::Arc;
 
 use cdb_types::DeviceAttestation;
 use cdb_wire::frame::{flags, FrameType, Header, HEADER_LEN};
-use cdb_wire::handshake::{WireEnrollRequest, WireEnrollResponse};
+use cdb_wire::handshake::{
+    WireEnrollRequest, WireEnrollResponse, WireIdentityOffer, WireIdentityRequest,
+};
 use rustls::pki_types::{CertificateDer, ServerName};
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
 
-use crate::keystore::EnrollError;
+use crate::error::EnrollError;
 
 /// The protocol version the enrollment frame carries: v1.0 packed as `major << 8 | minor`.
 const PROTOCOL_V1_0: u16 = 0x0100;
@@ -46,19 +53,6 @@ pub struct IssuedLeaf {
     pub serial: String,
     /// The certificate `notAfter` (RFC 3339).
     pub not_after: String,
-}
-
-/// A stand-in `DeviceAttestation` for a software-key (no-TPM) enrollment: only `ek_cert_der` is used, as
-/// the stable, unverified device anchor for the FQDN binding (attestation is not verified when the token
-/// is `cnf`-bound and the issuance policy's `require_attestation` is false). `anchor` MUST be stable across
-/// re-enrollments of the same identity (e.g. derived from the FQDN).
-#[must_use]
-pub fn software_attestation(anchor: Vec<u8>) -> DeviceAttestation {
-    DeviceAttestation {
-        ek_cert_der: anchor,
-        ak_pub: Vec::new(),
-        binding: Vec::new(),
-    }
 }
 
 /// Build the bootstrap-TLS client config: pin `ca_pem`, hybrid PQC KX, TLS 1.3, server-auth only, AWS-LC.
@@ -130,16 +124,13 @@ fn read_frame(stream: &mut impl Read) -> Result<(u16, Vec<u8>), EnrollError> {
     Ok((header.frame_type, payload))
 }
 
-/// Submit the enrollment over the bootstrap TLS and return the minted leaf.
-///
-/// # Errors
-/// [`EnrollError::Sign`] on a TLS/transport/frame failure, an unexpected frame, or a `Refused` response.
-pub fn submit_enrollment(
+/// Open a fresh bootstrap-TLS connection, send one `send_type` frame carrying `payload`, and return the
+/// response frame's `(type, payload)`. Each enroll exchange is a single request/reply.
+fn exchange(
     config: &EnrollWireConfig,
-    token: String,
-    csr_der: Vec<u8>,
-    attestation: DeviceAttestation,
-) -> Result<IssuedLeaf, EnrollError> {
+    send_type: FrameType,
+    payload: &[u8],
+) -> Result<(u16, Vec<u8>), EnrollError> {
     let tls_config = bootstrap_config(&config.ca_pem)?;
     let server_name = ServerName::try_from(config.server_name.clone()).map_err(|_| {
         EnrollError::Sign(format!(
@@ -152,7 +143,44 @@ pub fn submit_enrollment(
     let mut socket = TcpStream::connect(&config.addr)
         .map_err(|e| EnrollError::Sign(format!("connect {}: {e}", config.addr)))?;
     let mut tls = rustls::Stream::new(&mut conn, &mut socket);
+    write_frame(&mut tls, send_type, payload)?;
+    read_frame(&mut tls)
+}
 
+/// The identity pre-flight: learn the FQDN bound to this device's attested TPM identity, or `None` to
+/// invite a first-use proposal. The device never asserts a name once it is bound.
+///
+/// # Errors
+/// [`EnrollError::Sign`] on a TLS/frame failure or an unexpected response frame.
+pub fn request_identity_offer(
+    config: &EnrollWireConfig,
+    token: String,
+    attestation: DeviceAttestation,
+) -> Result<WireIdentityOffer, EnrollError> {
+    let request = WireIdentityRequest { token, attestation };
+    let mut payload = Vec::new();
+    ciborium::into_writer(&request, &mut payload)
+        .map_err(|e| EnrollError::Sign(format!("encode identity request: {e}")))?;
+    let (frame_type, resp_payload) = exchange(config, FrameType::EnrollIdentityOffer, &payload)?;
+    if frame_type != FrameType::EnrollIdentityResult.code() {
+        return Err(EnrollError::Sign(format!(
+            "unexpected identity frame type: 0x{frame_type:04X}"
+        )));
+    }
+    ciborium::from_reader(resp_payload.as_slice())
+        .map_err(|e| EnrollError::Sign(format!("decode identity offer: {e}")))
+}
+
+/// Submit the enrollment over the bootstrap TLS and return the minted leaf.
+///
+/// # Errors
+/// [`EnrollError::Sign`] on a TLS/transport/frame failure, an unexpected frame, or a `Refused` response.
+pub fn submit_enrollment(
+    config: &EnrollWireConfig,
+    token: String,
+    csr_der: Vec<u8>,
+    attestation: DeviceAttestation,
+) -> Result<IssuedLeaf, EnrollError> {
     let request = WireEnrollRequest {
         token,
         csr_der,
@@ -161,9 +189,7 @@ pub fn submit_enrollment(
     let mut payload = Vec::new();
     ciborium::into_writer(&request, &mut payload)
         .map_err(|e| EnrollError::Sign(format!("encode enroll request: {e}")))?;
-    write_frame(&mut tls, FrameType::EnrollSubmit, &payload)?;
-
-    let (frame_type, resp_payload) = read_frame(&mut tls)?;
+    let (frame_type, resp_payload) = exchange(config, FrameType::EnrollSubmit, &payload)?;
     if frame_type != FrameType::EnrollResult.code() {
         return Err(EnrollError::Sign(format!(
             "unexpected enroll frame type: 0x{frame_type:04X}"
@@ -190,13 +216,6 @@ pub fn submit_enrollment(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn software_attestation_carries_only_the_anchor() {
-        let att = software_attestation(b"stable-anchor".to_vec());
-        assert_eq!(att.ek_cert_der, b"stable-anchor");
-        assert!(att.ak_pub.is_empty() && att.binding.is_empty());
-    }
 
     #[test]
     fn a_frame_round_trips_through_the_blocking_codec() {
