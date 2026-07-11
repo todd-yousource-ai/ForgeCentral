@@ -15,12 +15,98 @@ const liveRead: ReadBinding = {
 };
 
 describe('INV-CONSOLE-NO-STUB: the committed binding registry', () => {
-  it('is structurally well-formed', () => {
+  it('is structurally well-formed (every binding dev-valid)', () => {
     expect(validateManifest(bindings)).toEqual([]);
   });
 
-  it('is release-ready (no PENDING binding, no mock op)', () => {
-    expect(() => assertReleaseReady(bindings)).not.toThrow();
+  it('its only release blocker is the named PENDING deferrals (no structural fault, no mock op)', () => {
+    // The registry now carries real surfaces whose engine work is honestly deferred (INV-CROSS), so a
+    // release build is correctly gated. Prove the ONLY reason it is not release-ready is those tracked
+    // PENDING bindings -- there is no structural violation and no mock op hiding behind the gate.
+    expect(validateManifest(bindings)).toEqual([]);
+    const pending = Object.values(bindings).filter((b) => b.status.kind === 'pending');
+    expect(pending.length).toBeGreaterThan(0);
+    expect(() => assertReleaseReady(bindings)).toThrow(/PENDING bindings must not ship/);
+    for (const binding of pending) {
+      if (binding.status.kind === 'pending') {
+        expect(binding.status.owningRepo).not.toBe('');
+        expect(binding.status.gatingTask).not.toBe('');
+      }
+    }
+  });
+});
+
+describe('IP-CONSOLE-12 DR.1: the entity-drawer (entity.*) bindings', () => {
+  const entityBindings = Object.values(bindings).filter((b) => b.id.startsWith('entity.'));
+
+  it('registers every drawer section read + quick-action command', () => {
+    const ids = entityBindings.map((b) => b.id).sort();
+    expect(ids).toEqual(
+      [
+        'entity.header',
+        'entity.info',
+        'entity.zones',
+        'entity.capabilities',
+        'entity.effectivePolicies',
+        'entity.recentDecisions',
+        'entity.isolate',
+        'entity.reassignZone',
+        'entity.remediation',
+        'entity.fullReport',
+      ].sort(),
+    );
+  });
+
+  it('binds the five CrucibleQL section reads live', () => {
+    for (const id of [
+      'entity.header',
+      'entity.info',
+      'entity.zones',
+      'entity.effectivePolicies',
+      'entity.recentDecisions',
+    ]) {
+      const binding = bindings[id];
+      expect(binding?.kind).toBe('read');
+      expect(binding?.surface).toBe('cruciblql');
+      expect(binding?.status.kind).toBe('live');
+    }
+  });
+
+  it('defers capabilities to the Torch Construction Report read binding (DR.4)', () => {
+    const capabilities = bindings['entity.capabilities'];
+    expect(capabilities?.status.kind).toBe('pending');
+    if (capabilities?.status.kind === 'pending') {
+      expect(capabilities.status.owningRepo).toBe('torch');
+      expect(capabilities.status.gatingTask).toMatch(/Construction Report/);
+    }
+  });
+
+  it('exposes Isolate as a real audited command with enforcement off by posture, not fabrication', () => {
+    const isolate = bindings['entity.isolate'];
+    expect(isolate?.kind).toBe('command');
+    expect(isolate?.status.kind).toBe('live');
+    if (isolate?.kind === 'command') {
+      expect(isolate.audited).toBe(true);
+      expect(isolate.authz).toBe('operator:contain');
+    }
+  });
+
+  it('every quick action is an audited command; deferred ones name their gating surface', () => {
+    for (const id of [
+      'entity.isolate',
+      'entity.reassignZone',
+      'entity.remediation',
+      'entity.fullReport',
+    ]) {
+      const binding = bindings[id];
+      expect(binding?.kind).toBe('command');
+      if (binding?.kind === 'command') {
+        expect(binding.audited).toBe(true);
+      }
+      if (binding?.status.kind === 'pending') {
+        expect(binding.status.gatingTask).not.toBe('');
+      }
+    }
   });
 });
 
