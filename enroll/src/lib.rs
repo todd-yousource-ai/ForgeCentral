@@ -9,6 +9,7 @@
 //! client (device-code MFA + CSR submit + cert receive) and the provisioning wrapper are D.3a-console.2/.3.
 
 pub mod device_grant;
+pub mod http;
 pub mod keystore;
 pub mod token_binding;
 
