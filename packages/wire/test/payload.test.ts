@@ -52,6 +52,36 @@ describe('encodeWireRequest', () => {
     );
   });
 
+  it('encodes ListAgents byte-identically to ciborium (crdb ER.1)', () => {
+    const request: WireRequest = { ListAgents: { request_id: 7 } };
+    expect(hex(encodeWireRequest(request))).toBe(
+      'a16a4c6973744167656e7473a16a726571756573745f696407',
+    );
+  });
+
+  it('encodes EntityDecisions byte-identically to ciborium (crdb ER.2c)', () => {
+    const request: WireRequest = {
+      EntityDecisions: { request_id: 7, entity_type: 'host', entity_value: 'host-7', limit: 10 },
+    };
+    expect(hex(encodeWireRequest(request))).toBe(
+      'a16f456e746974794465636973696f6e73a46a726571756573745f6964076b656e746974795f7479706564686f73746c656e746974795f76616c756566686f73742d37656c696d69740a',
+    );
+  });
+
+  it('encodes EntityConnections byte-identically to ciborium (crdb ER.5)', () => {
+    const request: WireRequest = {
+      EntityConnections: {
+        request_id: 7,
+        subject_kind: 'process',
+        subject_id: 'host-7:pid:1234',
+        limit: 10,
+      },
+    };
+    expect(hex(encodeWireRequest(request))).toBe(
+      'a171456e74697479436f6e6e656374696f6e73a46a726571756573745f6964076c7375626a6563745f6b696e646770726f636573736a7375626a6563745f69646f686f73742d373a7069643a31323334656c696d69740a',
+    );
+  });
+
   it('throws on an unsupported (write-path) variant rather than emitting a wrong shape', () => {
     const request = { TxnCommit: { txn: [], request_id: 1 } } as unknown as WireRequest;
     expect(() => encodeWireRequest(request)).toThrow(/not yet supported/);
@@ -71,5 +101,25 @@ describe('decodeWireReply', () => {
   it('decodes the CursorClosed unit variant', () => {
     const reply: WireReply = decodeWireReply(bytesOf('6c437572736f72436c6f736564'));
     expect(reply).toBe('CursorClosed');
+  });
+
+  it('decodes an AgentList reply byte-identically to ciborium (crdb ER.1)', () => {
+    const reply = decodeWireReply(
+      bytesOf(
+        'a1694167656e744c697374a1666167656e747381a4686167656e745f69646b6169673a6167656e743a6166737461747573666163746976656b656e726f6c6c65645f6174016a61747472696275746573818264726f6c65686f70657261746f72',
+      ),
+    );
+    expect(reply).toEqual({
+      AgentList: {
+        agents: [
+          {
+            agent_id: 'aig:agent:a',
+            status: 'active',
+            enrolled_at: 1,
+            attributes: [['role', 'operator']],
+          },
+        ],
+      },
+    });
   });
 });
