@@ -5,7 +5,19 @@ stitching remains manual). One PR per roster row, a named slice of `INV-CONSOLE-
 full `scripts/ci.sh` green, branch-per-PR off local `main`, no-ff merge, push to `origin`, docs separate
 from code. Reviewed with the maintainer before each merge.
 
-Status: **D.1 + D.2 LANDED. D.3 DECIDED = ZTP + full-TPM + enrolled-role grant; the crdb ENGINE + ENROLLMENT sides of
+Status (2026-07-11): **D.1-D.4 LANDED. D.3 COMPLETE + LIVE-PROVEN via the TPM revival.** The D.3a-console
+description below (software-key ZTP + DPoP) was SUPERSEDED: the live node enforces `require_attestation`
+globally, so the Console enrolls a **non-exportable TPM key** instead (revive TPM key custody, product owner
+2026-07-11). The full arc -- shared crdb `cdb-device-identity` crate (crdb `b51236b0`), the `console-tpm`
+backend, the TPM-native `console-enroll` flow, and the TPM-signing sidecar -- is tracked in
+**`IP-CONSOLE-00-SIDECAR-TPM(-LEDGER).md`** (COMPLETE). **D.3c live capstone PROVEN 2026-07-11** (operator
+MFA -> attestation accepted by the node -> CSR minted by step-ca -> leaf issued -> sidecar TPM-mTLS admitted
+on `:7878`; a real de-chunk bug found + fixed, FC `2fdc7d2`). Two box-topology caveats (shared vTPM -> torch's
+identity; the running node predates `enrolled_role_grants`) mean the clean distinct-`console-bff`-identity +
+live-delegation run is a production/separate-box exercise; the CODE is fully proven. The historical
+software-key D.3a-console narrative is retained below for provenance only.
+
+Historical (superseded): **D.1 + D.2 LANDED. D.3 DECIDED = ZTP + full-TPM + enrolled-role grant; the crdb ENGINE + ENROLLMENT sides of
 D.3 are COMPLETE -- D.3b-1 (mechanism, crdb `b988d3f7`) + D.3b-2 (live `AigRoleResolver` + `CDB_WIRE_ROLE_GRANTS`,
 crdb `4f861db2`) + D.3a crdb half (the sink writes `attributes["role"]` from a `role:` capability, crdb
 `f8f9321e`), INV-WIRE-ENROLLED-ROLE-GRANT: the whole chain (IdP group -> `role:console-operator` capability
