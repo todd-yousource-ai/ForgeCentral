@@ -100,7 +100,7 @@ pnpm run build
 # projects (NOT the pnpm workspace), each with its own Rust gate mirroring the engine repos'. Under
 # --skip-net they run --offline against the cargo cache (the sidecar's cdb-mtls git dep + the enroll
 # client's crates.io deps must be vendored/cached on a fresh offline machine).
-echo "==> [11] Rust projects (sidecar + enroll: fmt + clippy + test)"
+echo "==> [11] Rust projects (console-tpm + sidecar + enroll: fmt + clippy + test)"
 if [ "$skip_sidecar" = "true" ]; then
     echo "    Rust gate SKIPPED (--skip-sidecar)"
 elif ! command -v cargo >/dev/null 2>&1; then
@@ -108,23 +108,36 @@ elif ! command -v cargo >/dev/null 2>&1; then
 else
     offline=""
     [ "$skip_net" = "true" ] && offline="--offline"
-    for rust_project in console-tpm sidecar enroll; do
-        echo "    -- ${rust_project} --"
-        (
-            cd "${rust_project}"
-            cargo fmt --check
-            cargo clippy --all-targets ${offline} -- -D warnings
-            cargo test ${offline}
-            # Supply chain (network: cargo-deny's advisory DB + cargo-audit both need it). Never mask a
-            # real failure -- run the tool directly when present so a violation fails the gate.
-            if [ "$skip_net" = "false" ]; then
-                if command -v cargo-deny >/dev/null 2>&1; then cargo deny check; else echo "    (cargo-deny not installed; CI enforces ${rust_project}/deny.toml)"; fi
-                if command -v cargo-audit >/dev/null 2>&1; then cargo audit; else echo "    (cargo-audit not installed)"; fi
-            else
-                echo "    ${rust_project} supply-chain (deny + audit) skipped (--skip-net)"
-            fi
-        )
-    done
+    # The Rust crates git-depend on the PRIVATE Crucible repo (cdb-mtls / cdb-wire / cdb-types /
+    # cdb-device-identity). Online, that fetch needs a credential: locally the `github-crucible` SSH
+    # insteadOf + a deploy key; in CI the `CRUCIBLE_TOKEN` secret the workflow maps to a git credential.
+    # If the repo is not reachable (no token / no key), SKIP the Rust gate with an actionable message
+    # rather than failing on a cryptic `could not read Username` git error. `GIT_TERMINAL_PROMPT=0` makes
+    # the probe fail fast instead of prompting. Offline runs use the local cargo cache (no remote fetch).
+    if [ "$skip_net" != "true" ] && ! GIT_TERMINAL_PROMPT=0 git ls-remote \
+        https://github.com/todd-yousource-ai/Crucible.git HEAD >/dev/null 2>&1; then
+        echo "    Rust gate SKIPPED -- the private Crucible git dependency is not reachable."
+        echo "    Set the CRUCIBLE_TOKEN repository secret (a token with read access to"
+        echo "    todd-yousource-ai/Crucible) to enable it; the workflow maps it to the git credential."
+    else
+        for rust_project in console-tpm sidecar enroll; do
+            echo "    -- ${rust_project} --"
+            (
+                cd "${rust_project}"
+                cargo fmt --check
+                cargo clippy --all-targets ${offline} -- -D warnings
+                cargo test ${offline}
+                # Supply chain (network: cargo-deny's advisory DB + cargo-audit both need it). Never mask a
+                # real failure -- run the tool directly when present so a violation fails the gate.
+                if [ "$skip_net" = "false" ]; then
+                    if command -v cargo-deny >/dev/null 2>&1; then cargo deny check; else echo "    (cargo-deny not installed; CI enforces ${rust_project}/deny.toml)"; fi
+                    if command -v cargo-audit >/dev/null 2>&1; then cargo audit; else echo "    (cargo-audit not installed)"; fi
+                else
+                    echo "    ${rust_project} supply-chain (deny + audit) skipped (--skip-net)"
+                fi
+            )
+        done
+    fi
 fi
 
 echo "==> ALL GATES PASSED"
