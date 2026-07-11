@@ -5,12 +5,12 @@ Per-PR landing record for `IP-CONSOLE-12-ENTITY-DRAWER.md` (the shared detail + 
 `INV-CONSOLE-DRAWER-REAL`, the full `scripts/ci.sh` green, branch-per-PR off local `main`, no-ff merge,
 push to `origin`, docs separate from code. Reviewed with the maintainer before each merge.
 
-Status: **OPEN -- not started.** No surface prerequisite (built first; Logs P1.2 + Overview P1.3 reuse
-it). Phase 0 foundation + the browsable `:8443` enabler are landed.
+Status: **IN PROGRESS -- DR.1 landed.** No surface prerequisite (built first; Logs P1.2 + Overview P1.3
+reuse it). Phase 0 foundation + the browsable `:8443` enabler are landed.
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
-| DR.1 | INV-CONSOLE-DRAWER-CONTRACT | OPEN | -- | The section view models + quick-action shapes in `@forge/contracts`; `entity.*` binding-registry entries (capabilities/isolate/commands `PENDING`); `test:contract`. |
+| DR.1 | INV-CONSOLE-DRAWER-CONTRACT | LANDED | (this PR) | `@forge/contracts/src/entity.ts`: the entity ref (kind-branded union), the six section view models (header+trust, info, zones, capabilities, effective policies, recent decisions) as PROJECTIONS of the engine DTOs (`WireDecision`/`WireAuditEntry` + branded ids), the `SectionState<T>` envelope (ok/empty/not-applicable/pending/unauthorized/error, TRD-12 Sec 6), the aggregate `EntityDetailView`, and the quick-action command shapes (idempotent `commandId`; `IsolateEffect.enforcementActive=false`, AG.7 off). `@forge/bindings`: registered the 10 `entity.*` bindings -- 5 CrucibleQL section reads LIVE, `entity.capabilities` PENDING (torch DR.4 Construction Report read binding), `entity.isolate` LIVE audited command, `reassignZone`/`remediation`/`fullReport` PENDING (named gating surface). **Design note:** this puts the first tracked PENDING deferrals into the committed manifest, so `assertReleaseReady` now correctly gates a release; the F0.4 contract test inverted from "release-ready" to "dev-valid, only blocker is the named PENDING set" (the intended "PENDING passes DEV, fails release" behavior). Updated the F0.8 shell no-stub test (registry no longer empty; shell still consumes none of it -- drawer is DR.2). `test:contract` covers the registry; contracts `test/entity.test.ts` proves the DTO-projection typing. Full `scripts/ci.sh` green. |
 | DR.2 | INV-CONSOLE-DRAWER-SHELL | OPEN | -- | The drawer body in `@forge/design` (header/ScoreRing/sparkline, info, zones, capabilities, policies, recent decisions, actions), section skeletons, semantic color, fixtures only. |
 | DR.3 | INV-CONSOLE-DRAWER-BROKERED | OPEN | -- | The BFF read routes (`entity.header/info/zones/effectivePolicies/recentDecisions`) over `OperatorEngine`, tier-redacted, cached, per-section degrade. `recentDecisions` shares the P1.2 LOG substrate. |
 | DR.4 | INV-CONSOLE-DRAWER-CAPABILITIES (INV-CROSS) | OPEN | -- | `entity.capabilities` binds the Torch Construction Report (crdb/torch). `PENDING` until the read binding lands; honest empty state. |
