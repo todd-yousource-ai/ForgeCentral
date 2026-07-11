@@ -13,6 +13,7 @@ pub mod device_grant;
 pub mod http;
 pub mod keystore;
 pub mod token_binding;
+pub mod transport;
 
 pub use keystore::{EnrollError, SoftwareKeystore};
 pub use token_binding::{access_token_hash, canonical_ec_jwk, dpop_proof, jwk_thumbprint};
