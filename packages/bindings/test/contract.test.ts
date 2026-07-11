@@ -57,18 +57,23 @@ describe('IP-CONSOLE-12 DR.1: the entity-drawer (entity.*) bindings', () => {
     );
   });
 
-  it('binds the five CrucibleQL section reads live', () => {
-    for (const id of [
-      'entity.header',
-      'entity.info',
-      'entity.zones',
-      'entity.effectivePolicies',
-      'entity.recentDecisions',
-    ]) {
+  it('binds the engine-backed section reads live (identity/status/info + decisions)', () => {
+    // Backed by crdb ER.1 (LIST_AGENTS) + ER.2c (ENTITY_DECISIONS); these are genuinely live.
+    for (const id of ['entity.header', 'entity.info', 'entity.recentDecisions']) {
       const binding = bindings[id];
       expect(binding?.kind).toBe('read');
       expect(binding?.surface).toBe('cruciblql');
       expect(binding?.status.kind).toBe('live');
+    }
+  });
+
+  it('defers zones + effective policies to Forge (no queryable store in crdb)', () => {
+    for (const id of ['entity.zones', 'entity.effectivePolicies']) {
+      const binding = bindings[id];
+      expect(binding?.status.kind).toBe('pending');
+      if (binding?.status.kind === 'pending') {
+        expect(binding.status.owningRepo).toBe('forge');
+      }
     }
   });
 

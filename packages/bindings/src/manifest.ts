@@ -13,52 +13,73 @@
 import type { Binding, BindingManifest, CommandBinding, ReadBinding } from '@forge/contracts';
 import { bindingId } from '@forge/contracts';
 
-// -- IP-CONSOLE-12 (entity drawer, P1.1) DR.1: the `entity.*` drawer contract bindings ---------------
+// -- IP-CONSOLE-12 (entity drawer, P1.1) the `entity.*` drawer contract bindings ---------------------
 //
-// One binding per drawer section read + one per quick action (TRD-CONSOLE-12 Section 3). The five section
-// reads have real CrucibleQL backing today (INV-CONSOLE-CRUCIBLEQL-FIRST; the DR.3 resolver wires them);
-// `entity.capabilities` is PENDING behind the Torch Construction Report read binding (DR.4); the Isolate
-// command is real (enforcement OFF is a runtime posture, not a binding-liveness question), and the other
-// three quick actions are PENDING behind the engine command / target surface that exposes them (DR.5).
+// One binding per drawer section read + one per quick action (TRD-CONSOLE-12 Section 3). Reclassified
+// against grounded crdb reality (2026-07-11): `entity.header`/`entity.info` (identity + status) are LIVE
+// over LIST_AGENTS (crdb ER.1) and `entity.recentDecisions` is LIVE over ENTITY_DECISIONS (crdb ER.2c);
+// `entity.zones` + `entity.effectivePolicies` are PENDING (Forge-side, no queryable store in crdb);
+// `entity.capabilities` is PENDING behind the Torch Construction Report read binding. Trust Score was
+// removed (legacy). The Isolate command is real (enforcement OFF is a runtime posture, not a
+// binding-liveness question); the other three quick actions are PENDING behind the command / surface
+// that exposes them (DR.5).
 
 const entityReads: readonly ReadBinding[] = [
   {
+    // Identity + lifecycle status, from the engine agent directory (LIST_AGENTS, crdb ER.1). Trust
+    // Score removed; the header projects the AigAgentRecord status.
     id: bindingId('entity.header'),
     kind: 'read',
     surface: 'cruciblql',
-    op: 'entity_header_v1',
+    op: 'list_agents_v1',
     viewModel: 'HeaderView',
     status: { kind: 'live' },
   },
   {
+    // The same agent-directory record projects the info section (status, role/clearance, enrolled).
     id: bindingId('entity.info'),
     kind: 'read',
     surface: 'cruciblql',
-    op: 'entity_info_v1',
+    op: 'list_agents_v1',
     viewModel: 'EntityInfoView',
     status: { kind: 'live' },
   },
   {
+    // VTZ membership is resolved Torch/Forge-side and realized at the endpoint; crdb has no queryable
+    // VTZ-membership store (grounded review 2026-07-11), so this is a cross-repo deferral.
     id: bindingId('entity.zones'),
     kind: 'read',
-    surface: 'cruciblql',
+    surface: 'forge',
     op: 'entity_zones_v1',
     viewModel: 'ZonesView',
-    status: { kind: 'live' },
+    status: {
+      kind: 'pending',
+      owningRepo: 'forge',
+      gatingTask: 'Forge VTZ membership store + a queryable read surface (not in crdb today)',
+    },
   },
   {
+    // Effective policies are composed Torch/Forge-side and shipped as a signed bundle; crdb has no
+    // policy-in-force store and the direct-vs-inherited origin is flattened away.
     id: bindingId('entity.effectivePolicies'),
     kind: 'read',
-    surface: 'cruciblql',
+    surface: 'forge',
     op: 'entity_effective_policies_v1',
     viewModel: 'EffectivePoliciesView',
-    status: { kind: 'live' },
+    status: {
+      kind: 'pending',
+      owningRepo: 'forge',
+      gatingTask:
+        'Forge effective-policy resolution as a queryable read surface (not in crdb today)',
+    },
   },
   {
+    // Recent governed decisions for the entity, from the engine decision index (ENTITY_DECISIONS,
+    // crdb ER.2c, backed by the ER.2a live entity-indexing of every persisted decision).
     id: bindingId('entity.recentDecisions'),
     kind: 'read',
     surface: 'cruciblql',
-    op: 'entity_recent_decisions_v1',
+    op: 'entity_decisions_v1',
     viewModel: 'RecentDecisionsView',
     status: { kind: 'live' },
   },

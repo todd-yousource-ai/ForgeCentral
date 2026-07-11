@@ -21,12 +21,7 @@ function fixture(overrides: Partial<EntityDetailView> = {}): EntityDetailView {
       data: {
         displayName: 'Inventory-Bot',
         kindLabel: 'Agent',
-        trustScore: 82,
-        trend: [
-          { at: 1, score: 74 },
-          { at: 2, score: 78 },
-          { at: 3, score: 82 },
-        ],
+        status: 'active',
       },
     },
     info: {
@@ -78,13 +73,14 @@ function fixture(overrides: Partial<EntityDetailView> = {}): EntityDetailView {
 }
 
 describe('EntityDrawer: the resolved sections', () => {
-  it('titles the drawer with the identity and renders the Trust Score ring + trend', () => {
+  it('titles the drawer with the identity and shows the real lifecycle status (no trust score)', () => {
     render(<EntityDrawer open onClose={vi.fn()} detail={fixture()} />);
     expect(screen.getByRole('dialog')).toHaveAccessibleName('Inventory-Bot');
-    expect(screen.getByRole('img', { name: /trust score 82 of 100/ })).toBeInTheDocument();
-    expect(
-      screen.getByRole('img', { name: /trust score trend: 74 to 82 over 3 points/ }),
-    ).toBeInTheDocument();
+    // The header shows the engine agent status as a semantic badge, not a fabricated trust score.
+    expect(screen.getByText('active')).toBeInTheDocument();
+    expect(screen.getByText('Agent')).toBeInTheDocument();
+    // No trust-score ring or trend sparkline in the drawer.
+    expect(screen.queryByRole('img', { name: /trust score/ })).not.toBeInTheDocument();
   });
 
   it('renders the information, a connected VTZ, an effective policy, and a recent decision', () => {

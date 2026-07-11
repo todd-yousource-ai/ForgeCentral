@@ -12,12 +12,17 @@
 
 import type { ReactElement, ReactNode } from 'react';
 
-import type { DecisionId, EntityDetailView, PolicyId, SectionState, VtzId } from '@forge/contracts';
+import type {
+  DecisionId,
+  EntityDetailView,
+  EntityStatus,
+  PolicyId,
+  SectionState,
+  VtzId,
+} from '@forge/contracts';
 
 import { Badge, type BadgeVariant } from './Badge.js';
 import { Drawer } from './Drawer.js';
-import { ScoreRing } from './ScoreRing.js';
-import { Sparkline } from './Sparkline.js';
 
 /** Quick-action handlers. An omitted handler renders NO button: a PENDING or beyond-tier action is absent. */
 export interface EntityQuickActions {
@@ -122,6 +127,20 @@ function Section<T>({
 }
 
 /** A trust state maps to a semantic badge: "trusted" is good, anything else is neutral until classified. */
+/** An entity lifecycle status maps to a semantic badge (active good, suspended caution, compromised critical). */
+function statusVariant(status: EntityStatus): BadgeVariant {
+  switch (status) {
+    case 'active':
+      return 'good';
+    case 'suspended':
+      return 'caution';
+    case 'compromised':
+      return 'critical';
+    case 'unknown':
+      return 'neutral';
+  }
+}
+
 function trustStateVariant(state: string): BadgeVariant {
   return state.toLowerCase() === 'trusted' ? 'good' : 'neutral';
 }
@@ -160,14 +179,11 @@ export function EntityDrawer({
   return (
     <Drawer open={open} title={title} onClose={onClose}>
       <div className="fc-entity-detail">
-        <Section title="Trust Score" state={detail?.header} loading={loading}>
+        <Section title="Status" state={detail?.header} loading={loading}>
           {(header) => (
             <div className="fc-entity-header">
-              <ScoreRing score={header.trustScore} label={header.displayName} />
-              <div className="fc-entity-header__meta">
-                <span className="fc-entity-header__kind">{header.kindLabel}</span>
-                <Sparkline points={header.trend} label={`${header.displayName} trust score`} />
-              </div>
+              <span className="fc-entity-header__kind">{header.kindLabel}</span>
+              <Badge variant={statusVariant(header.status)}>{header.status}</Badge>
             </div>
           )}
         </Section>
