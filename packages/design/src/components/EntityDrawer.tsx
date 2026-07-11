@@ -141,10 +141,6 @@ function statusVariant(status: EntityStatus): BadgeVariant {
   }
 }
 
-function trustStateVariant(state: string): BadgeVariant {
-  return state.toLowerCase() === 'trusted' ? 'good' : 'neutral';
-}
-
 /** A resolved policy effect maps to a semantic badge. */
 function policyEffectVariant(effect: 'allow' | 'deny'): BadgeVariant {
   return effect === 'deny' ? 'critical' : 'good';
@@ -192,22 +188,16 @@ export function EntityDrawer({
           {(info) => (
             <dl className="fc-entity-info">
               <div className="fc-entity-info__row">
-                <dt>Trust state</dt>
-                <dd>
-                  <Badge variant={trustStateVariant(info.trustState)}>{info.trustState}</Badge>
-                </dd>
+                <dt>Role</dt>
+                <dd>{info.role ?? 'None'}</dd>
               </div>
               <div className="fc-entity-info__row">
-                <dt>Risk</dt>
-                <dd>{info.riskScore}</dd>
+                <dt>Clearance</dt>
+                <dd>{info.clearance ?? 'None'}</dd>
               </div>
               <div className="fc-entity-info__row">
-                <dt>Region</dt>
-                <dd>{info.region}</dd>
-              </div>
-              <div className="fc-entity-info__row">
-                <dt>Last seen</dt>
-                <dd>{formatInstant(info.lastSeen)}</dd>
+                <dt>Enrolled</dt>
+                <dd>{formatInstant(info.enrolledAt * 1000)}</dd>
               </div>
               <div className="fc-entity-info__row">
                 <dt>Tags</dt>
