@@ -5,7 +5,7 @@
 # committed, re-runnable script so a box move re-executes it (INV-CONSOLE-DEPLOY-REPRODUCIBLE).
 #
 # It provisions the ADMIN leg (the :8443 server cert) and writes the sidecar config. The ENGINE leg
-# identity (engine_cert/engine_key: the console-bff wire cert) is provisioned by D.3 (ZTP enrollment) and
+# identity (engine_cert = the enrolled leaf; the key is TPM-resident, re-derived at runtime via TCTI) is
 # only referenced here. Installing the systemd units + enabling them is the installer's job (D.4); this
 # script prints the follow-up commands.
 #
@@ -13,7 +13,6 @@
 #   NODE_IP=10.0.0.5 \
 #   ENGINE_CA=/etc/console-sidecar/engine-ca.pem \
 #   ENGINE_CERT=/etc/console-sidecar/engine-client.pem \
-#   ENGINE_KEY=/etc/console-sidecar/engine-client.key \
 #   sidecar/deploy/provision-sidecar.sh
 set -euo pipefail
 
@@ -28,7 +27,9 @@ ENGINE_ADDR="${ENGINE_ADDR:-127.0.0.1:7878}"
 ENGINE_SERVERNAME="${ENGINE_SERVERNAME:-wire.localhost}"
 ENGINE_CA="${ENGINE_CA:-$OUT_DIR/engine-ca.pem}"
 ENGINE_CERT="${ENGINE_CERT:-$OUT_DIR/engine-client.pem}"
-ENGINE_KEY="${ENGINE_KEY:-$OUT_DIR/engine-client.key}"
+# The engine key is TPM-resident (no key file): the sidecar re-derives it via this TCTI and signs the
+# engine-leg handshake in-device (the enrolled leaf is engine_cert).
+TCTI="${TCTI:-device:/dev/tpmrm0}"
 SIDECAR_USER="${SIDECAR_USER:-console-sidecar}"
 FORCE="${FORCE:-0}"
 
@@ -87,7 +88,7 @@ cat > "$CONFIG" <<EOF
   "engine_servername": "$ENGINE_SERVERNAME",
   "engine_ca": "$ENGINE_CA",
   "engine_cert": "$ENGINE_CERT",
-  "engine_key": "$ENGINE_KEY",
+  "tcti": "$TCTI",
   "egress_addr": "127.0.0.1:$EGRESS_PORT",
   "admin_cert": "$ADMIN_CERT",
   "admin_key": "$ADMIN_KEY"
@@ -101,7 +102,7 @@ if id "$SIDECAR_USER" >/dev/null 2>&1 && [ "$(id -u)" = "0" ]; then
 fi
 
 echo "provision-sidecar: OK. config + admin leaf in $OUT_DIR"
-echo "provision-sidecar: engine identity (engine_cert/engine_key) is provisioned by D.3 (ZTP enrollment)."
+echo "provision-sidecar: engine identity = the enrolled leaf (engine_cert); the key is TPM-resident (TCTI), no key file."
 echo "provision-sidecar: next -> install + enable the units:"
 echo "    install -m0644 sidecar/deploy/console-crypto-sidecar.service /etc/systemd/system/"
 echo "    install -m0644 apps/bff/deploy/console-bff.service            /etc/systemd/system/"
