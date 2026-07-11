@@ -12,14 +12,29 @@
 // task. Until then this facade is the BFF's mandatory delegation boundary + trace; the Principal it
 // records is exactly what F0.5c serializes onto the new wire field.
 
-import type { WireQueryRows, WireQuerySubmit } from '@forge/contracts';
+import type {
+  WireAgentList,
+  WireConnectionList,
+  WireDecisionList,
+  WireEntityConnections,
+  WireEntityDecisions,
+  WireListAgents,
+  WireQueryRows,
+  WireQuerySubmit,
+} from '@forge/contracts';
 
 import type { ExplainTier } from '../auth/tier.js';
 import type { CrucibleClient, EngineCallOptions, EngineHandle } from './client.js';
 import type { OperatorPrincipal } from './principal.js';
 
 /** The engine actions a surface brokers on behalf of an operator. */
-export type EngineAction = 'querySubmit' | 'cursorFetch' | 'cursorClose';
+export type EngineAction =
+  | 'querySubmit'
+  | 'listAgents'
+  | 'entityDecisions'
+  | 'entityConnections'
+  | 'cursorFetch'
+  | 'cursorClose';
 
 /** A record of one engine call the BFF made on behalf of an operator. */
 export interface EngineDelegation {
@@ -59,6 +74,24 @@ export interface OperatorEngine {
     request: WireQuerySubmit,
     opts?: EngineCallOptions,
   ): Promise<WireQueryRows>;
+  /** List the agent directory (LIST_AGENTS) on behalf of `principal`. */
+  listAgents(
+    principal: OperatorPrincipal,
+    request: WireListAgents,
+    opts?: EngineCallOptions,
+  ): Promise<WireAgentList>;
+  /** List an entity's recent decisions (ENTITY_DECISIONS) on behalf of `principal`. */
+  entityDecisions(
+    principal: OperatorPrincipal,
+    request: WireEntityDecisions,
+    opts?: EngineCallOptions,
+  ): Promise<WireDecisionList>;
+  /** List a subject's outbound connections (ENTITY_CONNECTIONS) on behalf of `principal`. */
+  entityConnections(
+    principal: OperatorPrincipal,
+    request: WireEntityConnections,
+    opts?: EngineCallOptions,
+  ): Promise<WireConnectionList>;
   /** Fetch the next page of an open cursor on behalf of `principal`. */
   cursorFetch(
     principal: OperatorPrincipal,
@@ -103,6 +136,21 @@ export function createOperatorEngine(
         operator: { principal: principal.principalId, tenant: principal.tenant },
       };
       return client.querySubmit(delegated, opts);
+    },
+    listAgents: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'listAgents', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.listAgents({ ...request, operator }, opts);
+    },
+    entityDecisions: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'entityDecisions', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.entityDecisions({ ...request, operator }, opts);
+    },
+    entityConnections: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'entityConnections', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.entityConnections({ ...request, operator }, opts);
     },
     cursorFetch: (principal, handle, opts) => {
       delegation.record(delegationFor(principal, 'cursorFetch'));
