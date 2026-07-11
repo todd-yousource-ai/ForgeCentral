@@ -9,5 +9,6 @@ export * from './generated/wire-dto.js';
 export * from './ids.js';
 export * from './errors.js';
 export * from './binding.js';
+export * from './entity.js';
 export * from './openapi.js';
 export * from './schema.js';
