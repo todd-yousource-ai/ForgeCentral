@@ -19,6 +19,7 @@ import type { BffConfig } from './config.js';
 import type { CrucibleClient } from './engine/client.js';
 import type { EphemeralCache } from './cache.js';
 import { openApiDocument } from './openapi.js';
+import { serveSpa } from './static.js';
 
 /** A structural view of the logger the server needs (so tests can pass a spy without pino). */
 export interface ServerLogger {
@@ -72,6 +73,11 @@ async function route(
   }
   if (path === '/openapi.json') {
     sendJson(res, 200, openApiDocument());
+    return;
+  }
+  // The Console SPA (served behind the admin plane) owns every other GET path -- a static asset or a
+  // client-side route. Only when FC_SPA_DIST is configured; otherwise the BFF stays API-only.
+  if (deps.config.spaDir !== undefined && (await serveSpa(deps.config.spaDir, path, res))) {
     return;
   }
   sendJson(res, 404, { error: 'not_found' });
