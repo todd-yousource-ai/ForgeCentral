@@ -1,13 +1,15 @@
 # IP-CONSOLE-00-SIDECAR-TPM -- the crypto sidecar presents the TPM-resident engine identity
 
-**Status:** PARKED (2026-07-10, superseded by the service-key ZTP decision). The Console's engine identity
-is now a **software-key ZTP enrollment** (`IP-CONSOLE-00-DEPLOY` D.3a-console): full ZTP (MFA + step-ca +
-AIG registration, so the enrolled-role permissions work) with a **software** P-384 key the sidecar reads as
-a PEM -- no TPM key, so no sidecar TPM signer. The product owner confirmed ZTP is required (permissions key
-off AIG enrollment, not static config) but TPM custody is not. This IP is retained as the **future hardware-
-hardening option**: if the Console identity should later become hardware-bound, this is the plan to present
-the TPM-resident key. Nothing was built here (plan only), so nothing unwinds. The D.3b role-grant machinery
-(landed) serves both the software-key and the TPM path unchanged.
+**Status:** COMPLETE + LIVE-PROVEN (2026-07-11). See the ledger for the per-PR record. The Console's engine
+identity is a **non-exportable TPM key**; the sidecar re-derives the deterministic TPM primary and signs the
+engine-leg mTLS handshake in-device. This was briefly PARKED (2026-07-10) for a software-key ZTP path, then
+REVIVED once the live node's enrollment policy was found to enforce `require_attestation` globally
+(`cdb-enroll/broker.rs:503`; no per-group override), so a software key could not enroll without weakening the
+server -- confirmed by the D.3c live run (attestation accepted, leaf issued, sidecar TPM-mTLS admitted). The
+node's `require_attestation` stays enforced (zero server weakening). The shared contract + rustls signer live
+in crdb's `cdb-device-identity` leaf crate (Console deps Crucible, never Torch); the concrete `tss-esapi`
+backend lives in the Console's `console-tpm` crate, so the engine's hermetic offline build pulls no TPM
+toolchain. Torch converges to the shared `cdb-device-identity` contract as a later follow-up.
 
 ---
 
