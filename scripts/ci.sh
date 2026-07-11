@@ -108,7 +108,7 @@ elif ! command -v cargo >/dev/null 2>&1; then
 else
     offline=""
     [ "$skip_net" = "true" ] && offline="--offline"
-    for rust_project in sidecar enroll; do
+    for rust_project in console-tpm sidecar enroll; do
         echo "    -- ${rust_project} --"
         (
             cd "${rust_project}"

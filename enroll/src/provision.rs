@@ -124,10 +124,10 @@ pub fn run_enrollment(config: &EnrollmentConfig) -> Result<(), EnrollError> {
     use crate::csr::{build_csr, CsrSubjectAltNames};
     use crate::device_flow::{run_device_grant, DeviceFlowEnv};
     use crate::spiffe::spiffe_provenance_uri;
-    use crate::tpm::TpmBackend;
     use crate::wire_client::{request_identity_offer, submit_enrollment, EnrollWireConfig};
     use cdb_device_identity::KeystoreBackend;
     use cdb_wire::handshake::WireIdentityOffer;
+    use console_tpm::TpmBackend;
 
     let key_err = |e: cdb_device_identity::KeystoreError| EnrollError::Keygen(e.to_string());
 

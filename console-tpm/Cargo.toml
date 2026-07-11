@@ -1,0 +1,31 @@
+# console-tpm/Cargo.toml -- the Console's shared TPM 2.0 device-identity backend.
+#
+# A standalone Rust crate (NOT in the pnpm workspace), like sidecar/ and enroll/. It holds the concrete
+# tss-esapi/libtss2 TpmBackend that implements cdb_device_identity::KeystoreBackend, shared by the
+# enrollment client and the crypto sidecar so their attestation + handshake signing cannot drift. The
+# concrete C-linking TPM code lives here (not in the engine's hermetic cdb-device-identity leaf crate),
+# so the engine's offline build never pulls the TPM toolchain. Linux-only (links libtss2).
+
+[package]
+name = "console-tpm"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.96.0"
+license = "LicenseRef-YouSource-Proprietary"
+publish = false
+description = "The Console's TPM 2.0 device-identity backend (tss-esapi): the concrete cdb_device_identity::KeystoreBackend shared by console-enroll and the crypto sidecar. Linux-only."
+
+[lib]
+name = "console_tpm"
+path = "src/lib.rs"
+
+[dependencies]
+# The shared device-identity contract (the KeystoreBackend trait TpmBackend implements) + the attestation
+# type. Same pinned rev as the enroll/sidecar clients.
+cdb-device-identity = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "b51236b0607401cf578e87a9fcaa57fd44158108" }
+cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "b51236b0607401cf578e87a9fcaa57fd44158108" }
+# The TPM 2.0 backend: tss-esapi links libtss2; p384 assembles the DER SPKI + ECDSA signature from the
+# TPM's raw EC point + r/s; rustls-pki-types parses the optional out-of-band EK cert PEM.
+tss-esapi = "7"
+p384 = "0.13"
+rustls-pki-types = { version = "1", features = ["std"] }
