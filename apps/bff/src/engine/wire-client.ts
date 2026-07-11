@@ -8,7 +8,14 @@
 // the sidecar and engine are reachable).
 
 import { type FrameTransport, connectLoopback, dispatch, wireHandshake } from '@forge/wire';
-import type { WireError, WireQueryRows, WireReply } from '@forge/contracts';
+import type {
+  WireAgentList,
+  WireConnectionList,
+  WireDecisionList,
+  WireError,
+  WireQueryRows,
+  WireReply,
+} from '@forge/contracts';
 
 import type { BffConfig } from '../config.js';
 import type { CrucibleClient, EngineCallOptions, EngineHandle } from './client.js';
@@ -41,6 +48,30 @@ export function replyToQueryRows(reply: WireReply): WireQueryRows {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a query');
+}
+
+/** Map an engine `WireReply` to `WireAgentList` (LIST_AGENTS), throwing a typed error on a refusal. */
+export function replyToAgentList(reply: WireReply): WireAgentList {
+  if (typeof reply === 'object' && 'AgentList' in reply) return reply.AgentList;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a list-agents read');
+}
+
+/** Map an engine `WireReply` to `WireDecisionList` (ENTITY_DECISIONS), throwing a typed error on a refusal. */
+export function replyToDecisionList(reply: WireReply): WireDecisionList {
+  if (typeof reply === 'object' && 'DecisionList' in reply) return reply.DecisionList;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for an entity-decisions read');
+}
+
+/** Map an engine `WireReply` to `WireConnectionList` (ENTITY_CONNECTIONS), throwing a typed error on a refusal. */
+export function replyToConnectionList(reply: WireReply): WireConnectionList {
+  if (typeof reply === 'object' && 'ConnectionList' in reply) return reply.ConnectionList;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for an entity-connections read');
 }
 
 /** Reject `op` if it does not settle within `ms` (a per-call bound; every engine call is bounded). */
@@ -107,6 +138,42 @@ export class WireCrucibleClient implements CrucibleClient {
       dispatch(transport, { CursorClose: { handle: [...handle] } }),
       this.timeoutFor(opts),
     );
+  }
+
+  async listAgents(
+    request: Parameters<CrucibleClient['listAgents']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireAgentList> {
+    const transport = await this.ensure();
+    const reply = await withTimeout(
+      dispatch(transport, { ListAgents: request }),
+      this.timeoutFor(opts),
+    );
+    return replyToAgentList(reply);
+  }
+
+  async entityDecisions(
+    request: Parameters<CrucibleClient['entityDecisions']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireDecisionList> {
+    const transport = await this.ensure();
+    const reply = await withTimeout(
+      dispatch(transport, { EntityDecisions: request }),
+      this.timeoutFor(opts),
+    );
+    return replyToDecisionList(reply);
+  }
+
+  async entityConnections(
+    request: Parameters<CrucibleClient['entityConnections']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireConnectionList> {
+    const transport = await this.ensure();
+    const reply = await withTimeout(
+      dispatch(transport, { EntityConnections: request }),
+      this.timeoutFor(opts),
+    );
+    return replyToConnectionList(reply);
   }
 
   async close(): Promise<void> {

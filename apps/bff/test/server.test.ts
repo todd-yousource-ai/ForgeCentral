@@ -35,6 +35,9 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
   return {
     ping,
     querySubmit: unused,
+    listAgents: unused,
+    entityDecisions: unused,
+    entityConnections: unused,
     cursorFetch: unused,
     cursorClose: unused,
     close: () => Promise.resolve(),
