@@ -5,6 +5,7 @@ import type {
   WireAgentList,
   WireConnectionList,
   WireDecisionList,
+  WireQueryRows,
 } from '@forge/contracts';
 import { principalId } from '@forge/contracts';
 import { describe, expect, it } from 'vitest';
@@ -24,11 +25,17 @@ const principal: OperatorPrincipal = {
 function engineWith(parts: {
   agents?: WireAgentList;
   decisions?: WireDecisionList;
+  capabilities?: WireQueryRows;
   failDirectory?: boolean;
+  failCapabilities?: boolean;
 }): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
+  const noRows: WireQueryRows = { rows: [], cursor: null, redacted_fields: [] };
   return {
-    querySubmit: unused,
+    querySubmit: () =>
+      parts.failCapabilities
+        ? Promise.reject(new Error('capabilities down'))
+        : Promise.resolve(parts.capabilities ?? noRows),
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: () =>
@@ -37,6 +44,18 @@ function engineWith(parts: {
         : Promise.resolve(parts.agents ?? { agents: [] }),
     entityDecisions: () => Promise.resolve(parts.decisions ?? { decisions: [] }),
     entityConnections: (): Promise<WireConnectionList> => Promise.resolve({ connections: [] }),
+  };
+}
+
+/** A `WireQueryRows` from `(relation, target)` pairs, as the `agent_capabilities` relation returns. */
+function capabilityRows(pairs: ReadonlyArray<readonly [string, string]>): WireQueryRows {
+  return {
+    rows: pairs.map(([relation, target]) => [
+      ['relation', { Text: relation }],
+      ['target', { Text: target }],
+    ]),
+    cursor: null,
+    redacted_fields: [],
   };
 }
 
@@ -71,6 +90,10 @@ describe('resolveEntityDetail', () => {
           },
         ],
       },
+      capabilities: capabilityRows([
+        ['USES_TOOL', 'tool:search'],
+        ['DELEGATES_TO', 'agent:sub'],
+      ]),
     });
 
     const detail = await resolveEntityDetail(engine, principal, ref);
@@ -96,9 +119,20 @@ describe('resolveEntityDetail', () => {
       expect(row?.status).toBe('denied');
       expect(row?.at).toBe(1_720_600_000_000);
     }
-    // The cross-repo sections are honest pending, never fabricated.
+    // Capabilities project the AIG edges into the drawer view, labelled by their source + surface.
+    expect(detail.capabilities.status).toBe('ok');
+    if (detail.capabilities.status === 'ok') {
+      expect(detail.capabilities.data).toEqual({
+        kind: 'capabilities',
+        source: 'aig-graph',
+        capabilities: [
+          { name: 'tool:search', surface: 'tools' },
+          { name: 'agent:sub', surface: 'delegation' },
+        ],
+      });
+    }
+    // The remaining cross-repo sections are honest pending, never fabricated.
     expect(detail.zones.status).toBe('pending');
-    expect(detail.capabilities.status).toBe('pending');
     expect(detail.effectivePolicies.status).toBe('pending');
   });
 
@@ -107,14 +141,44 @@ describe('resolveEntityDetail', () => {
     expect(detail.header.status).toBe('empty');
     expect(detail.info.status).toBe('empty');
     expect(detail.recentDecisions.status).toBe('empty');
+    // Capabilities apply only to an agent: a non-directory entity is not-applicable, never empty rows.
+    expect(detail.capabilities.status).toBe('not-applicable');
   });
 
   it('degrades the directory-backed sections to error when LIST_AGENTS fails, not the drawer', async () => {
     const detail = await resolveEntityDetail(engineWith({ failDirectory: true }), principal, ref);
     expect(detail.header.status).toBe('error');
     expect(detail.info.status).toBe('error');
-    // The other sections still resolve (tolerant fan-out).
+    // The other sections still resolve (tolerant fan-out); capabilities cannot gate without the directory.
     expect(detail.recentDecisions.status).toBe('empty');
-    expect(detail.capabilities.status).toBe('pending');
+    expect(detail.capabilities.status).toBe('error');
+  });
+
+  it('empties the capabilities section for an agent that holds no capability edges', async () => {
+    const detail = await resolveEntityDetail(
+      engineWith({
+        agents: {
+          agents: [{ agent_id: 'aig:agent:a', status: 'active', enrolled_at: 1, attributes: [] }],
+        },
+      }),
+      principal,
+      ref,
+    );
+    expect(detail.capabilities.status).toBe('empty');
+  });
+
+  it('degrades capabilities to error when the read fails, without failing the drawer', async () => {
+    const detail = await resolveEntityDetail(
+      engineWith({
+        agents: {
+          agents: [{ agent_id: 'aig:agent:a', status: 'active', enrolled_at: 1, attributes: [] }],
+        },
+        failCapabilities: true,
+      }),
+      principal,
+      ref,
+    );
+    expect(detail.header.status).toBe('ok');
+    expect(detail.capabilities.status).toBe('error');
   });
 });

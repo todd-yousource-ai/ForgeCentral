@@ -4,11 +4,14 @@
 // OperatorEngine (so every read runs as the operator, under the peer's Delegation grant). The section
 // fan-out uses TOLERANT parallelism: a failed section degrades to `error` for that section, never the
 // whole drawer (TRD-CONSOLE-12 Section 5). Header + info come from LIST_AGENTS (the agent directory);
-// recent decisions from ENTITY_DECISIONS. Zones / effective policies / capabilities are cross-repo
-// deferrals (Forge / Torch, no queryable store in crdb) and resolve to an honest `pending` state -- never
-// a fabricated section (INV-CONSOLE-DRAWER-REAL).
+// recent decisions from ENTITY_DECISIONS; capabilities from the `agent_capabilities` virtual relation
+// (crdb VR.3, the AIG tools/authority/delegation edges). Zones / effective policies remain cross-repo
+// deferrals (Forge, no queryable store in crdb) and resolve to an honest `pending` state -- never a
+// fabricated section (INV-CONSOLE-DRAWER-REAL).
 
 import type {
+  AgentCapabilityRow,
+  CapabilitiesView,
   DecisionStatus,
   EntityDetailView,
   EntityInfoView,
@@ -20,6 +23,8 @@ import type {
   SectionState,
   WireAgentRecord,
   WireDecisionRow,
+  WireQueryRows,
+  WireValue,
 } from '@forge/contracts';
 import { decisionId } from '@forge/contracts';
 
@@ -88,6 +93,47 @@ function pending(owningRepo: string, gatingTask: string): SectionState<never> {
   return { status: 'pending', owningRepo, gatingTask };
 }
 
+/** The Text payload of a named cell in a `WireQueryRows` row, or undefined (a non-Text/absent cell). */
+function textCell(
+  row: ReadonlyArray<readonly [string, WireValue]>,
+  name: string,
+): string | undefined {
+  const value = row.find(([cellName]) => cellName === name)?.[1];
+  return value && 'Text' in value ? value.Text : undefined;
+}
+
+/** Map an AIG capability relation tag to its drawer surface label (the category the row belongs to). */
+function capabilitySurface(relation: string): string {
+  switch (relation) {
+    case 'USES_TOOL':
+      return 'tools';
+    case 'GRANTS_AUTHORITY':
+      return 'authority';
+    case 'DELEGATES_TO':
+      return 'delegation';
+    default:
+      return relation.toLowerCase();
+  }
+}
+
+/**
+ * Map one `agent_capabilities` row (`relation`, `target`) to a capability row, or null for a malformed
+ * row (a missing/non-Text cell -- dropped, never fabricated).
+ */
+function toCapabilityRow(
+  row: ReadonlyArray<readonly [string, WireValue]>,
+): AgentCapabilityRow | null {
+  const relation = textCell(row, 'relation');
+  const target = textCell(row, 'target');
+  if (relation === undefined || target === undefined) return null;
+  return { name: target, surface: capabilitySurface(relation) };
+}
+
+/** Project the `agent_capabilities` read into its capability rows (malformed rows dropped). */
+function toCapabilityRows(rows: WireQueryRows): AgentCapabilityRow[] {
+  return rows.rows.map(toCapabilityRow).filter((row): row is AgentCapabilityRow => row !== null);
+}
+
 /**
  * Resolve the aggregated drawer detail for `ref`, brokered on behalf of `principal`. Tolerant fan-out:
  * each section resolves independently and degrades to `error`/`empty`/`pending` without failing the whole
@@ -99,7 +145,7 @@ export async function resolveEntityDetail(
   ref: EntityRef,
   opts?: EngineCallOptions,
 ): Promise<EntityDetailView> {
-  const [directory, decisions] = await Promise.allSettled([
+  const [directory, decisions, capabilities] = await Promise.allSettled([
     engine.listAgents(principal, { request_id: 0 }, opts),
     // ENTITY_DECISIONS is indexed by the engine EntityType (host/process/...); the entity kind is passed
     // opaquely, and the engine returns an honest empty result for a kind it does not index (e.g. an agent
@@ -109,17 +155,50 @@ export async function resolveEntityDetail(
       { request_id: 0, entity_type: ref.kind, entity_value: ref.id, limit: 50 },
       opts,
     ),
+    // The agent's AIG capability edges via the `agent_capabilities` virtual relation (crdb VR.3). The
+    // read runs for every entity; the section is gated to agents below (an entity absent from the agent
+    // directory is `not-applicable`, not empty).
+    engine.querySubmit(
+      principal,
+      {
+        request_id: 0,
+        text: 'FIND agent_capabilities WHERE agent_id = $a RETURN relation, target',
+        params: [['a', { Text: ref.id }]],
+      },
+      opts,
+    ),
   ]);
+
+  const record =
+    directory.status === 'fulfilled'
+      ? directory.value.agents.find((agent) => agent.agent_id === ref.id)
+      : undefined;
 
   let header: SectionState<HeaderView>;
   let info: SectionState<EntityInfoView>;
   if (directory.status === 'fulfilled') {
-    const record = directory.value.agents.find((agent) => agent.agent_id === ref.id);
     header = record ? { status: 'ok', data: toHeader(record) } : { status: 'empty' };
     info = record ? { status: 'ok', data: toInfo(record) } : { status: 'empty' };
   } else {
     header = { status: 'error', message: 'agent directory unavailable' };
     info = { status: 'error', message: 'agent directory unavailable' };
+  }
+
+  // Capabilities apply only to an agent: a non-agent entity (not in the directory) is `not-applicable`;
+  // a directory failure is `error`; otherwise the read projects to rows (empty when the agent holds none).
+  let capabilitiesSection: SectionState<CapabilitiesView>;
+  if (directory.status === 'rejected') {
+    capabilitiesSection = { status: 'error', message: 'agent directory unavailable' };
+  } else if (!record) {
+    capabilitiesSection = { status: 'not-applicable' };
+  } else if (capabilities.status === 'rejected') {
+    capabilitiesSection = { status: 'error', message: 'capabilities unavailable' };
+  } else {
+    const rows = toCapabilityRows(capabilities.value);
+    capabilitiesSection =
+      rows.length === 0
+        ? { status: 'empty' }
+        : { status: 'ok', data: { kind: 'capabilities', source: 'aig-graph', capabilities: rows } };
   }
 
   let recentDecisions: SectionState<RecentDecisionsView>;
@@ -137,7 +216,7 @@ export async function resolveEntityDetail(
     header,
     info,
     zones: pending('forge', 'Forge VTZ membership store (not queryable in crdb)'),
-    capabilities: pending('torch', 'torch-inspect Construction Report read binding'),
+    capabilities: capabilitiesSection,
     effectivePolicies: pending(
       'forge',
       'Forge effective-policy resolution (not queryable in crdb)',

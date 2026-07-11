@@ -77,13 +77,11 @@ describe('IP-CONSOLE-12 DR.1: the entity-drawer (entity.*) bindings', () => {
     }
   });
 
-  it('defers capabilities to the Torch Construction Report read binding (DR.4)', () => {
+  it('binds capabilities LIVE to the crdb agent_capabilities virtual relation (DR.4 / VR.3)', () => {
     const capabilities = bindings['entity.capabilities'];
-    expect(capabilities?.status.kind).toBe('pending');
-    if (capabilities?.status.kind === 'pending') {
-      expect(capabilities.status.owningRepo).toBe('torch');
-      expect(capabilities.status.gatingTask).toMatch(/Construction Report/);
-    }
+    expect(capabilities?.status.kind).toBe('live');
+    expect(capabilities?.surface).toBe('cruciblql');
+    expect(capabilities?.op).toBe('agent_capabilities_v1');
   });
 
   it('exposes Isolate as a real audited command with enforcement off by posture, not fabrication', () => {
