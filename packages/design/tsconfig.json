@@ -1,5 +1,5 @@
 {
-  "//": "Typecheck config for @forge/design. Extends the strict base; NodeNext ESM; React JSX + DOM libs for the component shells. tsconfig.build.json emits dist from src.",
+  "//": "Typecheck config for @forge/design. Extends the strict base; NodeNext ESM; React JSX + DOM libs for the component shells. @forge/contracts resolves to source via paths (type-only import: the drawer body is typed against the DR.1 view models) so typecheck does not depend on build order. tsconfig.build.json emits dist from src.",
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "NodeNext",
@@ -7,10 +7,11 @@
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "outDir": "dist",
-    "rootDir": ".",
-    "declaration": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@forge/contracts": ["../contracts/src/index.ts"]
+    }
   },
   "include": ["src", "test", "vitest.config.ts"]
 }

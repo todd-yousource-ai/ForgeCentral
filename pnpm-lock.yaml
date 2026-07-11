@@ -140,6 +140,10 @@ importers:
         version: 3.2.7(@types/node@22.20.1)(happy-dom@20.10.6)
 
   packages/design:
+    dependencies:
+      '@forge/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^6.6.3

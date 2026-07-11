@@ -1,10 +1,12 @@
 {
-  "//": "Build config: emit dist/ (JS + .d.ts) from src only; tests are excluded from the published output.",
+  "//": "Build config: emit dist/ (JS + .d.ts) from src only; tests are excluded from the published output. @forge/contracts is type-only (erased in JS, referenced in .d.ts); reset paths so the emit resolves it via the built package, not the source path used for typecheck.",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
+    "declaration": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "paths": {}
   },
   "include": ["src"]
 }
