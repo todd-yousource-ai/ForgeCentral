@@ -53,20 +53,23 @@ OUT_DIR="$SIDECAR_ETC" NODE_IP="$NODE_IP" \
   ENGINE_CERT="$ENGINE_CERT" ENGINE_KEY="$ENGINE_KEY" \
   bash "$repo_root/sidecar/deploy/provision-sidecar.sh"
 
-# ---- [4] enroll the engine identity (D.3a-console): the interactive operator-MFA step -------------
+# ---- [4] enroll the engine identity (IP-CONSOLE-00-SIDECAR-TPM): the interactive operator-MFA step -
+# The identity key is TPM-resident and non-exportable, so enrollment writes ONLY the leaf cert; the
+# sidecar re-derives the same TPM key at runtime and signs the engine-leg handshake in-device (the sidecar
+# TPM wiring lands in the sidecar-TPM PR; until then the sidecar still expects a key file).
 if [ "${CONSOLE_SKIP_ENROLL:-0}" = "1" ]; then
   log "[4] enrollment SKIPPED (CONSOLE_SKIP_ENROLL=1)"
-elif [ -s "$ENGINE_CERT" ] && [ -s "$ENGINE_KEY" ]; then
+elif [ -s "$ENGINE_CERT" ]; then
   log "[4] engine identity already present ($ENGINE_CERT); keeping it (set CONSOLE_SKIP_ENROLL=1 to force-skip, or remove it to re-enroll)"
 else
   [ -s "$ENROLL_ENV" ] || die "enrollment env not found at $ENROLL_ENV (see deploy/console-enroll.env.example)"
   log "[4] enrolling the engine identity -- approve the printed device code (operator MFA)"
-  # console-enroll writes the leaf cert + key where the sidecar config points; force those two.
+  # console-enroll writes only the leaf cert (no key file); force it to the sidecar's engine_cert path.
   set -a; . "$ENROLL_ENV"; set +a
-  CONSOLE_ENROLL_CERT_OUT="$ENGINE_CERT" CONSOLE_ENROLL_KEY_OUT="$ENGINE_KEY" \
+  CONSOLE_ENROLL_CERT_OUT="$ENGINE_CERT" \
     "$BIN_PREFIX/console-enroll" || die "enrollment failed (each device code is single-use; re-run install)"
-  chown console-sidecar:console-sidecar "$ENGINE_CERT" "$ENGINE_KEY"
-  chmod 0640 "$ENGINE_CERT"; chmod 0600 "$ENGINE_KEY"
+  chown console-sidecar:console-sidecar "$ENGINE_CERT"
+  chmod 0640 "$ENGINE_CERT"
 fi
 chown -R console-sidecar:console-sidecar "$SIDECAR_ETC"
 

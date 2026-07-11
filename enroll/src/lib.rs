@@ -14,17 +14,17 @@
 pub mod csr;
 pub mod device_flow;
 pub mod device_grant;
+pub mod error;
 pub mod http;
-pub mod keystore;
 pub mod provision;
-pub mod token_binding;
+pub mod spiffe;
 #[cfg(target_os = "linux")]
 pub mod tpm;
 pub mod transport;
 pub mod wire_client;
 
 pub use csr::{build_csr, CsrError, CsrSubjectAltNames};
-pub use keystore::{EnrollError, SoftwareKeystore};
-pub use token_binding::{access_token_hash, canonical_ec_jwk, dpop_proof, jwk_thumbprint};
+pub use error::EnrollError;
+pub use spiffe::spiffe_provenance_uri;
 #[cfg(target_os = "linux")]
 pub use tpm::TpmBackend;

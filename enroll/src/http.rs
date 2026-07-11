@@ -4,7 +4,7 @@
 //! transport runs over the platform's `tokio-rustls`/AWS-LC stack (D.3a-console.2c-2). This module is the
 //! pure, fixture-testable half: build the request bytes, parse a complete response buffer.
 
-use crate::keystore::EnrollError;
+use crate::error::EnrollError;
 
 /// A parsed HTTP response: the status code and the body bytes.
 #[derive(Debug)]
