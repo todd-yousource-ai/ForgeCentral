@@ -7,7 +7,7 @@
 //! enrollment bootstrap listener accepts in `WireEnrollRequest.csr_der`.
 //!
 //! Generic over `cdb_device_identity::KeystoreBackend`, so the same builder drives the TPM path
-//! (`crate::tpm::TpmBackend`) in production and a software signer in the unit test.
+//! (`console_tpm::TpmBackend`) in production and a software signer in the unit test.
 
 use cdb_device_identity::{KeystoreBackend, KeystoreError};
 use der::asn1::{BitString, Ia5String, ObjectIdentifier, OctetString};
@@ -258,7 +258,7 @@ mod tests {
     #[test]
     #[ignore = "needs a real TPM at /dev/tpmrm0"]
     fn a_csr_built_over_the_tpm_key_verifies() {
-        use crate::tpm::TpmBackend;
+        use console_tpm::TpmBackend;
 
         let mut tpm = TpmBackend::new("device:/dev/tpmrm0");
         tpm.open().expect("the host TPM is reachable");

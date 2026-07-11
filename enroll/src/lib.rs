@@ -18,13 +18,11 @@ pub mod error;
 pub mod http;
 pub mod provision;
 pub mod spiffe;
-#[cfg(target_os = "linux")]
-pub mod tpm;
 pub mod transport;
 pub mod wire_client;
 
+#[cfg(target_os = "linux")]
+pub use console_tpm::TpmBackend;
 pub use csr::{build_csr, CsrError, CsrSubjectAltNames};
 pub use error::EnrollError;
 pub use spiffe::spiffe_provenance_uri;
-#[cfg(target_os = "linux")]
-pub use tpm::TpmBackend;

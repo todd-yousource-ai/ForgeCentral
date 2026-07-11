@@ -1,21 +1,24 @@
-//! The Linux TPM 2.0 backend over the TSS ESAPI (`libtss2`), IP-CONSOLE-00-SIDECAR-TPM.
+//! The Console's TPM 2.0 device-identity backend over the TSS ESAPI (`libtss2`),
+//! IP-CONSOLE-00-SIDECAR-TPM. Linux-only.
 //!
-//! The concrete hardware backend for the shared `cdb_device_identity::KeystoreBackend` seam: the
-//! Console's engine identity is a non-exportable, hardware-resident key, so it enrolls exactly like a
-//! torch edge device and the node's `require_attestation` stays enforced (no server weakening). The
-//! private key is generated inside the TPM and never exported. The only dev/prod difference is the
-//! TCTI: a swtpm socket for a HW-agnostic test, the host TPM (`device:/dev/tpmrm0`) in production --
-//! same code, same seam.
+//! The concrete hardware backend for the shared `cdb_device_identity::KeystoreBackend` seam, used by
+//! BOTH the enrollment client (`console-enroll`, to enroll) and the crypto sidecar
+//! (`console-crypto-sidecar`, to re-derive the key + sign the engine-leg handshake at runtime) -- one
+//! backend so their behaviour cannot drift. The Console's engine identity is a non-exportable,
+//! hardware-resident key, so it enrolls exactly like a torch edge device and the node's
+//! `require_attestation` stays enforced (no server weakening). The private key is generated inside the
+//! TPM and never exported. The only dev/prod difference is the TCTI: a swtpm socket for a HW-agnostic
+//! test, the host TPM (`device:/dev/tpmrm0`) in production -- same code, same seam.
 //!
-//! This module is a faithful port of the proven torch-core TPM backend (verified against this node's
-//! pinned EK roots); it lives here (not in the engine's `cdb-device-identity` leaf crate) so the
-//! engine's hermetic, offline build never links the `tss-esapi`/`libtss2` C toolchain.
+//! Faithful port of the proven torch-core TPM backend (verified against this node's pinned EK roots).
+//! It is a separate Console crate (not the engine's hermetic `cdb-device-identity` leaf crate) so the
+//! engine's offline build never links the `tss-esapi`/`libtss2` C toolchain.
 
 use std::str::FromStr as _;
 
 use cdb_device_identity::{KeyHandle, KeyResidency, KeystoreBackend, KeystoreError};
-use rustls::pki_types::pem::PemObject as _;
-use rustls::pki_types::CertificateDer;
+use rustls_pki_types::pem::PemObject as _;
+use rustls_pki_types::CertificateDer;
 use tss_esapi::attributes::ObjectAttributesBuilder;
 use tss_esapi::handles::{KeyHandle as TpmKeyHandle, NvIndexHandle, NvIndexTpmHandle};
 use tss_esapi::interface_types::algorithm::{HashingAlgorithm, PublicAlgorithm};

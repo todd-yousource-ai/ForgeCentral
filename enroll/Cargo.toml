@@ -61,14 +61,13 @@ ciborium = "0.2"
 rustls-pemfile = "2"
 # The PKCS#10 CSR built over the TPM key (proof of possession, R-SED-9): the TBS CertificationRequestInfo
 # is assembled with x509-cert/der over the TPM's public SPKI, signed IN the device (the private key never
-# leaves it), and wrapped as ecdsa-with-SHA384. p384 assembles the DER SPKI + the ECDSA signature from the
-# TPM's raw EC point + r/s (and drives the software-signer CSR test). All pure-Rust (no C toolchain).
+# leaves it), and wrapped as ecdsa-with-SHA384. p384 assembles the DER SPKI + drives the software-signer
+# CSR test. All pure-Rust (no C toolchain).
 der = "0.7"
 x509-cert = "0.2"
 p384 = "0.13"
-# The TPM 2.0 backend (TRD-25 R-SED-5/6): the device identity is a non-exportable, hardware-resident key
-# so the Console enrolls like a torch device (the node's require_attestation stays enforced). tss-esapi
-# links libtss2 (present on the host). Linux-only (the concrete hardware backend; the trait + rustls signer
-# live in the engine's cdb-device-identity leaf crate so the engine's hermetic build pulls no TPM toolchain).
+# The concrete TPM 2.0 backend (the shared console-tpm crate: tss-esapi/libtss2 -> the KeystoreBackend the
+# CSR + attestation drive). Linux-only; the crypto sidecar shares the same crate so their behaviour cannot
+# drift. The engine's hermetic build never sees this (the trait + rustls signer live in cdb-device-identity).
 [target.'cfg(target_os = "linux")'.dependencies]
-tss-esapi = "7"
+console-tpm = { path = "../console-tpm" }
