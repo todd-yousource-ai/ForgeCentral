@@ -45,6 +45,9 @@ const ConfigSchema = z.object({
   cacheMaxEntries: z.coerce.number().int().positive().default(1000),
   /** Default per-call engine timeout in ms (every engine call is bounded). */
   requestTimeoutMs: z.coerce.number().int().positive().default(5000),
+  /** Path to the built Console SPA (apps/console/dist) the BFF serves behind the admin plane. When
+   * unset the BFF is API-only (no UI served). */
+  spaDir: z.string().min(1).optional(),
 
   // -- Operator session settings (used only when auth is enabled) --------------------------------
   /** Operator session lifetime in ms. */
@@ -92,6 +95,8 @@ export interface BffConfig {
   readonly cacheTtlMs: number;
   readonly cacheMaxEntries: number;
   readonly requestTimeoutMs: number;
+  /** Path to the built Console SPA served behind the admin plane; absent -> the BFF is API-only. */
+  readonly spaDir?: string;
   readonly session: SessionSettings;
   /** The OIDC login config, present only when `FC_OIDC_ISSUER` is set (auth enabled). */
   readonly oidc?: OidcConfig;
@@ -172,6 +177,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     cacheTtlMs: env['FC_CACHE_TTL_MS'],
     cacheMaxEntries: env['FC_CACHE_MAX_ENTRIES'],
     requestTimeoutMs: env['FC_REQUEST_TIMEOUT_MS'],
+    spaDir: env['FC_SPA_DIST'],
     sessionTtlMs: env['FC_SESSION_TTL_MS'],
     sessionCookieName: env['FC_SESSION_COOKIE'],
     sessionCookieSecure: env['FC_SESSION_COOKIE_SECURE'],
@@ -216,6 +222,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
       maxPendingLogins: raw.loginMax,
     },
     rbac: resolveRbac(env),
+    ...(raw.spaDir !== undefined ? { spaDir: raw.spaDir } : {}),
     ...(oidc !== undefined ? { oidc } : {}),
   };
 }
