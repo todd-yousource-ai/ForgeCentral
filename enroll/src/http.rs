@@ -86,13 +86,60 @@ pub fn parse_response(raw: &[u8]) -> Result<HttpResponse, EnrollError> {
             .then(|| value.trim().parse::<usize>().ok())
             .flatten()
     });
+    // A response body may be delimited by Content-Length OR by chunked transfer-encoding. The IdP token
+    // endpoint returns the (larger) token JSON chunked, so the chunk framing MUST be stripped before the
+    // body is JSON-parsed (otherwise the leading hex chunk size is read as the body).
+    let chunked = head.lines().any(|line| {
+        line.split_once(':').is_some_and(|(name, value)| {
+            name.trim().eq_ignore_ascii_case("transfer-encoding")
+                && value.to_ascii_lowercase().contains("chunked")
+        })
+    });
 
     let body_start = split + 4;
-    let body = match content_length {
-        Some(len) if body_start + len <= raw.len() => raw[body_start..body_start + len].to_vec(),
-        _ => raw[body_start..].to_vec(),
+    let raw_body = &raw[body_start..];
+    let body = if chunked {
+        dechunk(raw_body)?
+    } else {
+        match content_length {
+            Some(len) if len <= raw_body.len() => raw_body[..len].to_vec(),
+            _ => raw_body.to_vec(),
+        }
     };
     Ok(HttpResponse { status, body })
+}
+
+/// Decode a chunked transfer-encoding body: repeated `<hex-size>[;ext]\r\n<data>\r\n`, ended by a
+/// zero-size chunk. Any trailer after the final chunk is ignored.
+///
+/// # Errors
+/// [`EnrollError::Sign`] if a chunk size line is missing/malformed or a chunk is truncated.
+fn dechunk(mut rest: &[u8]) -> Result<Vec<u8>, EnrollError> {
+    let mut out = Vec::new();
+    loop {
+        let line_end =
+            find(rest, b"\r\n").ok_or_else(|| EnrollError::Sign("chunk size line".into()))?;
+        let size_line = std::str::from_utf8(&rest[..line_end])
+            .map_err(|_| EnrollError::Sign("non-UTF-8 chunk size".into()))?;
+        // The size may carry chunk extensions after ';'; take the hex prefix only.
+        let hex = size_line.split(';').next().unwrap_or("").trim();
+        let size = usize::from_str_radix(hex, 16)
+            .map_err(|_| EnrollError::Sign(format!("bad chunk size: {hex}")))?;
+        rest = &rest[line_end + 2..];
+        if size == 0 {
+            break;
+        }
+        if rest.len() < size {
+            return Err(EnrollError::Sign("chunk truncated".into()));
+        }
+        out.extend_from_slice(&rest[..size]);
+        rest = &rest[size..];
+        // Skip the CRLF that terminates the chunk data.
+        if rest.starts_with(b"\r\n") {
+            rest = &rest[2..];
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -136,6 +183,16 @@ mod tests {
         assert_eq!(resp.status, 400);
         assert!(!resp.is_success());
         assert_eq!(resp.body, b"{\"error\":\"authorization_pending\"}");
+    }
+
+    #[test]
+    fn parse_response_dechunks_a_chunked_body() {
+        // The token response Auth0 returns is chunked; the hex sizes + CRLFs must be stripped so the
+        // reassembled body is exactly the JSON (regression for "invalid number at line 1 column 4").
+        let raw = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n10\r\n{\"access_token\":\r\na\r\n\"abc.def\"}\r\n0\r\n\r\n";
+        let resp = parse_response(raw).unwrap();
+        assert_eq!(resp.status, 200);
+        assert_eq!(resp.body, b"{\"access_token\":\"abc.def\"}");
     }
 
     #[test]
