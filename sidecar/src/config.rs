@@ -13,6 +13,11 @@ use serde::Deserialize;
 
 use crate::bind::{assert_loopback_addr, assert_node_ip_bind, SidecarError};
 
+/// The default TPM TCTI: the host TPM resource manager.
+fn default_tcti() -> String {
+    "device:/dev/tpmrm0".to_owned()
+}
+
 /// The validated sidecar configuration. `deny_unknown_fields` makes a typo a startup failure, not a
 /// silently-ignored setting (fail-closed).
 #[derive(Debug, Clone, Deserialize)]
@@ -31,9 +36,13 @@ pub struct SidecarConfig {
     /// Path to the CA bundle that signs the engine's server certificate (the wire CA).
     pub engine_ca: PathBuf,
     /// Path to the sidecar's enrolled client certificate presented to the engine (the service Principal).
+    /// There is NO key file: the engine-identity key is non-exportable and TPM-resident (see `tcti`).
     pub engine_cert: PathBuf,
-    /// Path to the sidecar's engine-mTLS client private key.
-    pub engine_key: PathBuf,
+    /// The TPM TCTI the sidecar opens to re-derive the non-exportable engine-identity key and sign the
+    /// mTLS handshake in-device (the same deterministic primary `console-enroll` enrolled). Defaults to
+    /// the host TPM.
+    #[serde(default = "default_tcti")]
+    pub tcti: String,
     /// The loopback `ip:port` the sidecar listens on for the BFF's outbound wire bytes.
     pub egress_addr: String,
     /// Path to the admin-plane server certificate (the installer-provisioned CNSA-grade leaf).
@@ -95,7 +104,6 @@ mod tests {
             "engine_servername": "wire.localhost",
             "engine_ca": "/etc/console/engine-ca.pem",
             "engine_cert": "/etc/console/bff-cert.pem",
-            "engine_key": "/etc/console/bff-key.pem",
             "egress_addr": "127.0.0.1:8789",
             "admin_cert": "/etc/console/admin-cert.pem",
             "admin_key": "/etc/console/admin-key.pem"
@@ -108,6 +116,18 @@ mod tests {
         let config = SidecarConfig::from_json_str(&valid_json()).unwrap();
         assert_eq!(config.admin_port, 8443);
         assert_eq!(config.engine_addr, "engine.internal:7878");
+        // No key file: the engine key is TPM-resident; the TCTI defaults to the host TPM.
+        assert_eq!(config.tcti, "device:/dev/tpmrm0");
+    }
+
+    #[test]
+    fn rejects_a_stale_engine_key_field_fail_closed() {
+        // engine_key is gone (the key is TPM-resident); a config still carrying it is refused.
+        let json = valid_json().replace(
+            "\"engine_cert\": \"/etc/console/bff-cert.pem\",",
+            "\"engine_cert\": \"/etc/console/bff-cert.pem\", \"engine_key\": \"/x.key\",",
+        );
+        assert!(SidecarConfig::from_json_str(&json).is_err());
     }
 
     #[test]

@@ -2,7 +2,8 @@
 #
 # Installer-provisioned. The sidecar runs as a dedicated non-root user, terminates the admin-plane TLS on
 # node-IP:8443 and originates the engine mTLS on :7878, forwarding to/from the BFF over plaintext loopback.
-# It needs no privileges: 8443 and the loopback ports are all unprivileged, and it writes nothing.
+# It needs no privileges beyond the TPM: 8443 and the loopback ports are unprivileged and it writes
+# nothing, but the engine-identity key is TPM-resident so it needs /dev/tpmrm0 (group tss).
 
 [Unit]
 Description=Console AWS-LC crypto sidecar (admin TLS termination + engine mTLS origination)
@@ -23,7 +24,11 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-PrivateDevices=true
+# The engine key is TPM-resident: expose ONLY the TPM resource-manager device (a private /dev otherwise),
+# and join group tss so the service user can open /dev/tpmrm0 (mode 0660 root:tss).
+PrivateDevices=false
+DeviceAllow=/dev/tpmrm0 rw
+SupplementaryGroups=tss
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
