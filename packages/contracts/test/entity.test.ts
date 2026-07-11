@@ -76,7 +76,7 @@ describe('the aggregate detail view models every per-section state', () => {
       ref: { kind: 'principal', id: principalId('agent:inventory-bot') },
       header: {
         status: 'ok',
-        data: { displayName: 'Inventory-Bot', kindLabel: 'Agent', trustScore: 82, trend: [] },
+        data: { displayName: 'Inventory-Bot', kindLabel: 'Agent', status: 'active' },
       },
       info: {
         status: 'ok',

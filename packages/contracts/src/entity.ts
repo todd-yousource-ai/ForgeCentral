@@ -46,25 +46,26 @@ export type SectionState<T> =
   | { readonly status: 'unauthorized' }
   | { readonly status: 'error'; readonly message: string };
 
-// -- Section 3.1: header + Trust Score (principal, VTZ) ---------------------------------------------
-
-/** One point on the Trust Score trend sparkline: a `0..100` score at a unix-millis instant. */
-export interface TrustPoint {
-  readonly at: number;
-  readonly score: number;
-}
+// -- Section 3.1: header + status (principal, VTZ) --------------------------------------------------
 
 /**
- * The drawer header: identity, the engine's computed Trust Score (the same quantity Overview rings and
- * the Logs "Trust Delta" show -- a real computed value, not a UI heuristic), and its recent-window trend.
+ * The lifecycle status of an entity, projected from the engine's agent directory (`AigAgentRecord.status`
+ * via LIST_AGENTS): `active`, `suspended`, or `compromised`. `unknown` when the entity has no engine
+ * status (e.g. a VTZ or an object). Trust Score was removed as a legacy of the old architecture; the
+ * header shows this real status instead of a computed score.
+ */
+export type EntityStatus = 'active' | 'suspended' | 'compromised' | 'unknown';
+
+/**
+ * The drawer header: identity + the entity's real lifecycle status. A projection of the engine's agent
+ * directory (LIST_AGENTS); no trust score.
  */
 export interface HeaderView {
   readonly displayName: string;
   /** The human `kind` label, e.g. "Agent", "Virtual Trust Zone". */
   readonly kindLabel: string;
-  /** The engine's computed Trust Score, `0..100`. */
-  readonly trustScore: number;
-  readonly trend: readonly TrustPoint[];
+  /** The entity's lifecycle status (the engine's agent status), or `unknown`. */
+  readonly status: EntityStatus;
 }
 
 // -- Section 3.2: entity information ----------------------------------------------------------------
