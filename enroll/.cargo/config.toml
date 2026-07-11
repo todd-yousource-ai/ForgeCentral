@@ -1,0 +1,6 @@
+# Cargo fetches the cdb-wire / cdb-types git dependencies (the enrollment wire contract) over the
+# `github-crucible` SSH alias (defined in ~/.ssh/config). libgit2 does not read SSH host aliases, so shell
+# out to the git CLI, which does. Same workaround as the sidecar + the torch repo. CI provides the
+# credential (CRUCIBLE_TOKEN / the deploy key).
+[net]
+git-fetch-with-cli = true
