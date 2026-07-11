@@ -20,6 +20,11 @@ description = "Console service-key ZTP enrollment client: a software-key identit
 name = "console_enroll"
 path = "src/lib.rs"
 
+# The provisioning binary: run once at install to enroll the Console's engine identity (D.3a-console.3).
+[[bin]]
+name = "console-enroll"
+path = "src/main.rs"
+
 [dependencies]
 thiserror = "1.0"
 # P-384 keygen + PKCS#10 CSR generation. Force the AWS-LC backend (rcgen defaults to `ring`); the Console's

@@ -24,6 +24,9 @@ pub enum EnrollError {
     /// A signing operation failed.
     #[error("signing failed: {0}")]
     Sign(String),
+    /// Configuration was missing/invalid, or a file could not be read/written.
+    #[error("{0}")]
+    Provision(String),
 }
 
 /// A software-resident P-384 keystore for the Console's engine identity.
@@ -88,21 +91,39 @@ impl SoftwareKeystore {
             .map_err(|_| EnrollError::Sign("ecdsa p-384 sign failed".to_owned()))
     }
 
-    /// A PKCS#10 CSR PEM for `common_name` + the DNS `sans` (the proposed `console-bff` FQDN), signed by
-    /// the software key. This is the proof-of-possession the enrollment service + step-ca require.
-    ///
-    /// # Errors
-    /// [`EnrollError::Csr`] if the CSR cannot be built or serialized.
-    pub fn csr_pem(&self, common_name: &str, sans: &[String]) -> Result<String, EnrollError> {
+    /// Build a PKCS#10 CSR for `common_name` + the DNS `sans` (the proposed `console-bff` FQDN), signed by
+    /// the software key. The proof-of-possession the enrollment service + step-ca require.
+    fn build_csr(
+        &self,
+        common_name: &str,
+        sans: &[String],
+    ) -> Result<rcgen::CertificateSigningRequest, EnrollError> {
         let mut params =
             CertificateParams::new(sans.to_vec()).map_err(|e| EnrollError::Csr(e.to_string()))?;
         params
             .distinguished_name
             .push(DnType::CommonName, common_name);
-        let csr = params
+        params
             .serialize_request(&self.key_pair)
-            .map_err(|e| EnrollError::Csr(e.to_string()))?;
-        csr.pem().map_err(|e| EnrollError::Csr(e.to_string()))
+            .map_err(|e| EnrollError::Csr(e.to_string()))
+    }
+
+    /// The CSR as a PEM.
+    ///
+    /// # Errors
+    /// [`EnrollError::Csr`] if the CSR cannot be built or serialized.
+    pub fn csr_pem(&self, common_name: &str, sans: &[String]) -> Result<String, EnrollError> {
+        self.build_csr(common_name, sans)?
+            .pem()
+            .map_err(|e| EnrollError::Csr(e.to_string()))
+    }
+
+    /// The CSR as DER -- what the enrollment wire request (`WireEnrollRequest.csr_der`) carries.
+    ///
+    /// # Errors
+    /// [`EnrollError::Csr`] if the CSR cannot be built or serialized.
+    pub fn csr_der(&self, common_name: &str, sans: &[String]) -> Result<Vec<u8>, EnrollError> {
+        Ok(self.build_csr(common_name, sans)?.der().to_vec())
     }
 }
 

@@ -12,6 +12,7 @@ pub mod device_flow;
 pub mod device_grant;
 pub mod http;
 pub mod keystore;
+pub mod provision;
 pub mod token_binding;
 pub mod transport;
 pub mod wire_client;
