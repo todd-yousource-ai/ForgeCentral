@@ -11,7 +11,7 @@ import { PendingLoginStore } from './auth/login-store.js';
 import { SessionStore } from './auth/session.js';
 import { EphemeralCache } from './cache.js';
 import { loadConfig } from './config.js';
-import { createEngineClient } from './engine/index.js';
+import { createEngineClient, createOperatorEngine, loggerDelegationSink } from './engine/index.js';
 import { createLogger } from './log.js';
 import { createServer } from './server.js';
 
@@ -20,6 +20,8 @@ async function main(): Promise<void> {
   const log = createLogger(config.logLevel);
   const cache = new EphemeralCache<unknown>(config.cacheTtlMs, config.cacheMaxEntries);
   const client = createEngineClient(config);
+  // The operator-scoped engine facade (DR.3d): every entity read runs as the operator + is delegation-traced.
+  const operatorEngine = createOperatorEngine(client, loggerDelegationSink(log));
 
   // Operator auth mounts only when OIDC is configured (F0.5a-2); otherwise /auth/* is not served.
   let authRouter: AuthRouter | undefined;
@@ -42,6 +44,7 @@ async function main(): Promise<void> {
     log,
     cache,
     client,
+    operatorEngine,
     ...(authRouter !== undefined ? { authRouter } : {}),
   });
 
