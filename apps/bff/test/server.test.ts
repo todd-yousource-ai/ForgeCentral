@@ -62,11 +62,21 @@ function authRouterWith(session: OperatorSession | undefined): AuthRouter {
   return { handle: () => Promise.resolve(false), resolveSession: () => session };
 }
 
-/** A minimal OperatorEngine: the directory carries one active agent; the other reads are empty. */
+/** A minimal OperatorEngine: the directory carries one active agent with one capability edge. */
 function operatorEngineWith(): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   return {
-    querySubmit: unused,
+    querySubmit: () =>
+      Promise.resolve({
+        rows: [
+          [
+            ['relation', { Text: 'USES_TOOL' }],
+            ['target', { Text: 'tool:search' }],
+          ],
+        ],
+        cursor: null,
+        redacted_fields: [],
+      }),
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: () =>
@@ -172,7 +182,7 @@ describe('BFF HTTP surface', () => {
     expect(detail.header.status).toBe('ok');
     expect(detail.header.data?.status).toBe('active');
     expect(detail.header.data?.displayName).toBe('aig:agent:a');
-    // The cross-repo section is honest pending in the live payload too.
-    expect(detail.capabilities.status).toBe('pending');
+    // Capabilities resolve live from the agent_capabilities relation (VR.3), through the HTTP payload.
+    expect(detail.capabilities.status).toBe('ok');
   });
 });

@@ -19,7 +19,7 @@ import { bindingId } from '@forge/contracts';
 // against grounded crdb reality (2026-07-11): `entity.header`/`entity.info` (identity + status) are LIVE
 // over LIST_AGENTS (crdb ER.1) and `entity.recentDecisions` is LIVE over ENTITY_DECISIONS (crdb ER.2c);
 // `entity.zones` + `entity.effectivePolicies` are PENDING (Forge-side, no queryable store in crdb);
-// `entity.capabilities` is PENDING behind the Torch Construction Report read binding. Trust Score was
+// `entity.capabilities` is LIVE over the crdb `agent_capabilities` virtual relation (VR.3). Trust Score was
 // removed (legacy). The Isolate command is real (enforcement OFF is a runtime posture, not a
 // binding-liveness question); the other three quick actions are PENDING behind the command / surface
 // that exposes them (DR.5).
@@ -84,18 +84,16 @@ const entityReads: readonly ReadBinding[] = [
     status: { kind: 'live' },
   },
   {
-    // The wrapped agent's signed Construction Report (Torch torch-inspect). The report exists at onboard;
-    // exposing it on a read surface needs a crdb/torch read binding that is not yet wired (INV-CROSS).
+    // The agent's capability edges from the crdb AIG graph, via the `agent_capabilities` virtual relation
+    // (tools / authority / delegation; producer IP-CONSOLE-CAPABILITIES VR.3). LIVE. Upgrades to the full
+    // signed Construction Report (the 10-surface decomposition) when Phase B / CR.4 lands -- same view
+    // shape, richer source, no rebind.
     id: bindingId('entity.capabilities'),
     kind: 'read',
-    surface: 'torch',
-    op: 'entity_capabilities_v1',
+    surface: 'cruciblql',
+    op: 'agent_capabilities_v1',
     viewModel: 'CapabilitiesView',
-    status: {
-      kind: 'pending',
-      owningRepo: 'torch',
-      gatingTask: 'IP-CONSOLE-12 DR.4: torch-inspect Construction Report read binding',
-    },
+    status: { kind: 'live' },
   },
 ];
 

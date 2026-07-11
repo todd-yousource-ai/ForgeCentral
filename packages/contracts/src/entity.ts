@@ -103,11 +103,11 @@ export interface ZonesView {
 // -- Section 3.4: capabilities (AI agent principal) -------------------------------------------------
 
 /**
- * One capability decomposed from a wrapped agent's signed Construction Report (Torch `torch-inspect`, the
- * 10-surface decomposition). `surface` names which construction surface it came from (e.g. "tools",
- * "capabilities"). This is typed toward the Construction Report shape rather than an ad-hoc parse (the
- * schema-bypass guard, AI Quality Guide bug category 6); DR.4 binds it to the real report DTO once the
- * crdb/torch read binding is exposed.
+ * One capability an agent holds. `name` is the target (a tool / authority / sub-agent id from the AIG
+ * capability graph, or a report entry once the signed decomposition is bound); `surface` names the
+ * category it came from (e.g. "tools", "authority", "delegation" for the AIG graph, or a Construction
+ * Report surface). Typed toward this stable shape rather than an ad-hoc parse (the schema-bypass guard,
+ * AI Quality Guide bug category 6).
  */
 export interface AgentCapabilityRow {
   readonly name: string;
@@ -115,12 +115,25 @@ export interface AgentCapabilityRow {
 }
 
 /**
- * The capabilities section. `report` for a wrapped agent whose Construction Report resolved; `none` for a
- * non-agent entity (the section is `not-applicable` at the {@link SectionState} level). While the read
- * binding is PENDING (DR.4), the section resolves to `pending`, never a fabricated capability.
+ * Where an agent's capabilities were resolved from: the crdb **AIG capability graph** (the
+ * tools/authority/delegation edges, `FIND agent_capabilities`, Console-CAPABILITIES VR.3) or the signed
+ * **Construction Report** (Torch `torch-inspect`, the 10-surface decomposition, Phase B / CR.4). The
+ * view shape is identical across both, so the drawer upgrades to the richer source with no rework.
+ */
+export type CapabilitySource = 'aig-graph' | 'construction-report';
+
+/**
+ * The capabilities section. `capabilities` for an agent whose capability rows resolved (labelled with the
+ * `source` they came from); `none` for a non-agent entity (the section is `not-applicable` at the
+ * {@link SectionState} level). Never a fabricated capability -- a read failure degrades to `error` and an
+ * agent with no edges to `empty`.
  */
 export type CapabilitiesView =
-  | { readonly kind: 'report'; readonly capabilities: readonly AgentCapabilityRow[] }
+  | {
+      readonly kind: 'capabilities';
+      readonly source: CapabilitySource;
+      readonly capabilities: readonly AgentCapabilityRow[];
+    }
   | { readonly kind: 'none' };
 
 // -- Section 3.5: effective policies (principal, object) --------------------------------------------
