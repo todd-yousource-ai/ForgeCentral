@@ -71,10 +71,15 @@ mock provider. No fabricated data anywhere.
 
 ## 4. Phase 1 -- the live graph, the drawer, the LOG
 
+> **Build order is P1.1 -> P1.2 -> P1.3 (drawer -> Logs -> Overview), NOT the file number.** IP files are
+> named for their TRD (`IP-CONSOLE-12`/`-09`/`-01`), so listing by number reverses the order; THIS table is
+> the authoritative sequence. The drawer is first (Logs + Overview click through to it); Logs is second (it
+> establishes + proves the LOG substrate the Overview aggregates); the Overview flagship is third.
+
 | Step | TRD | Notes |
 |------|-----|-------|
-| P1.1 | `CONSOLE-12` Entity drawer | the shared detail + quick-actions pattern; every later surface reuses it |
-| P1.2 | `CONSOLE-09` Logs | the LOG decision/audit stream (CrucibleQL + the live tail); the shared decision substrate |
+| P1.1 | `CONSOLE-12` Entity drawer | the shared detail + quick-actions pattern; every later surface reuses it (**`IP-CONSOLE-12-ENTITY-DRAWER.md`**, roster DR.1-DR.N) |
+| P1.2 | `CONSOLE-09` Logs | the LOG decision/audit stream (CrucibleQL + the live tail); the shared decision substrate (**`IP-CONSOLE-09-LOGS.md`**, roster LG.1-LG.N) |
 | P1.3 | `CONSOLE-01` Overview | the live connectivity graph over the LOG aggregation + the canvas/WebGL renderer; the flagship (**`IP-CONSOLE-01-OVERVIEW.md`**, roster O1.1-O1.N) |
 
 **Phase 1 exit:** the home graph is live and streamed; clicking any entity opens the real drawer;
