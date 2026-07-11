@@ -75,7 +75,7 @@ mock provider. No fabricated data anywhere.
 |------|-----|-------|
 | P1.1 | `CONSOLE-12` Entity drawer | the shared detail + quick-actions pattern; every later surface reuses it |
 | P1.2 | `CONSOLE-09` Logs | the LOG decision/audit stream (CrucibleQL + the live tail); the shared decision substrate |
-| P1.3 | `CONSOLE-01` Overview | the live connectivity graph over the LOG aggregation + the canvas/WebGL renderer; the flagship |
+| P1.3 | `CONSOLE-01` Overview | the live connectivity graph over the LOG aggregation + the canvas/WebGL renderer; the flagship (**`IP-CONSOLE-01-OVERVIEW.md`**, roster O1.1-O1.N) |
 
 **Phase 1 exit:** the home graph is live and streamed; clicking any entity opens the real drawer;
 Logs shows the real decision stream with EXPLAIN. The three flagship canonical tasks pass E2E.
