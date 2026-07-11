@@ -5,7 +5,9 @@ Per-PR landing record for `IP-CONSOLE-12-ENTITY-DRAWER.md` (the shared detail + 
 `INV-CONSOLE-DRAWER-REAL`, the full `scripts/ci.sh` green, branch-per-PR off local `main`, no-ff merge,
 push to `origin`, docs separate from code. Reviewed with the maintainer before each merge.
 
-Status: **IN PROGRESS -- DR.1, DR.2 landed.** No surface prerequisite (built first; Logs P1.2 + Overview
+Status: **IN PROGRESS -- DR.1, DR.2 landed; DR.1 REVISED (trust score removed).**
+
+**DR.1 revision (2026-07-11):** Trust Score removed (legacy of the old architecture). `HeaderView` is now identity + `EntityStatus` (active/suspended/compromised/unknown, from the engine agent status); the drawer header drops `ScoreRing`/`Sparkline` for a status Badge (the primitives are retained for other uses). Bindings reclassified against grounded crdb reality: `entity.header`/`entity.info` LIVE over LIST_AGENTS (ER.1), `entity.recentDecisions` LIVE over ENTITY_DECISIONS (ER.2c); `entity.zones`/`entity.effectivePolicies` -> PENDING (Forge, no crdb store). Full TS gate green. No surface prerequisite (built first; Logs P1.2 + Overview
 P1.3 reuse it). Phase 0 foundation + the browsable `:8443` enabler are landed.
 
 | Step | Invariant | Status | Commit | Proof |
