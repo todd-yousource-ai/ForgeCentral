@@ -6,3 +6,5 @@ export * from './KpiCard.js';
 export * from './TabStrip.js';
 export * from './Drawer.js';
 export * from './ConfirmDialog.js';
+export * from './Sparkline.js';
+export * from './EntityDrawer.js';
