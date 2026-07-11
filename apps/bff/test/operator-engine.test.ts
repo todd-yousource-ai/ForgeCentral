@@ -44,6 +44,9 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       calls.push('cursorClose');
       return Promise.resolve();
     },
+    listAgents: () => Promise.resolve({ agents: [] }),
+    entityDecisions: () => Promise.resolve({ decisions: [] }),
+    entityConnections: () => Promise.resolve({ connections: [] }),
     close: () => Promise.resolve(),
     ...overrides,
   };

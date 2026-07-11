@@ -40,6 +40,9 @@ const silentLog: ServerLogger = { info: () => {}, warn: () => {}, error: () => {
 const unusedClient: CrucibleClient = {
   ping: () => Promise.resolve(),
   querySubmit: () => Promise.reject(new Error('unused')),
+  listAgents: () => Promise.reject(new Error('unused')),
+  entityDecisions: () => Promise.reject(new Error('unused')),
+  entityConnections: () => Promise.reject(new Error('unused')),
   cursorFetch: () => Promise.reject(new Error('unused')),
   cursorClose: () => Promise.reject(new Error('unused')),
   close: () => Promise.resolve(),

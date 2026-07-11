@@ -18,9 +18,17 @@ import { type FrameTransport, WireProtocolError } from './transport.js';
 /** The frame opcode a request is carried on. */
 function frameTypeForRequest(request: WireRequest): FrameType {
   if (request === 'TxnBegin') return FrameType.TxnBegin;
-  // Query submit and the memory-write submit both ride the QuerySubmit opcode; the payload's enum tag
-  // (`QuerySubmit` / `SubmitMemoryWrite`) distinguishes them server-side.
-  if (typeof request === 'object' && ('QuerySubmit' in request || 'SubmitMemoryWrite' in request)) {
+  // The read + memory-write submit verbs all ride the QuerySubmit opcode; the payload's enum tag
+  // (`QuerySubmit` / `SubmitMemoryWrite` / `ListAgents` / `EntityDecisions` / `EntityConnections`)
+  // discriminates them server-side, exactly as the node's own client tests do.
+  if (
+    typeof request === 'object' &&
+    ('QuerySubmit' in request ||
+      'SubmitMemoryWrite' in request ||
+      'ListAgents' in request ||
+      'EntityDecisions' in request ||
+      'EntityConnections' in request)
+  ) {
     return FrameType.QuerySubmit;
   }
   if (typeof request === 'object' && 'CursorFetch' in request) return FrameType.CursorFetch;

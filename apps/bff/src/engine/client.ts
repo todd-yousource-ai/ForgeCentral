@@ -6,7 +6,16 @@
 // system"). The concrete implementation is the enrolled mTLS `:7878` wire client (F0.3b); handlers and
 // tests depend on this interface, not on a transport.
 
-import type { WireQueryRows, WireQuerySubmit } from '@forge/contracts';
+import type {
+  WireAgentList,
+  WireConnectionList,
+  WireDecisionList,
+  WireEntityConnections,
+  WireEntityDecisions,
+  WireListAgents,
+  WireQueryRows,
+  WireQuerySubmit,
+} from '@forge/contracts';
 
 /** Per-call bounds. At least one of `timeoutMs`/`signal` should be set; the caller passes the config default. */
 export interface EngineCallOptions {
@@ -25,6 +34,18 @@ export interface CrucibleClient {
   ping(opts?: EngineCallOptions): Promise<void>;
   /** Submit a parameterized CrucibleQL read; returns the first page (with a cursor if more remains). */
   querySubmit(request: WireQuerySubmit, opts?: EngineCallOptions): Promise<WireQueryRows>;
+  /** List the agent-directory records for the session tenant (LIST_AGENTS, crdb ER.1). */
+  listAgents(request: WireListAgents, opts?: EngineCallOptions): Promise<WireAgentList>;
+  /** List an entity's recent governed decisions (ENTITY_DECISIONS, crdb ER.2c). */
+  entityDecisions(
+    request: WireEntityDecisions,
+    opts?: EngineCallOptions,
+  ): Promise<WireDecisionList>;
+  /** List a subject's outbound network connections (ENTITY_CONNECTIONS, crdb ER.5). */
+  entityConnections(
+    request: WireEntityConnections,
+    opts?: EngineCallOptions,
+  ): Promise<WireConnectionList>;
   /** Fetch the next page for an open cursor. */
   cursorFetch(handle: EngineHandle, opts?: EngineCallOptions): Promise<WireQueryRows>;
   /** Close an open cursor (releases engine-side resources). */

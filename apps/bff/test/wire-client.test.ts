@@ -7,6 +7,9 @@ import type { BffConfig } from '../src/config.js';
 import {
   EngineRefusedError,
   WireCrucibleClient,
+  replyToAgentList,
+  replyToConnectionList,
+  replyToDecisionList,
   replyToQueryRows,
 } from '../src/engine/wire-client.js';
 
@@ -64,6 +67,29 @@ describe('replyToQueryRows', () => {
   });
 });
 
+describe('the entity-read reply helpers (DR.3c)', () => {
+  const refused = {
+    Refused: {
+      error: { class: 'Denied' as const, code: 2, retry: 'Never' as const, correlation_id: 0 },
+    },
+  };
+
+  it('replyToAgentList returns the list, or throws on a refusal', () => {
+    expect(replyToAgentList({ AgentList: { agents: [] } }).agents).toEqual([]);
+    expect(() => replyToAgentList(refused)).toThrow(EngineRefusedError);
+  });
+
+  it('replyToDecisionList returns the list, or throws on a refusal', () => {
+    expect(replyToDecisionList({ DecisionList: { decisions: [] } }).decisions).toEqual([]);
+    expect(() => replyToDecisionList(refused)).toThrow(EngineRefusedError);
+  });
+
+  it('replyToConnectionList returns the list, or throws on a refusal', () => {
+    expect(replyToConnectionList({ ConnectionList: { connections: [] } }).connections).toEqual([]);
+    expect(() => replyToConnectionList(refused)).toThrow(EngineRefusedError);
+  });
+});
+
 describe('WireCrucibleClient', () => {
   it('querySubmit dispatches and returns decoded rows', async () => {
     const reply = encode({
@@ -97,5 +123,16 @@ describe('WireCrucibleClient', () => {
   it('ping rejects when the connector fails (engine unreachable)', async () => {
     const client = new WireCrucibleClient(config, () => Promise.reject(new Error('ECONNREFUSED')));
     await expect(client.ping()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('listAgents dispatches and returns the decoded agent list (DR.3c)', async () => {
+    const reply = encode({
+      AgentList: {
+        agents: [{ agent_id: 'aig:agent:a', status: 'active', enrolled_at: 1, attributes: [] }],
+      },
+    });
+    const client = new WireCrucibleClient(config, () => Promise.resolve(mockTransport(reply)));
+    const list = await client.listAgents({ request_id: 1 });
+    expect(list.agents[0]?.status).toBe('active');
   });
 });

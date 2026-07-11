@@ -6,7 +6,16 @@
 // piece of wire-specific knowledge: the float-typed `WireValue` variants (`Float`, `Vector`) must be
 // emitted as CBOR floats even when their value is integer-valued, which `wireValueToCbor` handles.
 
-import type { WireQuerySubmit, WireReply, WireRequest, WireValue } from '@forge/contracts';
+import type {
+  OperatorDelegation,
+  WireEntityConnections,
+  WireEntityDecisions,
+  WireListAgents,
+  WireQuerySubmit,
+  WireReply,
+  WireRequest,
+  WireValue,
+} from '@forge/contracts';
 
 import { CborFloat, decode, encode } from './cbor.js';
 
@@ -17,6 +26,20 @@ export function wireValueToCbor(value: WireValue): unknown {
   return value; // Bool / Int / Text / Bytes / Timestamp encode correctly as-is
 }
 
+/**
+ * Emit the optional operator delegation onto a request's CBOR map, ONLY when present -- byte-identical to
+ * a non-delegating client, matching crdb's `#[serde(default, skip_serializing_if = "Option::is_none")]`.
+ * The engine honors it only under the peer's Delegation grant; the ids are hyphenated UUID strings.
+ */
+function applyOperator(
+  out: Record<string, unknown>,
+  operator: OperatorDelegation | null | undefined,
+): void {
+  if (operator != null) {
+    out['operator'] = { principal: operator.principal, tenant: operator.tenant };
+  }
+}
+
 function submitToCbor(submit: WireQuerySubmit): unknown {
   // Field order matches the Rust struct (request_id, text, params, operator) so the CBOR map is
   // byte-identical.
@@ -25,12 +48,38 @@ function submitToCbor(submit: WireQuerySubmit): unknown {
     text: submit.text,
     params: submit.params.map(([key, value]) => [key, wireValueToCbor(value)]),
   };
-  // Operator delegation (F0.5c): emitted only when present, so a non-delegated read is byte-identical to
-  // a pre-delegation client -- matching crdb's `#[serde(default, skip_serializing_if = "Option::is_none")]`.
-  // The engine honors it only under the peer's Delegation grant; the ids are hyphenated UUID strings.
-  if (submit.operator != null) {
-    out['operator'] = { principal: submit.operator.principal, tenant: submit.operator.tenant };
-  }
+  applyOperator(out, submit.operator);
+  return out;
+}
+
+/** The agent-directory read (LIST_AGENTS, crdb ER.1). Fields in Rust struct order: request_id, operator. */
+function listAgentsToCbor(request: WireListAgents): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** The entity-decisions read (ENTITY_DECISIONS, crdb ER.2c). */
+function entityDecisionsToCbor(request: WireEntityDecisions): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    entity_type: request.entity_type,
+    entity_value: request.entity_value,
+    limit: request.limit,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** The connectivity read (ENTITY_CONNECTIONS, crdb ER.5). */
+function entityConnectionsToCbor(request: WireEntityConnections): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    subject_kind: request.subject_kind,
+    subject_id: request.subject_id,
+    limit: request.limit,
+  };
+  applyOperator(out, request.operator);
   return out;
 }
 
@@ -43,6 +92,13 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   if ('QuerySubmit' in request) return encode({ QuerySubmit: submitToCbor(request.QuerySubmit) });
   if ('SubmitMemoryWrite' in request) {
     return encode({ SubmitMemoryWrite: submitToCbor(request.SubmitMemoryWrite) });
+  }
+  if ('ListAgents' in request) return encode({ ListAgents: listAgentsToCbor(request.ListAgents) });
+  if ('EntityDecisions' in request) {
+    return encode({ EntityDecisions: entityDecisionsToCbor(request.EntityDecisions) });
+  }
+  if ('EntityConnections' in request) {
+    return encode({ EntityConnections: entityConnectionsToCbor(request.EntityConnections) });
   }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });
