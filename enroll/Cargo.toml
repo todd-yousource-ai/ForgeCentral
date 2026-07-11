@@ -42,3 +42,13 @@ serde_json = "1.0"
 # (keeps the crypto posture); webpki-roots supplies the public web PKI trust anchors for the IdP host.
 rustls = { version = "0.23", default-features = false, features = ["std", "aws_lc_rs", "tls12"] }
 webpki-roots = "1"
+# The shared CrucibleDB enrollment wire contract: the TRD-04a 16-byte frame header + the serde
+# WireIdentity/WireEnroll handshake messages (cdb-wire, `handshake` feature only -- `io` would pull tokio;
+# this client does blocking frame I/O itself) and DeviceAttestation (cdb-types). Byte-exact to the engine
+# by construction. Pinned rev, git-fetched via the `github-crucible` insteadOf (like the sidecar).
+cdb-wire = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "7f459214ec57065684ddaebfa6b1955356524955", default-features = false, features = ["handshake"] }
+cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "7f459214ec57065684ddaebfa6b1955356524955" }
+# CBOR encode/decode of the wire payloads (the codec cdb-wire itself uses).
+ciborium = "0.2"
+# Parse the pinned enroll-CA PEM into trust anchors for the bootstrap TLS to the node.
+rustls-pemfile = "2"
