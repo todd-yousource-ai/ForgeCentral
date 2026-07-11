@@ -49,11 +49,21 @@ rustls = { version = "0.23", default-features = false, features = ["std", "aws_l
 webpki-roots = "1"
 # The shared CrucibleDB enrollment wire contract: the TRD-04a 16-byte frame header + the serde
 # WireIdentity/WireEnroll handshake messages (cdb-wire, `handshake` feature only -- `io` would pull tokio;
-# this client does blocking frame I/O itself) and DeviceAttestation (cdb-types). Byte-exact to the engine
-# by construction. Pinned rev, git-fetched via the `github-crucible` insteadOf (like the sidecar).
-cdb-wire = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "7f459214ec57065684ddaebfa6b1955356524955", default-features = false, features = ["handshake"] }
-cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "7f459214ec57065684ddaebfa6b1955356524955" }
+# this client does blocking frame I/O itself), DeviceAttestation (cdb-types), and the client-side
+# device-identity seam (cdb-device-identity: the KeystoreBackend trait this crate's TpmBackend implements).
+# Byte-exact to the engine by construction. Pinned rev, git-fetched via the `github-crucible` insteadOf.
+cdb-wire = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "b51236b0607401cf578e87a9fcaa57fd44158108", default-features = false, features = ["handshake"] }
+cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "b51236b0607401cf578e87a9fcaa57fd44158108" }
+cdb-device-identity = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "b51236b0607401cf578e87a9fcaa57fd44158108" }
 # CBOR encode/decode of the wire payloads (the codec cdb-wire itself uses).
 ciborium = "0.2"
 # Parse the pinned enroll-CA PEM into trust anchors for the bootstrap TLS to the node.
 rustls-pemfile = "2"
+# The TPM 2.0 backend (TRD-25 R-SED-5/6): the device identity is a non-exportable, hardware-resident key
+# so the Console enrolls like a torch device (the node's require_attestation stays enforced). tss-esapi
+# links libtss2 (present on the host); p384 assembles the DER SPKI + the ECDSA signature from the TPM's raw
+# EC point + r/s. Linux-only (the concrete hardware backend; the trait + rustls signer live in the engine's
+# cdb-device-identity leaf crate so the engine's hermetic build pulls no TPM toolchain).
+[target.'cfg(target_os = "linux")'.dependencies]
+tss-esapi = "7"
+p384 = "0.13"

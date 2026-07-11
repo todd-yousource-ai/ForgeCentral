@@ -1,12 +1,15 @@
-//! The Console-owned service-key ZTP enrollment client (IP-CONSOLE-00-DEPLOY D.3a-console).
+//! The Console-owned ZTP enrollment client (IP-CONSOLE-00-DEPLOY D.3a-console / IP-CONSOLE-00-SIDECAR-TPM).
 //!
-//! `torch-enroll` is TPM-only and refuses a software key for a production identity, so the Console owns
-//! this small client: it enrolls the engine identity with a SOFTWARE P-384 key (still operator MFA +
-//! step-ca mint + AIG registration, so the enrolled-role permissions work), yielding the cert + key PEM
-//! the crypto sidecar presents on the engine leg. No TPM; the AWS-LC posture is unchanged.
+//! The Console enrolls its engine identity as a non-exportable, hardware-resident TPM key -- exactly
+//! like a torch edge device -- so the node's `require_attestation` stays enforced (no server
+//! weakening). Operator MFA + step-ca mint + AIG registration yield the leaf cert the crypto sidecar
+//! presents on the engine leg; the private key never leaves the TPM (the sidecar signs the mTLS
+//! handshake in the device via `cdb_device_identity`).
 //!
-//! D.3a-console.1 (this): the [`keystore`] -- P-384 keygen + PKCS#10 CSR + PEM export. The enroll protocol
-//! client (device-code MFA + CSR submit + cert receive) and the provisioning wrapper are D.3a-console.2/.3.
+//! [`tpm`] is the concrete `cdb_device_identity::KeystoreBackend` (Linux, `tss-esapi`/`libtss2`). The
+//! device-code MFA flow ([`device_flow`]/[`device_grant`]) obtains the operator token; the wire client
+//! ([`wire_client`]) submits the CSR + the real attestation. The software keystore + DPoP token binding
+//! are retired with the flow rewire (D.3a-console TPM PR2b).
 
 pub mod device_flow;
 pub mod device_grant;
@@ -14,8 +17,12 @@ pub mod http;
 pub mod keystore;
 pub mod provision;
 pub mod token_binding;
+#[cfg(target_os = "linux")]
+pub mod tpm;
 pub mod transport;
 pub mod wire_client;
 
 pub use keystore::{EnrollError, SoftwareKeystore};
 pub use token_binding::{access_token_hash, canonical_ec_jwk, dpop_proof, jwk_thumbprint};
+#[cfg(target_os = "linux")]
+pub use tpm::TpmBackend;
