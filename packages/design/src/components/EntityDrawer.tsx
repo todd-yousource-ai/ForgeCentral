@@ -38,7 +38,7 @@ export interface EntityDrawerProps {
   /** Asked to close (Escape, the close button, or a scrim click). */
   readonly onClose: () => void;
   /** The aggregated detail view. Undefined while the no-prefetch load is in flight (renders skeletons). */
-  readonly detail?: EntityDetailView;
+  readonly detail?: EntityDetailView | undefined;
   /** Loading (no prefetch hit): render section skeletons instead of content. */
   readonly loading?: boolean;
   /** Quick-action handlers; only provided actions render a button. */
