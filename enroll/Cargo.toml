@@ -59,11 +59,16 @@ cdb-device-identity = { git = "https://github.com/todd-yousource-ai/Crucible.git
 ciborium = "0.2"
 # Parse the pinned enroll-CA PEM into trust anchors for the bootstrap TLS to the node.
 rustls-pemfile = "2"
+# The PKCS#10 CSR built over the TPM key (proof of possession, R-SED-9): the TBS CertificationRequestInfo
+# is assembled with x509-cert/der over the TPM's public SPKI, signed IN the device (the private key never
+# leaves it), and wrapped as ecdsa-with-SHA384. p384 assembles the DER SPKI + the ECDSA signature from the
+# TPM's raw EC point + r/s (and drives the software-signer CSR test). All pure-Rust (no C toolchain).
+der = "0.7"
+x509-cert = "0.2"
+p384 = "0.13"
 # The TPM 2.0 backend (TRD-25 R-SED-5/6): the device identity is a non-exportable, hardware-resident key
 # so the Console enrolls like a torch device (the node's require_attestation stays enforced). tss-esapi
-# links libtss2 (present on the host); p384 assembles the DER SPKI + the ECDSA signature from the TPM's raw
-# EC point + r/s. Linux-only (the concrete hardware backend; the trait + rustls signer live in the engine's
-# cdb-device-identity leaf crate so the engine's hermetic build pulls no TPM toolchain).
+# links libtss2 (present on the host). Linux-only (the concrete hardware backend; the trait + rustls signer
+# live in the engine's cdb-device-identity leaf crate so the engine's hermetic build pulls no TPM toolchain).
 [target.'cfg(target_os = "linux")'.dependencies]
 tss-esapi = "7"
-p384 = "0.13"

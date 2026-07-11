@@ -11,6 +11,7 @@
 //! ([`wire_client`]) submits the CSR + the real attestation. The software keystore + DPoP token binding
 //! are retired with the flow rewire (D.3a-console TPM PR2b).
 
+pub mod csr;
 pub mod device_flow;
 pub mod device_grant;
 pub mod http;
@@ -22,6 +23,7 @@ pub mod tpm;
 pub mod transport;
 pub mod wire_client;
 
+pub use csr::{build_csr, CsrError, CsrSubjectAltNames};
 pub use keystore::{EnrollError, SoftwareKeystore};
 pub use token_binding::{access_token_hash, canonical_ec_jwk, dpop_proof, jwk_thumbprint};
 #[cfg(target_os = "linux")]
