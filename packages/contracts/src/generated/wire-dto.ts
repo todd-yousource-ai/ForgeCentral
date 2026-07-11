@@ -16,6 +16,17 @@ export type RetryClass = 'Never' | 'SafeSameRequest' | 'SafeAfterRefresh' | 'Cal
 
 export type StreamKind = 'Decision' | 'Audit';
 
+export interface WireAgentList {
+  agents: Array<WireAgentRecord>;
+}
+
+export interface WireAgentRecord {
+  agent_id: string;
+  attributes: Array<[string, string]>;
+  enrolled_at: number;
+  status: string;
+}
+
 export interface WireAuditEntry {
   action: string;
   commit_version: number;
@@ -24,6 +35,16 @@ export interface WireAuditEntry {
   resource: string;
   seq: number;
   timestamp: number;
+}
+
+export interface WireConnection {
+  destination_id: string;
+  destination_kind: string;
+  observed_at: number;
+}
+
+export interface WireConnectionList {
+  connections: Array<WireConnection>;
 }
 
 export interface WireDecision {
@@ -38,7 +59,36 @@ export interface WireDecision {
   tactics: Array<string>;
 }
 
+export interface WireDecisionList {
+  decisions: Array<WireDecisionRow>;
+}
+
+export interface WireDecisionRow {
+  created_at: number;
+  decision_id: string;
+  finding: string;
+  recommended_action: string;
+  rule_id: string;
+  tactics: Array<string>;
+}
+
 export type WireDriftTrigger = 'Schema' | 'Policy' | 'Statistics' | 'Model' | 'AsOf' | 'Workspace';
+
+export interface WireEntityConnections {
+  limit: number;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  subject_id: string;
+  subject_kind: string;
+}
+
+export interface WireEntityDecisions {
+  entity_type: string;
+  entity_value: string;
+  limit: number;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
 
 export interface WireError {
   class: WireErrorClass;
@@ -48,6 +98,11 @@ export interface WireError {
 }
 
 export type WireErrorClass = 'Unauthenticated' | 'Denied' | 'VersionUnsupported' | 'Conflict' | 'IdempotencyConflict' | 'AsOfUnavailable' | 'StorageUnavailable' | 'AuditFailure' | 'IntegrityFailure' | 'LimitExceeded' | 'Framing' | 'Internal';
+
+export interface WireListAgents {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
 
 export interface WireQueryRows {
   cursor: Array<number> | null;
@@ -64,6 +119,9 @@ export interface WireQuerySubmit {
 
 export type WireReply =
   | { QueryRows: WireQueryRows; }
+  | { AgentList: WireAgentList; }
+  | { DecisionList: WireDecisionList; }
+  | { ConnectionList: WireConnectionList; }
   | 'CursorClosed'
   | { TxnBegun: { txn: Array<number>; }; }
   | { Staged: { affected: number; }; }
@@ -87,7 +145,10 @@ export type WireRequest =
   | { TxnWrite: { params: Array<[string, WireValue]>; text: string; txn: Array<number>; }; }
   | { TxnCommit: { request_id: number; txn: Array<number>; }; }
   | { TxnAbort: { txn: Array<number>; }; }
-  | { SubmitMemoryWrite: WireQuerySubmit; };
+  | { SubmitMemoryWrite: WireQuerySubmit; }
+  | { ListAgents: WireListAgents; }
+  | { EntityDecisions: WireEntityDecisions; }
+  | { EntityConnections: WireEntityConnections; };
 
 export type WireStreamDelta =
   | { Decision: WireDecision; }
