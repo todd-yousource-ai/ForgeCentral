@@ -80,7 +80,7 @@ describe('the aggregate detail view models every per-section state', () => {
       },
       info: {
         status: 'ok',
-        data: { trustState: 'trusted', riskScore: 12, region: 'us', lastSeen: 0, tags: [] },
+        data: { role: 'operator', clearance: 'secret', enrolledAt: 0, tags: [] },
       },
       zones: { status: 'ok', data: { zones: [{ id: vtzId('vtz-1'), name: 'DMZ' }] } },
       // Capabilities read binding is not live yet (DR.4): honest pending, never a fabricated capability.

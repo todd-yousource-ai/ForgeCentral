@@ -26,9 +26,11 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
   client: CrucibleClient;
   calls: string[];
   requests: WireQuerySubmit[];
+  reads: Array<{ operator?: unknown }>;
 } {
   const calls: string[] = [];
   const requests: WireQuerySubmit[] = [];
+  const reads: Array<{ operator?: unknown }> = [];
   const client: CrucibleClient = {
     ping: () => Promise.resolve(),
     querySubmit: (req) => {
@@ -44,13 +46,25 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       calls.push('cursorClose');
       return Promise.resolve();
     },
-    listAgents: () => Promise.resolve({ agents: [] }),
-    entityDecisions: () => Promise.resolve({ decisions: [] }),
-    entityConnections: () => Promise.resolve({ connections: [] }),
+    listAgents: (req) => {
+      calls.push('listAgents');
+      reads.push(req);
+      return Promise.resolve({ agents: [] });
+    },
+    entityDecisions: (req) => {
+      calls.push('entityDecisions');
+      reads.push(req);
+      return Promise.resolve({ decisions: [] });
+    },
+    entityConnections: (req) => {
+      calls.push('entityConnections');
+      reads.push(req);
+      return Promise.resolve({ connections: [] });
+    },
     close: () => Promise.resolve(),
     ...overrides,
   };
-  return { client, calls, requests };
+  return { client, calls, requests, reads };
 }
 
 /** A delegation sink that captures what it recorded. */
@@ -103,6 +117,37 @@ describe('createOperatorEngine', () => {
         requestId: 7,
         tenant: 'tenant-op',
       },
+    ]);
+  });
+
+  it('records the delegation + injects the operator on the three entity reads (DR.3d)', async () => {
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    await engine.listAgents(admin, { request_id: 1 });
+    await engine.entityDecisions(admin, {
+      request_id: 2,
+      entity_type: 'host',
+      entity_value: 'host-7',
+      limit: 10,
+    });
+    await engine.entityConnections(admin, {
+      request_id: 3,
+      subject_kind: 'process',
+      subject_id: 'host-7:pid:1',
+      limit: 10,
+    });
+
+    expect(calls).toEqual(['listAgents', 'entityDecisions', 'entityConnections']);
+    // The engine injects the operator delegation onto every entity read sent to the client (F0.5c).
+    for (const read of reads) {
+      expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
+    }
+    expect(recorded.map((d) => d.action)).toEqual([
+      'listAgents',
+      'entityDecisions',
+      'entityConnections',
     ]);
   });
 

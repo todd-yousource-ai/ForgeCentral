@@ -71,15 +71,19 @@ export interface HeaderView {
 // -- Section 3.2: entity information ----------------------------------------------------------------
 
 /**
- * The entity/principal record projection (TRD-04 Principal for a principal, the Forge VTZ record for a
- * VTZ, the object registry for an object), tier-redacted server-side. `region` reflects the residency tag
- * (TRD-07); `lastSeen` is unix millis.
+ * The entity record projection, from the engine agent directory (`AigAgentRecord` via LIST_AGENTS),
+ * tier-redacted server-side. Real record fields -- no trust-era `trustState`/`riskScore`/`region` (the
+ * status is shown in the header). `enrolledAt` is unix seconds; `tags` carries the remaining record
+ * attributes as `key=value` strings.
  */
 export interface EntityInfoView {
-  readonly trustState: string;
-  readonly riskScore: number;
-  readonly region: string;
-  readonly lastSeen: number;
+  /** The operator role the record carries (from its attributes), when present. */
+  readonly role?: string;
+  /** The clearance label the record carries, when present. */
+  readonly clearance?: string;
+  /** When the entity was first enrolled/recorded (unix seconds). */
+  readonly enrolledAt: number;
+  /** The remaining record attributes as `key=value` tags. */
   readonly tags: readonly string[];
 }
 

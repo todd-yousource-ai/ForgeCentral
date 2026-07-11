@@ -27,10 +27,9 @@ function fixture(overrides: Partial<EntityDetailView> = {}): EntityDetailView {
     info: {
       status: 'ok',
       data: {
-        trustState: 'trusted',
-        riskScore: 12,
-        region: 'us-east',
-        lastSeen: 1_720_600_000_000,
+        role: 'operator',
+        clearance: 'secret',
+        enrolledAt: 1_720_600_000,
         tags: ['prod', 'inventory'],
       },
     },
@@ -85,7 +84,7 @@ describe('EntityDrawer: the resolved sections', () => {
 
   it('renders the information, a connected VTZ, an effective policy, and a recent decision', () => {
     render(<EntityDrawer open onClose={vi.fn()} detail={fixture()} />);
-    expect(screen.getByText('us-east')).toBeInTheDocument();
+    expect(screen.getByText('operator')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'DMZ' })).toBeInTheDocument();
     expect(screen.getByText('no-egress')).toBeInTheDocument();
     // Both a policy Deny and a decision Denied render a critical badge with their label (never color alone).
@@ -112,7 +111,7 @@ describe('EntityDrawer: honest non-ok states', () => {
     render(<EntityDrawer open onClose={vi.fn()} detail={detail} />);
     expect(screen.getByRole('alert')).toHaveTextContent('engine unreachable');
     // The rest of the drawer still renders.
-    expect(screen.getByText('us-east')).toBeInTheDocument();
+    expect(screen.getByText('operator')).toBeInTheDocument();
   });
 
   it('omits a not-applicable or unauthorized section entirely (absent, not disabled)', () => {
