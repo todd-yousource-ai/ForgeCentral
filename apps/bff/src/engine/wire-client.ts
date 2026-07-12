@@ -4,10 +4,23 @@
 // frame/CBOR/handshake/transport stack proven byte-exact against crdb). It dials the AWS-LC crypto sidecar
 // over a plaintext LOOPBACK socket; the sidecar originates the mTLS to the engine on :7878, so Node performs
 // no TLS (INV-CONSOLE-CRYPTO-AWSLC). It connects lazily (on the first call), completes the reactor
-// handshake, and dispatches operations; `ping` is the readiness probe (a live connection + handshake means
-// the sidecar and engine are reachable).
+// handshake, and dispatches operations.
+//
+// INV-CONSOLE-ENGINE-KEEPALIVE: the connection ACTIVELY stays live, and never fails open. A background
+// heartbeat sends a PING within the engine session-lease window (TRD-04a 3.1: a client that does not
+// heartbeat within the window has its connection closed by the engine); any transport failure (a lapsed
+// lease, an engine restart, a dropped socket) INVALIDATES the cached transport so the next call transparently
+// reconnects and retries once; and `ping` performs a real PING/PONG round-trip, so readiness reflects true
+// reachability and fails CLOSED (a dead link reads not-ready, never a stale "ready"). All transport ops
+// (dispatch + heartbeat) are serialized so frames never interleave on stream 0.
 
-import { type FrameTransport, connectLoopback, dispatch, wireHandshake } from '@forge/wire';
+import {
+  type FrameTransport,
+  connectLoopback,
+  dispatch,
+  heartbeat,
+  wireHandshake,
+} from '@forge/wire';
 import type {
   WireAgentList,
   WireConnectionList,
@@ -91,52 +104,138 @@ async function withTimeout<T>(op: Promise<T>, ms: number): Promise<T> {
 
 export class WireCrucibleClient implements CrucibleClient {
   private transport: FrameTransport | null = null;
+  /** Dedupes concurrent first-connects so a burst of calls shares one dial + handshake. */
+  private connecting: Promise<FrameTransport> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  /** Serializes every transport op (dispatch + heartbeat) so frames never interleave on stream 0. */
+  private opChain: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly config: BffConfig,
     private readonly connect: EngineConnector = connectEngine,
   ) {}
 
-  private async ensure(): Promise<FrameTransport> {
-    this.transport ??= await this.connect(this.config);
-    return this.transport;
+  /** Run `op` with exclusive access to the transport (one in-flight frame per connection, stream 0). */
+  private serialize<T>(op: () => Promise<T>): Promise<T> {
+    const run = this.opChain.then(op, op);
+    // Keep the chain alive across this op's outcome without swallowing the caller's own result/error.
+    this.opChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  /** The live transport, dialing + handshaking (and starting the heartbeat) once if absent. */
+  private async ensureTransport(): Promise<FrameTransport> {
+    if (this.transport) return this.transport;
+    this.connecting ??= this.connect(this.config).then(
+      (transport) => {
+        this.transport = transport;
+        this.connecting = null;
+        this.startHeartbeat();
+        return transport;
+      },
+      (error: unknown) => {
+        this.connecting = null;
+        throw error;
+      },
+    );
+    return this.connecting;
+  }
+
+  /** Drop `dead` if it is still the current transport, so the next op reconnects. Idempotent. */
+  private invalidate(dead: FrameTransport): void {
+    if (dead !== this.transport) return; // already replaced by a newer transport
+    this.stopHeartbeat();
+    this.transport = null;
+    void dead.close().catch(() => undefined);
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatTimer) return;
+    this.heartbeatTimer = setInterval(() => {
+      void this.beat();
+    }, this.config.heartbeatIntervalMs);
+    // The heartbeat must not by itself keep the Node process alive.
+    this.heartbeatTimer.unref?.();
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  /** One heartbeat tick: PING/PONG on the live transport; a failure invalidates it so the next call reconnects. */
+  private async beat(): Promise<void> {
+    const transport = this.transport;
+    if (!transport) return;
+    try {
+      await this.serialize(() => withTimeout(heartbeat(transport), this.config.requestTimeoutMs));
+    } catch {
+      this.invalidate(transport);
+    }
   }
 
   private timeoutFor(opts?: EngineCallOptions): number {
     return opts?.timeoutMs ?? this.config.requestTimeoutMs;
   }
 
+  /**
+   * Run a serialized transport op, reconnecting once if the connection died. A transport-level failure (a
+   * dead socket, a lapsed lease, an engine restart) invalidates the cached transport so it is never reused,
+   * and the op is retried once on a fresh connection. A domain refusal (`EngineRefusedError`) is not a
+   * transport failure and is rethrown immediately. Every verb here is an idempotent read, so a single retry
+   * is safe.
+   */
+  private async call<T>(
+    op: (transport: FrameTransport) => Promise<T>,
+    opts?: EngineCallOptions,
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const transport = await this.ensureTransport();
+      try {
+        return await this.serialize(() => withTimeout(op(transport), this.timeoutFor(opts)));
+      } catch (error) {
+        if (error instanceof EngineRefusedError) throw error;
+        lastError = error;
+        this.invalidate(transport);
+      }
+    }
+    throw lastError;
+  }
+
   async ping(opts?: EngineCallOptions): Promise<void> {
-    // Establishing the transport completes the mTLS handshake + the wire handshake; that IS reachability.
-    await withTimeout(this.ensure(), this.timeoutFor(opts));
+    // A real PING/PONG round-trip: readiness reflects true engine reachability, not a cached handle. Fail
+    // closed -- a dead or unreachable link rejects here (and readiness reports not-ready).
+    await this.call((transport) => heartbeat(transport), opts);
   }
 
   async querySubmit(
     request: Parameters<CrucibleClient['querySubmit']>[0],
     opts?: EngineCallOptions,
   ): Promise<WireQueryRows> {
-    const transport = await this.ensure();
-    const reply = await withTimeout(
-      dispatch(transport, { QuerySubmit: request }),
-      this.timeoutFor(opts),
+    return this.call(
+      async (transport) => replyToQueryRows(await dispatch(transport, { QuerySubmit: request })),
+      opts,
     );
-    return replyToQueryRows(reply);
   }
 
   async cursorFetch(handle: EngineHandle, opts?: EngineCallOptions): Promise<WireQueryRows> {
-    const transport = await this.ensure();
-    const reply = await withTimeout(
-      dispatch(transport, { CursorFetch: { handle: [...handle] } }),
-      this.timeoutFor(opts),
+    return this.call(
+      async (transport) =>
+        replyToQueryRows(await dispatch(transport, { CursorFetch: { handle: [...handle] } })),
+      opts,
     );
-    return replyToQueryRows(reply);
   }
 
   async cursorClose(handle: EngineHandle, opts?: EngineCallOptions): Promise<void> {
-    const transport = await this.ensure();
-    await withTimeout(
-      dispatch(transport, { CursorClose: { handle: [...handle] } }),
-      this.timeoutFor(opts),
+    await this.call(
+      (transport) => dispatch(transport, { CursorClose: { handle: [...handle] } }),
+      opts,
     );
   }
 
@@ -144,44 +243,40 @@ export class WireCrucibleClient implements CrucibleClient {
     request: Parameters<CrucibleClient['listAgents']>[0],
     opts?: EngineCallOptions,
   ): Promise<WireAgentList> {
-    const transport = await this.ensure();
-    const reply = await withTimeout(
-      dispatch(transport, { ListAgents: request }),
-      this.timeoutFor(opts),
+    return this.call(
+      async (transport) => replyToAgentList(await dispatch(transport, { ListAgents: request })),
+      opts,
     );
-    return replyToAgentList(reply);
   }
 
   async entityDecisions(
     request: Parameters<CrucibleClient['entityDecisions']>[0],
     opts?: EngineCallOptions,
   ): Promise<WireDecisionList> {
-    const transport = await this.ensure();
-    const reply = await withTimeout(
-      dispatch(transport, { EntityDecisions: request }),
-      this.timeoutFor(opts),
+    return this.call(
+      async (transport) =>
+        replyToDecisionList(await dispatch(transport, { EntityDecisions: request })),
+      opts,
     );
-    return replyToDecisionList(reply);
   }
 
   async entityConnections(
     request: Parameters<CrucibleClient['entityConnections']>[0],
     opts?: EngineCallOptions,
   ): Promise<WireConnectionList> {
-    const transport = await this.ensure();
-    const reply = await withTimeout(
-      dispatch(transport, { EntityConnections: request }),
-      this.timeoutFor(opts),
+    return this.call(
+      async (transport) =>
+        replyToConnectionList(await dispatch(transport, { EntityConnections: request })),
+      opts,
     );
-    return replyToConnectionList(reply);
   }
 
   async close(): Promise<void> {
-    if (this.transport) {
-      const transport = this.transport;
-      this.transport = null;
-      await transport.close();
-    }
+    this.stopHeartbeat();
+    const transport = this.transport;
+    this.transport = null;
+    this.connecting = null;
+    if (transport) await transport.close();
   }
 }
 

@@ -26,6 +26,7 @@ const config: BffConfig = {
   cacheTtlMs: 2000,
   cacheMaxEntries: 100,
   requestTimeoutMs: 1000,
+  heartbeatIntervalMs: 20_000,
   session: {
     ttlMs: 3_600_000,
     cookieName: 'fc_session',

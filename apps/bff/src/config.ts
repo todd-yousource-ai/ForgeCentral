@@ -45,6 +45,11 @@ const ConfigSchema = z.object({
   cacheMaxEntries: z.coerce.number().int().positive().default(1000),
   /** Default per-call engine timeout in ms (every engine call is bounded). */
   requestTimeoutMs: z.coerce.number().int().positive().default(5000),
+  /** Engine heartbeat interval in ms. The wire client sends a PING within this cadence to refresh the
+   * engine session lease (TRD-04a 3.1: a client must heartbeat within the lease window or the engine
+   * closes the connection; the crdb default lease is 60s). Keep it well under the lease so a missed beat
+   * or two does not lapse it. */
+  engineHeartbeatMs: z.coerce.number().int().positive().default(20_000),
   /** Path to the built Console SPA (apps/console/dist) the BFF serves behind the admin plane. When
    * unset the BFF is API-only (no UI served). */
   spaDir: z.string().min(1).optional(),
@@ -95,6 +100,8 @@ export interface BffConfig {
   readonly cacheTtlMs: number;
   readonly cacheMaxEntries: number;
   readonly requestTimeoutMs: number;
+  /** Engine heartbeat cadence in ms (PING keeps the engine session lease alive; see the schema note). */
+  readonly heartbeatIntervalMs: number;
   /** Path to the built Console SPA served behind the admin plane; absent -> the BFF is API-only. */
   readonly spaDir?: string;
   readonly session: SessionSettings;
@@ -177,6 +184,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     cacheTtlMs: env['FC_CACHE_TTL_MS'],
     cacheMaxEntries: env['FC_CACHE_MAX_ENTRIES'],
     requestTimeoutMs: env['FC_REQUEST_TIMEOUT_MS'],
+    engineHeartbeatMs: env['FC_ENGINE_HEARTBEAT_MS'],
     spaDir: env['FC_SPA_DIST'],
     sessionTtlMs: env['FC_SESSION_TTL_MS'],
     sessionCookieName: env['FC_SESSION_COOKIE'],
@@ -214,6 +222,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     cacheTtlMs: raw.cacheTtlMs,
     cacheMaxEntries: raw.cacheMaxEntries,
     requestTimeoutMs: raw.requestTimeoutMs,
+    heartbeatIntervalMs: raw.engineHeartbeatMs,
     session: {
       ttlMs: raw.sessionTtlMs,
       cookieName: raw.sessionCookieName,

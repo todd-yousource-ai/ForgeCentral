@@ -55,3 +55,25 @@ export async function dispatch(
   const frame = await transport.recv();
   return decodeWireReply(frame.payload);
 }
+
+/**
+ * Send a wire-level PING heartbeat on stream 0 and await the PONG. This refreshes the engine session
+ * lease (TRD-04a 3.1: a heartbeat frame on a lapsed lease closes the connection, so a client must PING
+ * within the lease window) and doubles as a liveness probe -- a resolved PONG proves the sidecar and the
+ * engine are reachable, where a shallow "is the socket object non-null" check cannot. It must be
+ * serialized with `dispatch` on the same transport (one in-flight frame per connection, stream 0).
+ */
+export async function heartbeat(transport: FrameTransport): Promise<void> {
+  await transport.send({
+    frameType: FrameType.Ping,
+    streamId: 0,
+    flags: Flags.END_STREAM,
+    payload: new Uint8Array(0),
+  });
+  const frame = await transport.recv();
+  if (frame.header.frameType !== FrameType.Pong) {
+    throw new WireProtocolError(
+      `heartbeat: expected a PONG reply, got frame type 0x${frame.header.frameType.toString(16)}`,
+    );
+  }
+}
