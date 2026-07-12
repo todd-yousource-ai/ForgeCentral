@@ -15,6 +15,12 @@ describe('loadConfig', () => {
     expect(config.httpPort).toBe(8787);
     expect(config.logLevel).toBe('info');
     expect(config.requestTimeoutMs).toBe(5000);
+    expect(config.heartbeatIntervalMs).toBe(20_000);
+  });
+
+  it('coerces the engine heartbeat interval from the environment', () => {
+    const config = loadConfig({ ...complete, FC_ENGINE_HEARTBEAT_MS: '5000' });
+    expect(config.heartbeatIntervalMs).toBe(5000);
   });
 
   it('coerces numeric env values', () => {

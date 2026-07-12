@@ -1,7 +1,15 @@
 // apps/bff/test/wire-client.test.ts -- F0.3b-3d the BFF's real engine client (over a mock transport).
 
-import { Flags, FrameType, PROTOCOL_V1_0, type FrameTransport, encode } from '@forge/wire';
-import { describe, expect, it } from 'vitest';
+import {
+  Flags,
+  FrameType,
+  PROTOCOL_V1_0,
+  type FrameTransport,
+  type OutboundFrame,
+  type WireFrame,
+  encode,
+} from '@forge/wire';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { BffConfig } from '../src/config.js';
 import {
@@ -21,6 +29,7 @@ const config: BffConfig = {
   cacheTtlMs: 2000,
   cacheMaxEntries: 100,
   requestTimeoutMs: 1000,
+  heartbeatIntervalMs: 20_000,
   session: {
     ttlMs: 3_600_000,
     cookieName: 'fc_session',
@@ -48,6 +57,35 @@ function mockTransport(replyPayload: Uint8Array): FrameTransport {
       }),
     close: () => Promise.resolve(),
   };
+}
+
+/** A frame of a given opcode with an empty payload (a PONG heartbeat reply). */
+function pongFrame(): WireFrame {
+  return {
+    header: {
+      protocolVersion: PROTOCOL_V1_0,
+      frameType: FrameType.Pong,
+      streamId: 0,
+      flags: Flags.END_STREAM,
+      payloadLen: 0,
+    },
+    payload: new Uint8Array(0),
+  };
+}
+
+/** A transport that answers every recv() with a PONG (a healthy heartbeat peer). */
+function pongTransport(): FrameTransport {
+  return {
+    send: () => Promise.resolve(),
+    recv: () => Promise.resolve(pongFrame()),
+    close: () => Promise.resolve(),
+  };
+}
+
+/** A dead transport: send/recv reject as a closed wire stream would (a lapsed lease / restart). */
+function deadTransport(): FrameTransport {
+  const closed = (): Promise<never> => Promise.reject(new Error('wire stream closed'));
+  return { send: closed, recv: closed, close: () => Promise.resolve() };
 }
 
 describe('replyToQueryRows', () => {
@@ -110,19 +148,29 @@ describe('WireCrucibleClient', () => {
     ).rejects.toBeInstanceOf(EngineRefusedError);
   });
 
-  it('ping resolves when the transport connects (reachability)', async () => {
+  it('ping does a real PING/PONG round-trip (readiness reflects reachability)', async () => {
     let connected = false;
     const client = new WireCrucibleClient(config, () => {
       connected = true;
-      return Promise.resolve(mockTransport(new Uint8Array(0)));
+      return Promise.resolve(pongTransport());
     });
     await client.ping();
     expect(connected).toBe(true);
+    await client.close();
   });
 
-  it('ping rejects when the connector fails (engine unreachable)', async () => {
+  it('ping rejects when the connector fails (engine unreachable -> fails closed)', async () => {
     const client = new WireCrucibleClient(config, () => Promise.reject(new Error('ECONNREFUSED')));
     await expect(client.ping()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('ping rejects when the peer never PONGs (a stale handle is not "ready")', async () => {
+    // A non-PONG reply is not liveness; readiness must fail closed rather than trust a cached handle.
+    const client = new WireCrucibleClient(config, () =>
+      Promise.resolve(mockTransport(new Uint8Array(0))),
+    );
+    await expect(client.ping()).rejects.toThrow();
+    await client.close();
   });
 
   it('listAgents dispatches and returns the decoded agent list (DR.3c)', async () => {
@@ -134,5 +182,63 @@ describe('WireCrucibleClient', () => {
     const client = new WireCrucibleClient(config, () => Promise.resolve(mockTransport(reply)));
     const list = await client.listAgents({ request_id: 1 });
     expect(list.agents[0]?.status).toBe('active');
+    await client.close();
+  });
+
+  it('reconnects and retries once after a transport failure (self-heals, never fails open)', async () => {
+    const good = encode({
+      AgentList: { agents: [{ agent_id: 'a', status: 'active', enrolled_at: 1, attributes: [] }] },
+    });
+    let dials = 0;
+    const client = new WireCrucibleClient(config, () => {
+      dials += 1;
+      // First dial hands back a dead transport (a lapsed lease / restart); the retry gets a live one.
+      return Promise.resolve(dials === 1 ? deadTransport() : mockTransport(good));
+    });
+    const list = await client.listAgents({ request_id: 1 });
+    expect(dials).toBe(2); // it re-dialed rather than reusing the dead transport
+    expect(list.agents[0]?.status).toBe('active');
+    await client.close();
+  });
+
+  it('does NOT reconnect on an engine refusal (a Denied is a domain result, not a dead link)', async () => {
+    const refused = encode({
+      Refused: { error: { class: 'Denied', code: 2, retry: 'Never', correlation_id: 0 } },
+    });
+    let dials = 0;
+    const client = new WireCrucibleClient(config, () => {
+      dials += 1;
+      return Promise.resolve(mockTransport(refused));
+    });
+    await expect(
+      client.querySubmit({ request_id: 1, text: 'FIND x', params: [] }),
+    ).rejects.toBeInstanceOf(EngineRefusedError);
+    expect(dials).toBe(1); // one dial: a refusal must not churn the connection
+    await client.close();
+  });
+
+  it('sends PING heartbeats on the configured interval (keeps the session lease alive)', async () => {
+    vi.useFakeTimers();
+    try {
+      let pings = 0;
+      const transport: FrameTransport = {
+        send: (frame: OutboundFrame) => {
+          if (frame.frameType === FrameType.Ping) pings += 1;
+          return Promise.resolve();
+        },
+        recv: () => Promise.resolve(pongFrame()),
+        close: () => Promise.resolve(),
+      };
+      const client = new WireCrucibleClient({ ...config, heartbeatIntervalMs: 1000 }, () =>
+        Promise.resolve(transport),
+      );
+      await client.ping(); // establishes the transport and starts the heartbeat
+      const afterConnect = pings;
+      await vi.advanceTimersByTimeAsync(3200);
+      expect(pings).toBeGreaterThan(afterConnect); // background heartbeats fired within the lease window
+      await client.close();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

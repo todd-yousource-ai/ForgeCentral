@@ -118,6 +118,9 @@ export interface WireLoopbackOptions {
 export function connectLoopback(options: WireLoopbackOptions): Promise<StreamFrameTransport> {
   return new Promise((resolve, reject) => {
     const socket = netConnect({ host: options.host, port: options.port }, () => {
+      // OS-level keepalive: surface a silently-dropped loopback link as a socket error (so the client
+      // invalidates and reconnects) rather than a hung connection. Defense in depth beneath the wire PING.
+      socket.setKeepAlive(true, 15_000);
       resolve(new StreamFrameTransport(socket));
     });
     socket.once('error', reject);
