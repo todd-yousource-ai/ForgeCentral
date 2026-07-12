@@ -13,6 +13,13 @@
 #   CONSOLE_BFF_DIST          dir holding the built BFF (dist/ + node_modules)
 #   CONSOLE_ENROLL_ENV        path to the console-enroll env file (the CONSOLE_ENROLL_* vars)
 #   CONSOLE_SKIP_ENROLL=1     optional: skip the interactive enrollment (e.g. re-run after enrolling)
+#   CONSOLE_PEER_TENANT       [4b] the node tenant UUID the console engine peer is attributed to (required
+#                             once a cert is present; the tenant the BFF operates in)
+#   CONSOLE_PEER_CLEARANCE    [4b] optional, default `secret`: the console peer's clearance
+#   CONSOLE_PEER_PLANES       [4b] optional, default `data,agent,cognition,otlp,delegation` (Global-Admin):
+#                             the wire planes the console service peer is granted
+#   CONSOLE_NODE_CBOR         [4b] optional, default `/etc/cdb/node.cbor`: the node config to pin into
+#   CONSOLE_CDB_MKCONFIG      [4b] optional, default `/usr/local/bin/cdb-mkconfig`: the pinning tool
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -72,6 +79,39 @@ else
   chmod 0640 "$ENGINE_CERT"
 fi
 chown -R console-sidecar:console-sidecar "$SIDECAR_ETC"
+
+# ---- [4b] pin the Console engine peer (Global-Admin service identity) into the node config --------
+# The Console's engine identity is a fixed SERVICE peer, not a human login: it holds a Global-Admin grant
+# (all wire planes incl. Delegation) so the BFF can broker operator-delegated reads across the engine,
+# decoupled from any MFA -- the human hop is gated at the BFF, not the engine seam. It is pinned by the
+# SHA-512 leaf fingerprint of the freshly-enrolled cert, re-executably on every rebuild, via the crdb
+# primitive `cdb-mkconfig --add-wire-peer` (a non-destructive read-modify-write; regenerating the whole
+# node.cbor would rotate the node's mTLS material and other state -- which is exactly how a rebuild used to
+# DROP this pin and break every operator read). Idempotent: re-running restarts cdb only if the pin changed.
+if [ -s "$ENGINE_CERT" ]; then
+  PEER_TENANT="${CONSOLE_PEER_TENANT:?set CONSOLE_PEER_TENANT to the node tenant UUID the console peer is attributed to}"
+  PEER_CLEARANCE="${CONSOLE_PEER_CLEARANCE:-secret}"
+  PEER_PLANES="${CONSOLE_PEER_PLANES:-data,agent,cognition,otlp,delegation}"
+  NODE_CBOR="${CONSOLE_NODE_CBOR:-/etc/cdb/node.cbor}"
+  CDB_MKCONFIG="${CONSOLE_CDB_MKCONFIG:-/usr/local/bin/cdb-mkconfig}"
+  [ -x "$CDB_MKCONFIG" ] || die "cdb-mkconfig not found at $CDB_MKCONFIG (set CONSOLE_CDB_MKCONFIG); needs the --add-wire-peer support"
+  [ -f "$NODE_CBOR" ] || die "node config not found at $NODE_CBOR (set CONSOLE_NODE_CBOR)"
+  log "[4b] pinning the console engine peer (Global-Admin) into $NODE_CBOR"
+  fp=$(openssl x509 -in "$ENGINE_CERT" -outform DER 2>/dev/null | openssl dgst -sha512 -hex | awk '{print $NF}')
+  [ -n "$fp" ] || die "could not compute the console cert SHA-512 fingerprint from $ENGINE_CERT"
+  before=$(sha256sum "$NODE_CBOR" | awk '{print $1}')
+  "$CDB_MKCONFIG" --add-wire-peer "${fp}=${PEER_TENANT}=${PEER_CLEARANCE}=${PEER_PLANES}" "$NODE_CBOR" \
+    || die "pinning the console peer failed (cdb-mkconfig --add-wire-peer)"
+  after=$(sha256sum "$NODE_CBOR" | awk '{print $1}')
+  if [ "$before" != "$after" ]; then
+    log "  node config changed -> restarting cdb to load the pinned peer (wire.peers is boot-bound)"
+    systemctl restart cdb
+  else
+    log "  console peer already pinned with this grant (no node restart needed)"
+  fi
+else
+  log "[4b] no engine cert at $ENGINE_CERT -> skipping the console peer pin (enrollment was skipped)"
+fi
 
 # ---- [5] BFF config + both units -----------------------------------------------------------------
 log "[5] BFF config + systemd units"
