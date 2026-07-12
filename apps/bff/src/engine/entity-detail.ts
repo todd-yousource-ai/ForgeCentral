@@ -135,6 +135,27 @@ function toCapabilityRows(rows: WireQueryRows): AgentCapabilityRow[] {
 }
 
 /**
+ * Map one `construction_report` row (`surface`, `entry`) to a capability row, or null for a malformed /
+ * entry-less row. The report's per-surface item (`entry`) is the capability name, tagged by its surface
+ * (tools/skills/mcp_servers/models/prompts/capabilities/persistence/risk/identity/sbom) -- the same
+ * {name, surface} shape as the AIG rows, so the drawer renders the richer source with no rework (CR.4). An
+ * `Unknown` surface (empty `entry`) is dropped, never fabricated.
+ */
+function toConstructionRow(
+  row: ReadonlyArray<readonly [string, WireValue]>,
+): AgentCapabilityRow | null {
+  const surface = textCell(row, 'surface');
+  const entry = textCell(row, 'entry');
+  if (surface === undefined || entry === undefined || entry === '') return null;
+  return { name: entry, surface };
+}
+
+/** Project the `construction_report` read into capability rows (malformed / empty-entry rows dropped). */
+function toConstructionRows(rows: WireQueryRows): AgentCapabilityRow[] {
+  return rows.rows.map(toConstructionRow).filter((row): row is AgentCapabilityRow => row !== null);
+}
+
+/**
  * Resolve the aggregated drawer detail for `ref`, brokered on behalf of `principal`. Tolerant fan-out:
  * each section resolves independently and degrades to `error`/`empty`/`pending` without failing the whole
  * drawer. No fabricated section.
@@ -145,7 +166,7 @@ export async function resolveEntityDetail(
   ref: EntityRef,
   opts?: EngineCallOptions,
 ): Promise<EntityDetailView> {
-  const [directory, decisions, capabilities] = await Promise.allSettled([
+  const [directory, decisions, capabilities, construction] = await Promise.allSettled([
     engine.listAgents(principal, { request_id: 0 }, opts),
     // ENTITY_DECISIONS is indexed by the engine EntityType (host/process/...); the entity kind is passed
     // opaquely, and the engine returns an honest empty result for a kind it does not index (e.g. an agent
@@ -163,6 +184,19 @@ export async function resolveEntityDetail(
       {
         request_id: 0,
         text: 'FIND agent_capabilities WHERE agent_id = $a RETURN relation, target',
+        params: [['a', { Text: ref.id }]],
+      },
+      opts,
+    ),
+    // The agent's signed Construction Report surfaces via the `construction_report` virtual relation
+    // (crdb CR.4): the 10-surface decomposition Torch shipped (tools/skills/mcp/models/prompts/...). The
+    // RICHER capability source -- preferred over the AIG edges when present, same {name, surface} shape so
+    // the drawer upgrades with no rework (INV-CONSOLE-DRAWER-REAL; never a fabricated surface).
+    engine.querySubmit(
+      principal,
+      {
+        request_id: 0,
+        text: 'FIND construction_report WHERE agent_id = $a RETURN surface, entry',
         params: [['a', { Text: ref.id }]],
       },
       opts,
@@ -191,14 +225,33 @@ export async function resolveEntityDetail(
     capabilitiesSection = { status: 'error', message: 'agent directory unavailable' };
   } else if (!record) {
     capabilitiesSection = { status: 'not-applicable' };
-  } else if (capabilities.status === 'rejected') {
-    capabilitiesSection = { status: 'error', message: 'capabilities unavailable' };
   } else {
-    const rows = toCapabilityRows(capabilities.value);
-    capabilitiesSection =
-      rows.length === 0
-        ? { status: 'empty' }
-        : { status: 'ok', data: { kind: 'capabilities', source: 'aig-graph', capabilities: rows } };
+    // Prefer the signed Construction Report (CR.4, the richer 10-surface decomposition Torch shipped) when
+    // it resolved with rows; else fall back to the AIG capability edges (VR.3); else empty. The two sources
+    // share the {name, surface} row shape, so the drawer renders either with no rework. Never fabricated.
+    const constructionRows =
+      construction.status === 'fulfilled' ? toConstructionRows(construction.value) : [];
+    if (constructionRows.length > 0) {
+      capabilitiesSection = {
+        status: 'ok',
+        data: {
+          kind: 'capabilities',
+          source: 'construction-report',
+          capabilities: constructionRows,
+        },
+      };
+    } else if (capabilities.status === 'rejected') {
+      capabilitiesSection = { status: 'error', message: 'capabilities unavailable' };
+    } else {
+      const rows = toCapabilityRows(capabilities.value);
+      capabilitiesSection =
+        rows.length === 0
+          ? { status: 'empty' }
+          : {
+              status: 'ok',
+              data: { kind: 'capabilities', source: 'aig-graph', capabilities: rows },
+            };
+    }
   }
 
   let recentDecisions: SectionState<RecentDecisionsView>;
