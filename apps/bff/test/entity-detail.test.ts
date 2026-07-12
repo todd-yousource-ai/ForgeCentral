@@ -26,16 +26,20 @@ function engineWith(parts: {
   agents?: WireAgentList;
   decisions?: WireDecisionList;
   capabilities?: WireQueryRows;
+  construction?: WireQueryRows;
   failDirectory?: boolean;
   failCapabilities?: boolean;
 }): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   const noRows: WireQueryRows = { rows: [], cursor: null, redacted_fields: [] };
   return {
-    querySubmit: () =>
-      parts.failCapabilities
-        ? Promise.reject(new Error('capabilities down'))
-        : Promise.resolve(parts.capabilities ?? noRows),
+    // Route by the read: `construction_report` (CR.4) vs `agent_capabilities` (VR.3).
+    querySubmit: (_principal, request) =>
+      request.text.includes('construction_report')
+        ? Promise.resolve(parts.construction ?? noRows)
+        : parts.failCapabilities
+          ? Promise.reject(new Error('capabilities down'))
+          : Promise.resolve(parts.capabilities ?? noRows),
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: () =>
@@ -53,6 +57,18 @@ function capabilityRows(pairs: ReadonlyArray<readonly [string, string]>): WireQu
     rows: pairs.map(([relation, target]) => [
       ['relation', { Text: relation }],
       ['target', { Text: target }],
+    ]),
+    cursor: null,
+    redacted_fields: [],
+  };
+}
+
+/** A `WireQueryRows` from `(surface, entry)` pairs, as the `construction_report` relation returns (CR.4). */
+function constructionRows(pairs: ReadonlyArray<readonly [string, string]>): WireQueryRows {
+  return {
+    rows: pairs.map(([surface, entry]) => [
+      ['surface', { Text: surface }],
+      ['entry', { Text: entry }],
     ]),
     cursor: null,
     redacted_fields: [],
@@ -180,5 +196,54 @@ describe('resolveEntityDetail', () => {
     );
     expect(detail.header.status).toBe('ok');
     expect(detail.capabilities.status).toBe('error');
+  });
+
+  it('prefers the signed Construction Report surfaces over the AIG edges (CR.4)', async () => {
+    const detail = await resolveEntityDetail(
+      engineWith({
+        agents: {
+          agents: [{ agent_id: 'aig:agent:a', status: 'active', enrolled_at: 1, attributes: [] }],
+        },
+        // The AIG edges are present, but the shipped report is the richer source and wins.
+        capabilities: capabilityRows([['USES_TOOL', 'tool:search']]),
+        construction: constructionRows([
+          ['tools', 'read_file'],
+          ['models', 'anthropic/claude-opus-4-8'],
+          // An Unknown surface carries an empty entry; it is dropped, never rendered as a row.
+          ['persistence', ''],
+        ]),
+      }),
+      principal,
+      ref,
+    );
+    expect(detail.capabilities.status).toBe('ok');
+    if (detail.capabilities.status === 'ok') {
+      expect(detail.capabilities.data).toEqual({
+        kind: 'capabilities',
+        source: 'construction-report',
+        capabilities: [
+          { name: 'read_file', surface: 'tools' },
+          { name: 'anthropic/claude-opus-4-8', surface: 'models' },
+        ],
+      });
+    }
+  });
+
+  it('falls back to the AIG edges when no Construction Report has been shipped (CR.4)', async () => {
+    const detail = await resolveEntityDetail(
+      engineWith({
+        agents: {
+          agents: [{ agent_id: 'aig:agent:a', status: 'active', enrolled_at: 1, attributes: [] }],
+        },
+        capabilities: capabilityRows([['USES_TOOL', 'tool:search']]),
+        // construction omitted -> the relation returns no rows -> the AIG source is used, not fabricated.
+      }),
+      principal,
+      ref,
+    );
+    expect(detail.capabilities.status).toBe('ok');
+    if (detail.capabilities.status === 'ok' && detail.capabilities.data.kind === 'capabilities') {
+      expect(detail.capabilities.data.source).toBe('aig-graph');
+    }
   });
 });
