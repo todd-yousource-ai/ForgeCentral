@@ -15,14 +15,16 @@ import {
 } from 'node:http';
 
 import { objectId, principalId, vtzId } from '@forge/contracts';
-import type { EntityRef } from '@forge/contracts';
+import type { EntityRef, IsolateRequest } from '@forge/contracts';
 
 import type { AuthRouter } from './auth/router.js';
 import type { BffConfig } from './config.js';
 import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
+import { resolveIsolate } from './engine/isolate.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
 import { principalFromSession } from './engine/principal.js';
+import { EngineRefusedError } from './engine/wire-client.js';
 import type { EphemeralCache } from './cache.js';
 import { openApiDocument } from './openapi.js';
 import { serveSpa } from './static.js';
@@ -90,6 +92,97 @@ async function handleEntityDetail(
   return true;
 }
 
+/** `POST /api/entity/<kind>/<id>/isolate` -- the Isolate quick-action command (DR.5c). */
+const ENTITY_ISOLATE_RE = /^\/api\/entity\/(principal|vtz|object)\/(.+)\/isolate$/;
+
+/** The largest isolate request body accepted (a tiny JSON envelope; anything larger is rejected). */
+const MAX_COMMAND_BODY_BYTES = 8_192;
+
+/** Read a bounded JSON request body; throws on an over-limit body or invalid JSON. */
+async function readJsonBody(req: IncomingMessage, limit: number): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const buf = chunk as Buffer;
+    size += buf.length;
+    if (size > limit) throw new Error('request body too large');
+    chunks.push(buf);
+  }
+  const text = Buffer.concat(chunks).toString('utf8').trim();
+  return text === '' ? {} : (JSON.parse(text) as unknown);
+}
+
+/** Parse + validate the isolate body into a typed `IsolateRequest` (with the URL-derived ref), or null. */
+function parseIsolateRequest(ref: EntityRef, body: unknown): IsolateRequest | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const b = body as Record<string, unknown>;
+  const { commandId, posture } = b;
+  if (typeof commandId !== 'string' || commandId.trim() === '') return null;
+  if (posture !== 'quarantine' && posture !== 'deny') return null;
+  return { ref, commandId, posture };
+}
+
+/**
+ * Serve the Isolate command: resolve the operator session (fail-closed 401), parse the confirm-gated
+ * request, and broker the containment to the engine (which injects the operator delegation). A denial
+ * (beyond-tier / no Delegation grant) is sanitized to a typed 403 with no internal detail. Returns true
+ * iff it claimed the request.
+ */
+async function handleEntityIsolate(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const match = ENTITY_ISOLATE_RE.exec(path);
+  if (!match) return false;
+  if (method !== 'POST') {
+    sendJson(res, 405, { error: 'method_not_allowed' });
+    return true;
+  }
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const ref = entityRefOf(match[1] ?? '', decodeURIComponent(match[2] ?? ''));
+  let request: IsolateRequest | null;
+  try {
+    request = parseIsolateRequest(ref, await readJsonBody(req, MAX_COMMAND_BODY_BYTES));
+  } catch {
+    request = null;
+  }
+  if (!request) {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  try {
+    const effect = await resolveIsolate(
+      deps.operatorEngine,
+      principalFromSession(session),
+      ref,
+      request,
+      Date.now(),
+      { timeoutMs: deps.config.requestTimeoutMs },
+    );
+    sendJson(res, 200, effect);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      // Sanitized refusal: the typed Section 12 class only, no internal detail (TRD-CONSOLE-12 Sec 7).
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'isolate command failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -106,6 +199,10 @@ async function route(
   path: string,
   res: ServerResponse,
 ): Promise<void> {
+  // Command routes (POST) are matched before the read-only gate.
+  if (await handleEntityIsolate(deps, req, method, path, res)) {
+    return;
+  }
   if (method !== 'GET') {
     sendJson(res, 405, { error: 'method_not_allowed' });
     return;

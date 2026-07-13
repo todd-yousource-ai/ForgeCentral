@@ -10,6 +10,7 @@ import type { AuthRouter } from '../src/auth/router.js';
 import type { OperatorSession } from '../src/auth/session.js';
 import type { CrucibleClient } from '../src/engine/client.js';
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
+import { EngineRefusedError } from '../src/engine/wire-client.js';
 import { createServer, type ServerDeps, type ServerLogger } from '../src/server.js';
 
 const config: BffConfig = {
@@ -188,5 +189,95 @@ describe('BFF HTTP surface', () => {
     expect(detail.header.data?.displayName).toBe('aig:agent:a');
     // Capabilities resolve live from the agent_capabilities relation (VR.3), through the HTTP payload.
     expect(detail.capabilities.status).toBe('ok');
+  });
+
+  it('POST /api/entity/<kind>/<id>/isolate brokers the containment + returns the honest effect (DR.5c)', async () => {
+    // The engine records the disposition and returns the effect; enforcement is off (AG.7).
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      contain: (_principal, req) =>
+        Promise.resolve({
+          action: req.request.action,
+          enforcement_active: false,
+          summary: `${req.request.action} recorded; enforcement off`,
+        }),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: engine,
+      },
+    );
+    const res = await fetch(`${base}/api/entity/principal/aig%3Aagent%3Aa/isolate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ commandId: 'cmd-1', posture: 'quarantine' }),
+    });
+    expect(res.status).toBe(200);
+    const effect = (await res.json()) as {
+      posture: string;
+      enforcementActive: boolean;
+      summary: string;
+    };
+    expect(effect.posture).toBe('quarantine');
+    expect(effect.enforcementActive).toBe(false);
+  });
+
+  it('POST isolate is 401 without an operator session (fail-closed)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(undefined),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    const res = await fetch(`${base}/api/entity/principal/aig%3Aagent%3Aa/isolate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ commandId: 'c', posture: 'quarantine' }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('POST isolate sanitizes an engine refusal to a typed 403 (beyond-tier / no delegation)', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      contain: () =>
+        Promise.reject(
+          new EngineRefusedError({ class: 'Denied', code: 2, retry: 'Never', correlation_id: 0 }),
+        ),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: engine,
+      },
+    );
+    const res = await fetch(`${base}/api/entity/principal/aig%3Aagent%3Aa/isolate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ commandId: 'c', posture: 'deny' }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: string; class: string };
+    expect(body.class).toBe('Denied');
+  });
+
+  it('POST isolate rejects a malformed body (bad posture) with 400', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    const res = await fetch(`${base}/api/entity/principal/aig%3Aagent%3Aa/isolate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ commandId: 'c', posture: 'nuke' }),
+    });
+    expect(res.status).toBe(400);
   });
 });
