@@ -11,7 +11,15 @@
 
 body {
   margin: 0;
-  background: var(--fc-color-surface-canvas);
+  /* The YouSource honeycomb is the ubiquitous app backdrop: a fixed, cover-sized brand image behind every
+   * surface (it shows through the transparent content region + the frosted chrome). The canvas token is
+   * the base color under it (a fallback while the image loads and behind its darkest areas). */
+  background-color: var(--fc-color-surface-canvas);
+  background-image: url('/honeycomb.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--fc-color-text-primary);
   font-family: var(--fc-font-fontFamily-sans);
   font-size: var(--fc-font-size-md);
@@ -53,7 +61,9 @@ body {
 /* ---- left rail ----------------------------------------------------------- */
 
 .fcx-rail {
-  background: var(--fc-color-surface-panel);
+  /* Frosted over the honeycomb: a translucent panel + blur so the backdrop reads through the chrome. */
+  background: color-mix(in srgb, var(--fc-color-surface-panel) 78%, transparent);
+  backdrop-filter: blur(10px);
   border-right: 1px solid var(--fc-color-surface-border);
   padding: var(--fc-space-md) var(--fc-space-sm);
 }
@@ -114,7 +124,9 @@ body {
   align-items: center;
   gap: var(--fc-space-lg);
   padding: var(--fc-space-md) var(--fc-space-xl);
-  background: var(--fc-color-surface-panel);
+  /* Frosted over the honeycomb, matching the rail. */
+  background: color-mix(in srgb, var(--fc-color-surface-panel) 78%, transparent);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--fc-color-surface-border);
 }
 
