@@ -27,7 +27,10 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'SubmitMemoryWrite' in request ||
       'ListAgents' in request ||
       'EntityDecisions' in request ||
-      'EntityConnections' in request)
+      'EntityConnections' in request ||
+      // Contain is a data-plane write; like SubmitMemoryWrite it rides the QuerySubmit opcode and the
+      // engine discriminates it by its CBOR enum tag, then routes it to the write path + Data-plane gate.
+      'Contain' in request)
   ) {
     return FrameType.QuerySubmit;
   }

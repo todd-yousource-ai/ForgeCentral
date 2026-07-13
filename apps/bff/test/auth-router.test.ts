@@ -44,6 +44,7 @@ const unusedClient: CrucibleClient = {
   listAgents: () => Promise.reject(new Error('unused')),
   entityDecisions: () => Promise.reject(new Error('unused')),
   entityConnections: () => Promise.reject(new Error('unused')),
+  contain: () => Promise.reject(new Error('unused')),
   cursorFetch: () => Promise.reject(new Error('unused')),
   cursorClose: () => Promise.reject(new Error('unused')),
   close: () => Promise.resolve(),

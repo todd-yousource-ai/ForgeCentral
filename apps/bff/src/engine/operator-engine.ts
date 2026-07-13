@@ -15,6 +15,8 @@
 import type {
   WireAgentList,
   WireConnectionList,
+  WireContain,
+  WireContainEffect,
   WireDecisionList,
   WireEntityConnections,
   WireEntityDecisions,
@@ -33,6 +35,7 @@ export type EngineAction =
   | 'listAgents'
   | 'entityDecisions'
   | 'entityConnections'
+  | 'contain'
   | 'cursorFetch'
   | 'cursorClose';
 
@@ -92,6 +95,14 @@ export interface OperatorEngine {
     request: WireEntityConnections,
     opts?: EngineCallOptions,
   ): Promise<WireConnectionList>;
+  /** Issue an operator containment disposition (CONTAIN) on behalf of `principal`. The operator
+   * delegation is set from `principal` server-side (never client-asserted), honored under the peer's
+   * Delegation grant; returns the honest effect (`enforcement_active` false today). */
+  contain(
+    principal: OperatorPrincipal,
+    request: WireContain,
+    opts?: EngineCallOptions,
+  ): Promise<WireContainEffect>;
   /** Fetch the next page of an open cursor on behalf of `principal`. */
   cursorFetch(
     principal: OperatorPrincipal,
@@ -151,6 +162,14 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'entityConnections', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.entityConnections({ ...request, operator }, opts);
+    },
+    contain: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'contain'));
+      // Inject the operator delegation from the authenticated principal (never client-asserted): the
+      // engine attributes the disposition to this operator, in this tenant, under the peer's Delegation
+      // grant. Overrides any operator already on the request -- the BFF is the authority on who acts.
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.contain({ ...request, operator }, opts);
     },
     cursorFetch: (principal, handle, opts) => {
       delegation.record(delegationFor(principal, 'cursorFetch'));

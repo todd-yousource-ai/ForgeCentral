@@ -61,6 +61,15 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ connections: [] });
     },
+    contain: (req) => {
+      calls.push('contain');
+      reads.push(req);
+      return Promise.resolve({
+        action: req.request.action,
+        enforcement_active: false,
+        summary: `${req.request.action} recorded`,
+      });
+    },
     close: () => Promise.resolve(),
     ...overrides,
   };
@@ -117,6 +126,39 @@ describe('createOperatorEngine', () => {
         requestId: 7,
         tenant: 'tenant-op',
       },
+    ]);
+  });
+
+  it('injects the operator delegation + records it on a contain command (DR.5b)', async () => {
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    const effect = await engine.contain(admin, {
+      // The request arrives WITHOUT an operator; the facade sets it from the principal (never
+      // client-asserted), and the engine attributes the disposition to that operator.
+      operator: null,
+      request: {
+        subject: 'aig:agent:a',
+        action: 'Quarantine',
+        reason: 'authored from a decision',
+        command_id: 'cmd-1',
+        issued_at: 1,
+        derived_from_decision_id: 'sha512:d1',
+        ai_assist: null,
+      },
+    });
+    expect(effect.action).toBe('Quarantine');
+    expect(effect.enforcement_active).toBe(false);
+    expect(calls).toEqual(['contain']);
+    // The facade injected the operator delegation onto the frame sent to the engine.
+    expect((reads[0] as { operator?: unknown }).operator).toEqual({
+      principal: 'principal-op',
+      tenant: 'tenant-op',
+    });
+    // The brokered command was recorded as a delegation before it ran (audited attempt).
+    expect(recorded).toEqual([
+      { operator: 'auth0|op', tier: 'Admin', action: 'contain', tenant: 'tenant-op' },
     ]);
   });
 

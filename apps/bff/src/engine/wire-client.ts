@@ -24,6 +24,7 @@ import {
 import type {
   WireAgentList,
   WireConnectionList,
+  WireContainEffect,
   WireDecisionList,
   WireError,
   WireQueryRows,
@@ -85,6 +86,14 @@ export function replyToConnectionList(reply: WireReply): WireConnectionList {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for an entity-connections read');
+}
+
+/** Map an engine `WireReply` to `WireContainEffect` (CONTAIN), throwing a typed error on a refusal. */
+export function replyToContainEffect(reply: WireReply): WireContainEffect {
+  if (typeof reply === 'object' && 'Contained' in reply) return reply.Contained;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a contain command');
 }
 
 /** Reject `op` if it does not settle within `ms` (a per-call bound; every engine call is bounded). */
@@ -267,6 +276,16 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToConnectionList(await dispatch(transport, { EntityConnections: request })),
+      opts,
+    );
+  }
+
+  async contain(
+    request: Parameters<CrucibleClient['contain']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireContainEffect> {
+    return this.call(
+      async (transport) => replyToContainEffect(await dispatch(transport, { Contain: request })),
       opts,
     );
   }

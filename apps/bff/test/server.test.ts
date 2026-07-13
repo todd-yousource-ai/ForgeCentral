@@ -42,6 +42,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     listAgents: unused,
     entityDecisions: unused,
     entityConnections: unused,
+    contain: unused,
     cursorFetch: unused,
     cursorClose: unused,
     close: () => Promise.resolve(),
@@ -86,6 +87,8 @@ function operatorEngineWith(): OperatorEngine {
       }),
     entityDecisions: () => Promise.resolve({ decisions: [] }),
     entityConnections: () => Promise.resolve({ connections: [] }),
+    // This route test does not exercise CONTAIN; fail loudly if it is reached (not a canned success).
+    contain: unused,
   };
 }
 
