@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { Drawer, EntityDrawer } from '@forge/design';
+import { ConfirmDialog, Drawer, EntityDrawer } from '@forge/design';
 import type { EntityRef } from '@forge/contracts';
 
 import { useEntityDetail } from '../entity/useEntityDetail.js';
+import { useIsolate } from '../entity/useIsolate.js';
 
 // The drawer host: the shell-level slide-over that realizes the select-then-act pattern (Section 5.3).
 // Clicking any entity anywhere (graph node, table row, decision card) opens a right drawer. Two modes:
@@ -34,10 +35,19 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   const [entityRef, setEntityRef] = useState<EntityRef | null>(null);
   const detail = useEntityDetail(entityRef);
 
-  const openEntity = useCallback((ref: EntityRef) => {
-    setRequest(null);
-    setEntityRef(ref);
-  }, []);
+  // The Isolate quick action (DR.5d): a confirm-gate holding a stable command id (idempotent re-submit),
+  // then the brokered command. Enforcement is OFF (AG.7): the confirm and the result say so honestly.
+  const isolate = useIsolate(entityRef);
+  const [confirm, setConfirm] = useState<{ commandId: string } | null>(null);
+
+  const openEntity = useCallback(
+    (ref: EntityRef) => {
+      setRequest(null);
+      setEntityRef(ref);
+      isolate.reset();
+    },
+    [isolate],
+  );
   const open = useCallback((next: DrawerRequest) => {
     setEntityRef(null);
     setRequest(next);
@@ -45,6 +55,7 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   const close = useCallback(() => {
     setRequest(null);
     setEntityRef(null);
+    setConfirm(null);
   }, []);
 
   const api = useMemo<DrawerApi>(
@@ -61,7 +72,42 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
             <p className="fcx-drawer__empty">Could not load this entity.</p>
           </Drawer>
         ) : (
-          <EntityDrawer open detail={detail.data} loading={detail.isLoading} onClose={close} />
+          <>
+            <EntityDrawer
+              open
+              detail={detail.data}
+              loading={detail.isLoading}
+              onClose={close}
+              actions={{ onIsolate: () => setConfirm({ commandId: crypto.randomUUID() }) }}
+            />
+            <ConfirmDialog
+              open={confirm !== null}
+              title="Isolate from network?"
+              description={`Move ${entityRef.id} into a quarantine posture: contained in a locked-down zone with brokered-only egress. The action is recorded and audited. Live enforcement is OFF (observe/quarantine posture), so no traffic is blocked yet.`}
+              confirmLabel="Isolate"
+              tone="critical"
+              onConfirm={() => {
+                if (confirm !== null) {
+                  isolate.mutate({ posture: 'quarantine', commandId: confirm.commandId });
+                }
+                setConfirm(null);
+              }}
+              onCancel={() => {
+                setConfirm(null);
+              }}
+            />
+            {isolate.isSuccess ? (
+              <p className="fcx-isolate-result" role="status">
+                Isolation recorded ({isolate.data.posture}). Enforcement is off; the disposition is
+                audited and distributed to the endpoint.
+              </p>
+            ) : null}
+            {isolate.isError ? (
+              <p className="fcx-isolate-result" role="alert">
+                Isolation could not be recorded (refused or unavailable).
+              </p>
+            ) : null}
+          </>
         )
       ) : (
         <Drawer open={request !== null} title={request?.title ?? ''} onClose={close}>
