@@ -7,6 +7,24 @@
 // A codegen round-trip test asserts this file equals the emitter output, so an un-regenerated wire
 // change fails the gate. Edit the schema (upstream, in crdb), not this file.
 
+export type Action = 'Permit' | 'Monitor' | 'Quarantine' | 'Deny';
+
+export interface AiAssist {
+  confidence_pct: number;
+  proposed_policy_digest: string;
+  verdict: string;
+}
+
+export interface ContainmentRequest {
+  action: Action;
+  ai_assist?: AiAssist | null;
+  command_id: string;
+  derived_from_decision_id?: string | null;
+  issued_at: number;
+  reason: string;
+  subject: string;
+}
+
 export interface OperatorDelegation {
   principal: string;
   tenant: string;
@@ -47,6 +65,17 @@ export interface WireConnectionList {
   connections: Array<WireConnection>;
 }
 
+export interface WireContain {
+  operator?: OperatorDelegation | null;
+  request: ContainmentRequest;
+}
+
+export interface WireContainEffect {
+  action: Action;
+  enforcement_active: boolean;
+  summary: string;
+}
+
 export interface WireDecision {
   anchor: string;
   confidence: string;
@@ -64,12 +93,15 @@ export interface WireDecisionList {
 }
 
 export interface WireDecisionRow {
+  confidence: string;
   created_at: number;
   decision_id: string;
+  evidence: Array<string>;
   finding: string;
   recommended_action: string;
   rule_id: string;
   tactics: Array<string>;
+  technique: string;
 }
 
 export type WireDriftTrigger = 'Schema' | 'Policy' | 'Statistics' | 'Model' | 'AsOf' | 'Workspace';
@@ -133,7 +165,8 @@ export type WireReply =
   | { Prepared: { handle: Array<number>; plan_id: string; statement_hash: string; }; }
   | { ReprepareRequired: { trigger: WireDriftTrigger; }; }
   | { NotYetWired: { verb: string; }; }
-  | { Refused: { error: WireError; }; };
+  | { Refused: { error: WireError; }; }
+  | { Contained: WireContainEffect; };
 
 export type WireRequest =
   | { QuerySubmit: WireQuerySubmit; }
@@ -148,7 +181,8 @@ export type WireRequest =
   | { SubmitMemoryWrite: WireQuerySubmit; }
   | { ListAgents: WireListAgents; }
   | { EntityDecisions: WireEntityDecisions; }
-  | { EntityConnections: WireEntityConnections; };
+  | { EntityConnections: WireEntityConnections; }
+  | { Contain: WireContain; };
 
 export type WireStreamDelta =
   | { Decision: WireDecision; }
