@@ -321,6 +321,108 @@
       ],
       "type": "object"
     },
+    "WireDecisionDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "type": "string"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "integer"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "finding": {
+          "type": "string"
+        },
+        "recommended_action": {
+          "type": "string"
+        },
+        "replay_as_of": {
+          "type": "integer"
+        },
+        "replay_digest": {
+          "type": "string"
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "source_context": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source_hosts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source_observations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source_subjects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tactics": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "technique": {
+          "type": "string"
+        },
+        "watermark_seconds": {
+          "type": "integer"
+        },
+        "window_seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "decision_id",
+        "rule_id",
+        "finding",
+        "technique",
+        "tactics",
+        "evidence",
+        "confidence",
+        "recommended_action",
+        "scope",
+        "source_hosts",
+        "source_subjects",
+        "source_context",
+        "source_observations",
+        "correlation_id",
+        "replay_as_of",
+        "watermark_seconds",
+        "window_seconds",
+        "replay_digest",
+        "created_at"
+      ],
+      "type": "object"
+    },
     "WireDecisionList": {
       "additionalProperties": false,
       "properties": {
@@ -523,6 +625,138 @@
       },
       "required": [
         "request_id"
+      ],
+      "type": "object"
+    },
+    "WireLogExplain": {
+      "additionalProperties": false,
+      "properties": {
+        "decision_id": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "decision_id"
+      ],
+      "type": "object"
+    },
+    "WireLogQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "rule_id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "search": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "since": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tactic": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "technique": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "until": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "request_id",
+        "limit"
       ],
       "type": "object"
     },
@@ -928,6 +1162,18 @@
             "Contained"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "DecisionDetail": {
+              "$ref": "#/$defs/WireDecisionDetail"
+            }
+          },
+          "required": [
+            "DecisionDetail"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -1253,6 +1499,30 @@
           },
           "required": [
             "Contain"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "LogQuery": {
+              "$ref": "#/$defs/WireLogQuery"
+            }
+          },
+          "required": [
+            "LogQuery"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "LogExplain": {
+              "$ref": "#/$defs/WireLogExplain"
+            }
+          },
+          "required": [
+            "LogExplain"
           ],
           "type": "object"
         }

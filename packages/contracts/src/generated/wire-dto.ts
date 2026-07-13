@@ -88,6 +88,28 @@ export interface WireDecision {
   tactics: Array<string>;
 }
 
+export interface WireDecisionDetail {
+  confidence: string;
+  correlation_id: string;
+  created_at: number;
+  decision_id: string;
+  evidence: Array<string>;
+  finding: string;
+  recommended_action: string;
+  replay_as_of: number;
+  replay_digest: string;
+  rule_id: string;
+  scope: string;
+  source_context: Array<string>;
+  source_hosts: Array<string>;
+  source_observations: Array<string>;
+  source_subjects: Array<string>;
+  tactics: Array<string>;
+  technique: string;
+  watermark_seconds: number;
+  window_seconds: number;
+}
+
 export interface WireDecisionList {
   decisions: Array<WireDecisionRow>;
 }
@@ -136,6 +158,26 @@ export interface WireListAgents {
   request_id: number;
 }
 
+export interface WireLogExplain {
+  decision_id: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireLogQuery {
+  action?: string | null;
+  confidence?: string | null;
+  limit: number;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  rule_id?: string | null;
+  search?: string | null;
+  since?: number | null;
+  tactic?: string | null;
+  technique?: string | null;
+  until?: number | null;
+}
+
 export interface WireQueryRows {
   cursor: Array<number> | null;
   redacted_fields: Array<string>;
@@ -166,7 +208,8 @@ export type WireReply =
   | { ReprepareRequired: { trigger: WireDriftTrigger; }; }
   | { NotYetWired: { verb: string; }; }
   | { Refused: { error: WireError; }; }
-  | { Contained: WireContainEffect; };
+  | { Contained: WireContainEffect; }
+  | { DecisionDetail: WireDecisionDetail; };
 
 export type WireRequest =
   | { QuerySubmit: WireQuerySubmit; }
@@ -182,7 +225,9 @@ export type WireRequest =
   | { ListAgents: WireListAgents; }
   | { EntityDecisions: WireEntityDecisions; }
   | { EntityConnections: WireEntityConnections; }
-  | { Contain: WireContain; };
+  | { Contain: WireContain; }
+  | { LogQuery: WireLogQuery; }
+  | { LogExplain: WireLogExplain; };
 
 export type WireStreamDelta =
   | { Decision: WireDecision; }
