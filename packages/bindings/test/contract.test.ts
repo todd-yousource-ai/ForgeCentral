@@ -113,6 +113,38 @@ describe('IP-CONSOLE-12 DR.1: the entity-drawer (entity.*) bindings', () => {
   });
 });
 
+describe('IP-CONSOLE-09 LG.1: the Logs (logs.*) decision-LOG bindings', () => {
+  const logBindings = Object.values(bindings).filter((b) => b.id.startsWith('logs.'));
+
+  it('registers the four LOG bindings (query/explain/tail/export)', () => {
+    const ids = logBindings.map((b) => b.id).sort();
+    expect(ids).toEqual(['logs.explain', 'logs.export', 'logs.query', 'logs.tail']);
+  });
+
+  it('binds query + explain LIVE to the crdb LOG_QUERY / LOG_EXPLAIN producer', () => {
+    // Backed by crdb IP-CONSOLE-LOG-QUERY LQ.2 (LOG_QUERY) + LQ.3 (LOG_EXPLAIN); genuinely live.
+    const query = bindings['logs.query'];
+    expect(query?.kind).toBe('read');
+    expect(query?.surface).toBe('cruciblql');
+    expect(query?.op).toBe('log_query_v1');
+    expect(query?.status.kind).toBe('live');
+    const explain = bindings['logs.explain'];
+    expect(explain?.op).toBe('log_explain_v1');
+    expect(explain?.status.kind).toBe('live');
+  });
+
+  it('defers tail (push) + export to their gating engine tasks, never a fabricated stream/CSV', () => {
+    for (const id of ['logs.tail', 'logs.export']) {
+      const binding = bindings[id];
+      expect(binding?.status.kind).toBe('pending');
+      if (binding?.status.kind === 'pending') {
+        expect(binding.status.owningRepo).toBe('crdb');
+        expect(binding.status.gatingTask).not.toBe('');
+      }
+    }
+  });
+});
+
 describe('INV-CONSOLE-NO-STUB: the enforcement rules', () => {
   it('accepts a well-formed live read binding', () => {
     const manifest: BindingManifest = { [liveRead.id]: liveRead };

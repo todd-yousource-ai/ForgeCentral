@@ -5,13 +5,15 @@ roadmap **P1.2 -- the second Phase-1 surface**). One PR per roster row, a named 
 `INV-CONSOLE-LOGS-REAL`, the full `scripts/ci.sh` green, branch-per-PR off local `main`, no-ff merge,
 push to `origin`, docs separate from code. Reviewed with the maintainer before each merge.
 
-Status: **OPEN -- not started.** Prerequisite: P1.1 `IP-CONSOLE-12` (drawer, for the row click). This
+Status: **IN PROGRESS -- LG.1 landed.** The crdb LOG substrate is live (`IP-CONSOLE-LOG-QUERY` LQ.1-LQ.3:
+`LOG_QUERY` + `LOG_EXPLAIN` over `:7878`), so `logs.query`/`logs.explain` bind LIVE. Prerequisite: P1.1
+`IP-CONSOLE-12` (drawer, for the row click) -- functionally complete. This
 surface establishes the LOG substrate the Overview (P1.3) aggregates. Phase 0 + the `:8443` enabler are
 landed.
 
 | Step | Invariant | Status | Commit | Proof |
 |------|-----------|--------|--------|-------|
-| LG.1 | INV-CONSOLE-LOGS-CONTRACT | OPEN | -- | The `LogRow` view model (typed vs the DecisionObject DTO) + `logs.query/tail/explain/export` shapes in `@forge/contracts`; binding-registry entries; `test:contract`. |
+| LG.1 | INV-CONSOLE-LOGS-CONTRACT | LANDED | (this PR) | `@forge/contracts`: resynced the vendored wire DTO schema to crdb (adds `WireLogQuery`/`WireLogExplain`/`WireDecisionDetail`) + regenerated the DTOs (drift gate green). New `logs.ts`: `LogRow` (projection of `WireDecisionRow`), `LogDetailView` (projection of `WireDecisionDetail` + the derived acting-entity ref for the LG.5 drill-in), `LogQueryFilter`, `LogPage`. Grounded-column note: entity/category/VTZ not emitted on a decision row (drill-in / Forge-side), trust delta removed -- those render empty, never fabricated. `@forge/bindings`: `logs.query` + `logs.explain` LIVE against crdb `LOG_QUERY`/`LOG_EXPLAIN` (IP-CONSOLE-LOG-QUERY LQ.2/LQ.3, landed); `logs.tail` + `logs.export` honest PENDING (crdb Part B push; crdb LQ.4 export). Tests: contracts `logs.test.ts` (6) + bindings `logs.*` block; F0.8 shell no-stub test updated to allow the `logs.*` contract. Full `scripts/ci.sh --skip-net --skip-e2e` green. |
 | LG.2 | INV-CONSOLE-LOGS-QUERY (the LOG substrate) | OPEN | -- | `logs.query` = parameterized CrucibleQL over the LOG (range + filters + search -> predicate), cursor-paged, engine-side; BFF route over `OperatorEngine`. The read the Overview aggregates. |
 | LG.3 | INV-CONSOLE-LOGS-TABLE | OPEN | -- | The virtualized server-paged table + the filter/search/time-range controls compiling to the query; loading + empty states. |
 | LG.4 | INV-CONSOLE-LIVE | OPEN | -- | `logs.tail` deltas prepended in place (< 2 s); stale/reconnect/resync; v1 polling, push (crdb Part B) later. |

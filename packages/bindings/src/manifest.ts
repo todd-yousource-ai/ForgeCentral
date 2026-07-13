@@ -151,6 +151,63 @@ const entityCommands: readonly CommandBinding[] = [
   },
 ];
 
+// -- IP-CONSOLE-09 (Logs, P1.2) the `logs.*` decision-LOG bindings -----------------------------------
+//
+// The tenant-wide decision LOG. `logs.query` + `logs.explain` are LIVE against the crdb
+// IP-CONSOLE-LOG-QUERY producer (LOG_QUERY / LOG_EXPLAIN over :7878, landed). `logs.tail` (the real push
+// stream) and `logs.export` (the audited engine export) are honest PENDING deferrals naming their gating
+// engine task -- v1 tailing polls `logs.query`, and export lands with crdb LQ.4.
+
+const logReads: readonly ReadBinding[] = [
+  {
+    // The tenant-wide decision LOG read: time range + structured filters + free-text search, newest-first
+    // and bounded, filtered engine-side (crdb LOG_QUERY, IP-CONSOLE-LOG-QUERY LQ.2).
+    id: bindingId('logs.query'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'log_query_v1',
+    viewModel: 'LogPage',
+    status: { kind: 'live' },
+  },
+  {
+    // The decision-by-id EXPLAIN read: the full decision detail (crdb LOG_EXPLAIN, LQ.3).
+    id: bindingId('logs.explain'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'log_explain_v1',
+    viewModel: 'LogDetailView',
+    status: { kind: 'live' },
+  },
+  {
+    // Live tailing. v1 polls `logs.query` over the recent window (F0.6 live-store); the dedicated bounded
+    // decision SUBSCRIBE push op is crdb Part B and swaps in without changing the surface.
+    id: bindingId('logs.tail'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'log_tail_v1',
+    viewModel: 'LogPage',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'IP-CONSOLE-READINESS Part B (bounded decision SUBSCRIBE push stream)',
+    },
+  },
+  {
+    // A real audited engine export of the current filtered set, recorded on the audit chain. Never a
+    // client-assembled CSV of fetched rows.
+    id: bindingId('logs.export'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'log_export_v1',
+    viewModel: 'LogPage',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'IP-CONSOLE-LOG-QUERY LQ.4 (audited LOG_EXPORT)',
+    },
+  },
+];
+
 function register(target: Record<string, Binding>, entries: readonly Binding[]): void {
   for (const entry of entries) {
     target[entry.id] = entry;
@@ -160,6 +217,7 @@ function register(target: Record<string, Binding>, entries: readonly Binding[]):
 const registry: Record<string, Binding> = {};
 register(registry, entityReads);
 register(registry, entityCommands);
+register(registry, logReads);
 
 /** The Console binding registry. Keyed by `BindingId`; populated by the surface IPs. */
 export const bindings: BindingManifest = registry;
