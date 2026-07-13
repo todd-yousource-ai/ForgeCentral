@@ -17,6 +17,8 @@ import type {
   WireEntityDecisions,
   WireListAgents,
   WireLogExplain,
+  WireLogExport,
+  WireLogExportEffect,
   WireLogQuery,
   WireQueryRows,
   WireQuerySubmit,
@@ -61,6 +63,9 @@ export interface CrucibleClient {
   logQuery(request: WireLogQuery, opts?: EngineCallOptions): Promise<WireDecisionList>;
   /** Explain one governed decision by id (LOG_EXPLAIN, crdb LQ.3): the full decision detail. */
   logExplain(request: WireLogExplain, opts?: EngineCallOptions): Promise<WireDecisionDetail>;
+  /** Export the filtered decision LOG (LOG_EXPORT, crdb LQ.4): the rows + an audited receipt (an
+   * audited data-plane write; the receipt lands on the TRD-04 audit chain). */
+  logExport(request: WireLogExport, opts?: EngineCallOptions): Promise<WireLogExportEffect>;
   /** Fetch the next page for an open cursor. */
   cursorFetch(handle: EngineHandle, opts?: EngineCallOptions): Promise<WireQueryRows>;
   /** Close an open cursor (releases engine-side resources). */

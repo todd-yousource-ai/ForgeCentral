@@ -15,14 +15,14 @@ import {
 } from 'node:http';
 
 import { objectId, principalId, vtzId } from '@forge/contracts';
-import type { EntityRef, IsolateRequest, LogQueryFilter } from '@forge/contracts';
+import type { EntityRef, IsolateRequest, LogExportRequest, LogQueryFilter } from '@forge/contracts';
 
 import type { AuthRouter } from './auth/router.js';
 import type { BffConfig } from './config.js';
 import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
 import { resolveIsolate } from './engine/isolate.js';
-import { resolveLogExplain, resolveLogQuery } from './engine/logs.js';
+import { resolveLogExplain, resolveLogExport, resolveLogQuery } from './engine/logs.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
 import { principalFromSession } from './engine/principal.js';
 import { EngineRefusedError } from './engine/wire-client.js';
@@ -184,6 +184,103 @@ async function handleEntityIsolate(
   return true;
 }
 
+/** Parse + validate the export body into a typed `LogExportRequest` (bounded filter), or null. */
+function parseLogExportRequest(body: unknown): LogExportRequest | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const b = body as Record<string, unknown>;
+  const commandId = b['commandId'];
+  const rawFilter = b['filter'];
+  if (typeof commandId !== 'string' || commandId.trim() === '') return null;
+  if (typeof rawFilter !== 'object' || rawFilter === null) return null;
+  const f = rawFilter as Record<string, unknown>;
+  const str = (v: unknown): string | undefined =>
+    typeof v === 'string' && v !== '' ? v : undefined;
+  const num = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  const requested = num(f['limit']);
+  const limit =
+    requested !== undefined && requested > 0
+      ? Math.min(requested, MAX_LOG_LIMIT)
+      : DEFAULT_LOG_LIMIT;
+  const since = num(f['since']);
+  const until = num(f['until']);
+  const technique = str(f['technique']);
+  const tactic = str(f['tactic']);
+  const ruleId = str(f['ruleId']);
+  const confidence = str(f['confidence']);
+  const action = str(f['action']);
+  const search = str(f['search']);
+  const filter: LogQueryFilter = {
+    ...(since !== undefined ? { since } : {}),
+    ...(until !== undefined ? { until } : {}),
+    ...(technique !== undefined ? { technique } : {}),
+    ...(tactic !== undefined ? { tactic } : {}),
+    ...(ruleId !== undefined ? { ruleId } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
+    ...(action !== undefined ? { action } : {}),
+    ...(search !== undefined ? { search } : {}),
+    limit,
+  };
+  return { commandId, filter };
+}
+
+/**
+ * Serve `POST /api/logs/export` -- the audited LOG export (LG.6). Resolve the operator session (401),
+ * parse the bounded body, and broker the audited `LOG_EXPORT` (the engine records the receipt on the audit
+ * chain; the operator delegation is injected server-side). A refusal is sanitized to a typed 403. Returns
+ * true iff it claimed the request.
+ */
+async function handleLogExport(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/logs/export') return false;
+  if (method !== 'POST') {
+    sendJson(res, 405, { error: 'method_not_allowed' });
+    return true;
+  }
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let request: LogExportRequest | null;
+  try {
+    request = parseLogExportRequest(await readJsonBody(req, MAX_COMMAND_BODY_BYTES));
+  } catch {
+    request = null;
+  }
+  if (!request) {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  try {
+    const view = await resolveLogExport(
+      deps.operatorEngine,
+      principalFromSession(session),
+      request,
+      Date.now(),
+      { timeoutMs: deps.config.requestTimeoutMs },
+    );
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'logs export failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 /** `/api/logs/explain/<decisionId>` -- the decision EXPLAIN read (LG.2; the id is percent-encoded). */
 const LOG_EXPLAIN_RE = /^\/api\/logs\/explain\/(.+)$/;
 
@@ -306,6 +403,9 @@ async function route(
 ): Promise<void> {
   // Command routes (POST) are matched before the read-only gate.
   if (await handleEntityIsolate(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleLogExport(deps, req, method, path, res)) {
     return;
   }
   if (method !== 'GET') {

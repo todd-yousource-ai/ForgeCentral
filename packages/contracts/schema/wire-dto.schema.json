@@ -654,6 +654,63 @@
       ],
       "type": "object"
     },
+    "WireLogExport": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "type": "string"
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "query": {
+          "$ref": "#/$defs/WireLogQuery"
+        }
+      },
+      "required": [
+        "query",
+        "command_id",
+        "issued_at"
+      ],
+      "type": "object"
+    },
+    "WireLogExportEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "commit_version": {
+          "type": "integer"
+        },
+        "export_id": {
+          "type": "string"
+        },
+        "row_count": {
+          "type": "integer"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/WireDecisionRow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "export_id",
+        "commit_version",
+        "row_count",
+        "rows"
+      ],
+      "type": "object"
+    },
     "WireLogQuery": {
       "additionalProperties": false,
       "properties": {
@@ -1174,6 +1231,18 @@
             "DecisionDetail"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "LogExported": {
+              "$ref": "#/$defs/WireLogExportEffect"
+            }
+          },
+          "required": [
+            "LogExported"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -1523,6 +1592,18 @@
           },
           "required": [
             "LogExplain"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "LogExport": {
+              "$ref": "#/$defs/WireLogExport"
+            }
+          },
+          "required": [
+            "LogExport"
           ],
           "type": "object"
         }

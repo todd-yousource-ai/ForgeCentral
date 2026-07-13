@@ -193,18 +193,15 @@ const logReads: readonly ReadBinding[] = [
     },
   },
   {
-    // A real audited engine export of the current filtered set, recorded on the audit chain. Never a
-    // client-assembled CSV of fetched rows.
+    // A real audited engine export of the current filtered set, recorded on the audit chain (crdb
+    // LOG_EXPORT, IP-CONSOLE-LOG-QUERY LQ.4, landed). Never a client-assembled CSV of a plain read: the
+    // rows come from the audited op, whose receipt lands on the chain.
     id: bindingId('logs.export'),
     kind: 'read',
     surface: 'cruciblql',
     op: 'log_export_v1',
-    viewModel: 'LogPage',
-    status: {
-      kind: 'pending',
-      owningRepo: 'crdb',
-      gatingTask: 'IP-CONSOLE-LOG-QUERY LQ.4 (audited LOG_EXPORT)',
-    },
+    viewModel: 'LogExportView',
+    status: { kind: 'live' },
   },
 ];
 

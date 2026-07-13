@@ -51,6 +51,7 @@ function engineWith(parts: {
     contain: unused,
     logQuery: unused,
     logExplain: unused,
+    logExport: unused,
   };
 }
 

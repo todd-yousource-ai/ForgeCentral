@@ -129,3 +129,28 @@ export interface LogQueryFilter {
 export interface LogPage {
   readonly rows: readonly LogRow[];
 }
+
+/**
+ * An operator's request to export the filtered LOG (`logs.export` -> crdb `LOG_EXPORT`). The export is a
+ * REAL audited engine op -- the engine records a receipt on the audit chain -- so the Console never
+ * assembles a client-side CSV of a plain read; it downloads the rows the audited op returns. Idempotent by
+ * `commandId`.
+ */
+export interface LogExportRequest {
+  readonly commandId: string;
+  readonly filter: LogQueryFilter;
+}
+
+/**
+ * The result of an audited `logs.export`: the exported rows plus the audit receipt (`exportId` +
+ * `commitVersion`) proving it landed on the chain. The Console shows the receipt and offers the rows as a
+ * download of the audited set.
+ */
+export interface LogExportView {
+  /** The content address of the committed export manifest (the audit receipt id). */
+  readonly exportId: string;
+  /** The commit version the audited export landed at (its audit-chain position); 0 on an idempotent replay. */
+  readonly commitVersion: number;
+  readonly rowCount: number;
+  readonly rows: readonly LogRow[];
+}

@@ -23,6 +23,8 @@ import type {
   WireEntityDecisions,
   WireListAgents,
   WireLogExplain,
+  WireLogExport,
+  WireLogExportEffect,
   WireLogQuery,
   WireQueryRows,
   WireQuerySubmit,
@@ -41,6 +43,7 @@ export type EngineAction =
   | 'contain'
   | 'logQuery'
   | 'logExplain'
+  | 'logExport'
   | 'cursorFetch'
   | 'cursorClose';
 
@@ -120,6 +123,12 @@ export interface OperatorEngine {
     request: WireLogExplain,
     opts?: EngineCallOptions,
   ): Promise<WireDecisionDetail>;
+  /** Export the filtered decision LOG (LOG_EXPORT) on behalf of `principal` (an audited write). */
+  logExport(
+    principal: OperatorPrincipal,
+    request: WireLogExport,
+    opts?: EngineCallOptions,
+  ): Promise<WireLogExportEffect>;
   /** Fetch the next page of an open cursor on behalf of `principal`. */
   cursorFetch(
     principal: OperatorPrincipal,
@@ -197,6 +206,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'logExplain', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.logExplain({ ...request, operator }, opts);
+    },
+    logExport: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'logExport', request.query.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.logExport({ ...request, operator }, opts);
     },
     cursorFetch: (principal, handle, opts) => {
       delegation.record(delegationFor(principal, 'cursorFetch'));

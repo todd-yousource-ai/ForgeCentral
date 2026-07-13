@@ -328,6 +328,17 @@ body {
   gap: var(--fc-space-sm);
 }
 
+.fcx-log-export-result {
+  margin: 0 0 var(--fc-space-md);
+  font-size: var(--fc-font-size-sm);
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-log-export-result code {
+  font-family: var(--fc-font-fontFamily-mono, monospace);
+  color: var(--fc-color-text-primary);
+}
+
 .fcx-log-controls {
   display: flex;
   flex-wrap: wrap;
