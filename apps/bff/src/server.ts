@@ -15,13 +15,14 @@ import {
 } from 'node:http';
 
 import { objectId, principalId, vtzId } from '@forge/contracts';
-import type { EntityRef, IsolateRequest } from '@forge/contracts';
+import type { EntityRef, IsolateRequest, LogQueryFilter } from '@forge/contracts';
 
 import type { AuthRouter } from './auth/router.js';
 import type { BffConfig } from './config.js';
 import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
 import { resolveIsolate } from './engine/isolate.js';
+import { resolveLogExplain, resolveLogQuery } from './engine/logs.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
 import { principalFromSession } from './engine/principal.js';
 import { EngineRefusedError } from './engine/wire-client.js';
@@ -183,6 +184,110 @@ async function handleEntityIsolate(
   return true;
 }
 
+/** `/api/logs/explain/<decisionId>` -- the decision EXPLAIN read (LG.2; the id is percent-encoded). */
+const LOG_EXPLAIN_RE = /^\/api\/logs\/explain\/(.+)$/;
+
+// TUNE(IP-CONSOLE-09 LG.2): the Logs page size. The engine further clamps to the committed per-tenant
+// result ceiling; these are the Console-side request bounds so an unbounded/oversized ask is refused here.
+const DEFAULT_LOG_LIMIT = 100;
+const MAX_LOG_LIMIT = 500;
+
+/** Parse the `/api/logs` query string into a bounded `LogQueryFilter`. Unknown/blank params are omitted. */
+function parseLogFilter(params: URLSearchParams): LogQueryFilter {
+  const str = (key: string): string | undefined => {
+    const value = params.get(key);
+    return value === null || value === '' ? undefined : value;
+  };
+  const num = (key: string): number | undefined => {
+    const value = params.get(key);
+    if (value === null || value === '') return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+  const requested = num('limit');
+  const limit =
+    requested !== undefined && requested > 0
+      ? Math.min(requested, MAX_LOG_LIMIT)
+      : DEFAULT_LOG_LIMIT;
+  const since = num('since');
+  const until = num('until');
+  const technique = str('technique');
+  const tactic = str('tactic');
+  const ruleId = str('ruleId');
+  const confidence = str('confidence');
+  const action = str('action');
+  const search = str('search');
+  return {
+    ...(since !== undefined ? { since } : {}),
+    ...(until !== undefined ? { until } : {}),
+    ...(technique !== undefined ? { technique } : {}),
+    ...(tactic !== undefined ? { tactic } : {}),
+    ...(ruleId !== undefined ? { ruleId } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
+    ...(action !== undefined ? { action } : {}),
+    ...(search !== undefined ? { search } : {}),
+    limit,
+  };
+}
+
+/**
+ * Serve the Logs reads (`GET /api/logs` -> a filtered LOG page; `GET /api/logs/explain/<id>` -> one
+ * decision's detail): resolve the operator session (fail-closed 401), broker the read through the
+ * OperatorEngine, and project the DTOs to view models. A refusal is sanitized (403 for the query gate; 404
+ * for an absent/denied decision, non-oracle). Returns true iff it claimed the request.
+ */
+async function handleLogs(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const explainMatch = LOG_EXPLAIN_RE.exec(path);
+  if (path !== '/api/logs' && !explainMatch) return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const principal = principalFromSession(session);
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    if (explainMatch) {
+      const detail = await resolveLogExplain(
+        deps.operatorEngine,
+        principal,
+        decodeURIComponent(explainMatch[1] ?? ''),
+        opts,
+      );
+      sendJson(res, 200, detail);
+    } else {
+      const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+      const page = await resolveLogQuery(
+        deps.operatorEngine,
+        principal,
+        parseLogFilter(params),
+        opts,
+      );
+      sendJson(res, 200, page);
+    }
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      // A query-gate refusal is a sanitized 403; an absent/denied decision is a non-oracle 404 (existence
+      // never leaks). No internal detail crosses the boundary.
+      if (explainMatch) sendJson(res, 404, { error: 'not_found' });
+      else sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'logs read failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -227,6 +332,9 @@ async function route(
     return;
   }
   if (await handleEntityDetail(deps, req, path, res)) {
+    return;
+  }
+  if (await handleLogs(deps, req, path, res)) {
     return;
   }
   // The Console SPA (served behind the admin plane) owns every other GET path -- a static asset or a

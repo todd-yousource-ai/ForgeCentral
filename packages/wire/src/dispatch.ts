@@ -28,6 +28,10 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'ListAgents' in request ||
       'EntityDecisions' in request ||
       'EntityConnections' in request ||
+      // The decision-LOG reads (LOG_QUERY / LOG_EXPLAIN, crdb IP-CONSOLE-LOG-QUERY) ride the QuerySubmit
+      // opcode too; the engine discriminates them by their CBOR enum tag.
+      'LogQuery' in request ||
+      'LogExplain' in request ||
       // Contain is a data-plane write; like SubmitMemoryWrite it rides the QuerySubmit opcode and the
       // engine discriminates it by its CBOR enum tag, then routes it to the write path + Data-plane gate.
       'Contain' in request)

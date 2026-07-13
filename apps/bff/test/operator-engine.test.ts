@@ -70,6 +70,36 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         summary: `${req.request.action} recorded`,
       });
     },
+    logQuery: (req) => {
+      calls.push('logQuery');
+      reads.push(req);
+      return Promise.resolve({ decisions: [] });
+    },
+    logExplain: (req) => {
+      calls.push('logExplain');
+      reads.push(req);
+      return Promise.resolve({
+        decision_id: 'sha512:d1',
+        rule_id: 'LR-EX-001',
+        finding: 'f',
+        technique: 'T1059',
+        tactics: [],
+        evidence: [],
+        confidence: 'HIGH',
+        recommended_action: 'escalate',
+        scope: 's',
+        source_hosts: [],
+        source_subjects: [],
+        source_context: [],
+        source_observations: [],
+        correlation_id: 'c',
+        replay_as_of: 1,
+        watermark_seconds: 0,
+        window_seconds: 0,
+        replay_digest: '',
+        created_at: 1,
+      });
+    },
     close: () => Promise.resolve(),
     ...overrides,
   };
@@ -191,6 +221,22 @@ describe('createOperatorEngine', () => {
       'entityDecisions',
       'entityConnections',
     ]);
+  });
+
+  it('records the delegation + injects the operator on the LOG reads (LG.2)', async () => {
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    await engine.logQuery(admin, { request_id: 4, technique: 'T1059', limit: 25 });
+    await engine.logExplain(admin, { request_id: 5, decision_id: 'sha512:d1' });
+
+    expect(calls).toEqual(['logQuery', 'logExplain']);
+    // The operator delegation is injected onto both LOG reads (never client-asserted).
+    for (const read of reads) {
+      expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
+    }
+    expect(recorded.map((d) => d.action)).toEqual(['logQuery', 'logExplain']);
   });
 
   it('records cursorFetch + cursorClose delegations and delegates', async () => {

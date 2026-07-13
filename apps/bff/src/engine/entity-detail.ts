@@ -68,11 +68,21 @@ function toInfo(record: WireAgentRecord): EntityInfoView {
 }
 
 /** Classify a decision's advisory action into the semantic badge status. */
-function toDecisionStatus(action: string): DecisionStatus {
+export function toDecisionStatus(action: string): DecisionStatus {
   const a = action.toLowerCase();
-  if (a.includes('deny') || a.includes('quarantine') || a.includes('block')) return 'denied';
-  if (a.includes('flag') || a.includes('alert') || a.includes('monitor')) return 'flagged';
-  if (a.includes('pass')) return 'pass';
+  // The advisory posture tags grade by severity (crdb `posture_tag`): `escalate` (act now) is the most
+  // severe, `candidate` warrants attention, `observe-only` is recorded/watched. A denial/quarantine verb
+  // is likewise the most severe; a monitor/alert verb warrants attention; a pass verb is neutral.
+  if (
+    a.includes('escalate') ||
+    a.includes('deny') ||
+    a.includes('quarantine') ||
+    a.includes('block')
+  )
+    return 'denied';
+  if (a.includes('candidate') || a.includes('flag') || a.includes('alert') || a.includes('monitor'))
+    return 'flagged';
+  if (a.includes('observe') || a.includes('pass')) return 'pass';
   return 'success';
 }
 

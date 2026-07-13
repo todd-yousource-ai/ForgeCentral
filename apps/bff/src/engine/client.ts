@@ -11,10 +11,13 @@ import type {
   WireConnectionList,
   WireContain,
   WireContainEffect,
+  WireDecisionDetail,
   WireDecisionList,
   WireEntityConnections,
   WireEntityDecisions,
   WireListAgents,
+  WireLogExplain,
+  WireLogQuery,
   WireQueryRows,
   WireQuerySubmit,
 } from '@forge/contracts';
@@ -53,6 +56,11 @@ export interface CrucibleClient {
    * (`enforcement_active` is `false` today, AG.7). A data-plane write, honored under the peer's
    * Delegation grant. */
   contain(request: WireContain, opts?: EngineCallOptions): Promise<WireContainEffect>;
+  /** Read the tenant-wide decision LOG (LOG_QUERY, crdb IP-CONSOLE-LOG-QUERY LQ.2): a filtered,
+   * time-ranged, searchable read, newest-first and bounded, filtered engine-side. */
+  logQuery(request: WireLogQuery, opts?: EngineCallOptions): Promise<WireDecisionList>;
+  /** Explain one governed decision by id (LOG_EXPLAIN, crdb LQ.3): the full decision detail. */
+  logExplain(request: WireLogExplain, opts?: EngineCallOptions): Promise<WireDecisionDetail>;
   /** Fetch the next page for an open cursor. */
   cursorFetch(handle: EngineHandle, opts?: EngineCallOptions): Promise<WireQueryRows>;
   /** Close an open cursor (releases engine-side resources). */
