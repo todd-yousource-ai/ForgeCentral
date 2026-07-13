@@ -216,5 +216,17 @@ export function componentStyles(): string {
 .fc-skeleton__line { height: 10px; border-radius: var(--fc-radius-sm); background: var(--fc-color-surface-border); animation: fc-skeleton-pulse var(--fc-motion-duration-base) var(--fc-motion-easing-standard) infinite alternate; }
 .fc-skeleton__line--short { width: 60%; }
 @keyframes fc-skeleton-pulse { from { opacity: 0.5; } to { opacity: 0.85; } }
+
+.fc-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+.fc-table__scroll { overflow-x: auto; border: 1px solid var(--fc-color-surface-border); border-radius: var(--fc-radius-lg); background: var(--fc-color-surface-card); }
+.fc-table { width: 100%; border-collapse: collapse; font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-sm); color: var(--fc-color-text-primary); }
+.fc-table thead th { position: sticky; top: 0; z-index: 1; text-align: left; padding: var(--fc-space-sm) var(--fc-space-md); font-size: var(--fc-font-size-xs); font-weight: var(--fc-font-weight-semibold); color: var(--fc-color-text-muted); background: var(--fc-color-surface-card); border-bottom: 1px solid var(--fc-color-surface-border); white-space: nowrap; }
+.fc-table tbody td { padding: var(--fc-space-sm) var(--fc-space-md); border-bottom: 1px solid color-mix(in srgb, var(--fc-color-surface-border) 60%, transparent); vertical-align: top; }
+.fc-table__cell--end { text-align: right; }
+.fc-table__row--interactive { cursor: pointer; }
+.fc-table__row--interactive:hover { background: color-mix(in srgb, var(--fc-color-text-muted) 10%, transparent); }
+.fc-table__row--interactive:focus-visible { outline: 2px solid var(--fc-color-status-info); outline-offset: -2px; }
+.fc-table__empty { padding: var(--fc-space-xl) var(--fc-space-md); text-align: center; color: var(--fc-color-text-muted); }
 `;
 }
