@@ -3,11 +3,17 @@ import { Link, Route, Routes, useLocation } from 'react-router-dom';
 
 import { DESTINATIONS } from '../ia/destinations.js';
 import { EmptyState } from '../states/States.js';
+import { LogsSurface } from '../surfaces/LogsSurface.js';
 import { SurfacePlaceholder } from '../surfaces/SurfacePlaceholder.js';
 
-// One route per destination, generated from the IA (single source). Every route renders the surface
-// placeholder (an honest empty state) in F0.8; each real surface swaps its element in later. An unknown
-// path is an explicit not-found state, never a blank screen or a redirect that hides the miss.
+// One route per destination, generated from the IA (single source). A real surface renders its own
+// element; the rest render the honest empty placeholder until their phase lands. An unknown path is an
+// explicit not-found state, never a blank screen or a redirect that hides the miss.
+
+/** The real surfaces that have replaced their placeholder, keyed by destination id (LG.3: Logs). */
+const SURFACES: Readonly<Record<string, ReactElement>> = {
+  logs: <LogsSurface />,
+};
 
 function NotFound(): ReactElement {
   const location = useLocation();
@@ -30,7 +36,11 @@ export function SurfaceRoutes(): ReactElement {
   return (
     <Routes>
       {DESTINATIONS.map((d) => (
-        <Route key={d.id} path={d.path} element={<SurfacePlaceholder destination={d} />} />
+        <Route
+          key={d.id}
+          path={d.path}
+          element={SURFACES[d.id] ?? <SurfacePlaceholder destination={d} />}
+        />
       ))}
       <Route path="*" element={<NotFound />} />
     </Routes>
