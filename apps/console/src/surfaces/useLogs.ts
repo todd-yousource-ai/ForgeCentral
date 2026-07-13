@@ -6,7 +6,7 @@
 // with the session cookie; the SPA never holds a token. TanStack Query owns caching/loading/error.
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { LogPage, LogQueryFilter } from '@forge/contracts';
+import type { LogDetailView, LogPage, LogQueryFilter } from '@forge/contracts';
 
 /** Serialize a `LogQueryFilter` into the `/api/logs` query string (only the set fields). */
 export function logsQueryString(filter: LogQueryFilter): string {
@@ -40,5 +40,36 @@ export function useLogs(filter: LogQueryFilter): UseQueryResult<LogPage> {
   return useQuery({
     queryKey: ['logs', filter],
     queryFn: () => fetchLogs(filter),
+  });
+}
+
+/** The cache key for one decision's EXPLAIN detail (its id), shared by the query + the imperative fetch. */
+export function logExplainQueryKey(decisionId: string): readonly [string, string] {
+  return ['logExplain', decisionId];
+}
+
+/** Fetch one decision's full detail from the BFF (GET /api/logs/explain/<id>). Throws on a non-2xx. */
+export async function fetchLogExplain(decisionId: string): Promise<LogDetailView> {
+  const res = await fetch(`/api/logs/explain/${encodeURIComponent(decisionId)}`, {
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(`log explain failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as LogDetailView;
+}
+
+/**
+ * The EXPLAIN detail for `decisionId`, or an idle query when null (no row expanded). The key is the
+ * decision id, so a row hover-prefetched into this cache opens its EXPLAIN + acting-entity instantly.
+ */
+export function useLogExplain(decisionId: string | null): UseQueryResult<LogDetailView> {
+  return useQuery({
+    queryKey: decisionId === null ? ['logExplain', null] : logExplainQueryKey(decisionId),
+    queryFn: () => {
+      if (decisionId === null) throw new Error('no decision id');
+      return fetchLogExplain(decisionId);
+    },
+    enabled: decisionId !== null,
   });
 }
