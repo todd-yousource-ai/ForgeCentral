@@ -5,8 +5,13 @@
 // query key is the filter -- changing a control refetches with the engine-compiled predicate. Same-origin
 // with the session cookie; the SPA never holds a token. TanStack Query owns caching/loading/error.
 
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { LogDetailView, LogPage, LogQueryFilter } from '@forge/contracts';
+
+// TUNE(IP-CONSOLE-09 LG.4): the live-tail poll interval. v1 polls the recent window so a new decision
+// appears within ~1 interval; the real push-stream (crdb Part B / F0.6 SSE) gives true < 2 s and swaps in
+// behind this same hook without touching the surface. 2 s balances freshness against engine read load.
+const LIVE_POLL_MS = 2000;
 
 /** Serialize a `LogQueryFilter` into the `/api/logs` query string (only the set fields). */
 export function logsQueryString(filter: LogQueryFilter): string {
@@ -34,12 +39,17 @@ export async function fetchLogs(filter: LogQueryFilter): Promise<LogPage> {
 
 /**
  * The live LOG page for `filter`. The query key carries the filter, so a control change refetches with the
- * engine-compiled predicate; TanStack keeps the previous page visible until the next resolves.
+ * engine-compiled predicate. When `live` (the range includes "now"), it polls the recent window so new
+ * decisions appear at the top in place; `keepPreviousData` holds the current rows across a refetch (no
+ * flash on a tick, and stale rows stay visible while a failed poll reconnects). `live=false` pauses the
+ * poll for a historical view.
  */
-export function useLogs(filter: LogQueryFilter): UseQueryResult<LogPage> {
+export function useLogs(filter: LogQueryFilter, live = true): UseQueryResult<LogPage> {
   return useQuery({
     queryKey: ['logs', filter],
     queryFn: () => fetchLogs(filter),
+    placeholderData: keepPreviousData,
+    refetchInterval: live ? LIVE_POLL_MS : false,
   });
 }
 

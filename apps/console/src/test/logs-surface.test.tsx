@@ -7,7 +7,7 @@ import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DrawerHost } from '../shell/DrawerHost.js';
-import { LogsSurface } from '../surfaces/LogsSurface.js';
+import { LogsSurface, liveIndicator } from '../surfaces/LogsSurface.js';
 import { renderWithProviders } from './render.js';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -187,5 +187,43 @@ describe('the Logs surface row interaction (LG.5)', () => {
     expect(
       fetchMock.mock.calls.some((c) => String(c[0]).startsWith('/api/entity/principal/')),
     ).toBe(true);
+  });
+});
+
+describe('the Logs live tail (LG.4)', () => {
+  it('derives the live indicator honestly (Live / Reconnecting / Paused)', () => {
+    expect(liveIndicator({ paused: false, degraded: false })).toEqual({
+      label: 'Live',
+      variant: 'good',
+    });
+    // A failed poll that kept its rows is a reconnecting state, never a fake "live".
+    expect(liveIndicator({ paused: false, degraded: true })).toEqual({
+      label: 'Reconnecting',
+      variant: 'caution',
+    });
+    // Pause wins (the operator stopped the poll).
+    expect(liveIndicator({ paused: true, degraded: true })).toEqual({
+      label: 'Paused',
+      variant: 'neutral',
+    });
+  });
+
+  it('shows a Live badge by default and pauses/resumes the poll on demand', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        if (input.startsWith('/api/logs')) return Promise.resolve(jsonResponse(200, page));
+        throw new Error(`unexpected fetch ${input}`);
+      }),
+    );
+    renderWithProviders(<LogsInHost />, { route: '/logs' });
+    await waitFor(() => {
+      expect(screen.getByText('Suspicious command')).toBeInTheDocument();
+    });
+    // Live by default; the operator can pause the poll (the badge + control reflect it honestly).
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(screen.getByText('Paused')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resume' })).toHaveAttribute('aria-pressed', 'true');
   });
 });
