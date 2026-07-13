@@ -99,22 +99,20 @@ body {
   box-shadow: inset 3px 0 0 0 var(--fc-color-brand-primary);
 }
 
-.fcx-rail__glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--fc-radius-sm);
-  background: var(--fc-color-surface-canvas);
-  color: var(--fc-color-text-muted);
-  font-size: var(--fc-font-size-xs);
-  font-weight: var(--fc-font-weight-semibold);
-  flex: none;
+/* The brand header at the top of the rail: the YouSource logo + the environment badge. */
+.fcx-rail__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fc-space-sm);
+  padding: var(--fc-space-sm) var(--fc-space-md) var(--fc-space-lg);
 }
 
-.fcx-rail__item--active .fcx-rail__glyph {
-  color: var(--fc-color-brand-primary);
+.fcx-rail__logo {
+  display: block;
+  width: 100%;
+  max-width: 168px;
+  height: auto;
 }
 
 /* ---- top bar ------------------------------------------------------------- */
@@ -128,17 +126,6 @@ body {
   background: color-mix(in srgb, var(--fc-color-surface-panel) 78%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--fc-color-surface-border);
-}
-
-.fcx-topbar__brand {
-  display: flex;
-  align-items: center;
-  gap: var(--fc-space-sm);
-}
-
-.fcx-topbar__wordmark {
-  font-weight: var(--fc-font-weight-bold);
-  letter-spacing: 0.02em;
 }
 
 .fcx-topbar__title {
@@ -492,9 +479,29 @@ body {
   box-shadow: var(--fc-elevation-drawer);
 }
 
+.fcx-login__logo {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  margin: 0 auto var(--fc-space-xl);
+}
+
+/* The product lockup: the ForgeCentral shield mark above the wordmark. */
+.fcx-login__product {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-forge-mark {
+  display: block;
+}
+
 .fcx-login__title {
   font-size: var(--fc-font-size-2xl);
-  margin: var(--fc-space-md) 0 var(--fc-space-sm);
+  margin: 0 0 var(--fc-space-sm);
 }
 
 .fcx-login__lead,
@@ -523,19 +530,11 @@ body {
   color: var(--fc-color-text-muted);
 }
 
-/* ---- responsive: collapse the rail to glyphs ----------------------------- */
+/* ---- responsive: a narrower rail on small viewports (labels stay -- no abbreviations) ---- */
 
 @media (max-width: 900px) {
   .fcx-shell {
-    grid-template-columns: 64px 1fr;
-  }
-
-  .fcx-rail__label {
-    display: none;
-  }
-
-  .fcx-rail__item {
-    justify-content: center;
+    grid-template-columns: 180px 1fr;
   }
 }
 
