@@ -43,6 +43,20 @@ function formatAt(atMillis: number): string {
   return new Date(atMillis).toISOString().replace('T', ' ').slice(0, 19);
 }
 
+/**
+ * The live-tail indicator (LG.4): `Paused` when the operator paused the poll; `Reconnecting` when a
+ * background poll failed but stale rows are still shown; otherwise `Live`. Pure so the derivation is tested
+ * directly. `degraded` is a failed refetch that kept its data (INV-CONSOLE-LIVE: honest, never a fake live).
+ */
+export function liveIndicator(opts: { readonly paused: boolean; readonly degraded: boolean }): {
+  readonly label: string;
+  readonly variant: BadgeVariant;
+} {
+  if (opts.paused) return { label: 'Paused', variant: 'neutral' };
+  if (opts.degraded) return { label: 'Reconnecting', variant: 'caution' };
+  return { label: 'Live', variant: 'good' };
+}
+
 /** The Logs surface: filter controls + the live decision-LOG table + the EXPLAIN drill-in + honest states. */
 export function LogsSurface(): ReactElement {
   const [search, setSearch] = useState('');
@@ -50,6 +64,7 @@ export function LogsSurface(): ReactElement {
   const [action, setAction] = useState('');
   const [range, setRange] = useState('all');
   const [explainId, setExplainId] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
 
   const drawer = useDrawer();
   const queryClient = useQueryClient();
@@ -68,8 +83,14 @@ export function LogsSurface(): ReactElement {
     };
   }, [search, confidence, action, range]);
 
-  const logs = useLogs(filter);
+  const logs = useLogs(filter, !paused);
   const explain = useLogExplain(explainId);
+
+  // A failed background poll that kept its rows is a reconnecting (degraded) live state, not a full error;
+  // the full ErrorState is only the initial load with no data at all.
+  const degraded = logs.isError && logs.data !== undefined;
+  const showFullError = logs.isError && logs.data === undefined;
+  const live = liveIndicator({ paused, degraded });
 
   // Warm the EXPLAIN cache on row hover/focus so a click opens the drawer / rationale instantly.
   const prefetchDetail = useCallback(
@@ -152,9 +173,22 @@ export function LogsSurface(): ReactElement {
 
   return (
     <section className="fcx-surface" aria-labelledby="surface-logs">
-      <h2 id="surface-logs" className="fcx-surface__heading">
-        Logs
-      </h2>
+      <div className="fcx-surface__header">
+        <h2 id="surface-logs" className="fcx-surface__heading">
+          Logs
+        </h2>
+        <div className="fcx-log-live">
+          <Badge variant={live.variant}>{live.label}</Badge>
+          <button
+            type="button"
+            className="fcx-btn"
+            aria-pressed={paused}
+            onClick={() => setPaused((p) => !p)}
+          >
+            {paused ? 'Resume' : 'Pause'}
+          </button>
+        </div>
+      </div>
 
       <div className="fcx-log-controls" role="search">
         <label className="fcx-field">
@@ -203,7 +237,7 @@ export function LogsSurface(): ReactElement {
 
       {logs.isLoading ? (
         <LoadingState label="Loading decisions" />
-      ) : logs.isError ? (
+      ) : showFullError ? (
         <ErrorState title="Could not load the decision log." onRetry={() => void logs.refetch()} />
       ) : (
         <DataTable

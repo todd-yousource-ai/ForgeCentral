@@ -314,6 +314,20 @@ body {
 }
 
 /* Logs surface (IP-CONSOLE-09 LG.3): the filter controls + the decision cell. */
+.fcx-surface__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fc-space-md);
+  flex-wrap: wrap;
+}
+
+.fcx-log-live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+}
+
 .fcx-log-controls {
   display: flex;
   flex-wrap: wrap;
