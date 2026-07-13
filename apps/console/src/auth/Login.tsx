@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { EnvBadge, Mark } from '../shell/Brand.js';
+import { EnvBadge, ForgeMark, YouSourceLogo } from '../shell/Brand.js';
 import { pollLogin, startLogin } from './api.js';
 import type { LoginStart } from './api.js';
 import { SESSION_QUERY_KEY } from './useSession.js';
@@ -76,10 +76,13 @@ export function Login(): ReactElement {
   return (
     <main className="fcx-login" aria-labelledby="fcx-login-title">
       <div className="fcx-login__card">
-        <Mark />
-        <h1 id="fcx-login-title" className="fcx-login__title">
-          YouSource Console
-        </h1>
+        <YouSourceLogo className="fcx-login__logo" />
+        <div className="fcx-login__product">
+          <ForgeMark size={64} />
+          <h1 id="fcx-login-title" className="fcx-login__title">
+            ForgeCentral
+          </h1>
+        </div>
         <EnvBadge />
         {phase.kind === 'awaiting' ? (
           <div className="fcx-login__await" role="status">

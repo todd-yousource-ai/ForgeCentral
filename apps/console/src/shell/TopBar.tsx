@@ -5,11 +5,11 @@ import { Badge } from '@forge/design';
 import { useLive } from '../live/LiveProvider.js';
 import { useLogout } from '../auth/useSession.js';
 import type { OperatorDto } from '../auth/api.js';
-import { EnvBadge, Mark } from './Brand.js';
 
-// The top bar: the mark + environment badge + the current destination title (left), the live indicator
-// (center-right), and the account menu (right). The live indicator reflects the live-store: with F0.6
-// deferred it reads "not live" rather than a fake "Live" pill (INV-CONSOLE-LIVE: honest freshness).
+// The top bar: the current destination title (left), the live indicator (center-right), and the account
+// menu (right). The brand (logo + environment badge) lives at the top of the left rail, not here. The live
+// indicator reflects the live-store: with F0.6 deferred it reads "not live" rather than a fake "Live" pill
+// (INV-CONSOLE-LIVE: honest freshness).
 
 function LiveIndicator(): ReactElement {
   const live = useLive();
@@ -65,11 +65,6 @@ export interface TopBarProps {
 export function TopBar({ title, operator }: TopBarProps): ReactElement {
   return (
     <header className="fcx-topbar">
-      <div className="fcx-topbar__brand">
-        <Mark size={22} />
-        <span className="fcx-topbar__wordmark">YouSource</span>
-        <EnvBadge />
-      </div>
       <h1 className="fcx-topbar__title">{title}</h1>
       <div className="fcx-topbar__right">
         <LiveIndicator />
