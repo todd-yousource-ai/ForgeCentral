@@ -46,6 +46,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     contain: unused,
     logQuery: unused,
     logExplain: unused,
+    logExport: unused,
     cursorFetch: unused,
     cursorClose: unused,
     close: () => Promise.resolve(),
@@ -129,6 +130,25 @@ function operatorEngineWith(): OperatorEngine {
         window_seconds: 60,
         replay_digest: 'sha512:rd',
         created_at: 1_700_000_000,
+      }),
+    logExport: () =>
+      Promise.resolve({
+        export_id: 'sha512:e1',
+        commit_version: 42,
+        row_count: 1,
+        rows: [
+          {
+            decision_id: 'sha512:d1',
+            rule_id: 'LR-EX-001',
+            finding: 'Suspicious command',
+            tactics: ['TA0002'],
+            technique: 'T1059',
+            evidence: ['dc:process_creation'],
+            confidence: 'HIGH',
+            recommended_action: 'escalate',
+            created_at: 1_700_000_000,
+          },
+        ],
       }),
   };
 }
@@ -304,6 +324,55 @@ describe('BFF HTTP surface', () => {
     );
     const res = await fetch(`${base}/api/logs/explain/sha512%3Aabsent`);
     expect(res.status).toBe(404);
+  });
+
+  it('POST /api/logs/export brokers the audited export + returns the receipt + rows (LG.6)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    const res = await fetch(`${base}/api/logs/export`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ commandId: 'cmd-1', filter: { technique: 'T1059', limit: 25 } }),
+    });
+    expect(res.status).toBe(200);
+    const view = (await res.json()) as {
+      exportId: string;
+      commitVersion: number;
+      rowCount: number;
+      rows: { decisionId: string }[];
+    };
+    // The audited receipt (id + commit version) proves it landed on the chain; the rows are the audited set.
+    expect(view.exportId).toBe('sha512:e1');
+    expect(view.commitVersion).toBe(42);
+    expect(view.rowCount).toBe(1);
+    expect(view.rows[0]?.decisionId).toBe('sha512:d1');
+  });
+
+  it('POST /api/logs/export is 401 without a session and 400 on a malformed body', async () => {
+    const noSession = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+    expect(
+      (await fetch(`${noSession}/api/logs/export`, { method: 'POST', body: '{}' })).status,
+    ).toBe(401);
+
+    const session = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    // A body missing commandId is a sanitized 400.
+    expect(
+      (
+        await fetch(`${session}/api/logs/export`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ filter: { limit: 10 } }),
+        })
+      ).status,
+    ).toBe(400);
   });
 
   it('POST /api/entity/<kind>/<id>/isolate brokers the containment + returns the honest effect (DR.5c)', async () => {

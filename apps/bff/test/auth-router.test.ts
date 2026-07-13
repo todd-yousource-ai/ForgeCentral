@@ -47,6 +47,7 @@ const unusedClient: CrucibleClient = {
   contain: () => Promise.reject(new Error('unused')),
   logQuery: () => Promise.reject(new Error('unused')),
   logExplain: () => Promise.reject(new Error('unused')),
+  logExport: () => Promise.reject(new Error('unused')),
   cursorFetch: () => Promise.reject(new Error('unused')),
   cursorClose: () => Promise.reject(new Error('unused')),
   close: () => Promise.resolve(),

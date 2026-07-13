@@ -227,3 +227,46 @@ describe('the Logs live tail (LG.4)', () => {
     expect(screen.getByRole('button', { name: 'Resume' })).toHaveAttribute('aria-pressed', 'true');
   });
 });
+
+describe('the Logs export (LG.6)', () => {
+  it('exports the audited set and shows the receipt (never a client-assembled CSV)', async () => {
+    const view = {
+      exportId: 'sha512:e1abc0000000000000000000',
+      commitVersion: 42,
+      rowCount: 1,
+      rows: page.rows,
+    };
+    const fetchMock = vi.fn((input: string, init?: RequestInit) => {
+      if (input === '/api/logs/export' && init?.method === 'POST')
+        return Promise.resolve(jsonResponse(200, view));
+      if (input.startsWith('/api/logs')) return Promise.resolve(jsonResponse(200, page));
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    // Stub the browser download primitives without replacing the URL constructor (the DOM needs it).
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+
+    renderWithProviders(<LogsInHost />, { route: '/logs' });
+    await waitFor(() => {
+      expect(screen.getByText('Suspicious command')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    // The audited receipt (its id + commit version) is shown; the export POSTed a commandId + the filter.
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(/audit receipt/i);
+    });
+    expect(screen.getByText('sha512:e1abc0000')).toBeInTheDocument();
+    expect(clickSpy).toHaveBeenCalled();
+    const call = fetchMock.mock.calls.find((c) => String(c[0]) === '/api/logs/export');
+    const body = JSON.parse((call?.[1] as RequestInit).body as string) as {
+      commandId: string;
+      filter: { limit: number };
+    };
+    expect(typeof body.commandId).toBe('string');
+    expect(body.filter.limit).toBe(100);
+  });
+});

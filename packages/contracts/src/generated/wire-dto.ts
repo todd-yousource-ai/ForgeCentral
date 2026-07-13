@@ -164,6 +164,20 @@ export interface WireLogExplain {
   request_id: number;
 }
 
+export interface WireLogExport {
+  command_id: string;
+  issued_at: number;
+  operator?: OperatorDelegation | null;
+  query: WireLogQuery;
+}
+
+export interface WireLogExportEffect {
+  commit_version: number;
+  export_id: string;
+  row_count: number;
+  rows: Array<WireDecisionRow>;
+}
+
 export interface WireLogQuery {
   action?: string | null;
   confidence?: string | null;
@@ -209,7 +223,8 @@ export type WireReply =
   | { NotYetWired: { verb: string; }; }
   | { Refused: { error: WireError; }; }
   | { Contained: WireContainEffect; }
-  | { DecisionDetail: WireDecisionDetail; };
+  | { DecisionDetail: WireDecisionDetail; }
+  | { LogExported: WireLogExportEffect; };
 
 export type WireRequest =
   | { QuerySubmit: WireQuerySubmit; }
@@ -227,7 +242,8 @@ export type WireRequest =
   | { EntityConnections: WireEntityConnections; }
   | { Contain: WireContain; }
   | { LogQuery: WireLogQuery; }
-  | { LogExplain: WireLogExplain; };
+  | { LogExplain: WireLogExplain; }
+  | { LogExport: WireLogExport; };
 
 export type WireStreamDelta =
   | { Decision: WireDecision; }

@@ -32,6 +32,8 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // opcode too; the engine discriminates them by their CBOR enum tag.
       'LogQuery' in request ||
       'LogExplain' in request ||
+      // LOG_EXPORT is an audited data-plane write; like Contain it rides the QuerySubmit opcode.
+      'LogExport' in request ||
       // Contain is a data-plane write; like SubmitMemoryWrite it rides the QuerySubmit opcode and the
       // engine discriminates it by its CBOR enum tag, then routes it to the write path + Data-plane gate.
       'Contain' in request)

@@ -27,6 +27,7 @@ import type {
   WireContainEffect,
   WireDecisionDetail,
   WireDecisionList,
+  WireLogExportEffect,
   WireError,
   WireQueryRows,
   WireReply,
@@ -103,6 +104,14 @@ export function replyToDecisionDetail(reply: WireReply): WireDecisionDetail {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a log-explain read');
+}
+
+/** Map an engine `WireReply` to `WireLogExportEffect` (LOG_EXPORT), throwing a typed error on a refusal. */
+export function replyToLogExported(reply: WireReply): WireLogExportEffect {
+  if (typeof reply === 'object' && 'LogExported' in reply) return reply.LogExported;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a log-export command');
 }
 
 /** Reject `op` if it does not settle within `ms` (a per-call bound; every engine call is bounded). */
@@ -316,6 +325,16 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToDecisionDetail(await dispatch(transport, { LogExplain: request })),
+      opts,
+    );
+  }
+
+  async logExport(
+    request: Parameters<CrucibleClient['logExport']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireLogExportEffect> {
+    return this.call(
+      async (transport) => replyToLogExported(await dispatch(transport, { LogExport: request })),
       opts,
     );
   }

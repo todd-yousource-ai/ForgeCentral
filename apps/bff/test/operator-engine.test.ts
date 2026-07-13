@@ -75,6 +75,16 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ decisions: [] });
     },
+    logExport: (req) => {
+      calls.push('logExport');
+      reads.push(req);
+      return Promise.resolve({
+        export_id: 'sha512:e1',
+        commit_version: 7,
+        row_count: 0,
+        rows: [],
+      });
+    },
     logExplain: (req) => {
       calls.push('logExplain');
       reads.push(req);
@@ -230,13 +240,19 @@ describe('createOperatorEngine', () => {
 
     await engine.logQuery(admin, { request_id: 4, technique: 'T1059', limit: 25 });
     await engine.logExplain(admin, { request_id: 5, decision_id: 'sha512:d1' });
+    await engine.logExport(admin, {
+      operator: null,
+      query: { request_id: 6, limit: 25 },
+      command_id: 'cmd-1',
+      issued_at: 1,
+    });
 
-    expect(calls).toEqual(['logQuery', 'logExplain']);
-    // The operator delegation is injected onto both LOG reads (never client-asserted).
+    expect(calls).toEqual(['logQuery', 'logExplain', 'logExport']);
+    // The operator delegation is injected onto every LOG op (never client-asserted).
     for (const read of reads) {
       expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
     }
-    expect(recorded.map((d) => d.action)).toEqual(['logQuery', 'logExplain']);
+    expect(recorded.map((d) => d.action)).toEqual(['logQuery', 'logExplain', 'logExport']);
   });
 
   it('records cursorFetch + cursorClose delegations and delegates', async () => {

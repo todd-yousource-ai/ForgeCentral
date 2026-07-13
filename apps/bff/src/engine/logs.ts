@@ -12,6 +12,8 @@ import { decisionId, principalId } from '@forge/contracts';
 import type {
   EntityRef,
   LogDetailView,
+  LogExportRequest,
+  LogExportView,
   LogPage,
   LogQueryFilter,
   LogRow,
@@ -122,4 +124,34 @@ export async function resolveLogExplain(
 ): Promise<LogDetailView> {
   const detail = await engine.logExplain(principal, { request_id: 0, decision_id: decision }, opts);
   return toLogDetail(detail);
+}
+
+/**
+ * Resolve an audited export of the filtered LOG (`LOG_EXPORT`), brokered on behalf of `principal`. The
+ * engine records the audit receipt and returns the exported rows; this projects the rows + the receipt.
+ * Idempotent by `request.commandId`. `now` is the export instant stamped on the audited receipt.
+ */
+export async function resolveLogExport(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  request: LogExportRequest,
+  now: number,
+  opts?: EngineCallOptions,
+): Promise<LogExportView> {
+  const effect = await engine.logExport(
+    principal,
+    {
+      operator: null,
+      query: filterToWire(request.filter),
+      command_id: request.commandId,
+      issued_at: Math.floor(now / 1000),
+    },
+    opts,
+  );
+  return {
+    exportId: effect.export_id,
+    commitVersion: effect.commit_version,
+    rowCount: effect.row_count,
+    rows: effect.rows.map(toLogRow),
+  };
 }
