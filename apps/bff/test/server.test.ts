@@ -44,6 +44,8 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     entityDecisions: unused,
     entityConnections: unused,
     contain: unused,
+    logQuery: unused,
+    logExplain: unused,
     cursorFetch: unused,
     cursorClose: unused,
     close: () => Promise.resolve(),
@@ -90,6 +92,44 @@ function operatorEngineWith(): OperatorEngine {
     entityConnections: () => Promise.resolve({ connections: [] }),
     // This route test does not exercise CONTAIN; fail loudly if it is reached (not a canned success).
     contain: unused,
+    logQuery: () =>
+      Promise.resolve({
+        decisions: [
+          {
+            decision_id: 'sha512:d1',
+            rule_id: 'LR-EX-001',
+            finding: 'Suspicious command',
+            tactics: ['TA0002'],
+            technique: 'T1059',
+            evidence: ['dc:process_creation'],
+            confidence: 'HIGH',
+            recommended_action: 'escalate',
+            created_at: 1_700_000_000,
+          },
+        ],
+      }),
+    logExplain: () =>
+      Promise.resolve({
+        decision_id: 'sha512:d1',
+        rule_id: 'LR-EX-001',
+        finding: 'Suspicious command',
+        technique: 'T1059',
+        tactics: ['TA0002'],
+        evidence: ['dc:process_creation'],
+        confidence: 'HIGH',
+        recommended_action: 'escalate',
+        scope: 'host-7',
+        source_hosts: ['host-7'],
+        source_subjects: ['host-7:pid:1234'],
+        source_context: [],
+        source_observations: [],
+        correlation_id: 'corr-1',
+        replay_as_of: 42,
+        watermark_seconds: 100,
+        window_seconds: 60,
+        replay_digest: 'sha512:rd',
+        created_at: 1_700_000_000,
+      }),
   };
 }
 
@@ -189,6 +229,81 @@ describe('BFF HTTP surface', () => {
     expect(detail.header.data?.displayName).toBe('aig:agent:a');
     // Capabilities resolve live from the agent_capabilities relation (VR.3), through the HTTP payload.
     expect(detail.capabilities.status).toBe('ok');
+  });
+
+  it('GET /api/logs brokers the LOG_QUERY read + projects the rows (LG.2)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    const res = await fetch(`${base}/api/logs?technique=T1059&limit=25`);
+    expect(res.status).toBe(200);
+    const page = (await res.json()) as {
+      rows: {
+        decisionId: string;
+        at: number;
+        technique: string;
+        outcome: string;
+        status: string;
+      }[];
+    };
+    expect(page.rows).toHaveLength(1);
+    // created_at seconds -> millis; the row projects the real decision fields.
+    expect(page.rows[0]?.at).toBe(1_700_000_000_000);
+    expect(page.rows[0]?.technique).toBe('T1059');
+    expect(page.rows[0]?.outcome).toBe('escalate');
+    // `escalate` is the most severe advisory posture -> the `denied` (most severe) badge classification.
+    expect(page.rows[0]?.status).toBe('denied');
+  });
+
+  it('GET /api/logs is 401 without an operator session (fail-closed)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+    const res = await fetch(`${base}/api/logs`);
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /api/logs/explain/<id> brokers LOG_EXPLAIN + derives the acting entity (LG.2)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    const res = await fetch(`${base}/api/logs/explain/sha512%3Ad1`);
+    expect(res.status).toBe(200);
+    const detail = (await res.json()) as {
+      decisionId: string;
+      scope: string;
+      sourceSubjects: string[];
+      actingEntity: { kind: string; id: string } | null;
+    };
+    expect(detail.decisionId).toBe('sha512:d1');
+    expect(detail.scope).toBe('host-7');
+    // The acting entity for the row -> drawer drill-in derives from the source subject.
+    expect(detail.actingEntity).toEqual({ kind: 'principal', id: 'host-7:pid:1234' });
+  });
+
+  it('GET /api/logs/explain sanitizes an absent/denied decision to a non-oracle 404', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      logExplain: () =>
+        Promise.reject(
+          new EngineRefusedError({ class: 'Denied', code: 0, retry: 'Never', correlation_id: 0 }),
+        ),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/logs/explain/sha512%3Aabsent`);
+    expect(res.status).toBe(404);
   });
 
   it('POST /api/entity/<kind>/<id>/isolate brokers the containment + returns the honest effect (DR.5c)', async () => {

@@ -25,6 +25,7 @@ import type {
   WireAgentList,
   WireConnectionList,
   WireContainEffect,
+  WireDecisionDetail,
   WireDecisionList,
   WireError,
   WireQueryRows,
@@ -94,6 +95,14 @@ export function replyToContainEffect(reply: WireReply): WireContainEffect {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a contain command');
+}
+
+/** Map an engine `WireReply` to `WireDecisionDetail` (LOG_EXPLAIN), throwing a typed error on a refusal. */
+export function replyToDecisionDetail(reply: WireReply): WireDecisionDetail {
+  if (typeof reply === 'object' && 'DecisionDetail' in reply) return reply.DecisionDetail;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a log-explain read');
 }
 
 /** Reject `op` if it does not settle within `ms` (a per-call bound; every engine call is bounded). */
@@ -286,6 +295,27 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireContainEffect> {
     return this.call(
       async (transport) => replyToContainEffect(await dispatch(transport, { Contain: request })),
+      opts,
+    );
+  }
+
+  async logQuery(
+    request: Parameters<CrucibleClient['logQuery']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireDecisionList> {
+    return this.call(
+      async (transport) => replyToDecisionList(await dispatch(transport, { LogQuery: request })),
+      opts,
+    );
+  }
+
+  async logExplain(
+    request: Parameters<CrucibleClient['logExplain']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireDecisionDetail> {
+    return this.call(
+      async (transport) =>
+        replyToDecisionDetail(await dispatch(transport, { LogExplain: request })),
       opts,
     );
   }

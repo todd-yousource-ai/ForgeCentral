@@ -17,10 +17,13 @@ import type {
   WireConnectionList,
   WireContain,
   WireContainEffect,
+  WireDecisionDetail,
   WireDecisionList,
   WireEntityConnections,
   WireEntityDecisions,
   WireListAgents,
+  WireLogExplain,
+  WireLogQuery,
   WireQueryRows,
   WireQuerySubmit,
 } from '@forge/contracts';
@@ -36,6 +39,8 @@ export type EngineAction =
   | 'entityDecisions'
   | 'entityConnections'
   | 'contain'
+  | 'logQuery'
+  | 'logExplain'
   | 'cursorFetch'
   | 'cursorClose';
 
@@ -103,6 +108,18 @@ export interface OperatorEngine {
     request: WireContain,
     opts?: EngineCallOptions,
   ): Promise<WireContainEffect>;
+  /** Read the tenant-wide decision LOG (LOG_QUERY) on behalf of `principal`. */
+  logQuery(
+    principal: OperatorPrincipal,
+    request: WireLogQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireDecisionList>;
+  /** Explain one governed decision by id (LOG_EXPLAIN) on behalf of `principal`. */
+  logExplain(
+    principal: OperatorPrincipal,
+    request: WireLogExplain,
+    opts?: EngineCallOptions,
+  ): Promise<WireDecisionDetail>;
   /** Fetch the next page of an open cursor on behalf of `principal`. */
   cursorFetch(
     principal: OperatorPrincipal,
@@ -170,6 +187,16 @@ export function createOperatorEngine(
       // grant. Overrides any operator already on the request -- the BFF is the authority on who acts.
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.contain({ ...request, operator }, opts);
+    },
+    logQuery: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'logQuery', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.logQuery({ ...request, operator }, opts);
+    },
+    logExplain: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'logExplain', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.logExplain({ ...request, operator }, opts);
     },
     cursorFetch: (principal, handle, opts) => {
       delegation.record(delegationFor(principal, 'cursorFetch'));
