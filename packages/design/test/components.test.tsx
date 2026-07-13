@@ -10,12 +10,14 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   Badge,
   ConfirmDialog,
+  DataTable,
   Drawer,
   KpiCard,
   ScoreRing,
   TabStrip,
   scoreBand,
 } from '../src/index.js';
+import type { DataTableColumn } from '../src/index.js';
 
 describe('Badge', () => {
   it('renders its label so meaning is never conveyed by color alone', () => {
@@ -182,5 +184,71 @@ describe('ConfirmDialog', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('fc-btn--critical');
+  });
+});
+
+describe('DataTable', () => {
+  interface Row {
+    readonly id: string;
+    readonly rule: string;
+    readonly at: number;
+  }
+  const columns: DataTableColumn<Row>[] = [
+    { id: 'rule', header: 'Rule', cell: (r) => r.rule },
+    { id: 'at', header: 'Time', cell: (r) => String(r.at), align: 'end' },
+  ];
+  const rows: Row[] = [
+    { id: 'a', rule: 'LR-EX-001', at: 200 },
+    { id: 'b', rule: 'LR-NET-002', at: 100 },
+  ];
+
+  it('renders a semantic table with headers + a row per datum', () => {
+    render(<DataTable caption="Decisions" columns={columns} rows={rows} rowKey={(r) => r.id} />);
+    expect(screen.getByRole('table', { name: 'Decisions' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Rule' })).toBeInTheDocument();
+    // One header row + two data rows.
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getByText('LR-NET-002')).toBeInTheDocument();
+  });
+
+  it('shows the honest empty node (not a fabricated row) when there are no rows', () => {
+    render(
+      <DataTable
+        caption="Decisions"
+        columns={columns}
+        rows={[]}
+        rowKey={(r) => r.id}
+        empty="No decisions match the current filters."
+      />,
+    );
+    expect(screen.getByText('No decisions match the current filters.')).toBeInTheDocument();
+    // The empty row is a single presentational placeholder (header + 1 placeholder), never invented data.
+    expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(screen.queryByText('LR-EX-001')).not.toBeInTheDocument();
+  });
+
+  it('makes rows interactive (click + keyboard) with an accessible label when onRowActivate is set', () => {
+    const onActivate = vi.fn();
+    render(
+      <DataTable
+        caption="Decisions"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        onRowActivate={onActivate}
+        rowLabel={(r) => `Open ${r.rule}`}
+      />,
+    );
+    const row = screen.getByRole('row', { name: 'Open LR-EX-001' });
+    expect(row).toHaveAttribute('tabindex', '0');
+    fireEvent.click(row);
+    expect(onActivate).toHaveBeenCalledWith(rows[0]);
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onActivate).toHaveBeenCalledTimes(2);
+  });
+
+  it('a non-interactive row has no tabindex (rows are inert without onRowActivate)', () => {
+    render(<DataTable caption="Decisions" columns={columns} rows={rows} rowKey={(r) => r.id} />);
+    expect(screen.getByText('LR-EX-001').closest('tr')).not.toHaveAttribute('tabindex');
   });
 });

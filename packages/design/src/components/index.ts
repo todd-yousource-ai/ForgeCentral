@@ -8,3 +8,4 @@ export * from './Drawer.js';
 export * from './ConfirmDialog.js';
 export * from './Sparkline.js';
 export * from './EntityDrawer.js';
+export * from './DataTable.js';
