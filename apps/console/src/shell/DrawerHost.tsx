@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ConfirmDialog, Drawer, EntityDrawer } from '@forge/design';
 import type { EntityRef } from '@forge/contracts';
 
-import { useEntityDetail } from '../entity/useEntityDetail.js';
+import { entityQueryKey, fetchEntityDetail, useEntityDetail } from '../entity/useEntityDetail.js';
 import { useIsolate } from '../entity/useIsolate.js';
 
 // The drawer host: the shell-level slide-over that realizes the select-then-act pattern (Section 5.3).
@@ -22,6 +23,10 @@ export interface DrawerRequest {
 interface DrawerApi {
   /** Open the LIVE entity drawer for an entity ref (fetches its detail from the BFF). */
   readonly openEntity: (ref: EntityRef) => void;
+  /** Warm the cache for an entity on hover/focus (DR.6), so a subsequent openEntity opens instantly (the
+   * detail is served from the cache, no loading flash). Idempotent + cheap: TanStack skips a fresh entity
+   * that is already fetching or fresh. */
+  readonly prefetchEntity: (ref: EntityRef) => void;
   /** Open a generic titled drawer with caller-supplied content. */
   readonly open: (request: DrawerRequest) => void;
   readonly close: () => void;
@@ -34,6 +39,7 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   const [request, setRequest] = useState<DrawerRequest | null>(null);
   const [entityRef, setEntityRef] = useState<EntityRef | null>(null);
   const detail = useEntityDetail(entityRef);
+  const queryClient = useQueryClient();
 
   // The Isolate quick action (DR.5d): a confirm-gate holding a stable command id (idempotent re-submit),
   // then the brokered command. Enforcement is OFF (AG.7): the confirm and the result say so honestly.
@@ -48,6 +54,15 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
     },
     [isolate],
   );
+  const prefetchEntity = useCallback(
+    (ref: EntityRef) => {
+      void queryClient.prefetchQuery({
+        queryKey: entityQueryKey(ref),
+        queryFn: () => fetchEntityDetail(ref),
+      });
+    },
+    [queryClient],
+  );
   const open = useCallback((next: DrawerRequest) => {
     setEntityRef(null);
     setRequest(next);
@@ -59,8 +74,14 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   }, []);
 
   const api = useMemo<DrawerApi>(
-    () => ({ openEntity, open, close, isOpen: request !== null || entityRef !== null }),
-    [openEntity, open, close, request, entityRef],
+    () => ({
+      openEntity,
+      prefetchEntity,
+      open,
+      close,
+      isOpen: request !== null || entityRef !== null,
+    }),
+    [openEntity, prefetchEntity, open, close, request, entityRef],
   );
 
   return (

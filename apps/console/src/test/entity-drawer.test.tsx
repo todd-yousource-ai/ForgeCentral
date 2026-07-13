@@ -47,6 +47,22 @@ function OpenButton(): ReactElement {
   );
 }
 
+/** Both triggers over the same drawer: a hover-style prefetch and the open (DR.6). */
+function Triggers(): ReactElement {
+  const drawer = useDrawer();
+  const ref = { kind: 'principal' as const, id: principalId('aig:agent:a') };
+  return (
+    <>
+      <button type="button" onClick={() => drawer.prefetchEntity(ref)}>
+        prefetch
+      </button>
+      <button type="button" onClick={() => drawer.openEntity(ref)}>
+        open
+      </button>
+    </>
+  );
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -128,6 +144,54 @@ describe('the live entity drawer (DR.3d)', () => {
     };
     expect(body.posture).toBe('quarantine');
     expect(typeof body.commandId).toBe('string');
+  });
+
+  it('prefetch warms the cache so a later open serves it with no refetch (DR.6)', async () => {
+    const fetchMock = vi.fn((input: string) => {
+      if (input.startsWith('/api/entity/principal/')) {
+        return Promise.resolve(jsonResponse(200, detail));
+      }
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithProviders(
+      <DrawerHost>
+        <Triggers />
+      </DrawerHost>,
+    );
+    // Hover-prefetch warms the cache.
+    fireEvent.click(screen.getByText('prefetch'));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    // Opening now serves the prefetched (still-fresh, staleTime 5s) detail -- instant, no second fetch.
+    fireEvent.click(screen.getByText('open'));
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toHaveAccessibleName('aig:agent:a');
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a tier-absent (unauthorized) section is absent, not a disabled placeholder (DR.6)', async () => {
+    const gated: EntityDetailView = { ...detail, info: { status: 'unauthorized' } };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(jsonResponse(200, gated))),
+    );
+    renderWithProviders(
+      <DrawerHost>
+        <OpenButton />
+      </DrawerHost>,
+    );
+    fireEvent.click(screen.getByText('open'));
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toHaveAccessibleName('aig:agent:a');
+    });
+    // The unauthorized Information section renders nothing -- absent (no title, no disabled placeholder).
+    expect(screen.queryByText('Information')).not.toBeInTheDocument();
+    // Authorized sections are unaffected (the header still shows).
+    expect(screen.getByText('active')).toBeInTheDocument();
   });
 
   it('shows a load error when the entity fetch fails', async () => {
