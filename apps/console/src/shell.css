@@ -313,6 +313,52 @@ body {
   border-color: var(--fc-color-brand-primary);
 }
 
+/* Logs surface (IP-CONSOLE-09 LG.3): the filter controls + the decision cell. */
+.fcx-log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fc-space-md);
+  margin-bottom: var(--fc-space-lg);
+}
+
+.fcx-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-xs);
+}
+
+.fcx-field__label {
+  font-size: var(--fc-font-size-xs);
+  font-weight: var(--fc-font-weight-semibold);
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-input {
+  padding: var(--fc-space-sm) var(--fc-space-md);
+  border-radius: var(--fc-radius-md);
+  border: 1px solid var(--fc-color-surface-border);
+  background: var(--fc-color-surface-card);
+  color: var(--fc-color-text-primary);
+  font: inherit;
+  font-size: var(--fc-font-size-sm);
+}
+
+.fcx-input:focus-visible {
+  outline: 2px solid var(--fc-color-status-info);
+  outline-offset: 1px;
+}
+
+.fcx-log-decision {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fcx-log-decision__rule {
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+}
+
 .fcx-btn--primary {
   background: var(--fc-color-brand-primary);
   color: var(--fc-color-text-onBrand);
