@@ -9,6 +9,8 @@
 import type {
   WireAgentList,
   WireConnectionList,
+  WireContain,
+  WireContainEffect,
   WireDecisionList,
   WireEntityConnections,
   WireEntityDecisions,
@@ -46,6 +48,11 @@ export interface CrucibleClient {
     request: WireEntityConnections,
     opts?: EngineCallOptions,
   ): Promise<WireConnectionList>;
+  /** Issue an operator containment disposition (CONTAIN, crdb IP-CONTAIN-COMMAND): record a
+   * `Quarantine`/`Deny` on a subject through the audited path. Returns the honest effect
+   * (`enforcement_active` is `false` today, AG.7). A data-plane write, honored under the peer's
+   * Delegation grant. */
+  contain(request: WireContain, opts?: EngineCallOptions): Promise<WireContainEffect>;
   /** Fetch the next page for an open cursor. */
   cursorFetch(handle: EngineHandle, opts?: EngineCallOptions): Promise<WireQueryRows>;
   /** Close an open cursor (releases engine-side resources). */
