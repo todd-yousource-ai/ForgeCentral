@@ -80,6 +80,56 @@ describe('the live entity drawer (DR.3d)', () => {
     );
   });
 
+  it('isolate: confirm-gates with the exact effect, brokers the command, shows the honest result (DR.5d)', async () => {
+    const fetchMock = vi.fn((input: string, init?: RequestInit) => {
+      if (input.endsWith('/isolate') && init?.method === 'POST') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            posture: 'quarantine',
+            enforcementActive: false,
+            summary: 'Quarantine recorded; enforcement off',
+          }),
+        );
+      }
+      if (input.startsWith('/api/entity/principal/')) {
+        return Promise.resolve(jsonResponse(200, detail));
+      }
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithProviders(
+      <DrawerHost>
+        <OpenButton />
+      </DrawerHost>,
+    );
+    fireEvent.click(screen.getByText('open'));
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toHaveAccessibleName('aig:agent:a');
+    });
+
+    // Clicking the action opens a confirm-gate that shows the EXACT effect + the enforcement-off honesty.
+    fireEvent.click(screen.getByRole('button', { name: 'Isolate from network' }));
+    await waitFor(() => {
+      expect(screen.getByText(/quarantine posture/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/enforcement is OFF/i)).toBeInTheDocument();
+
+    // Confirming brokers the command; the honest result appears.
+    fireEvent.click(screen.getByRole('button', { name: 'Isolate' }));
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(/Isolation recorded/i);
+    });
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith('/isolate'));
+    expect(call?.[0]).toBe('/api/entity/principal/aig%3Aagent%3Aa/isolate');
+    const body = JSON.parse((call?.[1] as RequestInit).body as string) as {
+      posture: string;
+      commandId: string;
+    };
+    expect(body.posture).toBe('quarantine');
+    expect(typeof body.commandId).toBe('string');
+  });
+
   it('shows a load error when the entity fetch fails', async () => {
     vi.stubGlobal(
       'fetch',
