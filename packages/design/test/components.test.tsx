@@ -13,11 +13,13 @@ import {
   DataTable,
   Drawer,
   KpiCard,
+  OverviewFlow,
   ScoreRing,
   TabStrip,
   scoreBand,
 } from '../src/index.js';
 import type { DataTableColumn } from '../src/index.js';
+import type { OverviewGraph } from '@forge/contracts';
 
 describe('Badge', () => {
   it('renders its label so meaning is never conveyed by color alone', () => {
@@ -250,5 +252,101 @@ describe('DataTable', () => {
   it('a non-interactive row has no tabindex (rows are inert without onRowActivate)', () => {
     render(<DataTable caption="Decisions" columns={columns} rows={rows} rowKey={(r) => r.id} />);
     expect(screen.getByText('LR-EX-001').closest('tr')).not.toHaveAttribute('tabindex');
+  });
+});
+
+describe('OverviewFlow', () => {
+  const graph: OverviewGraph = {
+    sources: [
+      { class: 'users', count: 12 },
+      { class: 'agents', count: 3 },
+    ],
+    destinations: [
+      { class: 'saas', count: 4 },
+      { class: 'private-apps', count: 2 },
+    ],
+    edges: [
+      { sourceClass: 'users', destClass: 'saas', weight: 5 },
+      { sourceClass: 'agents', destClass: 'private-apps', weight: 1 },
+    ],
+    risk: { level: 'red', escalate: 3, candidate: 2, observe: 7 },
+  };
+
+  it('enumerates the sources, destinations, and risk in the accessible name (never color alone)', () => {
+    render(<OverviewFlow graph={graph} />);
+    expect(screen.getByRole('img')).toHaveAccessibleName(
+      'Connectivity flow. Sources: Users 12, AI Agents 3. ' +
+        'Public zone risk: Critical (3 escalate, 2 candidate). ' +
+        'Destinations: SaaS Apps 4, Private Apps 2.',
+    );
+  });
+
+  it('renders a visible label + count for every class node (known + title-cased unknown)', () => {
+    render(<OverviewFlow graph={graph} />);
+    expect(screen.getByText('Users')).toBeInTheDocument();
+    expect(screen.getByText('AI Agents')).toBeInTheDocument();
+    expect(screen.getByText('SaaS Apps')).toBeInTheDocument();
+    // `private-apps` has no mapping in the mock's known set here -> title-cased honestly.
+    expect(screen.getByText('Private Apps')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+  });
+
+  it('colors the Public zone by the risk band as a token class (not a hex) + labels it', () => {
+    const { container } = render(<OverviewFlow graph={graph} />);
+    expect(container.querySelector('.fc-overview-flow__zone--critical')).not.toBeNull();
+    expect(screen.getByText('Public')).toBeInTheDocument();
+    expect(screen.getByText('Critical')).toBeInTheDocument();
+  });
+
+  it('draws each ribbon colored by its SOURCE class (weighted, semantic class)', () => {
+    const { container } = render(<OverviewFlow graph={graph} />);
+    expect(container.querySelector('.fc-overview-flow__edge--users')).not.toBeNull();
+    expect(container.querySelector('.fc-overview-flow__edge--agents')).not.toBeNull();
+    // The heaviest edge is thicker than the lightest (weight -> stroke width).
+    const users = container.querySelector('.fc-overview-flow__edge--users');
+    const agents = container.querySelector('.fc-overview-flow__edge--agents');
+    const widthOf = (el: Element | null): number => Number(el?.getAttribute('stroke-width') ?? '0');
+    expect(widthOf(users)).toBeGreaterThan(widthOf(agents));
+  });
+
+  it('falls back to a muted lane for an unknown source class (no crash, honest label)', () => {
+    const odd: OverviewGraph = {
+      sources: [{ class: 'satellites', count: 1 }],
+      destinations: [{ class: 'network', count: 1 }],
+      edges: [{ sourceClass: 'satellites', destClass: 'network', weight: 1 }],
+      risk: { level: 'yellow', escalate: 0, candidate: 1, observe: 0 },
+    };
+    const { container } = render(<OverviewFlow graph={odd} />);
+    expect(screen.getByText('Satellites')).toBeInTheDocument();
+    expect(container.querySelector('.fc-overview-flow__edge--muted')).not.toBeNull();
+    expect(container.querySelector('.fc-overview-flow__node--muted')).not.toBeNull();
+  });
+
+  it('renders the honest empty state for a tenant with no observed connectivity', () => {
+    const empty: OverviewGraph = {
+      sources: [],
+      destinations: [],
+      edges: [],
+      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+    };
+    const { container } = render(<OverviewFlow graph={empty} />);
+    expect(screen.getByRole('img')).toHaveAccessibleName(
+      'Connectivity flow: no connectivity observed. Public zone risk: Nominal.',
+    );
+    expect(screen.getByText('No connectivity observed')).toBeInTheDocument();
+    // The zone still shows its (green) risk; no source/destination node is fabricated.
+    expect(container.querySelector('.fc-overview-flow__zone--good')).not.toBeNull();
+    expect(container.querySelector('.fc-overview-flow__node')).toBeNull();
+  });
+
+  it('renders a busy skeleton while loading (graph null or loading flag), no fabricated flow', () => {
+    const { rerender, container } = render(<OverviewFlow graph={null} />);
+    const region = screen.getByRole('img');
+    expect(region).toHaveAccessibleName('Loading connectivity flow');
+    expect(region).toHaveAttribute('aria-busy', 'true');
+    expect(container.querySelector('.fc-overview-flow__node')).toBeNull();
+    // The loading flag forces the skeleton even when a graph is present.
+    rerender(<OverviewFlow graph={graph} loading />);
+    expect(screen.getByRole('img')).toHaveAttribute('aria-busy', 'true');
   });
 });
