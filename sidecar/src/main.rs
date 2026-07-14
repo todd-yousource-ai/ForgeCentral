@@ -95,16 +95,30 @@ async fn main() -> Result<(), SidecarError> {
     )
     .await?;
 
-    // The engine identity is TPM-resident: re-derive the key in the device and present the enrolled leaf.
-    let keystore = open_engine_keystore(&config.tcti)?;
-    let cert_chain_der = read_cert_chain_der(&config.engine_cert)?;
+    // Build the engine mTLS client config. When engine_key is set, present a SOFTWARE key -- the
+    // long-lived Console-CA leaf the node installer generates for the dedicated control plane (:7879,
+    // IP-CONSOLE-CONTROL-PLANE D2), signing in-process (no TPM). Otherwise re-derive the TPM-resident key
+    // in the device and present the enrolled leaf (the legacy wire-seam path).
+    let ca_pem = read_pem(&config.engine_ca)?;
+    let (client_config, tpm_gated) = if let Some(key_path) = &config.engine_key {
+        let cert_pem = read_pem(&config.engine_cert)?;
+        let key_pem = read_pem(key_path)?;
+        let cc = cdb_mtls::client_config(&ca_pem, &cert_pem, &key_pem)
+            .map_err(|e| SidecarError::Config(format!("engine software mtls config: {e}")))?;
+        (cc, false)
+    } else {
+        let keystore = open_engine_keystore(&config.tcti)?;
+        let cert_chain_der = read_cert_chain_der(&config.engine_cert)?;
+        let cc = cdb_device_identity::tpm_mtls_client_config(&ca_pem, cert_chain_der, keystore)
+            .map_err(|e| SidecarError::Config(format!("engine tpm mtls config: {e}")))?;
+        (cc, true)
+    };
     let engine = EngineOriginator::bind(
         &config.egress_addr,
         config.engine_addr.clone(),
         &config.engine_servername,
-        &read_pem(&config.engine_ca)?,
-        cert_chain_der,
-        keystore,
+        client_config,
+        tpm_gated,
     )
     .await?;
 

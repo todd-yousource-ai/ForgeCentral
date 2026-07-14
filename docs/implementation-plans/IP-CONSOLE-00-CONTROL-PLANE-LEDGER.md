@@ -11,8 +11,8 @@ reserved service tenant.
 
 | Step | Acceptance | Status | Commit |
 |------|-----------|--------|--------|
-| F1 | `console-enroll` issues a long-lived software-P-384 Console-CA leaf; no daily operator-MFA for the machine identity; human-login MFA unchanged | PLANNED | -- |
-| F2 | Sidecar presents the software key + long-lived leaf and connects to the `:7879` control plane; stale `engine_key`/TPM config reconciled | PLANNED | -- |
+| F1 | Console engine identity = the software-P-384 Console-CA leaf the crdb installer generates (A0 resolved: crdb owns the CA + mints the leaf, so console-enroll's ZTP engine enrollment is obsolete for the control plane -- no daily MFA for the machine identity; human-login MFA unchanged). The sidecar gains a software-key mode presenting it. PROVEN LIVE (software mTLS dial to :7879 admitted, 0 tls_accept_failed) | LANDED | `2d74749` |
+| F2 | Sidecar connects to the `:7879` control plane with the software leaf (`EngineOriginator::bind` takes a prebuilt `ClientConfig` + `tpm_gated`; gate only on the TPM path); `engine_key` reinstated as the software-key selector; `config.example.json` -> :7879. Landed with F1. REMAINING: reconcile `deploy/install.sh` to provision the runtime sidecar config pointing at `/etc/cdb/control` + `:7879` (+ deliver the leaf/key readably to the console-sidecar user) | LANDED | `2d74749` |
 | F3 | Assess-with-AI cognition verb + resolver + client method land (grant already present) | PLANNED | -- |
 | F4 | Global-admin tenant selector; stale tenant comments corrected | PLANNED | -- |
 
