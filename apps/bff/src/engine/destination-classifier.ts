@@ -183,5 +183,8 @@ export function classifyDestination(address: string, resolvedName?: string): Cla
     if (simple !== undefined) return { category: 'network', name: simple };
     return { category: 'network', name: ptr };
   }
-  return { category: 'network', name: address };
+  // Unresolved, unbranded: name by the bare IP HOST (not `ip:port`). The port added nothing to identity
+  // here (it is https/http noise -- a store/protocol port already produced a name above), and dropping it
+  // merges the same host captured both with and without a port (`1.2.3.4` and `1.2.3.4:443`) into one row.
+  return { category: 'network', name: ip };
 }
