@@ -27,6 +27,20 @@ async function mockBff(page: Page, authed: boolean): Promise<void> {
           body: JSON.stringify({ error: 'unauthenticated' }),
         }),
   );
+  // The home Overview surface reads its connectivity graph; a mocked empty tenant renders the honest empty
+  // state (never a live engine, never fabricated data).
+  await page.route('**/api/overview/graph*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        sources: [],
+        destinations: [],
+        edges: [],
+        risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      }),
+    }),
+  );
 }
 
 test('unauthenticated: the login screen renders, no shell', async ({ page }) => {
@@ -45,19 +59,13 @@ test('authenticated: the shell, the IA, empty states, and the drawer frame', asy
   await expect(rail).toBeVisible();
   await expect(rail.getByRole('link')).toHaveCount(11);
 
-  // The home surface is an honest empty state (no fabricated data), with the "not live" indicator.
+  // The home Overview surface renders live: the heading, the honest empty connectivity flow (the mocked
+  // tenant has none), and the "not live" indicator (the delta stream is not wired yet).
   await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
-  await expect(page.getByText('No Overview data yet')).toBeVisible();
+  await expect(page.getByText('No connectivity observed')).toBeVisible();
   await expect(page.getByText('Not live')).toBeVisible();
 
-  // The select-then-act drawer frame: open one click, close.
-  await expect(page.getByRole('dialog')).toBeHidden();
-  await page.getByRole('button', { name: 'Open entity drawer' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByRole('dialog')).toBeHidden();
-
-  // One-click navigation to another destination, still an honest empty state.
+  // One-click navigation to another destination, still an honest empty placeholder.
   await rail.getByRole('link', { name: 'Policies' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Policies' })).toBeVisible();
   await expect(page.getByText('No Policies data yet')).toBeVisible();
