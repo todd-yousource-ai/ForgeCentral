@@ -206,6 +206,19 @@ body {
   margin: 0 0 var(--fc-space-lg);
 }
 
+/* Overview (IP-CONSOLE-01 RD.4b): the VTZ page controls above the Sankey ("swipe for more"). */
+.fcx-ov-pager {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-md);
+  margin: 0 0 var(--fc-space-md);
+}
+
+.fcx-ov-pager__status {
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-sm);
+}
+
 /* ---- the four states ----------------------------------------------------- */
 
 .fcx-state {

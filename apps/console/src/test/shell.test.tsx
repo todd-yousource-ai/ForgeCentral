@@ -83,12 +83,13 @@ function logsRoutedFetch(): ReturnType<typeof vi.fn> {
   });
 }
 
-/** The home Overview surface reads the connectivity graph; an empty tenant graph keeps shell tests clean. */
+/** The home Overview surface reads the connectivity Sankey; an empty tenant graph keeps shell tests clean. */
 const EMPTY_GRAPH = {
   sources: [],
+  vtzs: [],
   destinations: [],
-  edges: [],
-  risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+  sourceEdges: [],
+  destEdges: [],
 };
 
 beforeEach(() => {
@@ -97,7 +98,7 @@ beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: string) => {
-      if (input.startsWith('/api/overview/graph'))
+      if (input.startsWith('/api/overview/sankey'))
         return Promise.resolve(jsonResponse(200, EMPTY_GRAPH));
       throw new Error(`unexpected fetch ${input}`);
     }),

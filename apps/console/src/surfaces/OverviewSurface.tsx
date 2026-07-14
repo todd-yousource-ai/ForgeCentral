@@ -1,75 +1,69 @@
-// apps/console/src/surfaces/OverviewSurface.tsx -- the Overview (connectivity) surface (IP-CONSOLE-01 O1.5).
+// apps/console/src/surfaces/OverviewSurface.tsx -- the Overview (connectivity) surface (IP-CONSOLE-01 RD.4b).
 //
-// The Console's flagship home: the live, tenant-wide connectivity flow. The `useOverview` hook reads the
-// real graph from the BFF (GET /api/overview/graph -> crdb CONNECTIVITY_GRAPH); this surface renders it with
-// the shared `OverviewFlow` and the source-class lane tabs, and owns the honest states. The engine has no
-// lane parameter (CONNECTIVITY_GRAPH is tenant-wide), so the tabs are a client-side VIEW filter over the
-// already-real graph -- All shows every lane; a lane tab shows that source, its outbound ribbons, and only
-// the destinations those ribbons reach (INV-CONSOLE-NO-STUB: a subset of real facts, never fabricated).
-// Loading and empty are the flow's own honest states; only a hard engine failure degrades to an ErrorState.
+// The Console's flagship home: the live, tenant-wide connectivity flow, rendered as the redesigned Sankey.
+// The `useOverview` hook reads the real VTZ-routed graph from the BFF (GET /api/overview/sankey -> crdb
+// CONNECTIVITY_GRAPH, zoned); this surface renders it with the shared `OverviewSankeyFlow` and owns the
+// honest states. The graphic shows at most three VTZs per page, so the surface pages the rest ("swipe for
+// more"); hovering a destination category filters the left flows to only the paths that feed it (a
+// client-side VIEW over the already-real graph, INV-CONSOLE-NO-STUB, never a data filter). The header badge
+// summarizes the worst VTZ risk band as a glanceable. Loading and empty are the flow's own honest states;
+// only a hard engine failure degrades to an ErrorState.
 
 import { useMemo, useState, type ReactElement } from 'react';
-import { Badge, OverviewFlow, TabStrip, sourceClassLabel, type BadgeVariant } from '@forge/design';
-import type { OverviewGraph, OverviewQuery, RiskLevel } from '@forge/contracts';
+import { Badge, OverviewSankeyFlow, type BadgeVariant } from '@forge/design';
+import {
+  overviewVtzPageCount,
+  type OverviewQuery,
+  type OverviewSankey,
+  type RiskLevel,
+} from '@forge/contracts';
 
 import { ErrorState, StaleBanner } from '../states/States.js';
 import { useLive } from '../live/LiveProvider.js';
 import { useOverview } from './useOverview.js';
 
-// TUNE(IP-CONSOLE-01 O1.5): the aggregation scan bound requested (the engine clamps to its per-tenant
-// ceiling). Matches the BFF default; O1.5 reads the full recent graph, no time window control yet.
+// TUNE(IP-CONSOLE-01 RD.4b): the aggregation scan bound requested (the engine clamps to its per-tenant
+// ceiling). Matches the BFF default; RD.4b reads the full recent graph, no time window control yet.
 const SCAN_LIMIT = 1000;
 
-/** The lane tab that shows every source (the default view). */
-const ALL_LANE = 'all';
-
-/** The risk band -> the header badge label + its semantic variant (the zone color's glanceable summary). */
+/** The risk band -> the header badge label + its semantic variant (the worst zone's glanceable summary). */
 const RISK_BADGE: Readonly<Record<RiskLevel, { label: string; variant: BadgeVariant }>> = {
   green: { label: 'Risk: Nominal', variant: 'good' },
   yellow: { label: 'Risk: Elevated', variant: 'caution' },
   red: { label: 'Risk: Critical', variant: 'critical' },
 };
 
+/** Severity order so the header can summarize the tenant by its single worst zone. */
+const RISK_RANK: Readonly<Record<RiskLevel, number>> = { green: 0, yellow: 1, red: 2 };
+
 /**
- * Project the graph to a single source lane: that source node, its outbound ribbons, and only the
- * destinations those ribbons reach. The risk band is tenant-wide, so it is carried through unchanged.
- * `all` returns the graph untouched.
+ * The worst risk band across the graph's VTZs, or `null` when there are no zones (an empty tenant shows no
+ * badge). The per-zone bands are the real detection-driven risk; this only picks the most severe to glance.
  */
-export function filterByLane(graph: OverviewGraph, lane: string): OverviewGraph {
-  if (lane === ALL_LANE) return graph;
-  const edges = graph.edges.filter((edge) => edge.sourceClass === lane);
-  const reached = new Set(edges.map((edge) => edge.destClass));
-  return {
-    sources: graph.sources.filter((node) => node.class === lane),
-    destinations: graph.destinations.filter((node) => reached.has(node.class)),
-    edges,
-    risk: graph.risk,
-  };
+export function worstRisk(graph: OverviewSankey): RiskLevel | null {
+  let worst: RiskLevel | null = null;
+  for (const vtz of graph.vtzs) {
+    if (worst === null || RISK_RANK[vtz.risk.level] > RISK_RANK[worst]) {
+      worst = vtz.risk.level;
+    }
+  }
+  return worst;
 }
 
-/** The Overview surface: the live connectivity flow + source-class lane tabs + the risk summary + states. */
+/** The Overview surface: the live connectivity Sankey + VTZ paging + hover-to-filter + the risk summary. */
 export function OverviewSurface(): ReactElement {
-  const [lane, setLane] = useState(ALL_LANE);
+  const [vtzPage, setVtzPage] = useState(0);
+  const [hoveredDest, setHoveredDest] = useState<string | null>(null);
   const query = useMemo<OverviewQuery>(() => ({ limit: SCAN_LIMIT }), []);
   const overview = useOverview(query);
   const live = useLive();
 
   const graph = overview.data;
-  // The lane tabs, derived from the real source classes present (plus All). If the selected lane is not in
-  // the current graph (data changed), fall through to All rather than showing an empty view.
-  const tabs = useMemo(
-    () => [
-      { id: ALL_LANE, label: 'All' },
-      ...(graph?.sources ?? []).map((node) => ({
-        id: node.class,
-        label: sourceClassLabel(node.class),
-      })),
-    ],
-    [graph],
-  );
-  const activeLane = tabs.some((tab) => tab.id === lane) ? lane : ALL_LANE;
-  const view = graph ? filterByLane(graph, activeLane) : null;
-  const risk = graph ? RISK_BADGE[graph.risk.level] : null;
+  const pageCount = graph ? overviewVtzPageCount(graph.vtzs.length) : 1;
+  // Clamp the page if the graph shrank (data changed) so we never render an empty page for a live tenant.
+  const activePage = Math.min(vtzPage, pageCount - 1);
+  const risk = graph ? worstRisk(graph) : null;
+  const badge = risk !== null ? RISK_BADGE[risk] : null;
   const showFullError = overview.isError && graph === undefined;
 
   return (
@@ -78,19 +72,34 @@ export function OverviewSurface(): ReactElement {
         <h2 id="surface-overview" className="fcx-surface__heading">
           Overview
         </h2>
-        {risk !== null ? <Badge variant={risk.variant}>{risk.label}</Badge> : null}
+        {badge !== null ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
       </div>
 
       {/* The graph reads live, but the delta stream (O1.7) is not wired yet -- mark it honestly. */}
       {live.status !== 'live' ? <StaleBanner reason={live.reason} /> : null}
 
-      {graph !== undefined && tabs.length > 1 ? (
-        <TabStrip
-          tabs={tabs}
-          activeId={activeLane}
-          onChange={setLane}
-          ariaLabel="Filter the connectivity flow by source class"
-        />
+      {graph !== undefined && pageCount > 1 ? (
+        <nav className="fcx-ov-pager" aria-label="Trust zone pages">
+          <button
+            type="button"
+            className="fcx-btn"
+            onClick={() => setVtzPage((p) => Math.max(0, p - 1))}
+            disabled={activePage === 0}
+          >
+            Previous zones
+          </button>
+          <span className="fcx-ov-pager__status" aria-live="polite">
+            Zones {activePage + 1} of {pageCount}
+          </span>
+          <button
+            type="button"
+            className="fcx-btn"
+            onClick={() => setVtzPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={activePage >= pageCount - 1}
+          >
+            More zones
+          </button>
+        </nav>
       ) : null}
 
       {showFullError ? (
@@ -100,7 +109,13 @@ export function OverviewSurface(): ReactElement {
         />
       ) : (
         <div className="fcx-overview-canvas">
-          <OverviewFlow graph={view} loading={overview.isLoading} />
+          <OverviewSankeyFlow
+            graph={graph ?? null}
+            loading={overview.isLoading}
+            vtzPage={activePage}
+            hoveredDest={hoveredDest}
+            onHoverDest={setHoveredDest}
+          />
         </div>
       )}
     </section>

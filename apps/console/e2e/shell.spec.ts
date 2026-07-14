@@ -27,17 +27,18 @@ async function mockBff(page: Page, authed: boolean): Promise<void> {
           body: JSON.stringify({ error: 'unauthenticated' }),
         }),
   );
-  // The home Overview surface reads its connectivity graph; a mocked empty tenant renders the honest empty
+  // The home Overview surface reads its connectivity Sankey; a mocked empty tenant renders the honest empty
   // state (never a live engine, never fabricated data).
-  await page.route('**/api/overview/graph*', (route) =>
+  await page.route('**/api/overview/sankey*', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         sources: [],
+        vtzs: [],
         destinations: [],
-        edges: [],
-        risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+        sourceEdges: [],
+        destEdges: [],
       }),
     }),
   );
