@@ -301,6 +301,12 @@
           },
           "type": "array"
         },
+        "top_destinations": {
+          "items": {
+            "$ref": "#/$defs/WireNamedDest"
+          },
+          "type": "array"
+        },
         "vtzs": {
           "items": {
             "$ref": "#/$defs/WireVtzNode"
@@ -315,7 +321,8 @@
         "risk",
         "vtzs",
         "source_edges",
-        "dest_edges"
+        "dest_edges",
+        "top_destinations"
       ],
       "type": "object"
     },
@@ -950,6 +957,22 @@
       "required": [
         "request_id",
         "limit"
+      ],
+      "type": "object"
+    },
+    "WireNamedDest": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "address",
+        "count"
       ],
       "type": "object"
     },

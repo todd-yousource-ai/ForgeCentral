@@ -35,6 +35,7 @@ import {
   resolveOverviewSankey,
 } from './engine/overview.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
+import type { ReverseDnsResolver } from './engine/reverse-dns.js';
 import { principalFromSession } from './engine/principal.js';
 import { EngineRefusedError } from './engine/wire-client.js';
 import type { EphemeralCache } from './cache.js';
@@ -57,6 +58,9 @@ export interface ServerDeps {
   readonly authRouter?: AuthRouter;
   /** The operator-scoped engine facade (DR.3d). Absent when auth is not configured; entity reads 503. */
   readonly operatorEngine?: OperatorEngine;
+  /** Reverse-DNS resolver for Overview destination names (cached + background). Absent -> destinations
+   * list their IPs (never a fabricated name). */
+  readonly reverseDns?: ReverseDnsResolver;
 }
 
 /** `/api/entity/<kind>/<id>` -- the drawer detail route (the id is percent-encoded; agent ids carry `:`). */
@@ -526,7 +530,9 @@ async function handleOverview(
     return true;
   }
   if (path === '/api/overview/sankey') {
-    await serveOverviewRead(deps, req, res, 'sankey', resolveOverviewSankey);
+    await serveOverviewRead(deps, req, res, 'sankey', (engine, principal, query, opts) =>
+      resolveOverviewSankey(engine, principal, query, opts, deps.reverseDns),
+    );
     return true;
   }
   return false;
