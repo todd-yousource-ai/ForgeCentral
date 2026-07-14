@@ -56,6 +56,17 @@ describe('the auth gate', () => {
         if (input === '/auth/me') {
           return Promise.resolve(jsonResponse(200, { operator: TEST_OPERATOR }));
         }
+        // The home Overview surface reads its (empty) connectivity graph once the shell mounts.
+        if (input.startsWith('/api/overview/graph')) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              sources: [],
+              destinations: [],
+              edges: [],
+              risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+            }),
+          );
+        }
         throw new Error(`unexpected fetch ${input}`);
       }),
     );

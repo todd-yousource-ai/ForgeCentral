@@ -77,8 +77,16 @@ function titleCase(tag: string): string {
     .join(' ');
 }
 
+/**
+ * The display label for a source class (`agents` -> `AI Agents`), title-casing an unknown tag. Exported so
+ * a consumer's source-class controls (the O1.5 lane tabs) label lanes identically to the flow itself.
+ */
+export function sourceClassLabel(className: string): string {
+  return SOURCE_META[className]?.label ?? titleCase(className);
+}
+
 function sourceLabel(node: OverviewClassNode): string {
-  return SOURCE_META[node.class]?.label ?? titleCase(node.class);
+  return sourceClassLabel(node.class);
 }
 
 function sourceLane(className: string): string {

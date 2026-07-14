@@ -29,9 +29,9 @@ describe('no-stub contract (F0.8 shell)', () => {
   });
 
   it('renders an honest empty state for every placeholder destination, never fabricated data', () => {
-    // The real surfaces (Logs, LG.3) render their own live element and are tested in their own suite;
-    // every remaining destination is still an honest placeholder that fabricates no data.
-    const REAL_SURFACES = new Set(['logs']);
+    // The real surfaces (Overview O1.5, Logs LG.3) render their own live element and are tested in their
+    // own suites; every remaining destination is still an honest placeholder that fabricates no data.
+    const REAL_SURFACES = new Set(['overview', 'logs']);
     for (const dest of DESTINATIONS.filter((d) => !REAL_SURFACES.has(d.id))) {
       const view = renderWithProviders(<Shell operator={TEST_OPERATOR} />, { route: dest.path });
       expect(screen.getByText(`No ${dest.label} data yet`)).toBeInTheDocument();
