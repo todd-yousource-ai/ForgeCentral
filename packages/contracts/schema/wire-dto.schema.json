@@ -194,6 +194,42 @@
       ],
       "type": "object"
     },
+    "WireConnClass": {
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "class",
+        "count"
+      ],
+      "type": "object"
+    },
+    "WireConnEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "dest_class": {
+          "type": "string"
+        },
+        "source_class": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_class",
+        "dest_class",
+        "weight"
+      ],
+      "type": "object"
+    },
     "WireConnection": {
       "additionalProperties": false,
       "properties": {
@@ -226,6 +262,85 @@
       },
       "required": [
         "connections"
+      ],
+      "type": "object"
+    },
+    "WireConnectivityGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "destinations": {
+          "items": {
+            "$ref": "#/$defs/WireConnClass"
+          },
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/WireConnEdge"
+          },
+          "type": "array"
+        },
+        "risk": {
+          "$ref": "#/$defs/WireRiskBand"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/WireConnClass"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "sources",
+        "destinations",
+        "edges",
+        "risk"
+      ],
+      "type": "object"
+    },
+    "WireConnectivityQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "type": "integer"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "since": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "until": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "request_id",
+        "limit"
       ],
       "type": "object"
     },
@@ -1243,6 +1358,18 @@
             "LogExported"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ConnectivityGraph": {
+              "$ref": "#/$defs/WireConnectivityGraph"
+            }
+          },
+          "required": [
+            "ConnectivityGraph"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -1606,8 +1733,44 @@
             "LogExport"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ConnectivityGraph": {
+              "$ref": "#/$defs/WireConnectivityQuery"
+            }
+          },
+          "required": [
+            "ConnectivityGraph"
+          ],
+          "type": "object"
         }
       ]
+    },
+    "WireRiskBand": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate": {
+          "type": "integer"
+        },
+        "escalate": {
+          "type": "integer"
+        },
+        "level": {
+          "type": "string"
+        },
+        "observe": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "level",
+        "escalate",
+        "candidate",
+        "observe"
+      ],
+      "type": "object"
     },
     "WireStreamDelta": {
       "oneOf": [
