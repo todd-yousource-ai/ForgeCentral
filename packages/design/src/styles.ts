@@ -228,5 +228,34 @@ export function componentStyles(): string {
 .fc-table__row--interactive:hover { background: color-mix(in srgb, var(--fc-color-text-muted) 10%, transparent); }
 .fc-table__row--interactive:focus-visible { outline: 2px solid var(--fc-color-status-info); outline-offset: -2px; }
 .fc-table__empty { padding: var(--fc-space-xl) var(--fc-space-md); text-align: center; color: var(--fc-color-text-muted); }
+
+.fc-overview-flow { display: block; width: 100%; }
+.fc-overview-flow svg { display: block; width: 100%; height: auto; }
+.fc-overview-flow__field { opacity: 0.25; }
+.fc-overview-flow__hex { stroke: var(--fc-color-surface-border); stroke-width: 1; }
+.fc-overview-flow__edge { stroke: var(--fc-color-text-muted); fill: none; stroke-linecap: round; opacity: 0.5; transition: opacity var(--fc-motion-duration-base) var(--fc-motion-easing-standard); }
+.fc-overview-flow__edge--users { stroke: var(--fc-color-flow-users); }
+.fc-overview-flow__edge--devices { stroke: var(--fc-color-flow-devices); }
+.fc-overview-flow__edge--agents { stroke: var(--fc-color-flow-agents); }
+.fc-overview-flow__edge--muted { stroke: var(--fc-color-text-muted); }
+.fc-overview-flow__node rect { fill: var(--fc-color-surface-card); stroke: var(--fc-color-surface-border); stroke-width: 1.5; }
+.fc-overview-flow__node--users rect { stroke: var(--fc-color-flow-users); }
+.fc-overview-flow__node--devices rect { stroke: var(--fc-color-flow-devices); }
+.fc-overview-flow__node--agents rect { stroke: var(--fc-color-flow-agents); }
+.fc-overview-flow__node--objects rect { stroke: var(--fc-color-flow-objects); }
+.fc-overview-flow__node--muted rect { stroke: var(--fc-color-text-muted); }
+.fc-overview-flow__node-label { fill: var(--fc-color-text-primary); font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-sm); font-weight: var(--fc-font-weight-semibold); }
+.fc-overview-flow__node-count { fill: var(--fc-color-text-muted); font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-xs); }
+.fc-overview-flow__zone rect { fill: color-mix(in srgb, var(--fc-color-text-muted) 12%, transparent); stroke: var(--fc-color-surface-border); stroke-width: 1.5; }
+.fc-overview-flow__zone--good rect { fill: color-mix(in srgb, var(--fc-color-status-good) 14%, transparent); stroke: var(--fc-color-status-good); }
+.fc-overview-flow__zone--caution rect { fill: color-mix(in srgb, var(--fc-color-status-caution) 14%, transparent); stroke: var(--fc-color-status-caution); }
+.fc-overview-flow__zone--critical rect { fill: color-mix(in srgb, var(--fc-color-status-critical) 16%, transparent); stroke: var(--fc-color-status-critical); }
+.fc-overview-flow__zone-label { fill: var(--fc-color-text-primary); font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-md); font-weight: var(--fc-font-weight-bold); }
+.fc-overview-flow__zone-risk { fill: var(--fc-color-text-muted); font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-xs); font-weight: var(--fc-font-weight-semibold); }
+.fc-overview-flow__zone--good .fc-overview-flow__zone-risk { fill: var(--fc-color-status-good); }
+.fc-overview-flow__zone--caution .fc-overview-flow__zone-risk { fill: var(--fc-color-status-caution); }
+.fc-overview-flow__zone--critical .fc-overview-flow__zone-risk { fill: var(--fc-color-status-critical); }
+.fc-overview-flow__empty-note { fill: var(--fc-color-text-muted); font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-sm); }
+.fc-overview-flow__skeleton { fill: var(--fc-color-surface-border); animation: fc-skeleton-pulse var(--fc-motion-duration-base) var(--fc-motion-easing-standard) infinite alternate; }
 `;
 }
