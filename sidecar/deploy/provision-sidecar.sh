@@ -23,12 +23,15 @@ ADMIN_PORT="${ADMIN_PORT:-8443}"
 ADMIN_DNS="${ADMIN_DNS:-console-admin.localhost}"
 BFF_HTTP_PORT="${BFF_HTTP_PORT:-8787}"          # the BFF admin http (the sidecar admin_upstream)
 EGRESS_PORT="${EGRESS_PORT:-8789}"              # the sidecar egress the BFF dials (loopback)
-ENGINE_ADDR="${ENGINE_ADDR:-127.0.0.1:7878}"
-ENGINE_SERVERNAME="${ENGINE_SERVERNAME:-wire.localhost}"
+# Default to the dedicated Console/Control plane (IP-CONSOLE-CONTROL-PLANE): a permanent software P-384
+# identity on :7879, separate from the ZTP wire seam. ENGINE_KEY (a software key) selects the software
+# path; the certs are the Console-CA leaf the node installer generates, copied into OUT_DIR by install.sh.
+ENGINE_ADDR="${ENGINE_ADDR:-127.0.0.1:7879}"
+ENGINE_SERVERNAME="${ENGINE_SERVERNAME:-control.localhost}"
 ENGINE_CA="${ENGINE_CA:-$OUT_DIR/engine-ca.pem}"
 ENGINE_CERT="${ENGINE_CERT:-$OUT_DIR/engine-client.pem}"
-# The engine key is TPM-resident (no key file): the sidecar re-derives it via this TCTI and signs the
-# engine-leg handshake in-device (the enrolled leaf is engine_cert).
+ENGINE_KEY="${ENGINE_KEY:-$OUT_DIR/engine-client.key}"
+# TCTI is the legacy TPM path, used only when ENGINE_KEY is empty (no software key).
 TCTI="${TCTI:-device:/dev/tpmrm0}"
 SIDECAR_USER="${SIDECAR_USER:-console-sidecar}"
 FORCE="${FORCE:-0}"
@@ -88,6 +91,7 @@ cat > "$CONFIG" <<EOF
   "engine_servername": "$ENGINE_SERVERNAME",
   "engine_ca": "$ENGINE_CA",
   "engine_cert": "$ENGINE_CERT",
+  "engine_key": "$ENGINE_KEY",
   "tcti": "$TCTI",
   "egress_addr": "127.0.0.1:$EGRESS_PORT",
   "admin_cert": "$ADMIN_CERT",
@@ -102,7 +106,7 @@ if id "$SIDECAR_USER" >/dev/null 2>&1 && [ "$(id -u)" = "0" ]; then
 fi
 
 echo "provision-sidecar: OK. config + admin leaf in $OUT_DIR"
-echo "provision-sidecar: engine identity = the enrolled leaf (engine_cert); the key is TPM-resident (TCTI), no key file."
+echo "provision-sidecar: engine identity = the software Console-CA leaf (engine_cert + engine_key) on the :7879 control plane (install.sh copies it from the node's /etc/cdb/control)."
 echo "provision-sidecar: next -> install + enable the units:"
 echo "    install -m0644 sidecar/deploy/console-crypto-sidecar.service /etc/systemd/system/"
 echo "    install -m0644 apps/bff/deploy/console-bff.service            /etc/systemd/system/"
