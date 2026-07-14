@@ -20,13 +20,17 @@ import {
   principalId,
   requestId,
   tenantId,
+  toOverviewGraph,
+  toRiskLevel,
 } from '../src/index.js';
 import type {
   Binding,
   ConsoleError,
   DecisionId,
+  OverviewGraph,
   ReadBinding,
   TenantId,
+  WireConnectivityGraph,
   WireReply,
   WireStreamEvent,
 } from '../src/index.js';
@@ -146,5 +150,61 @@ describe('binding manifest shape', () => {
       },
     };
     expect(isPending(b)).toBe(true);
+  });
+});
+
+describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connectivity DTO', () => {
+  it('projects a WireConnectivityGraph to the camelCase OverviewGraph (the cross-module guard)', () => {
+    // A drifted wire field would fail this projection at COMPILE time (the DTO is the generated type).
+    const wire: WireConnectivityGraph = {
+      sources: [
+        { class: 'devices', count: 3 },
+        { class: 'agents', count: 1 },
+      ],
+      destinations: [
+        { class: 'network', count: 2 },
+        { class: 'saas', count: 1 },
+      ],
+      edges: [{ source_class: 'devices', dest_class: 'network', weight: 2 }],
+      risk: { level: 'yellow', escalate: 0, candidate: 1, observe: 4 },
+    };
+    const view: OverviewGraph | null = toOverviewGraph(wire);
+    expect(view).not.toBeNull();
+    expect(view?.sources).toEqual([
+      { class: 'devices', count: 3 },
+      { class: 'agents', count: 1 },
+    ]);
+    expect(view?.edges).toEqual([{ sourceClass: 'devices', destClass: 'network', weight: 2 }]);
+    expect(view?.risk).toEqual({ level: 'yellow', escalate: 0, candidate: 1, observe: 4 });
+  });
+
+  it('renders an empty tenant as an empty, green graph (INV-CONSOLE-NO-STUB: no fabricated node)', () => {
+    const empty: WireConnectivityGraph = {
+      sources: [],
+      destinations: [],
+      edges: [],
+      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+    };
+    const view = toOverviewGraph(empty);
+    expect(view).toEqual({
+      sources: [],
+      destinations: [],
+      edges: [],
+      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+    });
+  });
+
+  it('narrows the engine risk-level tag and fails closed on an unknown tag', () => {
+    expect(toRiskLevel('red')).toBe('red');
+    expect(toRiskLevel('green')).toBe('green');
+    expect(toRiskLevel('chartreuse')).toBeNull();
+    // An unknown level fails the whole projection closed (the resolver maps null to the unavailable state).
+    const bad: WireConnectivityGraph = {
+      sources: [],
+      destinations: [],
+      edges: [],
+      risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+    };
+    expect(toOverviewGraph(bad)).toBeNull();
   });
 });

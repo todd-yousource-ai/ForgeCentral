@@ -147,6 +147,36 @@ describe('IP-CONSOLE-09 LG.1: the Logs (logs.*) decision-LOG bindings', () => {
   });
 });
 
+describe('IP-CONSOLE-01 O1.1: the Overview (overview.*) connectivity bindings', () => {
+  const overviewBindings = Object.values(bindings).filter((b) => b.id.startsWith('overview.'));
+
+  it('registers the three Overview bindings (graph/entityConnections/live)', () => {
+    const ids = overviewBindings.map((b) => b.id).sort();
+    expect(ids).toEqual(['overview.entityConnections', 'overview.graph', 'overview.live']);
+  });
+
+  it('binds graph + entityConnections LIVE to the crdb CONNECTIVITY_GRAPH / ENTITY_CONNECTIONS producers', () => {
+    // Backed by crdb IP-CONSOLE-CONNECTIVITY (CN.1-CN.N) + IP-CONSOLE-ENTITY-READ ER.5; genuinely live.
+    const graph = bindings['overview.graph'];
+    expect(graph?.kind).toBe('read');
+    expect(graph?.surface).toBe('cruciblql');
+    expect(graph?.op).toBe('connectivity_graph_v1');
+    expect(graph?.status.kind).toBe('live');
+    const connections = bindings['overview.entityConnections'];
+    expect(connections?.op).toBe('entity_connections_v1');
+    expect(connections?.status.kind).toBe('live');
+  });
+
+  it('defers only live (the push stream) to its gating engine task, never a fabricated stream', () => {
+    const live = bindings['overview.live'];
+    expect(live?.status.kind).toBe('pending');
+    if (live?.status.kind === 'pending') {
+      expect(live.status.owningRepo).toBe('crdb');
+      expect(live.status.gatingTask).not.toBe('');
+    }
+  });
+});
+
 describe('INV-CONSOLE-NO-STUB: the enforcement rules', () => {
   it('accepts a well-formed live read binding', () => {
     const manifest: BindingManifest = { [liveRead.id]: liveRead };

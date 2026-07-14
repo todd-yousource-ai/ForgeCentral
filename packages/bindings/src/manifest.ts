@@ -205,6 +205,54 @@ const logReads: readonly ReadBinding[] = [
   },
 ];
 
+// -- IP-CONSOLE-01 (Overview, P1.3) the `overview.*` connectivity-graph bindings --------------------
+//
+// The flagship home surface: the tenant-wide connectivity flow. `overview.graph` is LIVE against the crdb
+// IP-CONSOLE-CONNECTIVITY producer (CONNECTIVITY_GRAPH over :7878, landed CN.1-CN.N) -- the O1.2 "LOG
+// aggregation" the original plan marked PENDING is now the real engine substrate, so the binding ships
+// live. `overview.entityConnections` is LIVE over the crdb ENTITY_CONNECTIONS read (ER.5). `overview.live`
+// (the real push stream) is an honest PENDING deferral naming its gating engine task -- v1 liveness polls
+// `overview.graph` on the F0.6 live-store. Trust score was removed; the zone is colored by the risk band
+// carried on the graph (green/yellow/red from detected alerts).
+
+const overviewReads: readonly ReadBinding[] = [
+  {
+    // The tenant-wide connectivity roll-up: source-class/destination-class nodes + weighted edges + the
+    // risk band, bounded + time-windowed engine-side (crdb CONNECTIVITY_GRAPH, IP-CONSOLE-CONNECTIVITY
+    // CN.2). The middle "Public" VTZ is a Console render concept colored by the graph's risk band.
+    id: bindingId('overview.graph'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'connectivity_graph_v1',
+    viewModel: 'OverviewGraph',
+    status: { kind: 'live' },
+  },
+  {
+    // One entity's outbound connections for the hover highlight + drawer prefetch (crdb ENTITY_CONNECTIONS,
+    // IP-CONSOLE-ENTITY-READ ER.5). LIVE; feeds the < 3-click drill-in (O1.6).
+    id: bindingId('overview.entityConnections'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'entity_connections_v1',
+    viewModel: 'ConnectionList',
+    status: { kind: 'live' },
+  },
+  {
+    // Live deltas. v1 polls `overview.graph` over the recent window (F0.6 live-store); the dedicated
+    // bounded push SUBSCRIBE op is crdb Part B and swaps in without changing the surface.
+    id: bindingId('overview.live'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'overview_live_v1',
+    viewModel: 'OverviewGraph',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'IP-CONSOLE-READINESS Part B (bounded connectivity SUBSCRIBE push stream)',
+    },
+  },
+];
+
 function register(target: Record<string, Binding>, entries: readonly Binding[]): void {
   for (const entry of entries) {
     target[entry.id] = entry;
@@ -215,6 +263,7 @@ const registry: Record<string, Binding> = {};
 register(registry, entityReads);
 register(registry, entityCommands);
 register(registry, logReads);
+register(registry, overviewReads);
 
 /** The Console binding registry. Keyed by `BindingId`; populated by the surface IPs. */
 export const bindings: BindingManifest = registry;

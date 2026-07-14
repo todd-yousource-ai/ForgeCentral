@@ -55,6 +55,17 @@ export interface WireAuditEntry {
   timestamp: number;
 }
 
+export interface WireConnClass {
+  class: string;
+  count: number;
+}
+
+export interface WireConnEdge {
+  dest_class: string;
+  source_class: string;
+  weight: number;
+}
+
 export interface WireConnection {
   destination_id: string;
   destination_kind: string;
@@ -63,6 +74,21 @@ export interface WireConnection {
 
 export interface WireConnectionList {
   connections: Array<WireConnection>;
+}
+
+export interface WireConnectivityGraph {
+  destinations: Array<WireConnClass>;
+  edges: Array<WireConnEdge>;
+  risk: WireRiskBand;
+  sources: Array<WireConnClass>;
+}
+
+export interface WireConnectivityQuery {
+  limit: number;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  since?: number | null;
+  until?: number | null;
 }
 
 export interface WireContain {
@@ -224,7 +250,8 @@ export type WireReply =
   | { Refused: { error: WireError; }; }
   | { Contained: WireContainEffect; }
   | { DecisionDetail: WireDecisionDetail; }
-  | { LogExported: WireLogExportEffect; };
+  | { LogExported: WireLogExportEffect; }
+  | { ConnectivityGraph: WireConnectivityGraph; };
 
 export type WireRequest =
   | { QuerySubmit: WireQuerySubmit; }
@@ -243,7 +270,15 @@ export type WireRequest =
   | { Contain: WireContain; }
   | { LogQuery: WireLogQuery; }
   | { LogExplain: WireLogExplain; }
-  | { LogExport: WireLogExport; };
+  | { LogExport: WireLogExport; }
+  | { ConnectivityGraph: WireConnectivityQuery; };
+
+export interface WireRiskBand {
+  candidate: number;
+  escalate: number;
+  level: string;
+  observe: number;
+}
 
 export type WireStreamDelta =
   | { Decision: WireDecision; }
