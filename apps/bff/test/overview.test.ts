@@ -4,7 +4,11 @@ import type { WireConnectivityGraph, WireConnectivityQuery } from '@forge/contra
 import { describe, expect, it } from 'vitest';
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
-import { OverviewUnavailableError, resolveOverviewGraph } from '../src/engine/overview.js';
+import {
+  OverviewUnavailableError,
+  resolveOverviewGraph,
+  resolveOverviewSankey,
+} from '../src/engine/overview.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
 
 const principal: OperatorPrincipal = {
@@ -50,6 +54,9 @@ describe('resolveOverviewGraph', () => {
       destinations: [{ class: 'saas', count: 4 }],
       edges: [{ source_class: 'agents', dest_class: 'saas', weight: 4 }],
       risk: { level: 'yellow', escalate: 0, candidate: 2, observe: 5 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
     });
     const view = await resolveOverviewGraph(engine, principal, { limit: 1000 });
     expect(view.sources).toEqual([
@@ -68,6 +75,9 @@ describe('resolveOverviewGraph', () => {
       destinations: [],
       edges: [],
       risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
     });
     const view = await resolveOverviewGraph(engine, principal, { limit: 1000 });
     expect(view.sources).toEqual([]);
@@ -83,6 +93,9 @@ describe('resolveOverviewGraph', () => {
       edges: [],
       // A tag the Console does not know must never be silently mis-colored.
       risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
     });
     await expect(resolveOverviewGraph(engine, principal, { limit: 1000 })).rejects.toBeInstanceOf(
       OverviewUnavailableError,
@@ -95,6 +108,9 @@ describe('resolveOverviewGraph', () => {
       destinations: [],
       edges: [],
       risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
     });
     await resolveOverviewGraph(engine, principal, {
       since: 1_700_000_000_000,
@@ -116,9 +132,62 @@ describe('resolveOverviewGraph', () => {
       destinations: [],
       edges: [],
       risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
     });
     await resolveOverviewGraph(engine, principal, { limit: 1000 });
     expect(seen[0]?.since).toBeNull();
     expect(seen[0]?.until).toBeNull();
+  });
+});
+
+describe('resolveOverviewSankey (RD.4)', () => {
+  const zoned = {
+    sources: [{ class: 'agents', count: 3 }],
+    destinations: [{ class: 'saas', count: 4 }],
+    edges: [{ source_class: 'agents', dest_class: 'saas', weight: 4 }],
+    risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
+    vtzs: [
+      {
+        id: 'demo-public-agent',
+        name: 'Demo.Public.Agent',
+        risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
+      },
+    ],
+    source_edges: [{ source_class: 'agents', vtz_id: 'demo-public-agent', weight: 3 }],
+    dest_edges: [{ vtz_id: 'demo-public-agent', dest_class: 'saas', weight: 4 }],
+  };
+
+  it('projects the wire graph to the VTZ-routed OverviewSankey view model', async () => {
+    const { engine } = engineWith(zoned);
+    const view = await resolveOverviewSankey(engine, principal, { limit: 1000 });
+    expect(view.vtzs).toEqual([
+      {
+        id: 'demo-public-agent',
+        name: 'Demo.Public.Agent',
+        risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
+      },
+    ]);
+    expect(view.sourceEdges).toEqual([
+      { sourceClass: 'agents', vtzId: 'demo-public-agent', weight: 3 },
+    ]);
+    expect(view.destinations).toEqual([{ class: 'saas', count: 4, apps: [], moreCount: 4 }]);
+  });
+
+  it('fails closed (OverviewUnavailableError) when a VTZ risk-band level is unknown', async () => {
+    const { engine } = engineWith({
+      ...zoned,
+      vtzs: [
+        {
+          id: 'x',
+          name: 'X',
+          risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+        },
+      ],
+    });
+    await expect(resolveOverviewSankey(engine, principal, { limit: 1000 })).rejects.toBeInstanceOf(
+      OverviewUnavailableError,
+    );
   });
 });

@@ -65,7 +65,15 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
     connectivityGraph: (req) => {
       calls.push('connectivityGraph');
       reads.push(req);
-      return Promise.resolve({ sources: [], destinations: [], edges: [], risk: emptyRisk });
+      return Promise.resolve({
+        sources: [],
+        destinations: [],
+        edges: [],
+        risk: emptyRisk,
+        vtzs: [],
+        source_edges: [],
+        dest_edges: [],
+      });
     },
     contain: (req) => {
       calls.push('contain');

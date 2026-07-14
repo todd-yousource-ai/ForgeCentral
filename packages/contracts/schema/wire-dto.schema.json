@@ -268,6 +268,12 @@
     "WireConnectivityGraph": {
       "additionalProperties": false,
       "properties": {
+        "dest_edges": {
+          "items": {
+            "$ref": "#/$defs/WireVtzDestEdge"
+          },
+          "type": "array"
+        },
         "destinations": {
           "items": {
             "$ref": "#/$defs/WireConnClass"
@@ -283,9 +289,21 @@
         "risk": {
           "$ref": "#/$defs/WireRiskBand"
         },
+        "source_edges": {
+          "items": {
+            "$ref": "#/$defs/WireSourceVtzEdge"
+          },
+          "type": "array"
+        },
         "sources": {
           "items": {
             "$ref": "#/$defs/WireConnClass"
+          },
+          "type": "array"
+        },
+        "vtzs": {
+          "items": {
+            "$ref": "#/$defs/WireVtzNode"
           },
           "type": "array"
         }
@@ -294,7 +312,10 @@
         "sources",
         "destinations",
         "edges",
-        "risk"
+        "risk",
+        "vtzs",
+        "source_edges",
+        "dest_edges"
       ],
       "type": "object"
     },
@@ -1772,6 +1793,26 @@
       ],
       "type": "object"
     },
+    "WireSourceVtzEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "source_class": {
+          "type": "string"
+        },
+        "vtz_id": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_class",
+        "vtz_id",
+        "weight"
+      ],
+      "type": "object"
+    },
     "WireStreamDelta": {
       "oneOf": [
         {
@@ -1937,6 +1978,46 @@
           "type": "object"
         }
       ]
+    },
+    "WireVtzDestEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "dest_class": {
+          "type": "string"
+        },
+        "vtz_id": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "vtz_id",
+        "dest_class",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "WireVtzNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "risk": {
+          "$ref": "#/$defs/WireRiskBand"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "risk"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://schema.yousource.ai/crucible/wire/dto/v1",

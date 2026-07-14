@@ -290,3 +290,41 @@ export function overviewHighlight(graph: OverviewSankey, destClass: string): Ove
     destEdgeKeys: new Set(destEdges.map(destEdgeKey)),
   };
 }
+
+/**
+ * Project a generated `WireConnectivityGraph` (the RD.3 two-stage shape) to the {@link OverviewSankey} view
+ * model, or `null` if any VTZ risk band's level is unknown (fail-closed to the unavailable state). The wire
+ * carries no per-app breakdown yet (DNS resolution is a fast-follow), so each destination lists no apps and
+ * `moreCount` is its full connection count. A drifted wire field is a compile error here (the cross-module
+ * guard); the RD.4 BFF resolver calls this.
+ */
+export function toOverviewSankey(graph: WireConnectivityGraph): OverviewSankey | null {
+  const vtzs: OverviewVtzNode[] = [];
+  for (const v of graph.vtzs) {
+    const risk = toRiskBand(v.risk);
+    if (risk === null) {
+      return null;
+    }
+    vtzs.push({ id: v.id, name: v.name, risk });
+  }
+  return {
+    sources: graph.sources.map((s) => ({ class: s.class, count: s.count })),
+    vtzs,
+    destinations: graph.destinations.map((d) => ({
+      class: d.class,
+      count: d.count,
+      apps: [],
+      moreCount: d.count,
+    })),
+    sourceEdges: graph.source_edges.map((e) => ({
+      sourceClass: e.source_class,
+      vtzId: e.vtz_id,
+      weight: e.weight,
+    })),
+    destEdges: graph.dest_edges.map((e) => ({
+      vtzId: e.vtz_id,
+      destClass: e.dest_class,
+      weight: e.weight,
+    })),
+  };
+}

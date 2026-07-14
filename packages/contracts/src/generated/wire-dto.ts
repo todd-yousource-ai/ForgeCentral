@@ -77,10 +77,13 @@ export interface WireConnectionList {
 }
 
 export interface WireConnectivityGraph {
+  dest_edges: Array<WireVtzDestEdge>;
   destinations: Array<WireConnClass>;
   edges: Array<WireConnEdge>;
   risk: WireRiskBand;
+  source_edges: Array<WireSourceVtzEdge>;
   sources: Array<WireConnClass>;
+  vtzs: Array<WireVtzNode>;
 }
 
 export interface WireConnectivityQuery {
@@ -280,6 +283,12 @@ export interface WireRiskBand {
   observe: number;
 }
 
+export interface WireSourceVtzEdge {
+  source_class: string;
+  vtz_id: string;
+  weight: number;
+}
+
 export type WireStreamDelta =
   | { Decision: WireDecision; }
   | { Audit: WireAuditEntry; };
@@ -302,3 +311,15 @@ export type WireValue =
   | { Bytes: Array<number>; }
   | { Timestamp: number; }
   | { Vector: Array<number>; };
+
+export interface WireVtzDestEdge {
+  dest_class: string;
+  vtz_id: string;
+  weight: number;
+}
+
+export interface WireVtzNode {
+  id: string;
+  name: string;
+  risk: WireRiskBand;
+}

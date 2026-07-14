@@ -9,8 +9,13 @@
 // the engine emits a risk-band tag the Console does not know, the projection returns null and this raises
 // `OverviewUnavailableError` rather than mis-coloring the "Public" zone.
 
-import { toOverviewGraph } from '@forge/contracts';
-import type { OverviewGraph, OverviewQuery, WireConnectivityQuery } from '@forge/contracts';
+import { toOverviewGraph, toOverviewSankey } from '@forge/contracts';
+import type {
+  OverviewGraph,
+  OverviewQuery,
+  OverviewSankey,
+  WireConnectivityQuery,
+} from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -52,6 +57,26 @@ export async function resolveOverviewGraph(
 ): Promise<OverviewGraph> {
   const graph = await engine.connectivityGraph(principal, queryToWire(query), opts);
   const view = toOverviewGraph(graph);
+  if (view === null) {
+    throw new OverviewUnavailableError();
+  }
+  return view;
+}
+
+/**
+ * Resolve the tenant-wide VTZ-routed connectivity graph (RD.4) for `query`, brokered on behalf of
+ * `principal`. Same engine read (CONNECTIVITY_GRAPH), projected to the redesigned {@link OverviewSankey}
+ * two-stage view model (source -> VTZ -> destination, each VTZ with its own detection-driven risk). Fails
+ * closed to {@link OverviewUnavailableError} when a VTZ risk-band level is unknown.
+ */
+export async function resolveOverviewSankey(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  query: OverviewQuery,
+  opts?: EngineCallOptions,
+): Promise<OverviewSankey> {
+  const graph = await engine.connectivityGraph(principal, queryToWire(query), opts);
+  const view = toOverviewSankey(graph);
   if (view === null) {
     throw new OverviewUnavailableError();
   }
