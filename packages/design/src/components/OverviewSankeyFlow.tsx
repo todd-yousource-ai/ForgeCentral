@@ -520,14 +520,19 @@ export function OverviewSankeyFlow({
           const hiddenApps = d.apps.length - shownApps.length;
           const rows: { key: string; label: string; kind: 'app' | 'toggle' | 'tail' }[] =
             shownApps.map((a) => ({ key: a.address, label: a.name, kind: 'app' }));
+          // One "more" affordance at a time: collapsed with hidden apps shows a single fan-out toggle
+          // (it stands in for both the hidden named apps and the unclassified tail). Fully shown, the
+          // unclassified-tail count (connections beyond the engine's bounded top-N) reads as its own row,
+          // alongside a "show fewer" affordance when the list was fanned out.
           if (hiddenApps > 0) {
             rows.push({ key: '__toggle', label: `+${hiddenApps} more`, kind: 'toggle' });
-          } else if (isExpanded && d.apps.length > APPS_COLLAPSED) {
-            rows.push({ key: '__toggle', label: 'show fewer', kind: 'toggle' });
-          }
-          if (d.moreCount > 0) {
-            // Connections to destinations beyond the named list (the engine returns a bounded top-N).
-            rows.push({ key: '__tail', label: `+${d.moreCount} more`, kind: 'tail' });
+          } else {
+            if (isExpanded && d.apps.length > APPS_COLLAPSED) {
+              rows.push({ key: '__toggle', label: 'show fewer', kind: 'toggle' });
+            }
+            if (d.moreCount > 0) {
+              rows.push({ key: '__tail', label: `+${d.moreCount} more`, kind: 'tail' });
+            }
           }
           const rowH = 23;
           const top = d.y - ((rows.length - 1) * rowH) / 2;

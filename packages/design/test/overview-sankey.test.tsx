@@ -112,6 +112,30 @@ describe('OverviewSankeyFlow', () => {
     expect(screen.getByText('show fewer')).toBeInTheDocument();
   });
 
+  it('shows a single "more" affordance at a time (fan-out toggle collapsed, tail when shown)', () => {
+    const apps = Array.from({ length: 7 }, (_, i) => ({
+      name: `host-${i}.example`,
+      address: `10.0.0.${i}`,
+      count: 1,
+    }));
+    // 7 named apps (2 hidden) AND an unclassified tail: collapsed must show ONLY the fan-out toggle.
+    const withTail: OverviewSankey = {
+      ...graph,
+      destinations: [
+        { class: 'network', count: 40, apps, moreCount: 33 },
+        ...graph.destinations.filter((d) => d.class !== 'network'),
+      ],
+    };
+    render(<OverviewSankeyFlow graph={withTail} />);
+    expect(screen.getByText('+2 more')).toBeInTheDocument();
+    // The tail is NOT a second "+N more" row while collapsed.
+    expect(screen.queryByText('+33 more')).not.toBeInTheDocument();
+    // Fan out: the tail now reads as its own row, next to "show fewer".
+    fireEvent.click(screen.getByText('+2 more'));
+    expect(screen.getByText('+33 more')).toBeInTheDocument();
+    expect(screen.getByText('show fewer')).toBeInTheDocument();
+  });
+
   it('hovering a destination dims the ribbons not on a path that feeds it (linked highlight)', () => {
     const { container } = render(<OverviewSankeyFlow graph={graph} hoveredDest="private-apps" />);
     const ribbons = [...container.querySelectorAll('.fc-ov__ribbons path')];

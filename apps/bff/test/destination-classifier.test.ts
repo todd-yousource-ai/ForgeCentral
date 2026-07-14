@@ -81,9 +81,15 @@ describe('classifyDestination', () => {
       category: 'network',
       name: 'Someisp',
     });
+    // Unresolved + unbranded -> named by the bare IP host (the noise :443 is dropped), so the same host
+    // with and without a captured port collapses to one entry.
     expect(classifyDestination('203.0.113.9:443')).toEqual({
       category: 'network',
-      name: '203.0.113.9:443',
+      name: '203.0.113.9',
+    });
+    expect(classifyDestination('203.0.113.9')).toEqual({
+      category: 'network',
+      name: '203.0.113.9',
     });
   });
 });
