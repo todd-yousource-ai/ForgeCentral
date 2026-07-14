@@ -54,6 +54,9 @@ export const text = {
   primary: { value: '#F4F7FB', meaning: 'primary text on dark surfaces' },
   muted: { value: '#8A93A5', meaning: 'secondary/muted text and labels' },
   onBrand: { value: surface.canvas.value, meaning: 'dark text on a brand-green fill' },
+  // TUNE(IP-CONSOLE-01 RD.2): a softened off-white for large numerics (the Overview counts) -- lighter and
+  // thinner than `primary` so the big numbers do not read as heavy/bright.
+  soft: { value: '#C4CDDB', meaning: 'softened off-white for large numerics' },
 } as const;
 
 /** Every color token flattened to a `group.name` key, for CSS-variable generation and contrast tests. */

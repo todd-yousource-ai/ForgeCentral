@@ -257,5 +257,45 @@ export function componentStyles(): string {
 .fc-overview-flow__zone--critical .fc-overview-flow__zone-risk { fill: var(--fc-color-status-critical); }
 .fc-overview-flow__empty-note { fill: var(--fc-color-text-muted); font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-sm); }
 .fc-overview-flow__skeleton { fill: var(--fc-color-surface-border); animation: fc-skeleton-pulse var(--fc-motion-duration-base) var(--fc-motion-easing-standard) infinite alternate; }
+
+/* Overview redesign (Sankey) -- IP-CONSOLE-01 RD.2. Colours are tokens only. */
+.fc-ov { display: block; width: 100%; }
+.fc-ov svg { display: block; width: 100%; height: auto; }
+.fc-ov__ribbons { mix-blend-mode: screen; }
+.fc-ov__ring { fill: none; stroke-width: 1; stroke-dasharray: 0.5 4; stroke-linecap: round; opacity: 0.38; }
+.fc-ov__ring--users { stroke: var(--fc-color-flow-users); }
+.fc-ov__ring--devices { stroke: var(--fc-color-flow-devices); }
+.fc-ov__ring--agents { stroke: var(--fc-color-flow-agents); }
+.fc-ov__ring--objects { stroke: var(--fc-color-flow-objects); }
+.fc-ov__ring--muted { stroke: var(--fc-color-text-muted); }
+.fc-ov__count { fill: var(--fc-color-text-soft); font-family: var(--fc-font-fontFamily-sans); font-weight: 300; }
+.fc-ov__label { fill: var(--fc-color-text-muted); font-family: var(--fc-font-fontFamily-sans); font-weight: 600; letter-spacing: 0.2em; }
+.fc-ov__dest-label { fill: var(--fc-color-flow-objects); font-family: var(--fc-font-fontFamily-sans); font-weight: 600; letter-spacing: 0.08em; }
+.fc-ov__ray { stroke-width: 1; stroke-linecap: round; }
+.fc-ov__vtz--good .fc-ov__ray { stroke: var(--fc-color-status-good); }
+.fc-ov__vtz--caution .fc-ov__ray { stroke: var(--fc-color-status-caution); }
+.fc-ov__vtz--critical .fc-ov__ray { stroke: var(--fc-color-status-critical); }
+.fc-ov__rim { stroke-width: 0.6; }
+.fc-ov__vtz--good .fc-ov__rim { stroke: var(--fc-color-status-good); stroke-opacity: 0.4; }
+.fc-ov__vtz--caution .fc-ov__rim { stroke: var(--fc-color-status-caution); stroke-opacity: 0.4; }
+.fc-ov__vtz--critical .fc-ov__rim { stroke: var(--fc-color-status-critical); stroke-opacity: 0.4; }
+.fc-ov__vtz-disc { stroke-width: 1.25; stroke-opacity: 0.6; }
+.fc-ov__vtz--good .fc-ov__vtz-disc { fill: color-mix(in srgb, var(--fc-color-status-good) 8%, var(--fc-color-surface-card)); stroke: var(--fc-color-status-good); }
+.fc-ov__vtz--caution .fc-ov__vtz-disc { fill: color-mix(in srgb, var(--fc-color-status-caution) 8%, var(--fc-color-surface-card)); stroke: var(--fc-color-status-caution); }
+.fc-ov__vtz--critical .fc-ov__vtz-disc { fill: color-mix(in srgb, var(--fc-color-status-critical) 8%, var(--fc-color-surface-card)); stroke: var(--fc-color-status-critical); }
+.fc-ov__vtz-org { fill: var(--fc-color-text-muted); font-family: var(--fc-font-fontFamily-sans); font-weight: 600; }
+.fc-ov__vtz-name { fill: var(--fc-color-text-primary); font-family: var(--fc-font-fontFamily-sans); font-weight: 700; }
+.fc-ov__vtz-risk { font-family: var(--fc-font-fontFamily-sans); font-weight: 600; }
+.fc-ov__vtz--good .fc-ov__vtz-risk { fill: var(--fc-color-status-good); }
+.fc-ov__vtz--caution .fc-ov__vtz-risk { fill: var(--fc-color-status-caution); }
+.fc-ov__vtz--critical .fc-ov__vtz-risk { fill: var(--fc-color-status-critical); }
+.fc-ov__app { fill: var(--fc-color-text-primary); font-family: var(--fc-font-fontFamily-sans); }
+.fc-ov__app--more { fill: var(--fc-color-text-muted); }
+.fc-ov__app-dot { stroke: var(--fc-color-flow-objects); stroke-width: 1.1; }
+.fc-ov__app-dot--more { stroke: var(--fc-color-text-muted); }
+.fc-ov__empty-note { fill: var(--fc-color-text-muted); font-family: var(--fc-font-fontFamily-sans); font-size: 15px; }
+.fc-ov__skeleton { fill: var(--fc-color-surface-border); animation: fc-skeleton-pulse var(--fc-motion-duration-base) var(--fc-motion-easing-standard) infinite alternate; }
+.fc-ov__corona { transform-box: fill-box; transform-origin: center; animation: fc-ov-spin 120s linear infinite; }
+@keyframes fc-ov-spin { to { transform: rotate(360deg); } }
 `;
 }
