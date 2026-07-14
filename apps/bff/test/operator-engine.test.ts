@@ -157,6 +157,36 @@ describe('principalFromSession', () => {
       tenant: 'tenant-op',
     });
   });
+
+  it('lets a global-admin scope the read to a chosen tenant (the tenant selector)', () => {
+    const session: OperatorSession = {
+      sessionId: 'x',
+      subject: 'auth0|root',
+      tier: 'Developer',
+      principalId: 'principal-root',
+      tenant: 'tenant-home',
+      role: 'global-admin',
+      expiresAt: 1,
+    };
+    expect(principalFromSession(session, 'tenant-acme').tenant).toBe('tenant-acme');
+    // A blank/whitespace override falls back to the session's resolved tenant.
+    expect(principalFromSession(session, '   ').tenant).toBe('tenant-home');
+    expect(principalFromSession(session, undefined).tenant).toBe('tenant-home');
+  });
+
+  it('ignores a tenant override for a tenant-scoped operator (fail-closed)', () => {
+    const session: OperatorSession = {
+      sessionId: 'x',
+      subject: 'auth0|op',
+      tier: 'Developer',
+      principalId: 'principal-op',
+      tenant: 'tenant-op',
+      role: 'tenant-admin',
+      expiresAt: 1,
+    };
+    // A tenant-admin cannot switch tenants: the override is discarded, tenant stays pinned.
+    expect(principalFromSession(session, 'tenant-other').tenant).toBe('tenant-op');
+  });
 });
 
 describe('createOperatorEngine', () => {

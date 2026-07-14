@@ -5,12 +5,12 @@
 // at the type level). Each brokered call is recorded as a delegation -- who acted, at what tier, doing
 // what -- before it runs, so an attempt is always traced even if the engine refuses it.
 //
-// Scope note (honest, INV-CROSS): the engine still authorizes the TRANSPORT by the BFF's device-wide
-// service cert; it cannot yet re-authorize per operator, because `WireQuerySubmit` carries no operator
-// identity. Carrying the Principal onto the wire so the engine re-authorizes under the operator, and
-// writing the operator into the engine's authoritative audit stream, is the crdb **F0.5c** cross-repo
-// task. Until then this facade is the BFF's mandatory delegation boundary + trace; the Principal it
-// records is exactly what F0.5c serializes onto the new wire field.
+// Scope note (INV-CROSS, design decision D3): this facade injects `OperatorDelegation { principal, tenant }`
+// onto every wire request, and the engine narrows the read to that operator + tenant -- gated by the
+// console peer's `Delegation` grant, and refusing a reserved service tenant (IP-CONSOLE-CONTROL-PLANE C4).
+// Per D3 the operator -> tenant mapping stays OWNED BY ForgeCentral (resolved at login by its RBAC): the
+// engine trusts the Delegation-granted broker rather than verifying a signed per-operator assertion. This
+// facade is the BFF's mandatory delegation boundary + trace, and the source of the wire delegation.
 
 import type {
   WireAgentList,
@@ -57,7 +57,7 @@ export interface EngineDelegation {
   readonly action: EngineAction;
   /** The CrucibleQL request id, for a querySubmit. */
   readonly requestId?: number;
-  /** The operator's resolved tenant, when known (F0.5c). */
+  /** The operator's resolved tenant the delegation scopes the read to. */
   readonly tenant?: string;
 }
 
