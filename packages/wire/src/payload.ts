@@ -8,6 +8,7 @@
 
 import type {
   OperatorDelegation,
+  WireConnectivityQuery,
   WireEntityConnections,
   WireEntityDecisions,
   WireListAgents,
@@ -84,6 +85,21 @@ function entityConnectionsToCbor(request: WireEntityConnections): unknown {
 }
 
 /**
+ * The tenant-wide connectivity read (CONNECTIVITY_GRAPH, crdb IP-CONSOLE-CONNECTIVITY CN.2). Fields in the
+ * Rust struct order (request_id, since?, until?, limit, operator?); `since`/`until`/`operator` carry
+ * `skip_serializing_if = "Option::is_none"`, so a null bound is OMITTED (never emitted as null), matching
+ * the engine's byte shape exactly.
+ */
+function connectivityQueryToCbor(request: WireConnectivityQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  if (request.since != null) out['since'] = request.since;
+  if (request.until != null) out['until'] = request.until;
+  out['limit'] = request.limit;
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
  * Encode a WireRequest to its CBOR frame payload. The read + cursor variants (what the Console's reads
  * need) are supported; the write-path variants throw a clear error rather than emit a wrong shape.
  */
@@ -99,6 +115,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('EntityConnections' in request) {
     return encode({ EntityConnections: entityConnectionsToCbor(request.EntityConnections) });
+  }
+  if ('ConnectivityGraph' in request) {
+    return encode({ ConnectivityGraph: connectivityQueryToCbor(request.ConnectivityGraph) });
   }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });

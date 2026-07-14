@@ -15,7 +15,14 @@ import {
 } from 'node:http';
 
 import { objectId, principalId, vtzId } from '@forge/contracts';
-import type { EntityRef, IsolateRequest, LogExportRequest, LogQueryFilter } from '@forge/contracts';
+import type {
+  EntityRef,
+  IsolateRequest,
+  LogExportRequest,
+  LogQueryFilter,
+  OverviewGraph,
+  OverviewQuery,
+} from '@forge/contracts';
 
 import type { AuthRouter } from './auth/router.js';
 import type { BffConfig } from './config.js';
@@ -23,6 +30,7 @@ import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
 import { resolveIsolate } from './engine/isolate.js';
 import { resolveLogExplain, resolveLogExport, resolveLogQuery } from './engine/logs.js';
+import { OverviewUnavailableError, resolveOverviewGraph } from './engine/overview.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
 import { principalFromSession } from './engine/principal.js';
 import { EngineRefusedError } from './engine/wire-client.js';
@@ -385,6 +393,94 @@ async function handleLogs(
   return true;
 }
 
+// TUNE(IP-CONSOLE-01 O1.3): the Overview aggregation scan bound. The engine further clamps to the
+// committed per-tenant ceiling; these are the Console-side request bounds so an unbounded/oversized ask is
+// refused here.
+const DEFAULT_OVERVIEW_LIMIT = 1000;
+const MAX_OVERVIEW_LIMIT = 5000;
+
+// The connectivity graph reply carries no engine commit version to tag the cache with, so the ephemeral
+// cache degrades to a pure short-TTL projection cache under this constant sentinel (staleness bounded by
+// `cacheTtlMs`, short by design). The key is scoped by tenant + the query bounds, so a cached graph can
+// never be served across tenants (INV-CONSOLE-ENGINE-AUTHZ) or across differing windows.
+const OVERVIEW_CACHE_VERSION = 'overview-v1';
+
+/** Parse the `/api/overview/graph` query string into a bounded `OverviewQuery`. `since`/`until` are millis. */
+function parseOverviewQuery(params: URLSearchParams): OverviewQuery {
+  const num = (key: string): number | undefined => {
+    const value = params.get(key);
+    if (value === null || value === '') return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+  const requested = num('limit');
+  const limit =
+    requested !== undefined && requested > 0
+      ? Math.min(requested, MAX_OVERVIEW_LIMIT)
+      : DEFAULT_OVERVIEW_LIMIT;
+  const since = num('since');
+  const until = num('until');
+  return {
+    ...(since !== undefined ? { since } : {}),
+    ...(until !== undefined ? { until } : {}),
+    limit,
+  };
+}
+
+/**
+ * Serve the Overview connectivity graph (`GET /api/overview/graph`): resolve the operator session
+ * (fail-closed 401), broker the tenant-wide CONNECTIVITY_GRAPH read through the OperatorEngine, and project
+ * it to an `OverviewGraph`. Served from a tenant-scoped, short-TTL cache when warm (bounded, non-authoritative).
+ * Fails CLOSED to the unavailable state: an unknown risk-band tag is a 503, a query-gate refusal a sanitized
+ * 403. Returns true iff it claimed the request.
+ */
+async function handleOverview(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/overview/graph') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const principal = principalFromSession(session);
+  const query = parseOverviewQuery(new URL(req.url ?? '/', 'http://localhost').searchParams);
+  // Tenant-scoped + bounds-scoped key: a warm graph is never served across tenants or across windows.
+  const cacheKey = `overview:graph:${principal.tenant}:${String(query.since ?? '')}:${String(
+    query.until ?? '',
+  )}:${String(query.limit)}`;
+  const cached = deps.cache.get(cacheKey, OVERVIEW_CACHE_VERSION) as OverviewGraph | undefined;
+  if (cached !== undefined) {
+    sendJson(res, 200, cached);
+    return true;
+  }
+  try {
+    const graph = await resolveOverviewGraph(deps.operatorEngine, principal, query, {
+      timeoutMs: deps.config.requestTimeoutMs,
+    });
+    deps.cache.set(cacheKey, graph, OVERVIEW_CACHE_VERSION);
+    sendJson(res, 200, graph);
+  } catch (err) {
+    if (err instanceof OverviewUnavailableError) {
+      // The engine returned a graph the Console cannot color; surface the unavailable state, never a default.
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'overview read failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -435,6 +531,9 @@ async function route(
     return;
   }
   if (await handleLogs(deps, req, path, res)) {
+    return;
+  }
+  if (await handleOverview(deps, req, path, res)) {
     return;
   }
   // The Console SPA (served behind the admin plane) owns every other GET path -- a static asset or a

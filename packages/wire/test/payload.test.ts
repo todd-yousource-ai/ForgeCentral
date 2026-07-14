@@ -82,6 +82,35 @@ describe('encodeWireRequest', () => {
     );
   });
 
+  it('encodes ConnectivityGraph byte-identically to ciborium, omitting null bounds (crdb CN.2)', () => {
+    // Matches the crdb `WireRequest::ConnectivityGraph byte shape` golden: with since/until/operator None,
+    // the CBOR map is exactly { request_id, limit } in the Rust struct order.
+    const request: WireRequest = {
+      ConnectivityGraph: { request_id: 7, operator: null, since: null, until: null, limit: 100 },
+    };
+    expect(hex(encodeWireRequest(request))).toBe(
+      'a171436f6e6e65637469766974794772617068a26a726571756573745f696407656c696d69741864',
+    );
+  });
+
+  it('includes the time bounds + operator on ConnectivityGraph when present (Rust struct order)', () => {
+    const request: WireRequest = {
+      ConnectivityGraph: {
+        request_id: 7,
+        since: 1_700_000_000,
+        until: 1_700_000_060,
+        limit: 100,
+        operator: { principal: 'principal-op', tenant: 'tenant-op' },
+      },
+    };
+    // Fields emit in struct order (request_id, since, until, limit, operator) -> a 5-key inner map (0xa5).
+    const encoded = hex(encodeWireRequest(request));
+    expect(encoded).toContain('a56a726571756573745f696407'); // 5-key map opening on request_id = 7
+    expect(encoded).toContain('6573696e6365'); // the "since" key is present
+    expect(encoded).toContain('65756e74696c'); // the "until" key is present
+    expect(encoded).toContain('6f70657261746f72'); // the "operator" key is present
+  });
+
   it('throws on an unsupported (write-path) variant rather than emitting a wrong shape', () => {
     const request = { TxnCommit: { txn: [], request_id: 1 } } as unknown as WireRequest;
     expect(() => encodeWireRequest(request)).toThrow(/not yet supported/);

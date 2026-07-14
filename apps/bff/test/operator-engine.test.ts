@@ -14,6 +14,7 @@ import {
 } from '../src/engine/index.js';
 
 const rows: WireQueryRows = { cursor: null, redacted_fields: [], rows: [] };
+const emptyRisk = { level: 'green', escalate: 0, candidate: 0, observe: 0 };
 const admin: OperatorPrincipal = {
   subject: 'auth0|op',
   tier: 'Admin',
@@ -60,6 +61,11 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       calls.push('entityConnections');
       reads.push(req);
       return Promise.resolve({ connections: [] });
+    },
+    connectivityGraph: (req) => {
+      calls.push('connectivityGraph');
+      reads.push(req);
+      return Promise.resolve({ sources: [], destinations: [], edges: [], risk: emptyRisk });
     },
     contain: (req) => {
       calls.push('contain');
@@ -230,6 +236,36 @@ describe('createOperatorEngine', () => {
       'listAgents',
       'entityDecisions',
       'entityConnections',
+    ]);
+  });
+
+  it('records the delegation + injects the operator on the connectivity graph read (O1.3)', async () => {
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    const graph = await engine.connectivityGraph(admin, {
+      request_id: 9,
+      operator: null,
+      since: null,
+      until: null,
+      limit: 1000,
+    });
+    expect(graph.risk.level).toBe('green');
+    expect(calls).toEqual(['connectivityGraph']);
+    // The facade injects the operator delegation onto the tenant-wide read (never client-asserted).
+    expect((reads[0] as { operator?: unknown }).operator).toEqual({
+      principal: 'principal-op',
+      tenant: 'tenant-op',
+    });
+    expect(recorded).toEqual([
+      {
+        operator: 'auth0|op',
+        tier: 'Admin',
+        action: 'connectivityGraph',
+        requestId: 9,
+        tenant: 'tenant-op',
+      },
     ]);
   });
 

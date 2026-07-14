@@ -9,6 +9,8 @@
 import type {
   WireAgentList,
   WireConnectionList,
+  WireConnectivityGraph,
+  WireConnectivityQuery,
   WireContain,
   WireContainEffect,
   WireDecisionDetail,
@@ -53,6 +55,13 @@ export interface CrucibleClient {
     request: WireEntityConnections,
     opts?: EngineCallOptions,
   ): Promise<WireConnectionList>;
+  /** Read the tenant-wide connectivity aggregation (CONNECTIVITY_GRAPH, crdb IP-CONSOLE-CONNECTIVITY
+   * CN.2): a bounded, tenant-wide roll-up of the LEG `ConnectsTo` graph into source-class/destination-class
+   * nodes + weighted edges + a risk band, aggregated engine-side. */
+  connectivityGraph(
+    request: WireConnectivityQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireConnectivityGraph>;
   /** Issue an operator containment disposition (CONTAIN, crdb IP-CONTAIN-COMMAND): record a
    * `Quarantine`/`Deny` on a subject through the audited path. Returns the honest effect
    * (`enforcement_active` is `false` today, AG.7). A data-plane write, honored under the peer's

@@ -43,6 +43,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     listAgents: unused,
     entityDecisions: unused,
     entityConnections: unused,
+    connectivityGraph: unused,
     contain: unused,
     logQuery: unused,
     logExplain: unused,
@@ -91,6 +92,16 @@ function operatorEngineWith(): OperatorEngine {
       }),
     entityDecisions: () => Promise.resolve({ decisions: [] }),
     entityConnections: () => Promise.resolve({ connections: [] }),
+    connectivityGraph: () =>
+      Promise.resolve({
+        sources: [
+          { class: 'agents', count: 3 },
+          { class: 'users', count: 1 },
+        ],
+        destinations: [{ class: 'saas', count: 4 }],
+        edges: [{ source_class: 'agents', dest_class: 'saas', weight: 4 }],
+        risk: { level: 'yellow', escalate: 0, candidate: 2, observe: 5 },
+      }),
     // This route test does not exercise CONTAIN; fail loudly if it is reached (not a canned success).
     contain: unused,
     logQuery: () =>
@@ -373,6 +384,140 @@ describe('BFF HTTP surface', () => {
         })
       ).status,
     ).toBe(400);
+  });
+
+  it('GET /api/overview/graph brokers CONNECTIVITY_GRAPH + projects the camelCase graph (O1.3)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    const res = await fetch(`${base}/api/overview/graph?limit=100`);
+    expect(res.status).toBe(200);
+    const graph = (await res.json()) as {
+      sources: { class: string; count: number }[];
+      destinations: { class: string; count: number }[];
+      edges: { sourceClass: string; destClass: string; weight: number }[];
+      risk: { level: string; candidate: number; observe: number };
+    };
+    // The DTO's snake_case edge fields project to the camelCase view model, real engine facts throughout.
+    expect(graph.sources).toEqual([
+      { class: 'agents', count: 3 },
+      { class: 'users', count: 1 },
+    ]);
+    expect(graph.edges).toEqual([{ sourceClass: 'agents', destClass: 'saas', weight: 4 }]);
+    // The "Public" zone is colored by the risk band derived from detected alerts (no trust score).
+    expect(graph.risk.level).toBe('yellow');
+    expect(graph.risk.candidate).toBe(2);
+  });
+
+  it('GET /api/overview/graph is 401 without an operator session (fail-closed)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+    expect((await fetch(`${base}/api/overview/graph`)).status).toBe(401);
+  });
+
+  it('GET /api/overview/graph is 503 when the operator engine is not wired', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession) },
+    );
+    const res = await fetch(`${base}/api/overview/graph`);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'engine_unavailable' });
+  });
+
+  it('GET /api/overview/graph fails closed to 503 unavailable on an unknown risk-band tag (O1.3)', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      // An engine risk-band level the Console does not know must never be silently mis-colored.
+      connectivityGraph: () =>
+        Promise.resolve({
+          sources: [],
+          destinations: [],
+          edges: [],
+          risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+        }),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/overview/graph`);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'unavailable' });
+  });
+
+  it('GET /api/overview/graph serves an identical query from the short-TTL cache (O1.3)', async () => {
+    let hits = 0;
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      connectivityGraph: () => {
+        hits += 1;
+        return Promise.resolve({
+          sources: [],
+          destinations: [],
+          edges: [],
+          risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+        });
+      },
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    expect((await fetch(`${base}/api/overview/graph?limit=100`)).status).toBe(200);
+    expect((await fetch(`${base}/api/overview/graph?limit=100`)).status).toBe(200);
+    // The second identical read is served from the cache; the engine is hit exactly once.
+    expect(hits).toBe(1);
+    // A different window is a distinct cache key -> a fresh engine read.
+    expect((await fetch(`${base}/api/overview/graph?limit=200`)).status).toBe(200);
+    expect(hits).toBe(2);
+  });
+
+  it('GET /api/overview/graph keys the cache by tenant so a graph never leaks across tenants (O1.3)', async () => {
+    let hits = 0;
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      connectivityGraph: () => {
+        hits += 1;
+        return Promise.resolve({
+          sources: [],
+          destinations: [],
+          edges: [],
+          risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+        });
+      },
+    };
+    // One server, two operators in different tenants (the resolved session flips between requests).
+    let current: OperatorSession = operatorSession;
+    const router: AuthRouter = {
+      handle: () => Promise.resolve(false),
+      resolveSession: () => current,
+    };
+    const cache = new EphemeralCache<unknown>(config.cacheTtlMs, config.cacheMaxEntries);
+    const server = createServer({
+      config,
+      log: silentLog,
+      cache,
+      client: mockClient(() => Promise.resolve()),
+      authRouter: router,
+      operatorEngine: engine,
+    });
+    servers.push(server);
+    const base = await new Promise<string>((resolve, reject) => {
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        if (address === null || typeof address === 'string') return reject(new Error('no address'));
+        resolve(`http://127.0.0.1:${String(address.port)}`);
+      });
+    });
+    expect((await fetch(`${base}/api/overview/graph?limit=100`)).status).toBe(200);
+    current = { ...operatorSession, tenant: 'tenant-two' };
+    expect((await fetch(`${base}/api/overview/graph?limit=100`)).status).toBe(200);
+    // Same bounds, different tenant -> a distinct cache key -> the engine is read again (no cross-tenant reuse).
+    expect(hits).toBe(2);
   });
 
   it('POST /api/entity/<kind>/<id>/isolate brokers the containment + returns the honest effect (DR.5c)', async () => {

@@ -17,6 +17,7 @@ import {
   WireCrucibleClient,
   replyToAgentList,
   replyToConnectionList,
+  replyToConnectivityGraph,
   replyToDecisionList,
   replyToQueryRows,
 } from '../src/engine/wire-client.js';
@@ -126,6 +127,17 @@ describe('the entity-read reply helpers (DR.3c)', () => {
     expect(replyToConnectionList({ ConnectionList: { connections: [] } }).connections).toEqual([]);
     expect(() => replyToConnectionList(refused)).toThrow(EngineRefusedError);
   });
+
+  it('replyToConnectivityGraph returns the graph, or throws on a refusal (O1.3)', () => {
+    const graph = {
+      sources: [],
+      destinations: [],
+      edges: [],
+      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+    };
+    expect(replyToConnectivityGraph({ ConnectivityGraph: graph }).risk.level).toBe('green');
+    expect(() => replyToConnectivityGraph(refused)).toThrow(EngineRefusedError);
+  });
 });
 
 describe('WireCrucibleClient', () => {
@@ -182,6 +194,28 @@ describe('WireCrucibleClient', () => {
     const client = new WireCrucibleClient(config, () => Promise.resolve(mockTransport(reply)));
     const list = await client.listAgents({ request_id: 1 });
     expect(list.agents[0]?.status).toBe('active');
+    await client.close();
+  });
+
+  it('connectivityGraph dispatches and returns the decoded graph (O1.3)', async () => {
+    const reply = encode({
+      ConnectivityGraph: {
+        sources: [{ class: 'agents', count: 2 }],
+        destinations: [{ class: 'saas', count: 2 }],
+        edges: [{ source_class: 'agents', dest_class: 'saas', weight: 2 }],
+        risk: { level: 'red', escalate: 3, candidate: 1, observe: 0 },
+      },
+    });
+    const client = new WireCrucibleClient(config, () => Promise.resolve(mockTransport(reply)));
+    const graph = await client.connectivityGraph({
+      request_id: 1,
+      operator: null,
+      since: null,
+      until: null,
+      limit: 1000,
+    });
+    expect(graph.risk.level).toBe('red');
+    expect(graph.edges[0]?.weight).toBe(2);
     await client.close();
   });
 
