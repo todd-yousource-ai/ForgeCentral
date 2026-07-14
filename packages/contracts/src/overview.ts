@@ -187,18 +187,22 @@ export interface OverviewVtzNode {
   readonly risk: OverviewRiskBand;
 }
 
-/** One named application inside a destination category (a common DNS name, e.g. `Google`). */
+/** One named destination inside a category: a common DNS name (e.g. `github.com`) or, unresolved, its IP. */
 export interface OverviewApp {
+  /** The display name: the reverse-DNS resolution of {@link address}, or the raw IP when unresolved. */
   readonly name: string;
-  /** Connection count to this app, when known; omitted until per-app resolution lands. */
-  readonly count?: number;
+  /** The raw destination endpoint identity (the IP, or IP:port) the engine returned. */
+  readonly address: string;
+  /** Connection count to this destination. */
+  readonly count: number;
 }
 
 /**
  * One destination-category node (right column). The four fixed categories are `network` / `saas` /
- * `private-apps` / `data-stores`. `apps` is the top named apps to list on the shared apps arch; `moreCount`
- * is the "+N more" tail (`count - apps.length` when apps are known, else the full count). `apps` is empty
- * until DNS resolution lands -- the category count still renders (never a fabricated app name).
+ * `private-apps` / `data-stores`. `apps` is the top named destinations to list (the engine's ranked
+ * `top_destinations`, resolved to common names); `moreCount` is the "+N more" tail of connections to
+ * destinations not in the listed apps (`count - sum(apps.count)`). Only the `network` category carries
+ * apps today (every captured `ConnectsTo` destination is a network endpoint); others list none.
  */
 export interface OverviewDestNode {
   readonly class: string;
@@ -291,14 +295,22 @@ export function overviewHighlight(graph: OverviewSankey, destClass: string): Ove
   };
 }
 
+/** The destination category the engine's `top_destinations` (all network endpoints) list under. */
+const NETWORK_DEST_CLASS = 'network';
+
 /**
  * Project a generated `WireConnectivityGraph` (the RD.3 two-stage shape) to the {@link OverviewSankey} view
- * model, or `null` if any VTZ risk band's level is unknown (fail-closed to the unavailable state). The wire
- * carries no per-app breakdown yet (DNS resolution is a fast-follow), so each destination lists no apps and
- * `moreCount` is its full connection count. A drifted wire field is a compile error here (the cross-module
- * guard); the RD.4 BFF resolver calls this.
+ * model, or `null` if any VTZ risk band's level is unknown (fail-closed to the unavailable state).
+ *
+ * The engine returns the top specific destinations (`top_destinations`, ranked IPs); this lists them as the
+ * `network` category's apps. `resolveName` (the BFF's reverse-DNS) maps an IP to a common name; an
+ * unresolved address falls back to the IP itself (INV-CONSOLE-NO-STUB: never a fabricated name). A drifted
+ * wire field is a compile error here (the cross-module guard); the BFF resolver calls this.
  */
-export function toOverviewSankey(graph: WireConnectivityGraph): OverviewSankey | null {
+export function toOverviewSankey(
+  graph: WireConnectivityGraph,
+  resolveName?: (address: string) => string | undefined,
+): OverviewSankey | null {
   const vtzs: OverviewVtzNode[] = [];
   for (const v of graph.vtzs) {
     const risk = toRiskBand(v.risk);
@@ -307,15 +319,25 @@ export function toOverviewSankey(graph: WireConnectivityGraph): OverviewSankey |
     }
     vtzs.push({ id: v.id, name: v.name, risk });
   }
+  const networkApps: OverviewApp[] = graph.top_destinations.map((d) => ({
+    name: resolveName?.(d.address)?.trim() || d.address,
+    address: d.address,
+    count: d.count,
+  }));
+  const listedConnections = networkApps.reduce((sum, app) => sum + app.count, 0);
   return {
     sources: graph.sources.map((s) => ({ class: s.class, count: s.count })),
     vtzs,
-    destinations: graph.destinations.map((d) => ({
-      class: d.class,
-      count: d.count,
-      apps: [],
-      moreCount: d.count,
-    })),
+    destinations: graph.destinations.map((d) => {
+      const apps = d.class === NETWORK_DEST_CLASS ? networkApps : [];
+      const listed = d.class === NETWORK_DEST_CLASS ? listedConnections : 0;
+      return {
+        class: d.class,
+        count: d.count,
+        apps,
+        moreCount: Math.max(0, d.count - listed),
+      };
+    }),
     sourceEdges: graph.source_edges.map((e) => ({
       sourceClass: e.source_class,
       vtzId: e.vtz_id,

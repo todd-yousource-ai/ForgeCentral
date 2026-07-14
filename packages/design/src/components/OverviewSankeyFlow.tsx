@@ -13,6 +13,7 @@
 // destinations. Loading and empty are honest states (INV-CONSOLE-NO-STUB).
 
 import type { CSSProperties, ReactElement } from 'react';
+import { useState } from 'react';
 
 import {
   overviewHighlight,
@@ -53,6 +54,8 @@ const DEST_BULGE = 34;
 const DEST_R = 64;
 const APPX = 1120;
 const APPS_BULGE = 32;
+// The apps arch lists this many named destinations collapsed; the rest fan out on click ("+N more").
+const APPS_COLLAPSED = 5;
 const AY0 = 80;
 const AY1 = 820;
 // Perceptual ribbon widths so no single flow dominates.
@@ -234,6 +237,9 @@ export function OverviewSankeyFlow({
   hoveredDest = null,
   onHoverDest,
 }: OverviewSankeyFlowProps): ReactElement {
+  // Which destination category has its apps fanned out (top-N -> full list). Local UI state; the graph
+  // is unchanged. Hooks precede the early returns below (Rules of Hooks).
+  const [expandedDest, setExpandedDest] = useState<string | null>(null);
   const svgBase = {
     viewBox: `0 0 ${VIEW_W} ${VIEW_H}`,
     preserveAspectRatio: 'xMidYMid meet' as const,
@@ -509,10 +515,20 @@ export function OverviewSankeyFlow({
 
         {dests.map((d) => {
           const on = !hl || hl.destEdgeKeys.size === 0 || d.class === hoveredDest;
-          const rows = [
-            ...d.apps.map((a) => a.name),
-            ...(d.moreCount > 0 ? [`+${d.moreCount} more`] : []),
-          ];
+          const isExpanded = expandedDest === d.class;
+          const shownApps = isExpanded ? d.apps : d.apps.slice(0, APPS_COLLAPSED);
+          const hiddenApps = d.apps.length - shownApps.length;
+          const rows: { key: string; label: string; kind: 'app' | 'toggle' | 'tail' }[] =
+            shownApps.map((a) => ({ key: a.address, label: a.name, kind: 'app' }));
+          if (hiddenApps > 0) {
+            rows.push({ key: '__toggle', label: `+${hiddenApps} more`, kind: 'toggle' });
+          } else if (isExpanded && d.apps.length > APPS_COLLAPSED) {
+            rows.push({ key: '__toggle', label: 'show fewer', kind: 'toggle' });
+          }
+          if (d.moreCount > 0) {
+            // Connections to destinations beyond the named list (the engine returns a bounded top-N).
+            rows.push({ key: '__tail', label: `+${d.moreCount} more`, kind: 'tail' });
+          }
           const rowH = 23;
           const top = d.y - ((rows.length - 1) * rowH) / 2;
           const hover = onHoverDest
@@ -526,26 +542,35 @@ export function OverviewSankeyFlow({
             <g key={d.class} className="fc-ov__dest" opacity={on ? 1 : 0.4} {...hover}>
               <circle className="fc-ov__ring fc-ov__ring--objects" cx={d.x} cy={d.y} r={DEST_R} />
               {ringText(d.x, d.y, d.count, destLabel(d.class), 'fc-ov__dest-label')}
-              {rows.map((label, i) => {
+              {rows.map((row, i) => {
                 const ly = top + i * rowH;
                 const ax = appsArch(ly);
-                const more = label.endsWith('more');
+                const isMore = row.kind !== 'app';
+                const click =
+                  row.kind === 'toggle'
+                    ? {
+                        onClick: () => {
+                          setExpandedDest(isExpanded ? null : d.class);
+                        },
+                        style: { cursor: 'pointer' as const },
+                      }
+                    : {};
                 return (
-                  <g key={label}>
+                  <g key={row.key} {...click}>
                     <circle
-                      className={`fc-ov__app-dot${more ? ' fc-ov__app-dot--more' : ''}`}
+                      className={`fc-ov__app-dot${isMore ? ' fc-ov__app-dot--more' : ''}`}
                       cx={ax}
                       cy={ly}
                       r={2.5}
                       fill="none"
                     />
                     <text
-                      className={`fc-ov__app${more ? ' fc-ov__app--more' : ''}`}
+                      className={`fc-ov__app${isMore ? ' fc-ov__app--more' : ''}`}
                       x={ax + 14}
                       y={ly + 4}
                       fontSize={14}
                     >
-                      {label}
+                      {row.label}
                     </text>
                   </g>
                 );

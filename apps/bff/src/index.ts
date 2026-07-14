@@ -12,6 +12,7 @@ import { SessionStore } from './auth/session.js';
 import { EphemeralCache } from './cache.js';
 import { loadConfig } from './config.js';
 import { createEngineClient, createOperatorEngine, loggerDelegationSink } from './engine/index.js';
+import { ReverseDnsResolver } from './engine/reverse-dns.js';
 import { createLogger } from './log.js';
 import { createServer } from './server.js';
 
@@ -22,6 +23,8 @@ async function main(): Promise<void> {
   const client = createEngineClient(config);
   // The operator-scoped engine facade (DR.3d): every entity read runs as the operator + is delegation-traced.
   const operatorEngine = createOperatorEngine(client, loggerDelegationSink(log));
+  // Reverse-DNS for Overview destination names (cached + background; owns no durable data).
+  const reverseDns = new ReverseDnsResolver();
 
   // Operator auth mounts only when OIDC is configured (F0.5a-2); otherwise /auth/* is not served.
   let authRouter: AuthRouter | undefined;
@@ -45,6 +48,7 @@ async function main(): Promise<void> {
     cache,
     client,
     operatorEngine,
+    reverseDns,
     ...(authRouter !== undefined ? { authRouter } : {}),
   });
 

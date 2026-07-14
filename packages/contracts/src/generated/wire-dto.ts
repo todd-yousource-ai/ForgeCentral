@@ -83,6 +83,7 @@ export interface WireConnectivityGraph {
   risk: WireRiskBand;
   source_edges: Array<WireSourceVtzEdge>;
   sources: Array<WireConnClass>;
+  top_destinations: Array<WireNamedDest>;
   vtzs: Array<WireVtzNode>;
 }
 
@@ -219,6 +220,11 @@ export interface WireLogQuery {
   tactic?: string | null;
   technique?: string | null;
   until?: number | null;
+}
+
+export interface WireNamedDest {
+  address: string;
+  count: number;
 }
 
 export interface WireQueryRows {

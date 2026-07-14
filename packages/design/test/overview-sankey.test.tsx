@@ -25,9 +25,22 @@ const graph: OverviewSankey = {
     { id: 'vpubag', name: 'Demo.Public.Agent', risk: band('red') },
   ],
   destinations: [
-    { class: 'network', count: 101, apps: [{ name: 'Google' }, { name: 'IMAP' }], moreCount: 99 },
+    {
+      class: 'network',
+      count: 101,
+      apps: [
+        { name: 'dns.google', address: '8.8.8.8', count: 6 },
+        { name: 'github.com', address: '140.82.112.5', count: 2 },
+      ],
+      moreCount: 93,
+    },
     { class: 'saas', count: 323, apps: [], moreCount: 323 },
-    { class: 'private-apps', count: 52, apps: [{ name: 'Jira' }], moreCount: 51 },
+    {
+      class: 'private-apps',
+      count: 52,
+      apps: [{ name: 'jira.internal', address: '10.0.0.20', count: 1 }],
+      moreCount: 51,
+    },
     { class: 'data-stores', count: 18, apps: [], moreCount: 18 },
   ],
   sourceEdges: [
@@ -66,12 +79,37 @@ describe('OverviewSankeyFlow', () => {
     expect(container.querySelector('.fc-ov__vtz--good')).not.toBeNull();
     // Destination category + its common-name apps on the shared arch + the "+N more" tail.
     expect(screen.getByText('NETWORK')).toBeInTheDocument();
-    expect(screen.getByText('Google')).toBeInTheDocument();
-    expect(screen.getByText('+99 more')).toBeInTheDocument();
+    expect(screen.getByText('dns.google')).toBeInTheDocument();
+    expect(screen.getByText('+93 more')).toBeInTheDocument();
     // One ribbon per edge (source->VTZ + VTZ->dest), all full opacity when nothing is hovered.
     const ribbons = container.querySelectorAll('.fc-ov__ribbons path');
     expect(ribbons).toHaveLength(graph.sourceEdges.length + graph.destEdges.length);
     expect([...ribbons].every((p) => p.getAttribute('opacity') === '1')).toBe(true);
+  });
+
+  it('collapses the named apps to the top five and fans out the rest on click', () => {
+    const apps = Array.from({ length: 7 }, (_, i) => ({
+      name: `host-${i}.example`,
+      address: `10.0.0.${i}`,
+      count: 7 - i,
+    }));
+    const many: OverviewSankey = {
+      ...graph,
+      destinations: [
+        { class: 'network', count: 28, apps, moreCount: 0 },
+        ...graph.destinations.filter((d) => d.class !== 'network'),
+      ],
+    };
+    render(<OverviewSankeyFlow graph={many} />);
+    // Collapsed: only the top five names show; the 6th/7th hide behind "+2 more".
+    expect(screen.getByText('host-0.example')).toBeInTheDocument();
+    expect(screen.getByText('host-4.example')).toBeInTheDocument();
+    expect(screen.queryByText('host-5.example')).not.toBeInTheDocument();
+    // Fan out: clicking the "+2 more" toggle reveals all seven + a "show fewer" affordance.
+    fireEvent.click(screen.getByText('+2 more'));
+    expect(screen.getByText('host-5.example')).toBeInTheDocument();
+    expect(screen.getByText('host-6.example')).toBeInTheDocument();
+    expect(screen.getByText('show fewer')).toBeInTheDocument();
   });
 
   it('hovering a destination dims the ribbons not on a path that feeds it (linked highlight)', () => {

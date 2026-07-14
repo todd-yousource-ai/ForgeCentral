@@ -73,6 +73,7 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         vtzs: [],
         source_edges: [],
         dest_edges: [],
+        top_destinations: [],
       });
     },
     contain: (req) => {

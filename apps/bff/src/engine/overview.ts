@@ -20,6 +20,7 @@ import type {
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
 import type { OperatorPrincipal } from './principal.js';
+import type { ReverseDnsResolver } from './reverse-dns.js';
 
 /**
  * Raised when the connectivity graph cannot be projected to a well-formed view model -- specifically when
@@ -74,9 +75,13 @@ export async function resolveOverviewSankey(
   principal: OperatorPrincipal,
   query: OverviewQuery,
   opts?: EngineCallOptions,
+  reverseDns?: ReverseDnsResolver,
 ): Promise<OverviewSankey> {
   const graph = await engine.connectivityGraph(principal, queryToWire(query), opts);
-  const view = toOverviewSankey(graph);
+  // Resolve the engine's destination IPs to common names (reverse-DNS, cached + background); an
+  // unresolved IP falls back to itself inside toOverviewSankey (never a fabricated name).
+  const names = reverseDns?.namesFor(graph.top_destinations.map((d) => d.address));
+  const view = toOverviewSankey(graph, names ? (address) => names.get(address) : undefined);
   if (view === null) {
     throw new OverviewUnavailableError();
   }

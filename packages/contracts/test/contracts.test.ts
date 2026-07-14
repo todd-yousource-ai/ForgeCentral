@@ -176,6 +176,7 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       vtzs: [],
       source_edges: [],
       dest_edges: [],
+      top_destinations: [],
     };
     const view: OverviewGraph | null = toOverviewGraph(wire);
     expect(view).not.toBeNull();
@@ -196,6 +197,7 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       vtzs: [],
       source_edges: [],
       dest_edges: [],
+      top_destinations: [],
     };
     const view = toOverviewGraph(empty);
     expect(view).toEqual({
@@ -219,6 +221,7 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       vtzs: [],
       source_edges: [],
       dest_edges: [],
+      top_destinations: [],
     };
     expect(toOverviewGraph(bad)).toBeNull();
   });
@@ -243,7 +246,12 @@ describe('Overview redesign (Sankey) view model', () => {
       { id: 'vpubag', name: 'Demo.Public.Agent', risk: band('red') },
     ],
     destinations: [
-      { class: 'network', count: 101, apps: [{ name: 'Google' }], moreCount: 100 },
+      {
+        class: 'network',
+        count: 101,
+        apps: [{ name: 'dns.google', address: '8.8.8.8', count: 1 }],
+        moreCount: 100,
+      },
       { class: 'saas', count: 323, apps: [], moreCount: 323 },
       { class: 'private-apps', count: 52, apps: [], moreCount: 52 },
     ],
@@ -321,6 +329,7 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
       { source_class: 'devices', vtz_id: 'demo-public-agent', weight: 2 },
     ],
     dest_edges: [{ vtz_id: 'demo-public-agent', dest_class: 'network', weight: 2 }],
+    top_destinations: [],
   };
 
   it('projects the two-stage wire graph to the camelCase OverviewSankey (cross-module guard)', () => {
@@ -345,11 +354,42 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
     expect(view?.destEdges).toEqual([
       { vtzId: 'demo-public-agent', destClass: 'network', weight: 2 },
     ]);
-    // No per-app breakdown on the wire yet (DNS is a fast-follow): each dest lists no apps, moreCount = count.
+    // Empty top_destinations -> each dest lists no apps and moreCount is its full count.
     expect(view?.destinations).toEqual([
       { class: 'network', count: 2, apps: [], moreCount: 2 },
       { class: 'saas', count: 1, apps: [], moreCount: 1 },
     ]);
+  });
+
+  it('lists the network apps from top_destinations, resolving names (unresolved -> IP) with moreCount', () => {
+    const graph: WireConnectivityGraph = {
+      ...wire,
+      destinations: [
+        { class: 'network', count: 12 },
+        { class: 'saas', count: 1 },
+      ],
+      top_destinations: [
+        { address: '140.82.112.5', count: 5 },
+        { address: '8.8.8.8', count: 3 },
+        { address: '10.0.0.9', count: 1 },
+      ],
+    };
+    // The resolver names two of the three; the third has no name and falls back to its IP (never fabricated).
+    const names = new Map([
+      ['140.82.112.5', 'github.com'],
+      ['8.8.8.8', 'dns.google'],
+    ]);
+    const view = toOverviewSankey(graph, (address) => names.get(address));
+    const network = view?.destinations.find((d) => d.class === 'network');
+    expect(network?.apps).toEqual([
+      { name: 'github.com', address: '140.82.112.5', count: 5 },
+      { name: 'dns.google', address: '8.8.8.8', count: 3 },
+      { name: '10.0.0.9', address: '10.0.0.9', count: 1 },
+    ]);
+    // moreCount = class count (12) - the connections listed in apps (5+3+1=9) = 3.
+    expect(network?.moreCount).toBe(3);
+    // Only the network category carries apps; other categories list none.
+    expect(view?.destinations.find((d) => d.class === 'saas')?.apps).toEqual([]);
   });
 
   it('fails closed to null if any VTZ risk level is unknown', () => {
