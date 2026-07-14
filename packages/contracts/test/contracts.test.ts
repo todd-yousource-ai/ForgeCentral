@@ -13,10 +13,14 @@ import { describe, expect, it } from 'vitest';
 
 import { renderWireDtoTypes } from '../scripts/generate.mjs';
 import {
+  OVERVIEW_VTZS_PER_PAGE,
   WIRE_DTO_SCHEMA_ID,
   bindingId,
   decisionId,
   isPending,
+  overviewHighlight,
+  overviewVtzPage,
+  overviewVtzPageCount,
   principalId,
   requestId,
   tenantId,
@@ -28,6 +32,7 @@ import type {
   ConsoleError,
   DecisionId,
   OverviewGraph,
+  OverviewSankey,
   ReadBinding,
   TenantId,
   WireConnectivityGraph,
@@ -206,5 +211,73 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
     };
     expect(toOverviewGraph(bad)).toBeNull();
+  });
+});
+
+describe('Overview redesign (Sankey) view model', () => {
+  const band = (level: 'green' | 'yellow' | 'red') => ({
+    level,
+    escalate: level === 'red' ? 3 : 0,
+    candidate: level === 'yellow' ? 2 : 0,
+    observe: 5,
+  });
+  const graph: OverviewSankey = {
+    sources: [
+      { class: 'users', count: 515 },
+      { class: 'devices', count: 47 },
+      { class: 'agents', count: 3 },
+    ],
+    vtzs: [
+      { id: 'vpub', name: 'Demo.Users.Public', risk: band('green') },
+      { id: 'vpriv', name: 'Demo.Private.Agent', risk: band('yellow') },
+      { id: 'vpubag', name: 'Demo.Public.Agent', risk: band('red') },
+    ],
+    destinations: [
+      { class: 'network', count: 101, apps: [{ name: 'Google' }], moreCount: 100 },
+      { class: 'saas', count: 323, apps: [], moreCount: 323 },
+      { class: 'private-apps', count: 52, apps: [], moreCount: 52 },
+    ],
+    sourceEdges: [
+      { sourceClass: 'users', vtzId: 'vpub', weight: 515 },
+      { sourceClass: 'devices', vtzId: 'vpub', weight: 47 },
+      { sourceClass: 'agents', vtzId: 'vpriv', weight: 1 },
+      { sourceClass: 'agents', vtzId: 'vpubag', weight: 2 },
+    ],
+    destEdges: [
+      { vtzId: 'vpub', destClass: 'network', weight: 190 },
+      { vtzId: 'vpub', destClass: 'private-apps', weight: 96 },
+      { vtzId: 'vpubag', destClass: 'network', weight: 12 },
+    ],
+  };
+
+  it('pages the VTZs at most three per page ("swipe for more")', () => {
+    expect(OVERVIEW_VTZS_PER_PAGE).toBe(3);
+    expect(overviewVtzPageCount(3)).toBe(1);
+    expect(overviewVtzPageCount(4)).toBe(2);
+    expect(overviewVtzPageCount(0)).toBe(1); // an empty tenant still has one (empty) page
+    expect(overviewVtzPage(graph.vtzs, 0)).toHaveLength(3);
+    // A four-VTZ tenant spills the fourth onto page 1; an out-of-range page clamps in.
+    const four = [...graph.vtzs, { id: 'v4', name: 'Demo.Extra', risk: band('green') }];
+    expect(overviewVtzPage(four, 1).map((v) => v.id)).toEqual(['v4']);
+    expect(overviewVtzPage(four, 9).map((v) => v.id)).toEqual(['v4']);
+  });
+
+  it('computes the hover highlight: only the source->VTZ->dest paths feeding the hovered category', () => {
+    // Hover "private-apps": only Demo.Users.Public feeds it, so only Users + Devices contribute.
+    const hl = overviewHighlight(graph, 'private-apps');
+    expect([...hl.vtzIds]).toEqual(['vpub']);
+    expect(hl.destEdgeKeys.has('vpub>private-apps')).toBe(true);
+    expect(hl.sourceEdgeKeys.has('users>vpub')).toBe(true);
+    expect(hl.sourceEdgeKeys.has('devices>vpub')).toBe(true);
+    // The agent VTZs (and their source edges) are NOT on a path to private-apps -> excluded (dimmed).
+    expect(hl.sourceEdgeKeys.has('agents>vpriv')).toBe(false);
+    expect(hl.sourceEdgeKeys.has('agents>vpubag')).toBe(false);
+  });
+
+  it('highlight of network keeps both contributing VTZs (Public + Public.Agent)', () => {
+    const hl = overviewHighlight(graph, 'network');
+    expect([...hl.vtzIds].sort()).toEqual(['vpub', 'vpubag']);
+    expect(hl.sourceEdgeKeys.has('agents>vpubag')).toBe(true);
+    expect(hl.sourceEdgeKeys.has('users>vpub')).toBe(true);
   });
 });
