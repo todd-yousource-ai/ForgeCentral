@@ -22,6 +22,7 @@ import {
   overviewVtzPage,
   overviewVtzPageCount,
   principalId,
+  toOverviewSankey,
   requestId,
   tenantId,
   toOverviewGraph,
@@ -172,6 +173,9 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       ],
       edges: [{ source_class: 'devices', dest_class: 'network', weight: 2 }],
       risk: { level: 'yellow', escalate: 0, candidate: 1, observe: 4 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
     };
     const view: OverviewGraph | null = toOverviewGraph(wire);
     expect(view).not.toBeNull();
@@ -189,6 +193,9 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       destinations: [],
       edges: [],
       risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
     };
     const view = toOverviewGraph(empty);
     expect(view).toEqual({
@@ -209,6 +216,9 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       destinations: [],
       edges: [],
       risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
     };
     expect(toOverviewGraph(bad)).toBeNull();
   });
@@ -279,5 +289,80 @@ describe('Overview redesign (Sankey) view model', () => {
     expect([...hl.vtzIds].sort()).toEqual(['vpub', 'vpubag']);
     expect(hl.sourceEdgeKeys.has('agents>vpubag')).toBe(true);
     expect(hl.sourceEdgeKeys.has('users>vpub')).toBe(true);
+  });
+});
+
+describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
+  const wire: WireConnectivityGraph = {
+    sources: [
+      { class: 'devices', count: 3 },
+      { class: 'agents', count: 1 },
+    ],
+    destinations: [
+      { class: 'network', count: 2 },
+      { class: 'saas', count: 1 },
+    ],
+    edges: [{ source_class: 'devices', dest_class: 'network', weight: 2 }],
+    risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
+    vtzs: [
+      {
+        id: 'demo-users-public',
+        name: 'Demo.Users.Public',
+        risk: { level: 'green', escalate: 0, candidate: 0, observe: 5 },
+      },
+      {
+        id: 'demo-public-agent',
+        name: 'Demo.Public.Agent',
+        risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
+      },
+    ],
+    source_edges: [
+      { source_class: 'devices', vtz_id: 'demo-users-public', weight: 1 },
+      { source_class: 'devices', vtz_id: 'demo-public-agent', weight: 2 },
+    ],
+    dest_edges: [{ vtz_id: 'demo-public-agent', dest_class: 'network', weight: 2 }],
+  };
+
+  it('projects the two-stage wire graph to the camelCase OverviewSankey (cross-module guard)', () => {
+    const view = toOverviewSankey(wire);
+    expect(view).not.toBeNull();
+    expect(view?.vtzs).toEqual([
+      {
+        id: 'demo-users-public',
+        name: 'Demo.Users.Public',
+        risk: { level: 'green', escalate: 0, candidate: 0, observe: 5 },
+      },
+      {
+        id: 'demo-public-agent',
+        name: 'Demo.Public.Agent',
+        risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
+      },
+    ]);
+    expect(view?.sourceEdges).toEqual([
+      { sourceClass: 'devices', vtzId: 'demo-users-public', weight: 1 },
+      { sourceClass: 'devices', vtzId: 'demo-public-agent', weight: 2 },
+    ]);
+    expect(view?.destEdges).toEqual([
+      { vtzId: 'demo-public-agent', destClass: 'network', weight: 2 },
+    ]);
+    // No per-app breakdown on the wire yet (DNS is a fast-follow): each dest lists no apps, moreCount = count.
+    expect(view?.destinations).toEqual([
+      { class: 'network', count: 2, apps: [], moreCount: 2 },
+      { class: 'saas', count: 1, apps: [], moreCount: 1 },
+    ]);
+  });
+
+  it('fails closed to null if any VTZ risk level is unknown', () => {
+    const bad: WireConnectivityGraph = {
+      ...wire,
+      vtzs: [
+        {
+          id: 'x',
+          name: 'X',
+          risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+        },
+      ],
+    };
+    expect(toOverviewSankey(bad)).toBeNull();
   });
 });

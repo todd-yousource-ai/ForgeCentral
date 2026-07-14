@@ -101,6 +101,15 @@ function operatorEngineWith(): OperatorEngine {
         destinations: [{ class: 'saas', count: 4 }],
         edges: [{ source_class: 'agents', dest_class: 'saas', weight: 4 }],
         risk: { level: 'yellow', escalate: 0, candidate: 2, observe: 5 },
+        vtzs: [
+          {
+            id: 'demo-public-agent',
+            name: 'Demo.Public.Agent',
+            risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
+          },
+        ],
+        source_edges: [{ source_class: 'agents', vtz_id: 'demo-public-agent', weight: 3 }],
+        dest_edges: [{ vtz_id: 'demo-public-agent', dest_class: 'saas', weight: 4 }],
       }),
     // This route test does not exercise CONTAIN; fail loudly if it is reached (not a canned success).
     contain: unused,
@@ -410,6 +419,40 @@ describe('BFF HTTP surface', () => {
     expect(graph.risk.candidate).toBe(2);
   });
 
+  it('GET /api/overview/sankey projects the VTZ-routed two-stage view model (RD.4)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    const res = await fetch(`${base}/api/overview/sankey?limit=100`);
+    expect(res.status).toBe(200);
+    const sankey = (await res.json()) as {
+      vtzs: { id: string; name: string; risk: { level: string } }[];
+      sourceEdges: { sourceClass: string; vtzId: string; weight: number }[];
+      destEdges: { vtzId: string; destClass: string; weight: number }[];
+      destinations: { class: string; count: number; apps: unknown[]; moreCount: number }[];
+    };
+    // The two-stage flow: each VTZ carries its own detection-driven risk; the edges are source->VTZ->dest.
+    expect(sankey.vtzs).toEqual([
+      {
+        id: 'demo-public-agent',
+        name: 'Demo.Public.Agent',
+        risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
+      },
+    ]);
+    expect(sankey.sourceEdges).toEqual([
+      { sourceClass: 'agents', vtzId: 'demo-public-agent', weight: 3 },
+    ]);
+    expect(sankey.destEdges).toEqual([
+      { vtzId: 'demo-public-agent', destClass: 'saas', weight: 4 },
+    ]);
+    // No per-app breakdown on the wire yet -> apps empty, moreCount = the category count.
+    expect(sankey.destinations).toEqual([{ class: 'saas', count: 4, apps: [], moreCount: 4 }]);
+  });
+
   it('GET /api/overview/graph is 401 without an operator session (fail-closed)', async () => {
     const base = await start(
       mockClient(() => Promise.resolve()),
@@ -438,6 +481,9 @@ describe('BFF HTTP surface', () => {
           destinations: [],
           edges: [],
           risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+          vtzs: [],
+          source_edges: [],
+          dest_edges: [],
         }),
     };
     const base = await start(
@@ -460,6 +506,9 @@ describe('BFF HTTP surface', () => {
           destinations: [],
           edges: [],
           risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+          vtzs: [],
+          source_edges: [],
+          dest_edges: [],
         });
       },
     };
@@ -487,6 +536,9 @@ describe('BFF HTTP surface', () => {
           destinations: [],
           edges: [],
           risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+          vtzs: [],
+          source_edges: [],
+          dest_edges: [],
         });
       },
     };

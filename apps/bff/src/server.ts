@@ -20,7 +20,6 @@ import type {
   IsolateRequest,
   LogExportRequest,
   LogQueryFilter,
-  OverviewGraph,
   OverviewQuery,
 } from '@forge/contracts';
 
@@ -30,7 +29,11 @@ import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
 import { resolveIsolate } from './engine/isolate.js';
 import { resolveLogExplain, resolveLogExport, resolveLogQuery } from './engine/logs.js';
-import { OverviewUnavailableError, resolveOverviewGraph } from './engine/overview.js';
+import {
+  OverviewUnavailableError,
+  resolveOverviewGraph,
+  resolveOverviewSankey,
+} from './engine/overview.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
 import { principalFromSession } from './engine/principal.js';
 import { EngineRefusedError } from './engine/wire-client.js';
@@ -434,39 +437,53 @@ function parseOverviewQuery(params: URLSearchParams): OverviewQuery {
  * Fails CLOSED to the unavailable state: an unknown risk-band tag is a 503, a query-gate refusal a sanitized
  * 403. Returns true iff it claimed the request.
  */
-async function handleOverview(
+/** The shape of an overview resolver (graph or sankey): brokers the read + projects to a view model. */
+type OverviewResolver = (
+  engine: OperatorEngine,
+  principal: ReturnType<typeof principalFromSession>,
+  query: OverviewQuery,
+  opts?: { readonly timeoutMs?: number },
+) => Promise<unknown>;
+
+/**
+ * Serve an Overview read: resolve the operator session (fail-closed 401), broker the tenant-wide
+ * CONNECTIVITY_GRAPH read through the OperatorEngine, and project it via `resolve`. Served from a
+ * tenant-scoped, short-TTL cache when warm (keyed by `kind` so the flat and Sankey projections never
+ * collide). Fails CLOSED: an unknown risk-band tag is 503, a query-gate refusal a sanitized 403.
+ */
+async function serveOverviewRead(
   deps: ServerDeps,
   req: IncomingMessage,
-  path: string,
   res: ServerResponse,
-): Promise<boolean> {
-  if (path !== '/api/overview/graph') return false;
+  kind: string,
+  resolve: OverviewResolver,
+): Promise<void> {
   const session = deps.authRouter?.resolveSession(req);
   if (!session) {
     sendJson(res, 401, { error: 'unauthorized' });
-    return true;
+    return;
   }
   if (!deps.operatorEngine) {
     sendJson(res, 503, { error: 'engine_unavailable' });
-    return true;
+    return;
   }
   const principal = principalFromSession(session);
   const query = parseOverviewQuery(new URL(req.url ?? '/', 'http://localhost').searchParams);
   // Tenant-scoped + bounds-scoped key: a warm graph is never served across tenants or across windows.
-  const cacheKey = `overview:graph:${principal.tenant}:${String(query.since ?? '')}:${String(
+  const cacheKey = `overview:${kind}:${principal.tenant}:${String(query.since ?? '')}:${String(
     query.until ?? '',
   )}:${String(query.limit)}`;
-  const cached = deps.cache.get(cacheKey, OVERVIEW_CACHE_VERSION) as OverviewGraph | undefined;
+  const cached = deps.cache.get(cacheKey, OVERVIEW_CACHE_VERSION);
   if (cached !== undefined) {
     sendJson(res, 200, cached);
-    return true;
+    return;
   }
   try {
-    const graph = await resolveOverviewGraph(deps.operatorEngine, principal, query, {
+    const view = await resolve(deps.operatorEngine, principal, query, {
       timeoutMs: deps.config.requestTimeoutMs,
     });
-    deps.cache.set(cacheKey, graph, OVERVIEW_CACHE_VERSION);
-    sendJson(res, 200, graph);
+    deps.cache.set(cacheKey, view, OVERVIEW_CACHE_VERSION);
+    sendJson(res, 200, view);
   } catch (err) {
     if (err instanceof OverviewUnavailableError) {
       // The engine returned a graph the Console cannot color; surface the unavailable state, never a default.
@@ -478,7 +495,28 @@ async function handleOverview(
       sendJson(res, 502, { error: 'engine_error' });
     }
   }
-  return true;
+}
+
+/**
+ * The Overview reads: `GET /api/overview/graph` (the flat pre-redesign view) and `GET /api/overview/sankey`
+ * (the RD.4 VTZ-routed two-stage view). Both broker the same engine verb, projected differently. Returns
+ * true iff it claimed the request.
+ */
+async function handleOverview(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path === '/api/overview/graph') {
+    await serveOverviewRead(deps, req, res, 'graph', resolveOverviewGraph);
+    return true;
+  }
+  if (path === '/api/overview/sankey') {
+    await serveOverviewRead(deps, req, res, 'sankey', resolveOverviewSankey);
+    return true;
+  }
+  return false;
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
