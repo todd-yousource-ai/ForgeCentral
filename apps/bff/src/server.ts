@@ -70,6 +70,19 @@ function entityRefOf(kind: string, id: string): EntityRef {
 }
 
 /**
+ * The active-tenant override a GLOBAL-ADMIN may set per request (the tenant selector, IP-CONSOLE-00-CONTROL-PLANE
+ * F4): the trimmed `x-active-tenant` request header, or `undefined`. `principalFromSession` honors it only for
+ * a `global-admin` and ignores it for a tenant-scoped operator (fail-closed -- a tenant-user cannot switch
+ * tenants). A duplicate header (array) or an empty value yields `undefined` (the session's resolved tenant).
+ */
+function activeTenantOverride(req: IncomingMessage): string | undefined {
+  const value = req.headers['x-active-tenant'];
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
  * Serve the entity drawer detail: resolve the operator session (fail-closed 401 without one), then broker
  * the live reads through the OperatorEngine into an `EntityDetailView`. Returns true iff it claimed the
  * request.
@@ -94,7 +107,7 @@ async function handleEntityDetail(
   const ref = entityRefOf(match[1] ?? '', decodeURIComponent(match[2] ?? ''));
   const detail = await resolveEntityDetail(
     deps.operatorEngine,
-    principalFromSession(session),
+    principalFromSession(session, activeTenantOverride(req)),
     ref,
     {
       timeoutMs: deps.config.requestTimeoutMs,
@@ -176,7 +189,7 @@ async function handleEntityIsolate(
   try {
     const effect = await resolveIsolate(
       deps.operatorEngine,
-      principalFromSession(session),
+      principalFromSession(session, activeTenantOverride(req)),
       ref,
       request,
       Date.now(),
@@ -275,7 +288,7 @@ async function handleLogExport(
   try {
     const view = await resolveLogExport(
       deps.operatorEngine,
-      principalFromSession(session),
+      principalFromSession(session, activeTenantOverride(req)),
       request,
       Date.now(),
       { timeoutMs: deps.config.requestTimeoutMs },
@@ -361,7 +374,7 @@ async function handleLogs(
     sendJson(res, 503, { error: 'engine_unavailable' });
     return true;
   }
-  const principal = principalFromSession(session);
+  const principal = principalFromSession(session, activeTenantOverride(req));
   const opts = { timeoutMs: deps.config.requestTimeoutMs };
   try {
     if (explainMatch) {
@@ -467,7 +480,7 @@ async function serveOverviewRead(
     sendJson(res, 503, { error: 'engine_unavailable' });
     return;
   }
-  const principal = principalFromSession(session);
+  const principal = principalFromSession(session, activeTenantOverride(req));
   const query = parseOverviewQuery(new URL(req.url ?? '/', 'http://localhost').searchParams);
   // Tenant-scoped + bounds-scoped key: a warm graph is never served across tenants or across windows.
   const cacheKey = `overview:${kind}:${principal.tenant}:${String(query.since ?? '')}:${String(

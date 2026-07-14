@@ -5,13 +5,13 @@
 // anonymously (INV-CONSOLE-ENGINE-AUTHZ) -- the operator-engine facade (operator-engine.ts) makes that a
 // type-level requirement.
 //
-// The operator's TENANT is intentionally not carried here yet. The BFF holds one device-wide service cert
-// (the engine authorizes the transport by that cert today), so the engine cannot yet re-authorize per
-// operator: `WireQuerySubmit` has no operator-identity field. Carrying the operator identity + resolved
-// tenant to the engine so it re-authorizes under the operator (the device-wide envelope, admin scoped to
-// their own tenant) is the crdb INV-CROSS **F0.5c** (a new wire delegation field + the admin-scope read
-// path). Until it lands, the Principal is the BFF's authority record: it names who each call is for and
-// is recorded on every delegation, and it is exactly what F0.5c will serialize onto the wire.
+// The operator's TENANT IS carried: `operator-engine.ts` injects `OperatorDelegation { principal, tenant }`
+// onto every wire request, the engine narrows the read to it (gated by the peer's `Delegation` grant), and
+// the crdb control plane refuses a delegation naming a reserved service tenant (IP-CONSOLE-CONTROL-PLANE
+// C4). Per the locked design decision D3, the operator -> tenant mapping stays OWNED BY ForgeCentral (its
+// RBAC, resolved at login): the engine trusts the Delegation-granted broker rather than re-verifying a
+// signed assertion. This Principal is that BFF authority record -- who each call runs as, and the tenant
+// it is scoped to.
 
 import type { OperatorSession } from '../auth/session.js';
 import type { ExplainTier } from '../auth/tier.js';
@@ -22,18 +22,31 @@ export interface OperatorPrincipal {
   readonly subject: string;
   /** The operator's Crucible EXPLAIN tier (bounds what the engine reveals). */
   readonly tier: ExplainTier;
-  /** The stable engine `PrincipalId` (a UUID) the delegation asserts the read runs as (F0.5c). */
+  /** The stable engine `PrincipalId` (a UUID) the delegation asserts the read runs as. */
   readonly principalId: string;
-  /** The tenant the read is scoped to (resolved by the Console's RBAC, F0.5c). */
+  /** The tenant the read is scoped to (resolved by the Console's RBAC). */
   readonly tenant: string;
 }
 
-/** Derive the Principal from a live operator session. */
-export function principalFromSession(session: OperatorSession): OperatorPrincipal {
+/**
+ * Derive the Principal from a live operator session.
+ *
+ * `activeTenantOverride` lets a GLOBAL-ADMIN scope this request to a chosen tenant (the tenant selector):
+ * a global admin spans all tenants but the wire always names exactly one per read, so the UI picks it per
+ * request. The override is honored ONLY for `global-admin`; a tenant-scoped operator is pinned to their own
+ * tenant and the override is ignored (fail-closed -- a tenant-user can never switch tenants). An empty or
+ * missing override keeps the session's resolved tenant.
+ */
+export function principalFromSession(
+  session: OperatorSession,
+  activeTenantOverride?: string,
+): OperatorPrincipal {
+  const override = activeTenantOverride?.trim();
+  const tenant = session.role === 'global-admin' && override ? override : session.tenant;
   return {
     subject: session.subject,
     tier: session.tier,
     principalId: session.principalId,
-    tenant: session.tenant,
+    tenant,
   };
 }
