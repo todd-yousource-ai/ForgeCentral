@@ -1,10 +1,10 @@
-// apps/console/src/test/overview-surface.test.tsx -- IP-CONSOLE-01 O1.5 the live Overview surface.
+// apps/console/src/test/overview-surface.test.tsx -- IP-CONSOLE-01 RD.4b the live Overview Sankey surface.
 
-import type { OverviewGraph } from '@forge/contracts';
+import type { OverviewSankey } from '@forge/contracts';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { OverviewSurface, filterByLane } from '../surfaces/OverviewSurface.js';
+import { OverviewSurface, worstRisk } from '../surfaces/OverviewSurface.js';
 import { renderWithProviders } from './render.js';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -15,55 +15,79 @@ function jsonResponse(status: number, body: unknown): Response {
   } as Response;
 }
 
-const graph: OverviewGraph = {
+const band = (level: 'green' | 'yellow' | 'red') => ({
+  level,
+  escalate: level === 'red' ? 3 : 0,
+  candidate: level === 'yellow' ? 2 : 0,
+  observe: 5,
+});
+
+const graph: OverviewSankey = {
   sources: [
-    { class: 'users', count: 128 },
-    { class: 'devices', count: 74 },
-    { class: 'agents', count: 12 },
+    { class: 'users', count: 515 },
+    { class: 'devices', count: 47 },
+    { class: 'agents', count: 3 },
+  ],
+  vtzs: [
+    { id: 'vpub', name: 'Demo.Users.Public', risk: band('green') },
+    { id: 'vpriv', name: 'Demo.Private.Agent', risk: band('yellow') },
+    { id: 'vpubag', name: 'Demo.Public.Agent', risk: band('red') },
   ],
   destinations: [
-    { class: 'network', count: 96 },
-    { class: 'saas', count: 63 },
-    { class: 'data-stores', count: 17 },
+    { class: 'network', count: 101, apps: [], moreCount: 101 },
+    { class: 'saas', count: 323, apps: [], moreCount: 323 },
+    { class: 'private-apps', count: 52, apps: [], moreCount: 52 },
+    { class: 'data-stores', count: 18, apps: [], moreCount: 18 },
   ],
-  edges: [
-    { sourceClass: 'users', destClass: 'saas', weight: 52 },
-    { sourceClass: 'devices', destClass: 'network', weight: 61 },
-    { sourceClass: 'agents', destClass: 'data-stores', weight: 14 },
+  sourceEdges: [
+    { sourceClass: 'users', vtzId: 'vpub', weight: 515 },
+    { sourceClass: 'devices', vtzId: 'vpub', weight: 47 },
+    { sourceClass: 'agents', vtzId: 'vpriv', weight: 1 },
+    { sourceClass: 'agents', vtzId: 'vpubag', weight: 2 },
   ],
-  risk: { level: 'red', escalate: 4, candidate: 6, observe: 40 },
+  destEdges: [
+    { vtzId: 'vpub', destClass: 'network', weight: 190 },
+    { vtzId: 'vpub', destClass: 'private-apps', weight: 96 },
+    { vtzId: 'vpubag', destClass: 'network', weight: 12 },
+  ],
 };
 
-const emptyGraph: OverviewGraph = {
+/** A four-VTZ graph so the surface offers a second zone page. */
+const fourVtz: OverviewSankey = {
+  ...graph,
+  vtzs: [...graph.vtzs, { id: 'v4', name: 'Demo.Extra.Zone', risk: band('green') }],
+};
+
+const emptyGraph: OverviewSankey = {
   sources: [],
+  vtzs: [],
   destinations: [],
-  edges: [],
-  risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+  sourceEdges: [],
+  destEdges: [],
 };
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('filterByLane', () => {
-  it('returns the whole graph for the All lane', () => {
-    expect(filterByLane(graph, 'all')).toBe(graph);
+describe('worstRisk', () => {
+  it('summarizes the tenant by its single most severe zone', () => {
+    expect(worstRisk(graph)).toBe('red');
+    expect(worstRisk({ ...graph, vtzs: [{ id: 'v', name: 'Z', risk: band('yellow') }] })).toBe(
+      'yellow',
+    );
   });
 
-  it('projects a single source lane to its node, its ribbons, and only the destinations they reach', () => {
-    const view = filterByLane(graph, 'agents');
-    expect(view.sources).toEqual([{ class: 'agents', count: 12 }]);
-    expect(view.edges).toEqual([{ sourceClass: 'agents', destClass: 'data-stores', weight: 14 }]);
-    // Only the reached destination is kept; the tenant-wide risk band is carried through unchanged.
-    expect(view.destinations).toEqual([{ class: 'data-stores', count: 17 }]);
-    expect(view.risk).toBe(graph.risk);
+  it('is null when there are no zones (an empty tenant shows no badge)', () => {
+    expect(worstRisk(emptyGraph)).toBeNull();
   });
 });
 
-describe('the Overview surface (O1.5)', () => {
-  it('renders the live connectivity flow from GET /api/overview/graph, with the risk summary', async () => {
+describe('the Overview surface (RD.4b)', () => {
+  it('renders the live Sankey from GET /api/overview/sankey, with the worst-zone risk summary', async () => {
     const fetchMock = vi.fn((input: string) => {
-      if (input.startsWith('/api/overview/graph')) return Promise.resolve(jsonResponse(200, graph));
+      if (input.startsWith('/api/overview/sankey'))
+        return Promise.resolve(jsonResponse(200, graph));
       throw new Error(`unexpected fetch ${input}`);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -72,35 +96,64 @@ describe('the Overview surface (O1.5)', () => {
     await waitFor(() => {
       expect(screen.getByRole('img')).toHaveAccessibleName(/Connectivity flow\. Sources:/);
     });
-    // The header carries the tenant-wide risk band as a glanceable badge (red -> Critical).
+    // The header carries the worst VTZ risk band as a glanceable badge (a red zone -> Critical).
     expect(screen.getByText('Risk: Critical')).toBeInTheDocument();
+    // The accessible name enumerates the three demo zones + their detection-driven risk.
+    expect(screen.getByRole('img')).toHaveAccessibleName(/Demo\.Public\.Agent Critical/);
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/overview/graph'),
+      expect.stringContaining('/api/overview/sankey'),
       expect.objectContaining({ credentials: 'include' }),
     );
   });
 
-  it('offers a lane tab per source class + All, and filtering is a client-side view (no refetch)', async () => {
+  it('hovering a destination filters the left flows to only its contributing paths (no refetch)', async () => {
     const fetchMock = vi.fn((input: string) => {
-      if (input.startsWith('/api/overview/graph')) return Promise.resolve(jsonResponse(200, graph));
+      if (input.startsWith('/api/overview/sankey'))
+        return Promise.resolve(jsonResponse(200, graph));
       throw new Error(`unexpected fetch ${input}`);
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    renderWithProviders(<OverviewSurface />, { route: '/' });
+    const { container } = renderWithProviders(<OverviewSurface />, { route: '/' });
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: 'All' })).toBeInTheDocument();
+      expect(screen.getByText('NETWORK')).toBeInTheDocument();
     });
-    expect(screen.getByRole('tab', { name: 'AI Agents' })).toBeInTheDocument();
     const callsBefore = fetchMock.mock.calls.length;
 
-    // Selecting a lane narrows the view without another engine read (the graph is tenant-wide already).
-    fireEvent.click(screen.getByRole('tab', { name: 'AI Agents' }));
+    // Hover `private-apps` -> only users>vpub, devices>vpub, vpub>private-apps stay full; the rest dim.
+    const dests = [...container.querySelectorAll('.fc-ov__dest')];
+    const privateApps = dests.find((g) => g.textContent?.includes('PRIVATE APPS'));
+    expect(privateApps).toBeDefined();
+    fireEvent.mouseEnter(privateApps as Element);
     await waitFor(() => {
-      expect(screen.getByRole('img')).toHaveAccessibleName(/Sources: AI Agents 12\./);
+      const full = [...container.querySelectorAll('.fc-ov__ribbons path')].filter(
+        (p) => p.getAttribute('opacity') === '1',
+      );
+      expect(full).toHaveLength(3);
     });
-    expect(screen.getByRole('img')).toHaveAccessibleName(/Destinations: Data Stores 17\./);
+    // The filter is a client-side view over the already-real graph -- it never triggers another read.
     expect(fetchMock.mock.calls.length).toBe(callsBefore);
+  });
+
+  it('pages the VTZs when more than three zones exist ("swipe for more")', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(jsonResponse(200, fourVtz))),
+    );
+    renderWithProviders(<OverviewSurface />, { route: '/' });
+    await waitFor(() => {
+      expect(screen.getByText('Zones 1 of 2')).toBeInTheDocument();
+    });
+    // Page 1 shows the first three; the fourth is hidden until we advance.
+    expect(screen.getByText('Users.Public')).toBeInTheDocument();
+    expect(screen.queryByText('Extra.Zone')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More zones' }));
+    await waitFor(() => {
+      expect(screen.getByText('Zones 2 of 2')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Extra.Zone')).toBeInTheDocument();
+    expect(screen.queryByText('Users.Public')).not.toBeInTheDocument();
   });
 
   it('renders the honest empty state for a tenant with no observed connectivity', async () => {
@@ -112,8 +165,9 @@ describe('the Overview surface (O1.5)', () => {
     await waitFor(() => {
       expect(screen.getByText('No connectivity observed')).toBeInTheDocument();
     });
-    // No lane tabs when there are no source classes (only All would exist -> the strip is hidden).
-    expect(screen.queryByRole('tab', { name: 'All' })).not.toBeInTheDocument();
+    // No zone pager and no risk badge when there are no zones.
+    expect(screen.queryByRole('navigation', { name: 'Trust zone pages' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Risk:/)).not.toBeInTheDocument();
   });
 
   it('degrades to an error state with a retry when the read fails', async () => {

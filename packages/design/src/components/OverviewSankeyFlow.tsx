@@ -33,6 +33,12 @@ export interface OverviewSankeyFlowProps {
   readonly vtzPage?: number;
   /** The destination class currently hovered -> the flows collapse to only what feeds it (else all). */
   readonly hoveredDest?: string | null;
+  /**
+   * Pointer-hover callback for the destination nodes: the class on enter, `null` on leave. The parent owns
+   * {@link hoveredDest} and feeds it back, so the highlight is a controlled visual filter (the accessible
+   * name already enumerates every node, so this is a mouse-only enhancement, never the sole affordance).
+   */
+  readonly onHoverDest?: (destClass: string | null) => void;
 }
 
 // Fixed SVG coordinate system; the rendered size is responsive (viewBox + CSS width:100%).
@@ -226,6 +232,7 @@ export function OverviewSankeyFlow({
   loading,
   vtzPage = 0,
   hoveredDest = null,
+  onHoverDest,
 }: OverviewSankeyFlowProps): ReactElement {
   const svgBase = {
     viewBox: `0 0 ${VIEW_W} ${VIEW_H}`,
@@ -508,8 +515,15 @@ export function OverviewSankeyFlow({
           ];
           const rowH = 23;
           const top = d.y - ((rows.length - 1) * rowH) / 2;
+          const hover = onHoverDest
+            ? {
+                onMouseEnter: () => onHoverDest(d.class),
+                onMouseLeave: () => onHoverDest(null),
+                style: { cursor: 'pointer' as const },
+              }
+            : {};
           return (
-            <g key={d.class} opacity={on ? 1 : 0.4}>
+            <g key={d.class} className="fc-ov__dest" opacity={on ? 1 : 0.4} {...hover}>
               <circle className="fc-ov__ring fc-ov__ring--objects" cx={d.x} cy={d.y} r={DEST_R} />
               {ringText(d.x, d.y, d.count, destLabel(d.class), 'fc-ov__dest-label')}
               {rows.map((label, i) => {

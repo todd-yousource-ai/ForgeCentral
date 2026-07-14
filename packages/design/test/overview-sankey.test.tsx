@@ -1,7 +1,7 @@
 // packages/design/test/overview-sankey.test.tsx -- IP-CONSOLE-01 RD.2 the redesigned Overview Sankey.
 
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { OverviewSankeyFlow } from '../src/index.js';
 import type { OverviewSankey } from '@forge/contracts';
@@ -82,6 +82,18 @@ describe('OverviewSankeyFlow', () => {
     const full = ribbons.filter((p) => p.getAttribute('opacity') === '1');
     expect(dimmed.length).toBeGreaterThan(0);
     expect(full.length).toBe(3); // users>vpub, devices>vpub, vpub>private-apps
+  });
+
+  it('reports the hovered destination class to the parent (enter -> class, leave -> null)', () => {
+    const onHoverDest = vi.fn();
+    const { container } = render(<OverviewSankeyFlow graph={graph} onHoverDest={onHoverDest} />);
+    // Destination groups render in graph order; the first is `network`.
+    const dest = container.querySelector('.fc-ov__dest');
+    expect(dest).not.toBeNull();
+    fireEvent.mouseEnter(dest as Element);
+    expect(onHoverDest).toHaveBeenLastCalledWith('network');
+    fireEvent.mouseLeave(dest as Element);
+    expect(onHoverDest).toHaveBeenLastCalledWith(null);
   });
 
   it('pages the VTZs three per page ("swipe for more")', () => {
