@@ -28,6 +28,9 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'ListAgents' in request ||
       'EntityDecisions' in request ||
       'EntityConnections' in request ||
+      // The tenant-wide connectivity roll-up (CONNECTIVITY_GRAPH, crdb IP-CONSOLE-CONNECTIVITY) rides the
+      // QuerySubmit opcode too; the engine discriminates it by its CBOR enum tag.
+      'ConnectivityGraph' in request ||
       // The decision-LOG reads (LOG_QUERY / LOG_EXPLAIN, crdb IP-CONSOLE-LOG-QUERY) ride the QuerySubmit
       // opcode too; the engine discriminates them by their CBOR enum tag.
       'LogQuery' in request ||

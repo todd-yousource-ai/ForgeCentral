@@ -4,3 +4,4 @@ export * from './client.js';
 export * from './wire-client.js';
 export * from './principal.js';
 export * from './operator-engine.js';
+export * from './overview.js';

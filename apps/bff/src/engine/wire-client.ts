@@ -24,6 +24,7 @@ import {
 import type {
   WireAgentList,
   WireConnectionList,
+  WireConnectivityGraph,
   WireContainEffect,
   WireDecisionDetail,
   WireDecisionList,
@@ -88,6 +89,14 @@ export function replyToConnectionList(reply: WireReply): WireConnectionList {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for an entity-connections read');
+}
+
+/** Map an engine `WireReply` to `WireConnectivityGraph` (CONNECTIVITY_GRAPH), throwing a typed error on a refusal. */
+export function replyToConnectivityGraph(reply: WireReply): WireConnectivityGraph {
+  if (typeof reply === 'object' && 'ConnectivityGraph' in reply) return reply.ConnectivityGraph;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a connectivity-graph read');
 }
 
 /** Map an engine `WireReply` to `WireContainEffect` (CONTAIN), throwing a typed error on a refusal. */
@@ -294,6 +303,17 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToConnectionList(await dispatch(transport, { EntityConnections: request })),
+      opts,
+    );
+  }
+
+  async connectivityGraph(
+    request: Parameters<CrucibleClient['connectivityGraph']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireConnectivityGraph> {
+    return this.call(
+      async (transport) =>
+        replyToConnectivityGraph(await dispatch(transport, { ConnectivityGraph: request })),
       opts,
     );
   }
