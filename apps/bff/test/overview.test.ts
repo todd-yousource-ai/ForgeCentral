@@ -178,7 +178,14 @@ describe('resolveOverviewSankey (RD.4)', () => {
     expect(view.sourceEdges).toEqual([
       { sourceClass: 'agents', vtzId: 'demo-public-agent', weight: 3 },
     ]);
-    expect(view.destinations).toEqual([{ class: 'saas', count: 4, apps: [], moreCount: 4 }]);
+    // All four category rings render (empty rings are honest zeros); the engine-side saas count
+    // merges into the saas ring with no per-destination breakdown (moreCount).
+    expect(view.destinations).toEqual([
+      { class: 'network', count: 0, apps: [], moreCount: 0 },
+      { class: 'saas', count: 4, apps: [], moreCount: 4 },
+      { class: 'private-apps', count: 0, apps: [], moreCount: 0 },
+      { class: 'data-stores', count: 0, apps: [], moreCount: 0 },
+    ]);
   });
 
   it('fails closed (OverviewUnavailableError) when a VTZ risk-band level is unknown', async () => {
