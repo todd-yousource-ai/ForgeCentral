@@ -1,0 +1,116 @@
+// packages/design/test/overview-sankey.test.tsx -- IP-CONSOLE-01 RD.2 the redesigned Overview Sankey.
+
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+
+import { OverviewSankeyFlow } from '../src/index.js';
+import type { OverviewSankey } from '@forge/contracts';
+
+const band = (level: 'green' | 'yellow' | 'red') => ({
+  level,
+  escalate: level === 'red' ? 3 : 0,
+  candidate: level === 'yellow' ? 2 : 0,
+  observe: 5,
+});
+
+const graph: OverviewSankey = {
+  sources: [
+    { class: 'devices', count: 47 },
+    { class: 'users', count: 515 },
+    { class: 'agents', count: 3 },
+  ],
+  vtzs: [
+    { id: 'vpub', name: 'Demo.Users.Public', risk: band('green') },
+    { id: 'vpriv', name: 'Demo.Private.Agent', risk: band('yellow') },
+    { id: 'vpubag', name: 'Demo.Public.Agent', risk: band('red') },
+  ],
+  destinations: [
+    { class: 'network', count: 101, apps: [{ name: 'Google' }, { name: 'IMAP' }], moreCount: 99 },
+    { class: 'saas', count: 323, apps: [], moreCount: 323 },
+    { class: 'private-apps', count: 52, apps: [{ name: 'Jira' }], moreCount: 51 },
+    { class: 'data-stores', count: 18, apps: [], moreCount: 18 },
+  ],
+  sourceEdges: [
+    { sourceClass: 'users', vtzId: 'vpub', weight: 515 },
+    { sourceClass: 'devices', vtzId: 'vpub', weight: 47 },
+    { sourceClass: 'agents', vtzId: 'vpriv', weight: 1 },
+    { sourceClass: 'agents', vtzId: 'vpubag', weight: 2 },
+  ],
+  destEdges: [
+    { vtzId: 'vpub', destClass: 'network', weight: 190 },
+    { vtzId: 'vpub', destClass: 'private-apps', weight: 96 },
+    { vtzId: 'vpubag', destClass: 'network', weight: 12 },
+  ],
+};
+
+describe('OverviewSankeyFlow', () => {
+  it('enumerates sources, VTZs + risk, and destinations in the accessible name (not color alone)', () => {
+    render(<OverviewSankeyFlow graph={graph} />);
+    const name = screen.getByRole('img').getAttribute('aria-label') ?? '';
+    expect(name).toMatch(/Sources: DEVICES 47, USERS 515, AI AGENTS 3\./);
+    expect(name).toMatch(
+      /Zones: Demo\.Users\.Public Nominal, Demo\.Private\.Agent Elevated, Demo\.Public\.Agent Critical\./,
+    );
+    expect(name).toMatch(
+      /Destinations: NETWORK 101, SAAS APPS 323, PRIVATE APPS 52, DATA STORES 18\./,
+    );
+  });
+
+  it('renders source rings, VTZ names + per-VTZ risk class, dest categories, and the app spine', () => {
+    const { container } = render(<OverviewSankeyFlow graph={graph} />);
+    expect(screen.getByText('515')).toBeInTheDocument();
+    expect(screen.getByText('AI AGENTS')).toBeInTheDocument();
+    // VTZ name stacks at the first dot; the risk is a per-VTZ token class.
+    expect(screen.getByText('Users.Public')).toBeInTheDocument();
+    expect(container.querySelector('.fc-ov__vtz--critical')).not.toBeNull();
+    expect(container.querySelector('.fc-ov__vtz--good')).not.toBeNull();
+    // Destination category + its common-name apps on the shared arch + the "+N more" tail.
+    expect(screen.getByText('NETWORK')).toBeInTheDocument();
+    expect(screen.getByText('Google')).toBeInTheDocument();
+    expect(screen.getByText('+99 more')).toBeInTheDocument();
+    // One ribbon per edge (source->VTZ + VTZ->dest), all full opacity when nothing is hovered.
+    const ribbons = container.querySelectorAll('.fc-ov__ribbons path');
+    expect(ribbons).toHaveLength(graph.sourceEdges.length + graph.destEdges.length);
+    expect([...ribbons].every((p) => p.getAttribute('opacity') === '1')).toBe(true);
+  });
+
+  it('hovering a destination dims the ribbons not on a path that feeds it (linked highlight)', () => {
+    const { container } = render(<OverviewSankeyFlow graph={graph} hoveredDest="private-apps" />);
+    const ribbons = [...container.querySelectorAll('.fc-ov__ribbons path')];
+    // Only Users+Devices -> Public -> private-apps contribute; the rest dim to 0.12.
+    const dimmed = ribbons.filter((p) => p.getAttribute('opacity') === '0.12');
+    const full = ribbons.filter((p) => p.getAttribute('opacity') === '1');
+    expect(dimmed.length).toBeGreaterThan(0);
+    expect(full.length).toBe(3); // users>vpub, devices>vpub, vpub>private-apps
+  });
+
+  it('pages the VTZs three per page ("swipe for more")', () => {
+    const four: OverviewSankey = {
+      ...graph,
+      vtzs: [...graph.vtzs, { id: 'v4', name: 'Demo.Extra.Zone', risk: band('green') }],
+    };
+    const { rerender } = render(<OverviewSankeyFlow graph={four} vtzPage={0} />);
+    expect(screen.getByText('Users.Public')).toBeInTheDocument();
+    expect(screen.queryByText('Extra.Zone')).not.toBeInTheDocument();
+    rerender(<OverviewSankeyFlow graph={four} vtzPage={1} />);
+    expect(screen.getByText('Extra.Zone')).toBeInTheDocument();
+    expect(screen.queryByText('Users.Public')).not.toBeInTheDocument();
+  });
+
+  it('renders honest empty and loading states', () => {
+    const empty: OverviewSankey = {
+      sources: [],
+      vtzs: [],
+      destinations: [],
+      sourceEdges: [],
+      destEdges: [],
+    };
+    const { rerender } = render(<OverviewSankeyFlow graph={empty} />);
+    expect(screen.getByText('No connectivity observed')).toBeInTheDocument();
+
+    rerender(<OverviewSankeyFlow graph={null} loading />);
+    const region = screen.getByRole('img');
+    expect(region).toHaveAccessibleName('Loading connectivity flow');
+    expect(region).toHaveAttribute('aria-busy', 'true');
+  });
+});
