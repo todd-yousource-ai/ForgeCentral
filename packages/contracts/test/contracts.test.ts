@@ -392,6 +392,63 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
     expect(view?.destinations.find((d) => d.class === 'saas')?.apps).toEqual([]);
   });
 
+  it('re-buckets the flat network class into category rings, merging same-named apps', () => {
+    const graph: WireConnectivityGraph = {
+      ...wire,
+      destinations: [{ class: 'network', count: 20 }],
+      dest_edges: [{ vtz_id: 'demo-users-public', dest_class: 'network', weight: 20 }],
+      top_destinations: [
+        { address: '140.82.112.4', count: 4 }, // GitHub LB a
+        { address: '140.82.113.5', count: 2 }, // GitHub LB b -> merges into one GitHub x6
+        { address: '8.8.8.8', count: 5 }, // Google DNS (network)
+        { address: '10.0.0.20:5432', count: 3 }, // Postgres (data-stores)
+      ],
+    };
+    const names = new Map([
+      ['140.82.112.4', 'lb-a.github.com'],
+      ['140.82.113.5', 'lb-b.github.com'],
+      ['8.8.8.8', 'dns.google'],
+    ]);
+    const classify = (address: string, resolvedName?: string) => {
+      if (resolvedName?.endsWith('github.com'))
+        return { category: 'saas' as const, name: 'GitHub' };
+      if (resolvedName === 'dns.google')
+        return { category: 'network' as const, name: 'Google DNS' };
+      if (address.endsWith(':5432')) return { category: 'data-stores' as const, name: 'Postgres' };
+      return { category: 'network' as const, name: address };
+    };
+    const view = toOverviewSankey(graph, (a) => names.get(a), classify);
+    expect(view).not.toBeNull();
+    // ALL FOUR rings always render in ring order (an empty category is an honest zero, like a green VTZ).
+    expect(view?.destinations.map((d) => d.class)).toEqual([
+      'network',
+      'saas',
+      'private-apps',
+      'data-stores',
+    ]);
+    const byClass = new Map(view?.destinations.map((d) => [d.class, d]));
+    expect(byClass.get('private-apps')).toMatchObject({ count: 0, apps: [], moreCount: 0 });
+    // network = Google DNS (5) + the unclassified tail (20 - 14 = 6) as moreCount.
+    expect(byClass.get('network')).toMatchObject({ count: 11, moreCount: 6 });
+    expect(byClass.get('network')?.apps).toEqual([
+      { name: 'Google DNS', address: '8.8.8.8', count: 5 },
+    ]);
+    // saas = the two GitHub LB IPs MERGED under one simple name.
+    expect(byClass.get('saas')).toMatchObject({ count: 6, moreCount: 0 });
+    expect(byClass.get('saas')?.apps).toEqual([
+      { name: 'GitHub', address: '140.82.112.4', count: 6 },
+    ]);
+    expect(byClass.get('data-stores')?.apps).toEqual([
+      { name: 'Postgres', address: '10.0.0.20:5432', count: 3 },
+    ]);
+    // The single VTZ->network ribbon splits by the rings' real shares of 20: 11/20, 6/20, 3/20.
+    expect(view?.destEdges).toEqual([
+      { vtzId: 'demo-users-public', destClass: 'network', weight: 11 },
+      { vtzId: 'demo-users-public', destClass: 'saas', weight: 6 },
+      { vtzId: 'demo-users-public', destClass: 'data-stores', weight: 3 },
+    ]);
+  });
+
   it('fails closed to null if any VTZ risk level is unknown', () => {
     const bad: WireConnectivityGraph = {
       ...wire,

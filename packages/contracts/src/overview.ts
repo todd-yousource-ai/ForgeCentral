@@ -298,18 +298,119 @@ export function overviewHighlight(graph: OverviewSankey, destClass: string): Ove
 /** The destination category the engine's `top_destinations` (all network endpoints) list under. */
 const NETWORK_DEST_CLASS = 'network';
 
+/** The four destination categories, in ring order (top to bottom of the right column). */
+export const OVERVIEW_DEST_CATEGORIES = ['network', 'saas', 'private-apps', 'data-stores'] as const;
+export type OverviewDestCategory = (typeof OVERVIEW_DEST_CATEGORIES)[number];
+
+/** A classified destination: the ring it belongs to + the simple display name (`GitHub`, `Postgres`). */
+export interface OverviewClassifiedDest {
+  readonly category: OverviewDestCategory;
+  readonly name: string;
+}
+
+/** Classify one destination endpoint (the BFF's rich classifier satisfies this shape). */
+export type OverviewDestClassifier = (
+  address: string,
+  resolvedName?: string,
+) => OverviewClassifiedDest;
+
+/**
+ * Re-bucket the engine's flat `network` destinations into the four category rings using `classify`,
+ * merging same-named apps (two GitHub load-balancer IPs -> one `GitHub` with the summed count). Every
+ * count is a real engine count; only the grouping is derived. The unclassified tail (connections beyond
+ * the engine's ranked top-N) stays on the `network` ring as its `moreCount`. Each VTZ -> network ribbon
+ * splits across the resulting rings proportionally to their REAL classified totals (exact when one VTZ
+ * feeds the network class -- the common case; otherwise a documented proportional attribution).
+ */
+function rebucketDestinations(
+  graph: WireConnectivityGraph,
+  apps: readonly { app: OverviewApp; resolvedName: string | undefined }[],
+  classify: OverviewDestClassifier,
+): { destinations: OverviewDestNode[]; destEdges: OverviewDestEdge[] } {
+  // Merge classified apps by (category, name); the address kept is the highest-count contributor's.
+  const merged = new Map<string, { category: OverviewDestCategory; app: OverviewApp }>();
+  for (const { app, resolvedName } of apps) {
+    const { category, name } = classify(app.address, resolvedName);
+    const key = `${category} ${name}`;
+    const prior = merged.get(key);
+    if (prior) {
+      merged.set(key, {
+        category,
+        app: { ...prior.app, count: prior.app.count + app.count },
+      });
+    } else {
+      merged.set(key, { category, app: { name, address: app.address, count: app.count } });
+    }
+  }
+  const byCategory = new Map<OverviewDestCategory, OverviewApp[]>();
+  for (const { category, app } of merged.values()) {
+    const list = byCategory.get(category) ?? [];
+    list.push(app);
+    byCategory.set(category, list);
+  }
+  for (const list of byCategory.values()) {
+    list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }
+
+  const engineNetwork = graph.destinations.find((d) => d.class === NETWORK_DEST_CLASS);
+  const networkTotal = engineNetwork?.count ?? 0;
+  const classifiedTotal = [...merged.values()].reduce((s, m) => s + m.app.count, 0);
+  const tail = Math.max(0, networkTotal - classifiedTotal);
+
+  // An engine class that IS one of the four categories (e.g. an engine-side `saas` count) merges into
+  // that ring; its connections have no per-destination breakdown, so they land in the ring's moreCount.
+  const engineExtra = (c: OverviewDestCategory): number =>
+    c === NETWORK_DEST_CLASS ? 0 : (graph.destinations.find((d) => d.class === c)?.count ?? 0);
+  const categoryCount = (c: OverviewDestCategory): number => {
+    const listed = (byCategory.get(c) ?? []).reduce((s, a) => s + a.count, 0);
+    return listed + (c === NETWORK_DEST_CLASS ? tail : engineExtra(c));
+  };
+  // ALL FOUR category rings always render (the same stability precedent as the VTZ column: every
+  // configured zone appears, green when quiet). An empty ring is an honest zero, never omitted.
+  const destinations: OverviewDestNode[] = OVERVIEW_DEST_CATEGORIES.map((c) => ({
+    class: c,
+    count: categoryCount(c),
+    apps: byCategory.get(c) ?? [],
+    moreCount: c === NETWORK_DEST_CLASS ? tail : engineExtra(c),
+  }));
+  // An engine class outside the four categories (none live today) passes through untouched.
+  for (const d of graph.destinations) {
+    if (d.class !== NETWORK_DEST_CLASS && !OVERVIEW_DEST_CATEGORIES.some((c) => c === d.class)) {
+      destinations.push({ class: d.class, count: d.count, apps: [], moreCount: d.count });
+    }
+  }
+
+  const destEdges: OverviewDestEdge[] = [];
+  for (const e of graph.dest_edges) {
+    if (e.dest_class !== NETWORK_DEST_CLASS || networkTotal === 0) {
+      destEdges.push({ vtzId: e.vtz_id, destClass: e.dest_class, weight: e.weight });
+      continue;
+    }
+    for (const c of OVERVIEW_DEST_CATEGORIES) {
+      const share = categoryCount(c) / networkTotal;
+      if (share > 0) {
+        destEdges.push({ vtzId: e.vtz_id, destClass: c, weight: e.weight * share });
+      }
+    }
+  }
+  return { destinations, destEdges };
+}
+
 /**
  * Project a generated `WireConnectivityGraph` (the RD.3 two-stage shape) to the {@link OverviewSankey} view
  * model, or `null` if any VTZ risk band's level is unknown (fail-closed to the unavailable state).
  *
- * The engine returns the top specific destinations (`top_destinations`, ranked IPs); this lists them as the
- * `network` category's apps. `resolveName` (the BFF's reverse-DNS) maps an IP to a common name; an
- * unresolved address falls back to the IP itself (INV-CONSOLE-NO-STUB: never a fabricated name). A drifted
- * wire field is a compile error here (the cross-module guard); the BFF resolver calls this.
+ * The engine returns the top specific destinations (`top_destinations`, ranked IPs). `resolveName` (the
+ * BFF's reverse-DNS) maps an IP to a common name; an unresolved address falls back to the IP itself
+ * (INV-CONSOLE-NO-STUB: never a fabricated name). `classify` (the BFF's rich classifier) re-buckets the
+ * flat network class into the four category rings with simple merged names; without it every destination
+ * lists under `network` unmerged. A drifted wire field is a compile error here (the cross-module guard);
+ * the BFF resolver calls this.
  */
 export function toOverviewSankey(
   graph: WireConnectivityGraph,
   resolveName?: (address: string) => string | undefined,
+  classify?: OverviewDestClassifier,
 ): OverviewSankey | null {
   const vtzs: OverviewVtzNode[] = [];
   for (const v of graph.vtzs) {
@@ -319,17 +420,25 @@ export function toOverviewSankey(
     }
     vtzs.push({ id: v.id, name: v.name, risk });
   }
-  const networkApps: OverviewApp[] = graph.top_destinations.map((d) => ({
-    name: resolveName?.(d.address)?.trim() || d.address,
-    address: d.address,
-    count: d.count,
-  }));
-  const listedConnections = networkApps.reduce((sum, app) => sum + app.count, 0);
-  return {
-    sources: graph.sources.map((s) => ({ class: s.class, count: s.count })),
-    vtzs,
-    destinations: graph.destinations.map((d) => {
-      const apps = d.class === NETWORK_DEST_CLASS ? networkApps : [];
+  const resolved = graph.top_destinations.map((d) => {
+    const resolvedName = resolveName?.(d.address)?.trim();
+    return {
+      resolvedName:
+        resolvedName !== undefined && resolvedName.length > 0 ? resolvedName : undefined,
+      app: {
+        name: resolvedName !== undefined && resolvedName.length > 0 ? resolvedName : d.address,
+        address: d.address,
+        count: d.count,
+      } satisfies OverviewApp,
+    };
+  });
+  const listedConnections = resolved.reduce((sum, r) => sum + r.app.count, 0);
+
+  const bucketed = classify ? rebucketDestinations(graph, resolved, classify) : undefined;
+  const destinations =
+    bucketed?.destinations ??
+    graph.destinations.map((d) => {
+      const apps = d.class === NETWORK_DEST_CLASS ? resolved.map((r) => r.app) : [];
       const listed = d.class === NETWORK_DEST_CLASS ? listedConnections : 0;
       return {
         class: d.class,
@@ -337,16 +446,24 @@ export function toOverviewSankey(
         apps,
         moreCount: Math.max(0, d.count - listed),
       };
-    }),
+    });
+  const destEdges =
+    bucketed?.destEdges ??
+    graph.dest_edges.map((e) => ({
+      vtzId: e.vtz_id,
+      destClass: e.dest_class,
+      weight: e.weight,
+    }));
+
+  return {
+    sources: graph.sources.map((s) => ({ class: s.class, count: s.count })),
+    vtzs,
+    destinations,
     sourceEdges: graph.source_edges.map((e) => ({
       sourceClass: e.source_class,
       vtzId: e.vtz_id,
       weight: e.weight,
     })),
-    destEdges: graph.dest_edges.map((e) => ({
-      vtzId: e.vtz_id,
-      destClass: e.dest_class,
-      weight: e.weight,
-    })),
+    destEdges,
   };
 }

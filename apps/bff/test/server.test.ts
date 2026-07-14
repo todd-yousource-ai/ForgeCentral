@@ -451,7 +451,13 @@ describe('BFF HTTP surface', () => {
       { vtzId: 'demo-public-agent', destClass: 'saas', weight: 4 },
     ]);
     // No per-app breakdown on the wire yet -> apps empty, moreCount = the category count.
-    expect(sankey.destinations).toEqual([{ class: 'saas', count: 4, apps: [], moreCount: 4 }]);
+    // All four category rings render; the engine-side saas count merges into its ring.
+    expect(sankey.destinations).toEqual([
+      { class: 'network', count: 0, apps: [], moreCount: 0 },
+      { class: 'saas', count: 4, apps: [], moreCount: 4 },
+      { class: 'private-apps', count: 0, apps: [], moreCount: 0 },
+      { class: 'data-stores', count: 0, apps: [], moreCount: 0 },
+    ]);
   });
 
   it('GET /api/overview/graph is 401 without an operator session (fail-closed)', async () => {

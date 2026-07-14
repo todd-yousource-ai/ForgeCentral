@@ -18,6 +18,7 @@ import type {
 } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
+import { classifyDestination } from './destination-classifier.js';
 import type { OperatorEngine } from './operator-engine.js';
 import type { OperatorPrincipal } from './principal.js';
 import type { ReverseDnsResolver } from './reverse-dns.js';
@@ -79,9 +80,15 @@ export async function resolveOverviewSankey(
 ): Promise<OverviewSankey> {
   const graph = await engine.connectivityGraph(principal, queryToWire(query), opts);
   // Resolve the engine's destination IPs to common names (reverse-DNS, cached + background); an
-  // unresolved IP falls back to itself inside toOverviewSankey (never a fabricated name).
+  // unresolved IP falls back to itself inside toOverviewSankey (never a fabricated name). The rich
+  // classifier then re-buckets the flat network class into the four category rings with simple
+  // merged brand names (GitHub, Google DNS, Postgres...).
   const names = reverseDns?.namesFor(graph.top_destinations.map((d) => d.address));
-  const view = toOverviewSankey(graph, names ? (address) => names.get(address) : undefined);
+  const view = toOverviewSankey(
+    graph,
+    names ? (address) => names.get(address) : undefined,
+    classifyDestination,
+  );
   if (view === null) {
     throw new OverviewUnavailableError();
   }
