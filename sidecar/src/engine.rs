@@ -12,11 +12,12 @@
 
 use std::sync::Arc;
 
-use cdb_device_identity::{tpm_signing_gate, SharedKeystore};
+use cdb_device_identity::tpm_signing_gate;
 use tokio::io::copy_bidirectional;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::rustls::pki_types::ServerName;
+use tokio_rustls::rustls::ClientConfig;
 use tokio_rustls::TlsConnector;
 
 use crate::bind::{assert_loopback_addr, SidecarError};
@@ -27,29 +28,30 @@ pub struct EngineOriginator {
     connector: TlsConnector,
     engine_addr: String,
     server_name: ServerName<'static>,
+    /// Whether the handshake must acquire the process TPM signing gate (true for the TPM-resident key;
+    /// false for a software key, which signs in-process).
+    tpm_gated: bool,
 }
 
 impl EngineOriginator {
     /// Bind the loopback `egress_addr` (fail-closed: must be loopback) and prepare the mTLS client channel
-    /// to `engine_addr`, verifying the engine server certificate as `server_name` against `ca_pem` and
-    /// presenting `cert_chain_der` (the Console's enrolled leaf, DER) signed by the TPM-resident key in
-    /// `keystore` (the private key never leaves the device).
+    /// to `engine_addr`, verifying the engine server certificate as `server_name` and presenting the
+    /// mutually-authenticating `client_config` the caller built -- either the TPM-resident identity
+    /// (`tpm_gated = true`, the private key never leaves the device) or the software Console-CA leaf on the
+    /// control plane (`tpm_gated = false`, IP-CONSOLE-CONTROL-PLANE D2). `tpm_gated` gates the handshake on
+    /// the process TPM signing gate (needed only when the key is in-device).
     ///
     /// # Errors
-    /// [`SidecarError::Config`] on a non-loopback egress, a bad server name, or malformed mTLS material;
-    /// [`SidecarError::Listen`] if the egress socket cannot bind.
+    /// [`SidecarError::Config`] on a non-loopback egress or a bad server name; [`SidecarError::Listen`] if
+    /// the egress socket cannot bind.
     pub async fn bind(
         egress_addr: &str,
         engine_addr: String,
         server_name: &str,
-        ca_pem: &[u8],
-        cert_chain_der: Vec<Vec<u8>>,
-        keystore: SharedKeystore,
+        client_config: ClientConfig,
+        tpm_gated: bool,
     ) -> Result<Self, SidecarError> {
         assert_loopback_addr(egress_addr)?;
-        let client_config =
-            cdb_device_identity::tpm_mtls_client_config(ca_pem, cert_chain_der, keystore)
-                .map_err(|e| SidecarError::Config(format!("engine mtls config: {e}")))?;
         let name = ServerName::try_from(server_name.to_owned())
             .map_err(|e| SidecarError::Config(format!("engine server name {server_name}: {e}")))?;
         let listener = TcpListener::bind(egress_addr)
@@ -60,6 +62,7 @@ impl EngineOriginator {
             connector: TlsConnector::from(Arc::new(client_config)),
             engine_addr,
             server_name: name,
+            tpm_gated,
         })
     }
 
@@ -83,10 +86,17 @@ impl EngineOriginator {
             SidecarError::Serve(format!("engine connect {}: {e}", self.engine_addr))
         })?;
         // Serialize the in-TPM handshake signature so at most one connect parks a worker in the device.
-        let _permit = tpm_signing_gate()
-            .acquire()
-            .await
-            .map_err(|e| SidecarError::Serve(format!("tpm signing gate: {e}")))?;
+        // Only the TPM path needs the gate; a software key signs in-process (no device round-trip).
+        let _permit = if self.tpm_gated {
+            Some(
+                tpm_signing_gate()
+                    .acquire()
+                    .await
+                    .map_err(|e| SidecarError::Serve(format!("tpm signing gate: {e}")))?,
+            )
+        } else {
+            None
+        };
         self.connector
             .connect(self.server_name.clone(), tcp)
             .await
@@ -107,8 +117,9 @@ impl EngineOriginator {
             let connector = self.connector.clone();
             let engine_addr = self.engine_addr.clone();
             let name = self.server_name.clone();
+            let tpm_gated = self.tpm_gated;
             tokio::spawn(async move {
-                let _ = tunnel(&connector, name, &engine_addr, down).await;
+                let _ = tunnel(&connector, name, &engine_addr, down, tpm_gated).await;
             });
         }
     }
@@ -120,16 +131,24 @@ async fn tunnel(
     name: ServerName<'static>,
     engine_addr: &str,
     mut down: TcpStream,
+    tpm_gated: bool,
 ) -> Result<(), SidecarError> {
     let tcp = TcpStream::connect(engine_addr)
         .await
         .map_err(|e| SidecarError::Serve(format!("engine connect {engine_addr}: {e}")))?;
-    // Gate only the handshake (the in-TPM signature); the permit is released before the long-lived tunnel.
+    // Gate only the handshake (the in-TPM signature), and only for the TPM path; a software key signs
+    // in-process. The permit is released before the long-lived tunnel.
     let mut up = {
-        let _permit = tpm_signing_gate()
-            .acquire()
-            .await
-            .map_err(|e| SidecarError::Serve(format!("tpm signing gate: {e}")))?;
+        let _permit = if tpm_gated {
+            Some(
+                tpm_signing_gate()
+                    .acquire()
+                    .await
+                    .map_err(|e| SidecarError::Serve(format!("tpm signing gate: {e}")))?,
+            )
+        } else {
+            None
+        };
         connector
             .connect(name, tcp)
             .await
@@ -189,16 +208,22 @@ mod tests {
         (cert.pem().into_bytes(), cert.der().to_vec())
     }
 
+    /// A TPM-signed client config over a null (mock) keystore, for the bind tests.
+    fn tpm_client_config(ca_pem: &[u8], leaf_der: Vec<u8>) -> tokio_rustls::rustls::ClientConfig {
+        cdb_device_identity::tpm_mtls_client_config(ca_pem, vec![leaf_der], null_keystore())
+            .unwrap()
+    }
+
     #[tokio::test]
     async fn refuses_a_routable_egress_bind() {
         let (ca_pem, leaf_der) = self_signed();
+        let cc = tpm_client_config(&ca_pem, leaf_der);
         let result = EngineOriginator::bind(
             "10.0.0.5:0",
             "127.0.0.1:7878".to_owned(),
             "wire.localhost",
-            &ca_pem,
-            vec![leaf_der],
-            null_keystore(),
+            cc,
+            true,
         )
         .await;
         assert!(result.is_err(), "a routable egress bind must be refused");
@@ -207,16 +232,40 @@ mod tests {
     #[tokio::test]
     async fn binds_a_loopback_egress_with_the_tpm_signed_profile() {
         let (ca_pem, leaf_der) = self_signed();
+        let cc = tpm_client_config(&ca_pem, leaf_der);
         let originator = EngineOriginator::bind(
             "127.0.0.1:0",
             "127.0.0.1:7878".to_owned(),
             "wire.localhost",
-            &ca_pem,
-            vec![leaf_der],
-            null_keystore(),
+            cc,
+            true,
         )
         .await
         .expect("loopback egress + TPM-signed client config should build");
+        assert!(originator.local_addr().unwrap().ip().is_loopback());
+    }
+
+    #[tokio::test]
+    async fn binds_a_loopback_egress_with_a_software_key() {
+        // IP-CONSOLE-CONTROL-PLANE F1/D2: the control-plane path presents a SOFTWARE key -- the sidecar
+        // builds a software mTLS client config (no TPM, tpm_gated = false) from the Console-CA leaf + key.
+        let key = rcgen::KeyPair::generate().unwrap();
+        let params = rcgen::CertificateParams::new(vec!["console.local".to_owned()]).unwrap();
+        let cert = params.self_signed(&key).unwrap();
+        let ca_pem = cert.pem().into_bytes();
+        let cert_pem = cert.pem().into_bytes();
+        let key_pem = key.serialize_pem().into_bytes();
+        let cc = cdb_mtls::client_config(&ca_pem, &cert_pem, &key_pem)
+            .expect("a software mTLS client config should build");
+        let originator = EngineOriginator::bind(
+            "127.0.0.1:0",
+            "127.0.0.1:7879".to_owned(),
+            "control.localhost",
+            cc,
+            false,
+        )
+        .await
+        .expect("loopback egress + software client config should build");
         assert!(originator.local_addr().unwrap().ip().is_loopback());
     }
 
@@ -247,14 +296,41 @@ mod tests {
         tpm.open().expect("open the host TPM");
         tpm.generate_key().expect("re-derive the enrolled TPM key");
         let keystore: SharedKeystore = Arc::new(Mutex::new(tpm));
+        let cc = cdb_device_identity::tpm_mtls_client_config(&ca, vec![leaf_der], keystore)
+            .expect("build the TPM-signed client config");
 
-        let originator =
-            EngineOriginator::bind("127.0.0.1:0", addr, &sni, &ca, vec![leaf_der], keystore)
-                .await
-                .expect("originator builds from the enrolled TPM identity");
+        let originator = EngineOriginator::bind("127.0.0.1:0", addr, &sni, cc, true)
+            .await
+            .expect("originator builds from the enrolled TPM identity");
         originator
             .dial_engine()
             .await
             .expect("TPM-signed mTLS handshake to the live engine :7878 completes");
+    }
+
+    /// Software live capstone (IP-CONSOLE-CONTROL-PLANE F1/D2): present the software Console-CA leaf and
+    /// dial the running control plane on `:7879`, proving the software mTLS handshake completes. Env:
+    /// `SIDECAR_TEST_ENGINE_CA` / `_CERT` / `_KEY` (the control `ca.pem` / `client.pem` / `client.key`),
+    /// `SIDECAR_TEST_ENGINE_ADDR` (default `127.0.0.1:7879`), `SIDECAR_TEST_ENGINE_SNI` (default
+    /// `control.localhost`).
+    #[tokio::test]
+    #[ignore = "requires the live control plane + the software Console-CA leaf"]
+    async fn dials_the_live_control_plane_over_software_mtls() {
+        let ca = std::fs::read(std::env::var("SIDECAR_TEST_ENGINE_CA").unwrap()).unwrap();
+        let cert = std::fs::read(std::env::var("SIDECAR_TEST_ENGINE_CERT").unwrap()).unwrap();
+        let key = std::fs::read(std::env::var("SIDECAR_TEST_ENGINE_KEY").unwrap()).unwrap();
+        let addr = std::env::var("SIDECAR_TEST_ENGINE_ADDR")
+            .unwrap_or_else(|_| "127.0.0.1:7879".to_owned());
+        let sni = std::env::var("SIDECAR_TEST_ENGINE_SNI")
+            .unwrap_or_else(|_| "control.localhost".to_owned());
+        let cc =
+            cdb_mtls::client_config(&ca, &cert, &key).expect("build the software client config");
+        let originator = EngineOriginator::bind("127.0.0.1:0", addr, &sni, cc, false)
+            .await
+            .expect("originator builds from the software Console-CA leaf");
+        originator
+            .dial_engine()
+            .await
+            .expect("software mTLS handshake to the live control plane :7879 completes");
     }
 }

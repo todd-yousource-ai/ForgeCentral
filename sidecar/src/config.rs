@@ -35,12 +35,19 @@ pub struct SidecarConfig {
     pub engine_servername: String,
     /// Path to the CA bundle that signs the engine's server certificate (the wire CA).
     pub engine_ca: PathBuf,
-    /// Path to the sidecar's enrolled client certificate presented to the engine (the service Principal).
-    /// There is NO key file: the engine-identity key is non-exportable and TPM-resident (see `tcti`).
+    /// Path to the sidecar's client certificate presented to the engine (the service Principal).
     pub engine_cert: PathBuf,
+    /// Optional path to a software engine-identity **private key** (PEM). When present, the sidecar
+    /// presents a SOFTWARE key -- the long-lived Console-CA leaf the node installer generates for the
+    /// dedicated control plane (IP-CONSOLE-CONTROL-PLANE D2, `/etc/cdb/control/client.key`) -- instead of
+    /// re-deriving a TPM-resident key. This is the control-plane path: a permanent, pinned software P-384
+    /// identity on `:7879`, decoupled from ZTP and from the box TPM (so no identity collision with Torch).
+    /// When ABSENT, the key is TPM-resident (`tcti`), the legacy wire-seam path.
+    #[serde(default)]
+    pub engine_key: Option<PathBuf>,
     /// The TPM TCTI the sidecar opens to re-derive the non-exportable engine-identity key and sign the
     /// mTLS handshake in-device (the same deterministic primary `console-enroll` enrolled). Defaults to
-    /// the host TPM.
+    /// the host TPM. Ignored when `engine_key` selects the software path.
     #[serde(default = "default_tcti")]
     pub tcti: String,
     /// The loopback `ip:port` the sidecar listens on for the BFF's outbound wire bytes.
@@ -121,13 +128,25 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_stale_engine_key_field_fail_closed() {
-        // engine_key is gone (the key is TPM-resident); a config still carrying it is refused.
+    fn a_config_without_engine_key_is_tpm_mode() {
+        // The default (no engine_key) is the TPM-resident wire-seam path.
+        let config = SidecarConfig::from_json_str(&valid_json()).unwrap();
+        assert!(config.engine_key.is_none());
+    }
+
+    #[test]
+    fn accepts_a_software_engine_key_for_the_control_plane() {
+        // IP-CONSOLE-CONTROL-PLANE D2: a software engine_key selects the control-plane path (the
+        // Console-CA leaf on :7879), presenting a software key instead of the TPM-resident one.
         let json = valid_json().replace(
             "\"engine_cert\": \"/etc/console/bff-cert.pem\",",
-            "\"engine_cert\": \"/etc/console/bff-cert.pem\", \"engine_key\": \"/x.key\",",
+            "\"engine_cert\": \"/etc/cdb/control/client.pem\", \"engine_key\": \"/etc/cdb/control/client.key\",",
         );
-        assert!(SidecarConfig::from_json_str(&json).is_err());
+        let config = SidecarConfig::from_json_str(&json).unwrap();
+        assert_eq!(
+            config.engine_key.as_deref(),
+            Some(std::path::Path::new("/etc/cdb/control/client.key"))
+        );
     }
 
     #[test]
