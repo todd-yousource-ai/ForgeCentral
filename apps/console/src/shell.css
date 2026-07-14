@@ -15,7 +15,15 @@ body {
    * surface (it shows through the transparent content region + the frosted chrome). The canvas token is
    * the base color under it (a fallback while the image loads and behind its darkest areas). */
   background-color: var(--fc-color-surface-canvas);
-  background-image: url('/honeycomb.jpg');
+  /* Dim the honeycomb so it recedes behind the diagram (it read too bright against the flow): a
+   * canvas-color scrim layered over the brand image. INV-CONSOLE-DESIGN-SEMANTIC-COLOR: the scrim is
+   * the canvas token via color-mix (the same idiom as the frosted chrome), never a hand-picked hex. */
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--fc-color-surface-canvas) 66%, transparent),
+      color-mix(in srgb, var(--fc-color-surface-canvas) 66%, transparent)
+    ),
+    url('/honeycomb.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
