@@ -157,3 +157,136 @@ export function toOverviewGraph(graph: WireConnectivityGraph): OverviewGraph | n
     risk,
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// Overview REDESIGN (Sankey) view model -- the locked 2026-07-14 design (supersedes the single "Public"
+// zone above; the old `OverviewGraph` stays until the surface migrates). The graphic is a true three-column
+// Sankey: source-class nodes -> up to 3 VTZ nodes (each with its OWN detection-driven risk band) ->
+// destination-category nodes (each carrying its top named apps). Flows are two-stage and weighted:
+// source -> VTZ (`OverviewSourceEdge`) and VTZ -> destination (`OverviewDestEdge`). Every value is a real
+// engine fact (INV-CONSOLE-NO-STUB): VTZ risk is COMPUTED FROM DETECTIONS, never hardcoded; app names come
+// from DNS resolution (a fast-follow -- until then `apps` is empty and only the category count shows).
+
+/** One source-class node (left column): `users` / `devices` / `agents`, with its connection count. */
+export interface OverviewSourceNode {
+  readonly class: string;
+  readonly count: number;
+}
+
+/**
+ * One Virtual Trust Zone node (center column). `risk` is its OWN band, computed from the detections on the
+ * entities assigned to it (green Nominal / yellow Elevated / red Critical) -- it shifts live and is never a
+ * fixed property of the zone. At most 3 render per page (the surface pages the rest, "swipe for more").
+ */
+export interface OverviewVtzNode {
+  /** Stable zone id (e.g. the seeded demo VTZ id). */
+  readonly id: string;
+  /** Display name, dotted (e.g. `Demo.Users.Public`); the renderer stacks it at the first dot. */
+  readonly name: string;
+  /** The detection-driven risk band coloring the zone. */
+  readonly risk: OverviewRiskBand;
+}
+
+/** One named application inside a destination category (a common DNS name, e.g. `Google`). */
+export interface OverviewApp {
+  readonly name: string;
+  /** Connection count to this app, when known; omitted until per-app resolution lands. */
+  readonly count?: number;
+}
+
+/**
+ * One destination-category node (right column). The four fixed categories are `network` / `saas` /
+ * `private-apps` / `data-stores`. `apps` is the top named apps to list on the shared apps arch; `moreCount`
+ * is the "+N more" tail (`count - apps.length` when apps are known, else the full count). `apps` is empty
+ * until DNS resolution lands -- the category count still renders (never a fabricated app name).
+ */
+export interface OverviewDestNode {
+  readonly class: string;
+  readonly count: number;
+  readonly apps: readonly OverviewApp[];
+  readonly moreCount: number;
+}
+
+/** A weighted source-class -> VTZ flow (left stage). `weight` is the classified `ConnectsTo` edge count. */
+export interface OverviewSourceEdge {
+  readonly sourceClass: string;
+  readonly vtzId: string;
+  readonly weight: number;
+}
+
+/** A weighted VTZ -> destination-category flow (right stage). */
+export interface OverviewDestEdge {
+  readonly vtzId: string;
+  readonly destClass: string;
+  readonly weight: number;
+}
+
+/**
+ * The redesigned Overview Sankey. Two-stage, VTZ-routed connectivity. An empty tenant yields empty arrays
+ * (the renderer shows the honest "no connectivity observed" state); a VTZ with no detections is green.
+ */
+export interface OverviewSankey {
+  readonly sources: readonly OverviewSourceNode[];
+  readonly vtzs: readonly OverviewVtzNode[];
+  readonly destinations: readonly OverviewDestNode[];
+  readonly sourceEdges: readonly OverviewSourceEdge[];
+  readonly destEdges: readonly OverviewDestEdge[];
+}
+
+/** The home page shows at most this many VTZs; the rest are reachable by paging ("swipe for more"). */
+export const OVERVIEW_VTZS_PER_PAGE = 3;
+
+/** The number of VTZ pages for `count` zones (at least 1, so an empty tenant still has a page). */
+export function overviewVtzPageCount(count: number): number {
+  return Math.max(1, Math.ceil(count / OVERVIEW_VTZS_PER_PAGE));
+}
+
+/**
+ * The VTZs visible on page `page` (0-based), at most {@link OVERVIEW_VTZS_PER_PAGE}. An out-of-range page
+ * clamps into bounds so the surface never renders an empty page for a non-empty tenant.
+ */
+export function overviewVtzPage(
+  vtzs: readonly OverviewVtzNode[],
+  page: number,
+): readonly OverviewVtzNode[] {
+  const pages = overviewVtzPageCount(vtzs.length);
+  const clamped = Math.max(0, Math.min(page, pages - 1));
+  const start = clamped * OVERVIEW_VTZS_PER_PAGE;
+  return vtzs.slice(start, start + OVERVIEW_VTZS_PER_PAGE);
+}
+
+/**
+ * The set of edge endpoints to keep when a destination category is highlighted (the hover-to-filter
+ * interaction): the VTZ->dest edges into `destClass`, plus the source->VTZ edges feeding those VTZs. A
+ * caller dims every edge not returned here. `null` `destClass` means "nothing hovered" (keep all).
+ */
+export interface OverviewHighlight {
+  readonly vtzIds: ReadonlySet<string>;
+  readonly sourceEdgeKeys: ReadonlySet<string>;
+  readonly destEdgeKeys: ReadonlySet<string>;
+}
+
+/** A stable key for a source edge (`sourceClass>vtzId`), matching {@link overviewHighlight}. */
+export function sourceEdgeKey(edge: OverviewSourceEdge): string {
+  return `${edge.sourceClass}>${edge.vtzId}`;
+}
+
+/** A stable key for a dest edge (`vtzId>destClass`). */
+export function destEdgeKey(edge: OverviewDestEdge): string {
+  return `${edge.vtzId}>${edge.destClass}`;
+}
+
+/**
+ * Compute the highlight set for a hovered destination category. Returns the contributing VTZs + the edge
+ * keys on the source->VTZ->`destClass` paths, so the renderer keeps those and dims the rest.
+ */
+export function overviewHighlight(graph: OverviewSankey, destClass: string): OverviewHighlight {
+  const destEdges = graph.destEdges.filter((e) => e.destClass === destClass);
+  const vtzIds = new Set(destEdges.map((e) => e.vtzId));
+  const sourceEdges = graph.sourceEdges.filter((e) => vtzIds.has(e.vtzId));
+  return {
+    vtzIds,
+    sourceEdgeKeys: new Set(sourceEdges.map(sourceEdgeKey)),
+    destEdgeKeys: new Set(destEdges.map(destEdgeKey)),
+  };
+}
