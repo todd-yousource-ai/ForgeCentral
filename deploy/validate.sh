@@ -34,8 +34,11 @@ else
 fi
 
 echo "==> [4/4] admin floor: sub-floor (X25519, P-256) is refused"
-if echo | openssl s_client -connect "${NODE_IP}:${ADMIN_PORT}" -groups X25519:prime256v1 -tls1_3 2>&1 \
-    | grep -qiE "handshake failure|alert|no shared|sslv3 alert"; then
+# A refused handshake makes openssl exit non-zero BY DESIGN; under `set -o pipefail` that would poison
+# `openssl | grep` and misreport the (correct) refusal as a failure. Capture first, tolerate the expected
+# non-zero, then match the refusal alert -- so the check passes precisely when the floor IS enforced.
+sub_floor_probe=$(echo | openssl s_client -connect "${NODE_IP}:${ADMIN_PORT}" -groups X25519:prime256v1 -tls1_3 2>&1 || true)
+if printf '%s' "$sub_floor_probe" | grep -qiE "handshake failure|alert|no shared|sslv3 alert"; then
   ok "sub-floor refused (fail-closed)"
 else
   fail "a sub-floor client was NOT refused on ${NODE_IP}:${ADMIN_PORT} -- the admin plane floor is not enforced"
