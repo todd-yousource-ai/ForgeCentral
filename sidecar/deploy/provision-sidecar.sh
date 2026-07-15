@@ -5,9 +5,9 @@
 # committed, re-runnable script so a box move re-executes it (INV-CONSOLE-DEPLOY-REPRODUCIBLE).
 #
 # It provisions the ADMIN leg (the :8443 server cert) and writes the sidecar config. The ENGINE leg
-# identity (engine_cert = the enrolled leaf; the key is TPM-resident, re-derived at runtime via TCTI) is
-# only referenced here. Installing the systemd units + enabling them is the installer's job (D.4); this
-# script prints the follow-up commands.
+# identity (engine_cert/engine_key = the software Console-CA leaf on the :7879 control plane,
+# IP-CONSOLE-CONTROL-PLANE D2) is only referenced here. Installing the systemd units + enabling them is the
+# installer's job (D.4); this script prints the follow-up commands.
 #
 # Usage (env-configured; all have sane defaults except the engine cert paths):
 #   NODE_IP=10.0.0.5 \

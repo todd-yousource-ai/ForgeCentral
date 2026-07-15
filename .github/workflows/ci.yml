@@ -36,17 +36,6 @@ jobs:
         if: ${{ env.CRUCIBLE_TOKEN != '' }}
         run: git config --global url."https://x-access-token:${CRUCIBLE_TOKEN}@github.com/".insteadOf "https://github.com/"
 
-      - name: Install the TPM system libraries (tss2) for the console-tpm build
-        # console-tpm links the real tpm2-tss stack: tss-esapi -> tss-esapi-sys, whose build script
-        # resolves the system `tss2-sys` library via pkg-config. The runner ships without it, so the
-        # Rust gate's console-tpm compile fails ("Package 'tss2-sys' ... not found"). No TPM hardware is
-        # needed to build -- the device tests are #[ignore]d -- only the dev libraries. libtss2-dev
-        # provides tss2-sys.pc (and the esys/mu/tcti pkgconfig). Needs the runner's sudo, so it lives
-        # here (not in the shared scripts/ci.sh, which must also run on already-provisioned dev boxes).
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libtss2-dev
-
       - name: Provision Playwright (browser + OS libraries) for the e2e stage
         # The runner has no browser or its shared libraries; --with-deps apt-installs them (needs the
         # runner's sudo, so it lives here, not in the shared scripts/ci.sh). The gate's e2e stage then

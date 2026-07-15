@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # deploy/install.sh -- the end-to-end YouSource Console install (IP-CONSOLE-00-DEPLOY D.4).
 #
-# Lays the whole two-process Console down on a node and enrolls its engine identity, then self-checks. It
-# ties together D.1 (the BFF unit), D.2 (the sidecar config + admin cert), and D.3a-console (the ZTP
-# enrollment): install the binaries + units, provision the sidecar, run `console-enroll` (the operator
-# approves the MFA device code -- the one interactive step) to mint the engine cert/key the sidecar
-# presents, enable both units, and validate. Fail-closed and idempotent where the underlying steps are.
+# Lays the whole two-process Console down on a node and delivers its engine identity, then self-checks. It
+# ties together D.1 (the BFF unit), D.2 (the sidecar config + admin cert), and the control-plane engine
+# identity: install the binaries + units, provision the sidecar, deliver the permanent SOFTWARE Console-CA
+# leaf the node installer minted (IP-CONSOLE-CONTROL-PLANE D2 -- no MFA, no ZTP, no TPM), enable both units,
+# and validate. Fail-closed and idempotent where the underlying steps are.
 #
-# Config is env. Required unless noted; see deploy/console-enroll.env.example for the enrollment vars.
+# Config is env. Required unless noted.
 #   CONSOLE_NODE_IP            the node's own IP (the sidecar admin bind + the validate target)
-#   CONSOLE_BIN_DIR           dir holding the built binaries: console-crypto-sidecar, console-enroll
+#   CONSOLE_BIN_DIR           dir holding the built binary: console-crypto-sidecar
 #   CONSOLE_BFF_DIST          dir holding the built BFF (dist/ + node_modules)
-#   CONSOLE_ENROLL_ENV        path to the console-enroll env file (the CONSOLE_ENROLL_* vars)
-#   CONSOLE_SKIP_ENROLL=1     optional: skip the interactive enrollment (e.g. re-run after enrolling)
+#   CONSOLE_CONTROL_SRC       [4] optional, default `/etc/cdb/control`: where the node installer's software
+#                             Console-CA leaf (ca.pem/client.pem/client.key) lives
+#   CONSOLE_SKIP_ENROLL=1     optional: skip the engine-identity leaf delivery (e.g. re-run after delivery)
 #   CONSOLE_PEER_TENANT       [4b] the node tenant UUID the console engine peer is attributed to (required
 #                             once a cert is present; the tenant the BFF operates in)
 #   CONSOLE_PEER_CLEARANCE    [4b] optional, default `secret`: the console peer's clearance
@@ -30,7 +31,6 @@ log() { echo "==> $*"; }
 NODE_IP="${CONSOLE_NODE_IP:?set CONSOLE_NODE_IP to the node IP}"
 BIN_DIR="${CONSOLE_BIN_DIR:?set CONSOLE_BIN_DIR to the built-binaries dir}"
 BFF_DIST="${CONSOLE_BFF_DIST:?set CONSOLE_BFF_DIST to the built BFF dir}"
-ENROLL_ENV="${CONSOLE_ENROLL_ENV:-/etc/console-enroll/config.env}"
 SIDECAR_ETC=/etc/console-sidecar
 BFF_ETC=/etc/console-bff
 BFF_LIB=/usr/local/lib/console-bff
@@ -46,7 +46,6 @@ id console-bff     >/dev/null 2>&1 || useradd --system --no-create-home --shell 
 # ---- [2] binaries + the built BFF ----------------------------------------------------------------
 log "[2] binaries"
 install -m 0755 "$BIN_DIR/console-crypto-sidecar" "$BIN_PREFIX/console-crypto-sidecar"
-install -m 0755 "$BIN_DIR/console-enroll"         "$BIN_PREFIX/console-enroll"
 install -d -m 0755 "$BFF_LIB"
 cp -a "$BFF_DIST/." "$BFF_LIB/"
 

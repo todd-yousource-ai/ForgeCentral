@@ -96,11 +96,11 @@ echo "==> [10] build"
 pnpm run build
 
 # ---- [11] the Console-owned Rust projects (fmt + clippy -D warnings + test + supply chain) ----------
-# The AWS-LC crypto sidecar (sidecar/) and the ZTP enrollment client (enroll/) are standalone Cargo
-# projects (NOT the pnpm workspace), each with its own Rust gate mirroring the engine repos'. Under
+# The AWS-LC crypto sidecar (sidecar/) is a standalone Cargo
+# project (NOT the pnpm workspace), with its own Rust gate mirroring the engine repos.. Under
 # --skip-net they run --offline against the cargo cache (the sidecar's cdb-mtls git dep + the enroll
 # client's crates.io deps must be vendored/cached on a fresh offline machine).
-echo "==> [11] Rust projects (console-tpm + sidecar + enroll: fmt + clippy + test)"
+echo "==> [11] Rust projects (sidecar: fmt + clippy + test)"
 if [ "$skip_sidecar" = "true" ]; then
     echo "    Rust gate SKIPPED (--skip-sidecar)"
 elif ! command -v cargo >/dev/null 2>&1; then
@@ -113,7 +113,7 @@ else
     # deploy key; in CI the `CRUCIBLE_TOKEN` secret the workflow maps to a git credential. If it is not
     # reachable the fetch below fails the gate (RED) -- no soft-skip, so a green gate genuinely means the
     # crates built. To intentionally skip the Rust gate (e.g. a TS-only change), pass --skip-sidecar.
-    for rust_project in console-tpm sidecar enroll; do
+    for rust_project in sidecar; do
         echo "    -- ${rust_project} --"
         (
             cd "${rust_project}"
