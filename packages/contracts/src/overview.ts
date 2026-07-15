@@ -140,6 +140,16 @@ export function toRiskBand(band: WireRiskBand): OverviewRiskBand | null {
 }
 
 /**
+ * Narrow the wire's `profile` string to a {@link VtzProfile} (PR-3b). A recognized tag maps through; an
+ * unknown or empty value (e.g. a graph from an engine that predates the field) projects to `observe`, the
+ * safe learning default -- never a fabricated stricter posture. Unlike {@link toRiskBand}, an unknown
+ * profile does not fail the whole graph: the zone still renders, just in its default posture.
+ */
+export function toVtzProfile(profile: string): VtzProfile {
+  return profile === 'standard' || profile === 'quarantine' ? profile : 'observe';
+}
+
+/**
  * Project a generated `WireConnectivityGraph` to the {@link OverviewGraph} view model, or `null` if the
  * risk band's level is unknown (fail-closed to the unavailable state). This is the whole O1.1 DTO ->
  * view-model projection; the O1.3 resolver calls it, and the contract test proves it is well-typed against
@@ -178,11 +188,23 @@ export interface OverviewSourceNode {
  * entities assigned to it (green Nominal / yellow Elevated / red Critical) -- it shifts live and is never a
  * fixed property of the zone. At most 3 render per page (the surface pages the rest, "swipe for more").
  */
+/**
+ * A VTZ's enforcement posture (IP-CONSOLE-AGENT-CONNECTIVITY PR-3b): the profile the operator applies to
+ * the zone. `observe` (the default) permits any + mandates a record -- the safe learning on-ramp, so an
+ * agent placed in the zone is only watched; `standard` is the domain default posture; `quarantine`
+ * denies/isolates. For this IP it is a carried, operator-shown attribute the Console displays (the flip
+ * affordance lands later). Narrowed from the wire's `profile` string; an unknown/empty value from an
+ * older engine projects to `observe` (never a fabricated stricter posture).
+ */
+export type VtzProfile = 'observe' | 'standard' | 'quarantine';
+
 export interface OverviewVtzNode {
   /** Stable zone id (e.g. the seeded demo VTZ id). */
   readonly id: string;
   /** Display name, dotted (e.g. `Demo.Users.Public`); the renderer stacks it at the first dot. */
   readonly name: string;
+  /** The zone's enforcement posture, shown by the Console (PR-3b). */
+  readonly profile: VtzProfile;
   /** The detection-driven risk band coloring the zone. */
   readonly risk: OverviewRiskBand;
 }
@@ -418,7 +440,7 @@ export function toOverviewSankey(
     if (risk === null) {
       return null;
     }
-    vtzs.push({ id: v.id, name: v.name, risk });
+    vtzs.push({ id: v.id, name: v.name, profile: toVtzProfile(v.profile), risk });
   }
   const resolved = graph.top_destinations.map((d) => {
     const resolvedName = resolveName?.(d.address)?.trim();

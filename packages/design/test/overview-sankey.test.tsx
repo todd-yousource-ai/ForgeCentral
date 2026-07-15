@@ -20,9 +20,9 @@ const graph: OverviewSankey = {
     { class: 'agents', count: 3 },
   ],
   vtzs: [
-    { id: 'vpub', name: 'Demo.Users.Public', risk: band('green') },
-    { id: 'vpriv', name: 'Demo.Private.Agent', risk: band('yellow') },
-    { id: 'vpubag', name: 'Demo.Public.Agent', risk: band('red') },
+    { id: 'vpub', name: 'Demo.Users.Public', profile: 'observe', risk: band('green') },
+    { id: 'vpriv', name: 'Demo.Private.Agent', profile: 'observe', risk: band('yellow') },
+    { id: 'vpubag', name: 'Demo.Public.Agent', profile: 'observe', risk: band('red') },
   ],
   destinations: [
     {
@@ -77,6 +77,9 @@ describe('OverviewSankeyFlow', () => {
     expect(screen.getByText('Users.Public')).toBeInTheDocument();
     expect(container.querySelector('.fc-ov__vtz--critical')).not.toBeNull();
     expect(container.querySelector('.fc-ov__vtz--good')).not.toBeNull();
+    // PR-3b: each zone shows its enforcement profile (all three demo zones are Observe -> "Watching").
+    expect(container.querySelectorAll('.fc-ov__vtz-profile')).toHaveLength(3);
+    expect(screen.getAllByText('Watching')).toHaveLength(3);
     // Destination category + its common-name apps on the shared arch + the "+N more" tail.
     expect(screen.getByText('NETWORK')).toBeInTheDocument();
     expect(screen.getByText('dns.google')).toBeInTheDocument();
@@ -161,7 +164,10 @@ describe('OverviewSankeyFlow', () => {
   it('pages the VTZs three per page ("swipe for more")', () => {
     const four: OverviewSankey = {
       ...graph,
-      vtzs: [...graph.vtzs, { id: 'v4', name: 'Demo.Extra.Zone', risk: band('green') }],
+      vtzs: [
+        ...graph.vtzs,
+        { id: 'v4', name: 'Demo.Extra.Zone', profile: 'observe', risk: band('green') },
+      ],
     };
     const { rerender } = render(<OverviewSankeyFlow graph={four} vtzPage={0} />);
     expect(screen.getByText('Users.Public')).toBeInTheDocument();

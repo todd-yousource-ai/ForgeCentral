@@ -84,6 +84,13 @@ const RISK_MOD: Readonly<Record<RiskLevel, string>> = {
   yellow: 'caution',
   red: 'critical',
 };
+// The VTZ enforcement posture, shown on the zone (PR-3b). Observe (the learning default) reads as
+// "Watching"; Standard/Quarantine name the applied posture.
+const PROFILE_LABEL: Readonly<Record<OverviewVtzNode['profile'], string>> = {
+  observe: 'Watching',
+  standard: 'Standard',
+  quarantine: 'Quarantine',
+};
 const LANE_MOD = (cls: string): string => (SOURCE_LABEL[cls] ? cls : 'muted');
 
 function titleCase(tag: string): string {
@@ -508,6 +515,15 @@ export function OverviewSankeyFlow({
                 fontSize={9.5}
               >
                 {RISK_LABEL[v.risk.level]}
+              </text>
+              <text
+                className="fc-ov__vtz-profile"
+                x={v.x}
+                y={v.y + 31}
+                textAnchor="middle"
+                fontSize={8.5}
+              >
+                {PROFILE_LABEL[v.profile]}
               </text>
             </g>
           );

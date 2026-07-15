@@ -105,6 +105,7 @@ function operatorEngineWith(): OperatorEngine {
           {
             id: 'demo-public-agent',
             name: 'Demo.Public.Agent',
+            profile: 'observe',
             risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
           },
         ],
@@ -431,7 +432,7 @@ describe('BFF HTTP surface', () => {
     const res = await fetch(`${base}/api/overview/sankey?limit=100`);
     expect(res.status).toBe(200);
     const sankey = (await res.json()) as {
-      vtzs: { id: string; name: string; risk: { level: string } }[];
+      vtzs: { id: string; name: string; profile: string; risk: { level: string } }[];
       sourceEdges: { sourceClass: string; vtzId: string; weight: number }[];
       destEdges: { vtzId: string; destClass: string; weight: number }[];
       destinations: { class: string; count: number; apps: unknown[]; moreCount: number }[];
@@ -441,6 +442,7 @@ describe('BFF HTTP surface', () => {
       {
         id: 'demo-public-agent',
         name: 'Demo.Public.Agent',
+        profile: 'observe',
         risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
       },
     ]);

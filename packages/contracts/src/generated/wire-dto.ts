@@ -327,5 +327,6 @@ export interface WireVtzDestEdge {
 export interface WireVtzNode {
   id: string;
   name: string;
+  profile: string;
   risk: WireRiskBand;
 }
