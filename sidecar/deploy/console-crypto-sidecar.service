@@ -1,9 +1,9 @@
 # console-crypto-sidecar.service -- systemd unit for the Console AWS-LC crypto sidecar (CS.5).
 #
 # Installer-provisioned. The sidecar runs as a dedicated non-root user, terminates the admin-plane TLS on
-# node-IP:8443 and originates the engine mTLS on :7878, forwarding to/from the BFF over plaintext loopback.
-# It needs no privileges beyond the TPM: 8443 and the loopback ports are unprivileged and it writes
-# nothing, but the engine-identity key is TPM-resident so it needs /dev/tpmrm0 (group tss).
+# node-IP:8443 and originates the engine mTLS on the :7879 control plane, forwarding to/from the BFF over
+# plaintext loopback. It needs no special privileges: 8443 and the loopback ports are unprivileged, it
+# writes nothing, and the engine-identity key is a software Console-CA leaf file (no TPM device access).
 
 [Unit]
 Description=Console AWS-LC crypto sidecar (admin TLS termination + engine mTLS origination)
@@ -24,11 +24,8 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-# The engine key is TPM-resident: expose ONLY the TPM resource-manager device (a private /dev otherwise),
-# and join group tss so the service user can open /dev/tpmrm0 (mode 0660 root:tss).
-PrivateDevices=false
-DeviceAllow=/dev/tpmrm0 rw
-SupplementaryGroups=tss
+# The engine key is a software leaf file (no TPM), so the service needs no device access at all.
+PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

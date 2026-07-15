@@ -30,20 +30,11 @@ rustls-pki-types = { version = "1", features = ["std"] }
 # via the `github-crucible` insteadOf (same pattern as torch-core). Leaf crate: rustls + aws-lc-rs, no
 # engine deps -- it does not pull the database.
 cdb-mtls = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "b51236b0607401cf578e87a9fcaa57fd44158108" }
-# The client-side device-identity seam: the KeystoreBackend trait, the rustls TPM signer, and
-# tpm_mtls_client_config (present a non-exportable TPM key on the engine mTLS leg). Same pinned rev.
-cdb-device-identity = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "b51236b0607401cf578e87a9fcaa57fd44158108" }
-# The concrete TPM backend, shared with console-enroll: the sidecar re-derives the SAME non-exportable key
-# (the deterministic TPM primary) and signs the handshake in-device. Linux-only (links libtss2), so the
-# sidecar is a Linux daemon by construction (it needs /dev/tpmrm0).
-console-tpm = { path = "../console-tpm" }
 
 [dev-dependencies]
-# Test-only: mint a throwaway P-384 leaf so the terminator's floor can be proven against real rustls
-# clients. The runtime crate never mints certs (the installer provisions the admin leaf).
+# Test-only: mint a throwaway P-384 leaf so the terminator's floor + the engine leg can be proven against
+# real rustls clients. The runtime crate never mints certs (the installer provisions the leaves).
 rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
-# Test-only: the DeviceAttestation return type for the no-op KeystoreBackend the engine build tests use.
-cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "b51236b0607401cf578e87a9fcaa57fd44158108" }
 
 # The workspace-wide lint policy (mirrors the engine repos' Rust_Dev_Rules Section 13). Inlined here
 # because this crate is a standalone Cargo project, not a member of a lint-bearing workspace.

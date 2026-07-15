@@ -2,11 +2,12 @@
 
 The end-to-end install of the two-process Console (`IP-CONSOLE-00-DEPLOY`). `install.sh` lays down the
 whole stack -- the AWS-LC **crypto sidecar**, the Node **BFF** (which serves the SPA + the API), and the
-**TPM-enrolled engine identity** -- and self-checks. It ties together the per-component pieces:
+**software Console-CA engine identity** -- and self-checks. It ties together the per-component pieces:
 
 - **D.1** the BFF unit (`apps/bff/deploy/`).
 - **D.2** the sidecar admin cert + config (`sidecar/deploy/provision-sidecar.sh`).
-- **D.3a-console** the ZTP enrollment client (`enroll/`, the `console-enroll` binary).
+- **Control-plane engine identity** the node installer mints the software Console-CA leaf; `install.sh`
+  delivers it (no separate enrollment client). See `IP-CONSOLE-CONTROL-PLANE.md`.
 
 ## Topology (Console + Crucible on the same box)
 
@@ -15,34 +16,34 @@ engine leg is loopback.
 
 ```
 operator browser =[TLS 1.3 hybrid PQC / P-384 floor]=> sidecar node-IP:8443 --loopback--> BFF (SPA + API)
-BFF --loopback plaintext--> sidecar egress =[mTLS, TPM-signed]=> engine 127.0.0.1:7878  (same box)
+BFF --loopback plaintext--> sidecar egress =[mTLS, software P-384]=> control plane 127.0.0.1:7879  (same box)
 ```
 
-The engine identity is **ZTP-enrolled to the TPM** (operator MFA + step-ca + AIG registration): the private
-key is **non-exportable and TPM-resident** -- `console-enroll` writes only the leaf cert, and the sidecar
-**re-derives the same deterministic TPM key at runtime** and signs the engine-leg handshake **in the
-device** (`cdb_device_identity::tpm_mtls_client_config`). There is no key file. The node's
-`require_attestation` stays enforced (the Console attests like a torch edge device); the AWS-LC posture is
-unchanged. See `IP-CONSOLE-00-SIDECAR-TPM.md`.
+The engine identity is the permanent **software Console-CA leaf** the node installer generates for the
+dedicated `:7879` control plane (IP-CONSOLE-CONTROL-PLANE D2): a long-lived (10y, admin-rotated) P-384 key
+at `/etc/cdb/control/client.key`, pinned as an all-planes static wire peer. `install.sh` copies that leaf
+into the sidecar's cert dir and the sidecar signs the engine-leg handshake **in-process** -- **no operator
+MFA, no ZTP, no TPM**. Software (not TPM) is deliberate (D2): it decouples the Console identity from the
+box TPM so it never collides with a TPM-resident Torch edge. The retired ZTP/TPM `console-enroll` path is
+gone.
 
 Because the Console and the engine share a host, the security boundary is the **engine's per-peer
-authorization**, not a network gap: the Console's enrolled peer holds a least-privilege grant
-(`[Data, Delegation]`, not god-mode), and tenant isolation bounds a Console compromise to that grant. Keep
-customer torch **edge** agents off this box (one vTPM = one device identity); torch runs on the endpoints
-it governs, not on the operator's Crucible+Console node.
+authorization**, not a network gap: the Console's pinned peer holds its grant on the dedicated control
+plane, and tenant isolation bounds a Console compromise. Keep customer torch **edge** agents off this box;
+torch runs on the endpoints it governs, not on the operator's Crucible+Console node.
 
 ## What `install.sh` does
 
 1. **Service users** `console-sidecar`, `console-bff` (system, non-login).
-2. **Binaries** `console-crypto-sidecar` + `console-enroll` into `/usr/local/bin`; the built BFF into
+2. **Binaries** `console-crypto-sidecar` into `/usr/local/bin`; the built BFF into
    `/usr/local/lib/console-bff`; the built SPA (`apps/console/dist`) where `FC_SPA_DIST` points.
-3. **Sidecar provisioning** (D.2): the admin P-384 leaf + `config.json` (engine_cert = the enrolled leaf,
-   `tcti` = the host TPM; no key file).
-4. **Enrollment** (D.3a-console): runs `console-enroll` -- **the one interactive step: the operator
-   approves the printed device code (MFA)** -- which attests the TPM identity and writes the minted leaf
-   the sidecar presents. Skipped when an identity is already present, or with `CONSOLE_SKIP_ENROLL=1`.
-5. **Config + units**: the BFF `config.env`, both systemd units (the sidecar unit carries
-   `DeviceAllow=/dev/tpmrm0` + `SupplementaryGroups=tss`), enabled + started.
+3. **Sidecar provisioning** (D.2): the admin P-384 leaf + `config.json` (engine_cert/engine_key = the
+   software Console-CA leaf on the `:7879` control plane).
+4. **Engine identity delivery**: copies the node installer's software Console-CA leaf
+   (`ca.pem`/`client.pem`/`client.key` from `/etc/cdb/control`, override with `CONSOLE_CONTROL_SRC`) into
+   the sidecar's cert dir -- **no MFA, no ZTP, no TPM**; the leaf is a permanent pinned identity. Skipped
+   when an identity is already present, or with `CONSOLE_SKIP_ENROLL=1`.
+5. **Config + units**: the BFF `config.env`, both systemd units, enabled + started.
 6. **Validate** (`validate.sh`): the install gate (both units up, `/readyz` green through the TPM-signed
    engine leg, the admin P-384 floor admitted + the sub-floor refused). A red leg aborts.
 

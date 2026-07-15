@@ -1,5 +1,0 @@
-# Pin the toolchain to match the sidecar + the engine repos (crdb/torch) so the AWS-LC crypto and the
-# enrollment CSR the engine's step-ca verifies build identically. Bump deliberately, in lockstep with CI.
-[toolchain]
-channel = "1.96.0"
-components = ["rustfmt", "clippy"]
