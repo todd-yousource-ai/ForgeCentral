@@ -23,6 +23,7 @@ import {
   overviewVtzPageCount,
   principalId,
   toOverviewSankey,
+  toVtzProfile,
   requestId,
   tenantId,
   toOverviewGraph,
@@ -241,9 +242,9 @@ describe('Overview redesign (Sankey) view model', () => {
       { class: 'agents', count: 3 },
     ],
     vtzs: [
-      { id: 'vpub', name: 'Demo.Users.Public', risk: band('green') },
-      { id: 'vpriv', name: 'Demo.Private.Agent', risk: band('yellow') },
-      { id: 'vpubag', name: 'Demo.Public.Agent', risk: band('red') },
+      { id: 'vpub', name: 'Demo.Users.Public', profile: 'observe', risk: band('green') },
+      { id: 'vpriv', name: 'Demo.Private.Agent', profile: 'observe', risk: band('yellow') },
+      { id: 'vpubag', name: 'Demo.Public.Agent', profile: 'observe', risk: band('red') },
     ],
     destinations: [
       {
@@ -275,7 +276,10 @@ describe('Overview redesign (Sankey) view model', () => {
     expect(overviewVtzPageCount(0)).toBe(1); // an empty tenant still has one (empty) page
     expect(overviewVtzPage(graph.vtzs, 0)).toHaveLength(3);
     // A four-VTZ tenant spills the fourth onto page 1; an out-of-range page clamps in.
-    const four = [...graph.vtzs, { id: 'v4', name: 'Demo.Extra', risk: band('green') }];
+    const four = [
+      ...graph.vtzs,
+      { id: 'v4', name: 'Demo.Extra', profile: 'observe' as const, risk: band('green') },
+    ];
     expect(overviewVtzPage(four, 1).map((v) => v.id)).toEqual(['v4']);
     expect(overviewVtzPage(four, 9).map((v) => v.id)).toEqual(['v4']);
   });
@@ -300,6 +304,19 @@ describe('Overview redesign (Sankey) view model', () => {
   });
 });
 
+describe('toVtzProfile (PR-3b VTZ profile projection)', () => {
+  it('maps a recognized profile through and defaults an unknown/empty to observe', () => {
+    // A recognized posture projects verbatim.
+    expect(toVtzProfile('observe')).toBe('observe');
+    expect(toVtzProfile('standard')).toBe('standard');
+    expect(toVtzProfile('quarantine')).toBe('quarantine');
+    // An unknown value, or the empty string an older engine sends, defaults to observe (the safe
+    // learning posture) -- never a fabricated stricter posture.
+    expect(toVtzProfile('')).toBe('observe');
+    expect(toVtzProfile('deny-everything')).toBe('observe');
+  });
+});
+
 describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
   const wire: WireConnectivityGraph = {
     sources: [
@@ -316,11 +333,13 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
       {
         id: 'demo-users-public',
         name: 'Demo.Users.Public',
+        profile: 'observe',
         risk: { level: 'green', escalate: 0, candidate: 0, observe: 5 },
       },
       {
         id: 'demo-public-agent',
         name: 'Demo.Public.Agent',
+        profile: 'standard',
         risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
       },
     ],
@@ -339,11 +358,13 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
       {
         id: 'demo-users-public',
         name: 'Demo.Users.Public',
+        profile: 'observe',
         risk: { level: 'green', escalate: 0, candidate: 0, observe: 5 },
       },
       {
         id: 'demo-public-agent',
         name: 'Demo.Public.Agent',
+        profile: 'standard',
         risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
       },
     ]);
@@ -456,6 +477,7 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
         {
           id: 'x',
           name: 'X',
+          profile: 'observe',
           risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
         },
       ],

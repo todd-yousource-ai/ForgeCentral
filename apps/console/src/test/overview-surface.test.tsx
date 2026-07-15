@@ -29,9 +29,9 @@ const graph: OverviewSankey = {
     { class: 'agents', count: 3 },
   ],
   vtzs: [
-    { id: 'vpub', name: 'Demo.Users.Public', risk: band('green') },
-    { id: 'vpriv', name: 'Demo.Private.Agent', risk: band('yellow') },
-    { id: 'vpubag', name: 'Demo.Public.Agent', risk: band('red') },
+    { id: 'vpub', name: 'Demo.Users.Public', profile: 'observe', risk: band('green') },
+    { id: 'vpriv', name: 'Demo.Private.Agent', profile: 'observe', risk: band('yellow') },
+    { id: 'vpubag', name: 'Demo.Public.Agent', profile: 'observe', risk: band('red') },
   ],
   destinations: [
     { class: 'network', count: 101, apps: [], moreCount: 101 },
@@ -55,7 +55,10 @@ const graph: OverviewSankey = {
 /** A four-VTZ graph so the surface offers a second zone page. */
 const fourVtz: OverviewSankey = {
   ...graph,
-  vtzs: [...graph.vtzs, { id: 'v4', name: 'Demo.Extra.Zone', risk: band('green') }],
+  vtzs: [
+    ...graph.vtzs,
+    { id: 'v4', name: 'Demo.Extra.Zone', profile: 'observe', risk: band('green') },
+  ],
 };
 
 const emptyGraph: OverviewSankey = {
@@ -73,9 +76,12 @@ afterEach(() => {
 describe('worstRisk', () => {
   it('summarizes the tenant by its single most severe zone', () => {
     expect(worstRisk(graph)).toBe('red');
-    expect(worstRisk({ ...graph, vtzs: [{ id: 'v', name: 'Z', risk: band('yellow') }] })).toBe(
-      'yellow',
-    );
+    expect(
+      worstRisk({
+        ...graph,
+        vtzs: [{ id: 'v', name: 'Z', profile: 'observe', risk: band('yellow') }],
+      }),
+    ).toBe('yellow');
   });
 
   it('is null when there are no zones (an empty tenant shows no badge)', () => {

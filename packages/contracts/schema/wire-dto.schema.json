@@ -2031,6 +2031,9 @@
         "name": {
           "type": "string"
         },
+        "profile": {
+          "type": "string"
+        },
         "risk": {
           "$ref": "#/$defs/WireRiskBand"
         }
@@ -2038,6 +2041,7 @@
       "required": [
         "id",
         "name",
+        "profile",
         "risk"
       ],
       "type": "object"

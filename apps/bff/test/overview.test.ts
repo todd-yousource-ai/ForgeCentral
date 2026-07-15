@@ -157,6 +157,7 @@ describe('resolveOverviewSankey (RD.4)', () => {
       {
         id: 'demo-public-agent',
         name: 'Demo.Public.Agent',
+        profile: 'observe',
         risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
       },
     ],
@@ -172,6 +173,7 @@ describe('resolveOverviewSankey (RD.4)', () => {
       {
         id: 'demo-public-agent',
         name: 'Demo.Public.Agent',
+        profile: 'observe',
         risk: { level: 'red', escalate: 1, candidate: 0, observe: 0 },
       },
     ]);
@@ -195,6 +197,7 @@ describe('resolveOverviewSankey (RD.4)', () => {
         {
           id: 'x',
           name: 'X',
+          profile: 'observe',
           risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
         },
       ],
