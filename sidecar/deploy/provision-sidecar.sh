@@ -31,8 +31,6 @@ ENGINE_SERVERNAME="${ENGINE_SERVERNAME:-control.localhost}"
 ENGINE_CA="${ENGINE_CA:-$OUT_DIR/engine-ca.pem}"
 ENGINE_CERT="${ENGINE_CERT:-$OUT_DIR/engine-client.pem}"
 ENGINE_KEY="${ENGINE_KEY:-$OUT_DIR/engine-client.key}"
-# TCTI is the legacy TPM path, used only when ENGINE_KEY is empty (no software key).
-TCTI="${TCTI:-device:/dev/tpmrm0}"
 SIDECAR_USER="${SIDECAR_USER:-console-sidecar}"
 FORCE="${FORCE:-0}"
 
@@ -92,7 +90,6 @@ cat > "$CONFIG" <<EOF
   "engine_ca": "$ENGINE_CA",
   "engine_cert": "$ENGINE_CERT",
   "engine_key": "$ENGINE_KEY",
-  "tcti": "$TCTI",
   "egress_addr": "127.0.0.1:$EGRESS_PORT",
   "admin_cert": "$ADMIN_CERT",
   "admin_key": "$ADMIN_KEY"
