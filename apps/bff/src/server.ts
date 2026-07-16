@@ -413,11 +413,13 @@ async function handleLogs(
   return true;
 }
 
-// TUNE(IP-CONSOLE-01 O1.3): the Overview aggregation scan bound. The engine further clamps to the
-// committed per-tenant ceiling; these are the Console-side request bounds so an unbounded/oversized ask is
-// refused here.
-const DEFAULT_OVERVIEW_LIMIT = 1000;
-const MAX_OVERVIEW_LIMIT = 5000;
+// TUNE(IP-CONSOLE-01 O1.3, operator steer 2026-07-16): the Overview request bound -- engine-side it
+// scopes the risk-window decision selection (the edge population is bounded by the engine's own
+// connectivity ceiling and served from the live overlay). Raised 1000 -> 10k to build out the current
+// environment; the engine further clamps to its committed per-tenant ceiling, and these Console-side
+// bounds refuse an unbounded/oversized ask here.
+const DEFAULT_OVERVIEW_LIMIT = 10_000;
+const MAX_OVERVIEW_LIMIT = 10_000;
 
 // The connectivity graph reply carries no engine commit version to tag the cache with, so the ephemeral
 // cache degrades to a pure short-TTL projection cache under this constant sentinel (staleness bounded by
