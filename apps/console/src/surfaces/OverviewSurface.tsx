@@ -22,9 +22,10 @@ import { ErrorState, StaleBanner } from '../states/States.js';
 import { useLive } from '../live/LiveProvider.js';
 import { useOverview } from './useOverview.js';
 
-// TUNE(IP-CONSOLE-01 RD.4b): the aggregation scan bound requested (the engine clamps to its per-tenant
-// ceiling). Matches the BFF default; RD.4b reads the full recent graph, no time window control yet.
-const SCAN_LIMIT = 1000;
+// TUNE(IP-CONSOLE-01 RD.4b, operator steer 2026-07-16): the request bound (the engine clamps to its
+// per-tenant ceiling). Matches the BFF default (10k, raised to build out the current environment);
+// RD.4b reads the full recent graph, no time window control yet.
+const SCAN_LIMIT = 10_000;
 
 /** The risk band -> the header badge label + its semantic variant (the worst zone's glanceable summary). */
 const RISK_BADGE: Readonly<Record<RiskLevel, { label: string; variant: BadgeVariant }>> = {
