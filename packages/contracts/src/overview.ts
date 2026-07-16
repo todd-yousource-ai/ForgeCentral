@@ -38,7 +38,8 @@ export type RiskLevel = 'green' | 'yellow' | 'red';
 
 /**
  * One source-class or destination-class node of the connectivity flow, projected from a `WireConnClass`.
- * `count` is the number of classified connection edges that touch the class (the column node's weight).
+ * `count` is the number of DISTINCT classified entities in the class (`INV-CONNECTIVITY-NODE-DISTINCT`:
+ * a device with forty flows is one device; edge multiplicity/volume lives on the edge weights).
  */
 export interface OverviewClassNode {
   /**
@@ -46,7 +47,7 @@ export interface OverviewClassNode {
    * / `private-apps` / `servers` / `data-stores`. Derived engine-side from the LEG node kind.
    */
   readonly class: string;
-  /** How many classified `ConnectsTo` edges touch this class. */
+  /** How many DISTINCT classified entities this class holds. */
   readonly count: number;
 }
 
@@ -86,6 +87,11 @@ export interface OverviewGraph {
   readonly destinations: readonly OverviewClassNode[];
   readonly edges: readonly OverviewEdge[];
   readonly risk: OverviewRiskBand;
+  /**
+   * True iff the engine's edge scan hit its ceiling (`INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED`): the
+   * graph is a prefix, and the surface must say so rather than present the prefix as the whole.
+   */
+  readonly truncated: boolean;
 }
 
 /**
@@ -165,6 +171,7 @@ export function toOverviewGraph(graph: WireConnectivityGraph): OverviewGraph | n
     destinations: graph.destinations.map(toClassNode),
     edges: graph.edges.map(toEdge),
     risk,
+    truncated: graph.truncated,
   };
 }
 
@@ -222,9 +229,11 @@ export interface OverviewApp {
 /**
  * One destination-category node (right column). The four fixed categories are `network` / `saas` /
  * `private-apps` / `data-stores`. `apps` is the top named destinations to list (the engine's ranked
- * `top_destinations`, resolved to common names); `moreCount` is the "+N more" tail of connections to
- * destinations not in the listed apps (`count - sum(apps.count)`). Only the `network` category carries
- * apps today (every captured `ConnectsTo` destination is a network endpoint); others list none.
+ * `top_destinations`, resolved to common names); `count` is the number of DISTINCT destinations the
+ * ring holds (`INV-CONNECTIVITY-NODE-DISTINCT`: 2 SaaS apps read "2", however many connections they
+ * received -- connection multiplicity/volume lives on the ribbon weights); `moreCount` is the "+N more"
+ * tail of distinct destinations not in the listed apps. Only the `network` category carries apps today
+ * (every captured `ConnectsTo` destination is a network endpoint); others list none.
  */
 export interface OverviewDestNode {
   readonly class: string;
@@ -257,6 +266,12 @@ export interface OverviewSankey {
   readonly destinations: readonly OverviewDestNode[];
   readonly sourceEdges: readonly OverviewSourceEdge[];
   readonly destEdges: readonly OverviewDestEdge[];
+  /**
+   * True iff the engine's edge scan hit its ceiling (`INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED`): the
+   * Sankey shows a prefix of the connectivity graph, and the surface badges it rather than presenting
+   * the prefix as the whole.
+   */
+  readonly truncated: boolean;
 }
 
 /** The home page shows at most this many VTZs; the rest are reachable by paging ("swipe for more"). */
@@ -338,11 +353,14 @@ export type OverviewDestClassifier = (
 
 /**
  * Re-bucket the engine's flat `network` destinations into the four category rings using `classify`,
- * merging same-named apps (two GitHub load-balancer IPs -> one `GitHub` with the summed count). Every
- * count is a real engine count; only the grouping is derived. The unclassified tail (connections beyond
- * the engine's ranked top-N) stays on the `network` ring as its `moreCount`. Each VTZ -> network ribbon
- * splits across the resulting rings proportionally to their REAL classified totals (exact when one VTZ
- * feeds the network class -- the common case; otherwise a documented proportional attribution).
+ * merging same-named apps (two GitHub load-balancer IPs -> one `GitHub` with the summed connection
+ * count). Ring `count`s are DISTINCT destinations (`INV-CONNECTIVITY-NODE-DISTINCT`, matching the
+ * engine's distinct-entity node counts): a ring reads the number of apps it LISTS (merged: two GitHub
+ * LB IPs are one app), and the network ring adds the distinct unlisted tail (engine distinct total
+ * minus the listed addresses) as its `moreCount`. Each
+ * VTZ -> network ribbon splits across the resulting rings proportionally to their listed CONNECTION
+ * totals (the closest available traffic proxy; ribbons carry volume, so a distinct-count share would
+ * distort them) -- exact when one VTZ feeds the network class, the common case.
  */
 function rebucketDestinations(
   graph: WireConnectivityGraph,
@@ -374,17 +392,20 @@ function rebucketDestinations(
     list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }
 
+  // The engine's network count is DISTINCT endpoints; the distinct unlisted tail is that total minus
+  // the listed addresses (the engine ranks top-N, so beyond-N endpoints have no per-app identity).
   const engineNetwork = graph.destinations.find((d) => d.class === NETWORK_DEST_CLASS);
   const networkTotal = engineNetwork?.count ?? 0;
-  const classifiedTotal = [...merged.values()].reduce((s, m) => s + m.app.count, 0);
-  const tail = Math.max(0, networkTotal - classifiedTotal);
+  const tail = Math.max(0, networkTotal - apps.length);
 
-  // An engine class that IS one of the four categories (e.g. an engine-side `saas` count) merges into
-  // that ring; its connections have no per-destination breakdown, so they land in the ring's moreCount.
+  // An engine class that IS one of the four categories (e.g. an engine-side `saas` distinct count)
+  // merges into that ring; those entities have no per-destination breakdown, so they land in moreCount.
   const engineExtra = (c: OverviewDestCategory): number =>
     c === NETWORK_DEST_CLASS ? 0 : (graph.destinations.find((d) => d.class === c)?.count ?? 0);
+  // A ring's count matches what the operator sees: the merged apps LISTED on it (two GitHub LB IPs
+  // are one app) plus, for network, the distinct unlisted endpoints (`moreCount`).
   const categoryCount = (c: OverviewDestCategory): number => {
-    const listed = (byCategory.get(c) ?? []).reduce((s, a) => s + a.count, 0);
+    const listed = (byCategory.get(c) ?? []).length;
     return listed + (c === NETWORK_DEST_CLASS ? tail : engineExtra(c));
   };
   // ALL FOUR category rings always render (the same stability precedent as the VTZ column: every
@@ -402,14 +423,21 @@ function rebucketDestinations(
     }
   }
 
+  // Ribbon attribution: split each VTZ -> network ribbon by the rings' listed CONNECTION totals (the
+  // ribbon weight is volume/connection mass; a distinct-count share would distort it). The unlisted
+  // tail has no connection breakdown, so it follows the listed distribution; with nothing listed the
+  // ribbon stays on the network ring (honest: no basis to split).
+  const connByCategory = (c: OverviewDestCategory): number =>
+    (byCategory.get(c) ?? []).reduce((s, a) => s + a.count, 0);
+  const listedConnTotal = OVERVIEW_DEST_CATEGORIES.reduce((s, c) => s + connByCategory(c), 0);
   const destEdges: OverviewDestEdge[] = [];
   for (const e of graph.dest_edges) {
-    if (e.dest_class !== NETWORK_DEST_CLASS || networkTotal === 0) {
+    if (e.dest_class !== NETWORK_DEST_CLASS || listedConnTotal === 0) {
       destEdges.push({ vtzId: e.vtz_id, destClass: e.dest_class, weight: e.weight });
       continue;
     }
     for (const c of OVERVIEW_DEST_CATEGORIES) {
-      const share = categoryCount(c) / networkTotal;
+      const share = connByCategory(c) / listedConnTotal;
       if (share > 0) {
         destEdges.push({ vtzId: e.vtz_id, destClass: c, weight: e.weight * share });
       }
@@ -454,14 +482,15 @@ export function toOverviewSankey(
       } satisfies OverviewApp,
     };
   });
-  const listedConnections = resolved.reduce((sum, r) => sum + r.app.count, 0);
-
   const bucketed = classify ? rebucketDestinations(graph, resolved, classify) : undefined;
   const destinations =
     bucketed?.destinations ??
     graph.destinations.map((d) => {
+      // Without a classifier the engine classes pass through. `count` is DISTINCT destinations
+      // (INV-CONNECTIVITY-NODE-DISTINCT), so the "+N more" tail is the distinct total minus the
+      // LISTED addresses (each ranked top destination is one distinct endpoint).
       const apps = d.class === NETWORK_DEST_CLASS ? resolved.map((r) => r.app) : [];
-      const listed = d.class === NETWORK_DEST_CLASS ? listedConnections : 0;
+      const listed = d.class === NETWORK_DEST_CLASS ? resolved.length : 0;
       return {
         class: d.class,
         count: d.count,
@@ -487,5 +516,6 @@ export function toOverviewSankey(
       weight: e.weight,
     })),
     destEdges,
+    truncated: graph.truncated,
   };
 }

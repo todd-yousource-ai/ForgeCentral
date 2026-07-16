@@ -423,7 +423,9 @@ const MAX_OVERVIEW_LIMIT = 5000;
 // cache degrades to a pure short-TTL projection cache under this constant sentinel (staleness bounded by
 // `cacheTtlMs`, short by design). The key is scoped by tenant + the query bounds, so a cached graph can
 // never be served across tenants (INV-CONSOLE-ENGINE-AUTHZ) or across differing windows.
-const OVERVIEW_CACHE_VERSION = 'overview-v1';
+// v2: the view models carry `truncated` + distinct-entity counts (INV-CONNECTIVITY-NODE-DISTINCT);
+// the bump guarantees no pre-upgrade cached projection (old shape/semantics) is ever served.
+const OVERVIEW_CACHE_VERSION = 'overview-v2';
 
 /** Parse the `/api/overview/graph` query string into a bounded `OverviewQuery`. `since`/`until` are millis. */
 function parseOverviewQuery(params: URLSearchParams): OverviewQuery {

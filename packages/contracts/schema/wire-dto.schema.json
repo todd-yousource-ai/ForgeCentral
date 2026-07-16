@@ -307,6 +307,9 @@
           },
           "type": "array"
         },
+        "truncated": {
+          "type": "boolean"
+        },
         "vtzs": {
           "items": {
             "$ref": "#/$defs/WireVtzNode"
@@ -322,7 +325,8 @@
         "vtzs",
         "source_edges",
         "dest_edges",
-        "top_destinations"
+        "top_destinations",
+        "truncated"
       ],
       "type": "object"
     },

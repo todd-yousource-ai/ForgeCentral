@@ -112,6 +112,7 @@ function operatorEngineWith(): OperatorEngine {
         source_edges: [{ source_class: 'agents', vtz_id: 'demo-public-agent', weight: 3 }],
         dest_edges: [{ vtz_id: 'demo-public-agent', dest_class: 'saas', weight: 4 }],
         top_destinations: [],
+        truncated: false,
       }),
     // This route test does not exercise CONTAIN; fail loudly if it is reached (not a canned success).
     contain: unused,
@@ -494,6 +495,7 @@ describe('BFF HTTP surface', () => {
           source_edges: [],
           dest_edges: [],
           top_destinations: [],
+          truncated: false,
         }),
     };
     const base = await start(
@@ -520,6 +522,7 @@ describe('BFF HTTP surface', () => {
           source_edges: [],
           dest_edges: [],
           top_destinations: [],
+          truncated: false,
         });
       },
     };
@@ -551,6 +554,7 @@ describe('BFF HTTP surface', () => {
           source_edges: [],
           dest_edges: [],
           top_destinations: [],
+          truncated: false,
         });
       },
     };

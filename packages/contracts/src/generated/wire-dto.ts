@@ -84,6 +84,7 @@ export interface WireConnectivityGraph {
   source_edges: Array<WireSourceVtzEdge>;
   sources: Array<WireConnClass>;
   top_destinations: Array<WireNamedDest>;
+  truncated: boolean;
   vtzs: Array<WireVtzNode>;
 }
 

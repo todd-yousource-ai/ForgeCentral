@@ -73,6 +73,9 @@ export function OverviewSurface(): ReactElement {
           Overview
         </h2>
         {badge !== null ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+        {/* INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED: the engine reports when its edge scan hit the
+            ceiling; the surface says so rather than presenting a prefix of the graph as the whole. */}
+        {graph?.truncated === true ? <Badge variant="caution">Partial graph</Badge> : null}
       </div>
 
       {/* The graph reads live, but the delta stream (O1.7) is not wired yet -- mark it honestly. */}

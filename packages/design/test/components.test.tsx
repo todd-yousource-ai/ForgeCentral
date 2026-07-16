@@ -270,6 +270,7 @@ describe('OverviewFlow', () => {
       { sourceClass: 'agents', destClass: 'private-apps', weight: 1 },
     ],
     risk: { level: 'red', escalate: 3, candidate: 2, observe: 7 },
+    truncated: false,
   };
 
   it('enumerates the sources, destinations, and risk in the accessible name (never color alone)', () => {
@@ -315,6 +316,7 @@ describe('OverviewFlow', () => {
       destinations: [{ class: 'network', count: 1 }],
       edges: [{ sourceClass: 'satellites', destClass: 'network', weight: 1 }],
       risk: { level: 'yellow', escalate: 0, candidate: 1, observe: 0 },
+      truncated: false,
     };
     const { container } = render(<OverviewFlow graph={odd} />);
     expect(screen.getByText('Satellites')).toBeInTheDocument();
@@ -328,6 +330,7 @@ describe('OverviewFlow', () => {
       destinations: [],
       edges: [],
       risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      truncated: false,
     };
     const { container } = render(<OverviewFlow graph={empty} />);
     expect(screen.getByRole('img')).toHaveAccessibleName(

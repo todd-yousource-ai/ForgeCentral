@@ -54,6 +54,7 @@ const graph: OverviewSankey = {
     { vtzId: 'vpub', destClass: 'private-apps', weight: 96 },
     { vtzId: 'vpubag', destClass: 'network', weight: 12 },
   ],
+  truncated: false,
 };
 
 describe('OverviewSankeyFlow', () => {
@@ -184,6 +185,7 @@ describe('OverviewSankeyFlow', () => {
       destinations: [],
       sourceEdges: [],
       destEdges: [],
+      truncated: false,
     };
     const { rerender } = render(<OverviewSankeyFlow graph={empty} />);
     expect(screen.getByText('No connectivity observed')).toBeInTheDocument();
