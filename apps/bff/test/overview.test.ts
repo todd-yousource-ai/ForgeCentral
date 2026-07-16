@@ -58,6 +58,7 @@ describe('resolveOverviewGraph', () => {
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     });
     const view = await resolveOverviewGraph(engine, principal, { limit: 1000 });
     expect(view.sources).toEqual([
@@ -80,6 +81,7 @@ describe('resolveOverviewGraph', () => {
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     });
     const view = await resolveOverviewGraph(engine, principal, { limit: 1000 });
     expect(view.sources).toEqual([]);
@@ -99,6 +101,7 @@ describe('resolveOverviewGraph', () => {
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     });
     await expect(resolveOverviewGraph(engine, principal, { limit: 1000 })).rejects.toBeInstanceOf(
       OverviewUnavailableError,
@@ -115,6 +118,7 @@ describe('resolveOverviewGraph', () => {
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     });
     await resolveOverviewGraph(engine, principal, {
       since: 1_700_000_000_000,
@@ -140,6 +144,7 @@ describe('resolveOverviewGraph', () => {
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     });
     await resolveOverviewGraph(engine, principal, { limit: 1000 });
     expect(seen[0]?.since).toBeNull();
@@ -164,6 +169,7 @@ describe('resolveOverviewSankey (RD.4)', () => {
     source_edges: [{ source_class: 'agents', vtz_id: 'demo-public-agent', weight: 3 }],
     dest_edges: [{ vtz_id: 'demo-public-agent', dest_class: 'saas', weight: 4 }],
     top_destinations: [],
+    truncated: false,
   };
 
   it('projects the wire graph to the VTZ-routed OverviewSankey view model', async () => {

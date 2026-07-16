@@ -138,6 +138,7 @@ describe('the entity-read reply helpers (DR.3c)', () => {
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     };
     expect(replyToConnectivityGraph({ ConnectivityGraph: graph }).risk.level).toBe('green');
     expect(() => replyToConnectivityGraph(refused)).toThrow(EngineRefusedError);
@@ -212,6 +213,7 @@ describe('WireCrucibleClient', () => {
         source_edges: [],
         dest_edges: [],
         top_destinations: [],
+        truncated: false,
       },
     });
     const client = new WireCrucibleClient(config, () => Promise.resolve(mockTransport(reply)));

@@ -50,6 +50,7 @@ const graph: OverviewSankey = {
     { vtzId: 'vpub', destClass: 'private-apps', weight: 96 },
     { vtzId: 'vpubag', destClass: 'network', weight: 12 },
   ],
+  truncated: false,
 };
 
 /** A four-VTZ graph so the surface offers a second zone page. */
@@ -67,6 +68,7 @@ const emptyGraph: OverviewSankey = {
   destinations: [],
   sourceEdges: [],
   destEdges: [],
+  truncated: false,
 };
 
 afterEach(() => {
@@ -110,6 +112,22 @@ describe('the Overview surface (RD.4b)', () => {
       expect.stringContaining('/api/overview/sankey'),
       expect.objectContaining({ credentials: 'include' }),
     );
+    // INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED: a complete graph shows no truncation badge.
+    expect(screen.queryByText('Partial graph')).not.toBeInTheDocument();
+  });
+
+  it('badges a truncated graph as partial (INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED)', async () => {
+    const fetchMock = vi.fn((input: string) => {
+      if (input.startsWith('/api/overview/sankey'))
+        return Promise.resolve(jsonResponse(200, { ...graph, truncated: true }));
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithProviders(<OverviewSurface />, { route: '/' });
+    await waitFor(() => {
+      expect(screen.getByText('Partial graph')).toBeInTheDocument();
+    });
   });
 
   it('hovering a destination filters the left flows to only its contributing paths (no refetch)', async () => {

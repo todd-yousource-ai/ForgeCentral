@@ -178,6 +178,7 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     };
     const view: OverviewGraph | null = toOverviewGraph(wire);
     expect(view).not.toBeNull();
@@ -199,6 +200,7 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     };
     const view = toOverviewGraph(empty);
     expect(view).toEqual({
@@ -206,6 +208,7 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       destinations: [],
       edges: [],
       risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      truncated: false,
     });
   });
 
@@ -223,6 +226,7 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
+      truncated: false,
     };
     expect(toOverviewGraph(bad)).toBeNull();
   });
@@ -267,6 +271,7 @@ describe('Overview redesign (Sankey) view model', () => {
       { vtzId: 'vpub', destClass: 'private-apps', weight: 96 },
       { vtzId: 'vpubag', destClass: 'network', weight: 12 },
     ],
+    truncated: false,
   };
 
   it('pages the VTZs at most three per page ("swipe for more")', () => {
@@ -349,6 +354,7 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
     ],
     dest_edges: [{ vtz_id: 'demo-public-agent', dest_class: 'network', weight: 2 }],
     top_destinations: [],
+    truncated: false,
   };
 
   it('projects the two-stage wire graph to the camelCase OverviewSankey (cross-module guard)', () => {
@@ -380,6 +386,9 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
       { class: 'network', count: 2, apps: [], moreCount: 2 },
       { class: 'saas', count: 1, apps: [], moreCount: 1 },
     ]);
+    // INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED: the engine's truncation flag reaches the view model.
+    expect(view?.truncated).toBe(false);
+    expect(toOverviewSankey({ ...wire, truncated: true })?.truncated).toBe(true);
   });
 
   it('lists the network apps from top_destinations, resolving names (unresolved -> IP) with moreCount', () => {
@@ -407,8 +416,9 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
       { name: 'dns.google', address: '8.8.8.8', count: 3 },
       { name: '10.0.0.9', address: '10.0.0.9', count: 1 },
     ]);
-    // moreCount = class count (12) - the connections listed in apps (5+3+1=9) = 3.
-    expect(network?.moreCount).toBe(3);
+    // moreCount = the distinct total (12) - the LISTED addresses (3) = 9 unlisted distinct endpoints
+    // (INV-CONNECTIVITY-NODE-DISTINCT: counts are distinct destinations, never connection sums).
+    expect(network?.moreCount).toBe(9);
     // Only the network category carries apps; other categories list none.
     expect(view?.destinations.find((d) => d.class === 'saas')?.apps).toEqual([]);
   });
@@ -420,9 +430,9 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
       dest_edges: [{ vtz_id: 'demo-users-public', dest_class: 'network', weight: 20 }],
       top_destinations: [
         { address: '140.82.112.4', count: 4 }, // GitHub LB a
-        { address: '140.82.113.5', count: 2 }, // GitHub LB b -> merges into one GitHub x6
-        { address: '8.8.8.8', count: 5 }, // Google DNS (network)
-        { address: '10.0.0.20:5432', count: 3 }, // Postgres (data-stores)
+        { address: '140.82.113.5', count: 4 }, // GitHub LB b -> merges into ONE GitHub app x8
+        { address: '8.8.8.8', count: 8 }, // Google DNS (network)
+        { address: '10.0.0.20:5432', count: 4 }, // Postgres (data-stores)
       ],
     };
     const names = new Map([
@@ -449,24 +459,28 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
     ]);
     const byClass = new Map(view?.destinations.map((d) => [d.class, d]));
     expect(byClass.get('private-apps')).toMatchObject({ count: 0, apps: [], moreCount: 0 });
-    // network = Google DNS (5) + the unclassified tail (20 - 14 = 6) as moreCount.
-    expect(byClass.get('network')).toMatchObject({ count: 11, moreCount: 6 });
+    // Ring counts are DISTINCT destinations (INV-CONNECTIVITY-NODE-DISTINCT): network = 1 listed app
+    // (Google DNS) + the distinct unlisted tail (20 distinct endpoints - 4 listed addresses = 16).
+    expect(byClass.get('network')).toMatchObject({ count: 17, moreCount: 16 });
     expect(byClass.get('network')?.apps).toEqual([
-      { name: 'Google DNS', address: '8.8.8.8', count: 5 },
+      { name: 'Google DNS', address: '8.8.8.8', count: 8 },
     ]);
-    // saas = the two GitHub LB IPs MERGED under one simple name.
-    expect(byClass.get('saas')).toMatchObject({ count: 6, moreCount: 0 });
+    // saas = the two GitHub LB IPs MERGED under ONE app -> the ring reads 1 and lists 1 (consistent).
+    expect(byClass.get('saas')).toMatchObject({ count: 1, moreCount: 0 });
     expect(byClass.get('saas')?.apps).toEqual([
-      { name: 'GitHub', address: '140.82.112.4', count: 6 },
+      { name: 'GitHub', address: '140.82.112.4', count: 8 },
     ]);
+    expect(byClass.get('data-stores')).toMatchObject({ count: 1, moreCount: 0 });
     expect(byClass.get('data-stores')?.apps).toEqual([
-      { name: 'Postgres', address: '10.0.0.20:5432', count: 3 },
+      { name: 'Postgres', address: '10.0.0.20:5432', count: 4 },
     ]);
-    // The single VTZ->network ribbon splits by the rings' real shares of 20: 11/20, 6/20, 3/20.
+    // The VTZ->network ribbon splits by the rings' listed CONNECTION shares (8+8+4=20 listed):
+    // network 8/20, saas 8/20, data-stores 4/20 of the weight-20 ribbon -- volume mass, never
+    // distinct-count shares (which would distort traffic).
     expect(view?.destEdges).toEqual([
-      { vtzId: 'demo-users-public', destClass: 'network', weight: 11 },
-      { vtzId: 'demo-users-public', destClass: 'saas', weight: 6 },
-      { vtzId: 'demo-users-public', destClass: 'data-stores', weight: 3 },
+      { vtzId: 'demo-users-public', destClass: 'network', weight: 8 },
+      { vtzId: 'demo-users-public', destClass: 'saas', weight: 8 },
+      { vtzId: 'demo-users-public', destClass: 'data-stores', weight: 4 },
     ]);
   });
 
