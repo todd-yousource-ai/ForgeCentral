@@ -84,9 +84,13 @@ fi
 
 echo "==> [9] supply chain (audit + install-script lockdown + source pinning + licenses + SBOM)"
 if [ "$skip_net" = "false" ]; then
-    pnpm audit --audit-level=high
+    # `pnpm audit` calls the npm quick-audit endpoint the registry RETIRED (410, 2026-07), and every
+    # current pnpm major (9/10/11) still does; audit-bulk.mjs is the same check over the documented
+    # bulk advisory endpoint (lockfile-derived package set, local range matching, fail-closed).
+    node scripts/audit-bulk.mjs --level=high
 else
-    echo "    dependency audit skipped (--skip-net; the advisory DB needs network)"
+    node scripts/audit-bulk.mjs --self-test
+    echo "    dependency audit skipped (--skip-net; the advisory DB needs network); self-test ran"
 fi
 pnpm run check:supply-chain
 pnpm run check:licenses
