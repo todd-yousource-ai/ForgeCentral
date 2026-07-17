@@ -30,7 +30,9 @@ log() { echo "==> $*"; }
 # ---- config -------------------------------------------------------------------------------------
 NODE_IP="${CONSOLE_NODE_IP:?set CONSOLE_NODE_IP to the node IP}"
 BIN_DIR="${CONSOLE_BIN_DIR:?set CONSOLE_BIN_DIR to the built-binaries dir}"
-BFF_DIST="${CONSOLE_BFF_DIST:?set CONSOLE_BFF_DIST to the built BFF dir}"
+# The built BFF dir (dist/ + node_modules). Optional: when unset, the installer BUILDS a self-contained
+# BFF from the repo (pnpm), so a rebuild is a single command with no pre-staged artifact.
+BFF_DIST="${CONSOLE_BFF_DIST:-}"
 SIDECAR_ETC=/etc/console-sidecar
 BFF_ETC=/etc/console-bff
 BFF_LIB=/usr/local/lib/console-bff
@@ -46,6 +48,21 @@ id console-bff     >/dev/null 2>&1 || useradd --system --no-create-home --shell 
 # ---- [2] binaries + the built BFF ----------------------------------------------------------------
 log "[2] binaries"
 install -m 0755 "$BIN_DIR/console-crypto-sidecar" "$BIN_PREFIX/console-crypto-sidecar"
+# Build a self-contained BFF from the repo when no prebuilt dir is supplied (the rebuild is part of the
+# installer, per the deployment contract). pnpm's `deploy --prod` flattens the workspace deps + the
+# built package into one directory the service runs from -- no dev deps, no workspace symlinks.
+if [ -z "$BFF_DIST" ]; then
+  command -v pnpm >/dev/null 2>&1 || die "pnpm required to build the BFF (or set CONSOLE_BFF_DIST to a prebuilt dir)"
+  log "  building the self-contained BFF from $repo_root (pnpm build + deploy)"
+  ( cd "$repo_root" \
+      && pnpm install --frozen-lockfile \
+      && pnpm -r --if-present run build \
+      && rm -rf "$repo_root/.bff-deploy" \
+      && pnpm --filter @forge/bff --prod deploy "$repo_root/.bff-deploy" ) \
+    || die "BFF build failed"
+  BFF_DIST="$repo_root/.bff-deploy"
+  log "  built self-contained BFF at $BFF_DIST"
+fi
 install -d -m 0755 "$BFF_LIB"
 cp -a "$BFF_DIST/." "$BFF_LIB/"
 
@@ -116,6 +133,16 @@ fi
 log "[5] BFF config + systemd units"
 install -d -m 0750 "$BFF_ETC"
 [ -f "$BFF_ETC/config.env" ] || install -m 0640 "$repo_root/apps/bff/deploy/config.example.env" "$BFF_ETC/config.env"
+# Pin the operator's read tenant to the SAME fixed constant the crdb installer hardcodes as the node's
+# wire/enrollment tenant (df46dcb7). The Console's CONNECTIVITY_GRAPH read scans session.tenant, so the
+# operator MUST read the tenant torch ships to; a per-install random tenant is why the Overview kept
+# coming up empty. Deterministic across rebuilds; overridable via CONSOLE_OPERATOR_TENANT. Idempotent:
+# replace any existing (commented or live) FC_RBAC_CONFIG line -- the operator is a global-admin on this
+# single tenant, groupRoles/localRbac stay empty for the single-node console.
+OPERATOR_TENANT="${CONSOLE_OPERATOR_TENANT:-df46dcb7-2e91-448c-a406-42e492b85e36}"
+sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_RBAC_CONFIG=/d' "$BFF_ETC/config.env"
+printf 'FC_RBAC_CONFIG={"groupRoles":{},"localRbac":{},"defaultTenant":"%s"}\n' "$OPERATOR_TENANT" >>"$BFF_ETC/config.env"
+log "  operator read tenant pinned to $OPERATOR_TENANT (FC_RBAC_CONFIG.defaultTenant)"
 chown -R console-bff:console-bff "$BFF_ETC"
 install -m 0644 "$repo_root/sidecar/deploy/console-crypto-sidecar.service" /etc/systemd/system/
 install -m 0644 "$repo_root/apps/bff/deploy/console-bff.service"           /etc/systemd/system/
