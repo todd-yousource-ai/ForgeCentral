@@ -19,7 +19,7 @@ Group=console-bff
 # The installer lays the built BFF (dist + node_modules) here; node is the platform runtime.
 EnvironmentFile=/etc/console-bff/config.env
 # node is provisioned at /usr/local/bin (the platform convention on these nodes, matching the engine box).
-ExecStart=/usr/local/bin/node /usr/local/lib/console-bff/index.js
+ExecStart=/usr/local/bin/node /usr/local/lib/console-bff/dist/index.js
 Restart=on-failure
 RestartSec=2
 
