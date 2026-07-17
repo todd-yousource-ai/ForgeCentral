@@ -1,14 +1,10 @@
-// apps/bff/test/overview.test.ts -- IP-CONSOLE-01 O1.3 the Overview connectivity-graph resolver.
+// apps/bff/test/overview.test.ts -- the Overview connectivity-graph resolver (RD.4; O1.3 route retired).
 
 import type { WireConnectivityGraph, WireConnectivityQuery } from '@forge/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
-import {
-  OverviewUnavailableError,
-  resolveOverviewGraph,
-  resolveOverviewSankey,
-} from '../src/engine/overview.js';
+import { OverviewUnavailableError, resolveOverviewSankey } from '../src/engine/overview.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
 
 const principal: OperatorPrincipal = {
@@ -44,114 +40,6 @@ function engineWith(graph: WireConnectivityGraph): {
   return { engine, seen };
 }
 
-describe('resolveOverviewGraph', () => {
-  it('projects the engine graph into the camelCase OverviewGraph (real facts, no fabrication)', async () => {
-    const { engine } = engineWith({
-      sources: [
-        { class: 'agents', count: 3 },
-        { class: 'users', count: 1 },
-      ],
-      destinations: [{ class: 'saas', count: 4 }],
-      edges: [{ source_class: 'agents', dest_class: 'saas', weight: 4 }],
-      risk: { level: 'yellow', escalate: 0, candidate: 2, observe: 5 },
-      vtzs: [],
-      source_edges: [],
-      dest_edges: [],
-      top_destinations: [],
-      truncated: false,
-    });
-    const view = await resolveOverviewGraph(engine, principal, { limit: 1000 });
-    expect(view.sources).toEqual([
-      { class: 'agents', count: 3 },
-      { class: 'users', count: 1 },
-    ]);
-    // The snake_case wire edge fields project to camelCase.
-    expect(view.edges).toEqual([{ sourceClass: 'agents', destClass: 'saas', weight: 4 }]);
-    // The zone is colored by the risk band (green/yellow/red from detected alerts), not a trust score.
-    expect(view.risk).toEqual({ level: 'yellow', escalate: 0, candidate: 2, observe: 5 });
-  });
-
-  it('yields an empty, green graph for a platform with no observed connectivity (no stub)', async () => {
-    const { engine } = engineWith({
-      sources: [],
-      destinations: [],
-      edges: [],
-      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
-      vtzs: [],
-      source_edges: [],
-      dest_edges: [],
-      top_destinations: [],
-      truncated: false,
-    });
-    const view = await resolveOverviewGraph(engine, principal, { limit: 1000 });
-    expect(view.sources).toEqual([]);
-    expect(view.destinations).toEqual([]);
-    expect(view.edges).toEqual([]);
-    expect(view.risk.level).toBe('green');
-  });
-
-  it('fails closed (OverviewUnavailableError) when the risk-band level is unknown', async () => {
-    const { engine } = engineWith({
-      sources: [],
-      destinations: [],
-      edges: [],
-      // A tag the Console does not know must never be silently mis-colored.
-      risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
-      vtzs: [],
-      source_edges: [],
-      dest_edges: [],
-      top_destinations: [],
-      truncated: false,
-    });
-    await expect(resolveOverviewGraph(engine, principal, { limit: 1000 })).rejects.toBeInstanceOf(
-      OverviewUnavailableError,
-    );
-  });
-
-  it('compiles the query to the engine: millis -> seconds, request_id 0, operator null (server-injected)', async () => {
-    const { engine, seen } = engineWith({
-      sources: [],
-      destinations: [],
-      edges: [],
-      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
-      vtzs: [],
-      source_edges: [],
-      dest_edges: [],
-      top_destinations: [],
-      truncated: false,
-    });
-    await resolveOverviewGraph(engine, principal, {
-      since: 1_700_000_000_000,
-      until: 1_700_000_060_000,
-      limit: 250,
-    });
-    expect(seen[0]).toEqual({
-      request_id: 0,
-      operator: null,
-      since: 1_700_000_000,
-      until: 1_700_000_060,
-      limit: 250,
-    });
-  });
-
-  it('omits the time bounds as null when the query carries none', async () => {
-    const { engine, seen } = engineWith({
-      sources: [],
-      destinations: [],
-      edges: [],
-      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
-      vtzs: [],
-      source_edges: [],
-      dest_edges: [],
-      top_destinations: [],
-      truncated: false,
-    });
-    await resolveOverviewGraph(engine, principal, { limit: 1000 });
-    expect(seen[0]?.since).toBeNull();
-    expect(seen[0]?.until).toBeNull();
-  });
-});
-
 describe('resolveOverviewSankey (RD.4)', () => {
   const zoned = {
     sources: [{ class: 'agents', count: 3 }],
@@ -168,6 +56,19 @@ describe('resolveOverviewSankey (RD.4)', () => {
     ],
     source_edges: [{ source_class: 'agents', vtz_id: 'demo-public-agent', weight: 3 }],
     dest_edges: [{ vtz_id: 'demo-public-agent', dest_class: 'saas', weight: 4 }],
+    top_destinations: [],
+    truncated: false,
+  };
+
+  /** An engine graph with no observed connectivity (the honest-empty case). */
+  const empty: WireConnectivityGraph = {
+    sources: [],
+    destinations: [],
+    edges: [],
+    risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+    vtzs: [],
+    source_edges: [],
+    dest_edges: [],
     top_destinations: [],
     truncated: false,
   };
@@ -196,6 +97,17 @@ describe('resolveOverviewSankey (RD.4)', () => {
     ]);
   });
 
+  it('yields an empty graph for a platform with no observed connectivity (no stub)', async () => {
+    const { engine } = engineWith(empty);
+    const view = await resolveOverviewSankey(engine, principal, { limit: 1000 });
+    expect(view.sources).toEqual([]);
+    expect(view.vtzs).toEqual([]);
+    expect(view.sourceEdges).toEqual([]);
+    expect(view.destEdges).toEqual([]);
+    // The four category rings still render as honest zeros, never fabricated content.
+    expect(view.destinations.every((d) => d.count === 0 && d.apps.length === 0)).toBe(true);
+  });
+
   it('fails closed (OverviewUnavailableError) when a VTZ risk-band level is unknown', async () => {
     const { engine } = engineWith({
       ...zoned,
@@ -211,5 +123,28 @@ describe('resolveOverviewSankey (RD.4)', () => {
     await expect(resolveOverviewSankey(engine, principal, { limit: 1000 })).rejects.toBeInstanceOf(
       OverviewUnavailableError,
     );
+  });
+
+  it('compiles the query to the engine: millis -> seconds, request_id 0, operator null (server-injected)', async () => {
+    const { engine, seen } = engineWith(empty);
+    await resolveOverviewSankey(engine, principal, {
+      since: 1_700_000_000_000,
+      until: 1_700_000_060_000,
+      limit: 250,
+    });
+    expect(seen[0]).toEqual({
+      request_id: 0,
+      operator: null,
+      since: 1_700_000_000,
+      until: 1_700_000_060,
+      limit: 250,
+    });
+  });
+
+  it('omits the time bounds as null when the query carries none', async () => {
+    const { engine, seen } = engineWith(empty);
+    await resolveOverviewSankey(engine, principal, { limit: 1000 });
+    expect(seen[0]?.since).toBeNull();
+    expect(seen[0]?.until).toBeNull();
   });
 });

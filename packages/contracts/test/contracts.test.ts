@@ -26,14 +26,12 @@ import {
   toVtzProfile,
   requestId,
   tenantId,
-  toOverviewGraph,
   toRiskLevel,
 } from '../src/index.js';
 import type {
   Binding,
   ConsoleError,
   DecisionId,
-  OverviewGraph,
   OverviewSankey,
   ReadBinding,
   TenantId,
@@ -132,11 +130,11 @@ describe('error taxonomy composes the generated wire class', () => {
 describe('binding manifest shape', () => {
   it('a live read binding is not pending', () => {
     const b: ReadBinding = {
-      id: bindingId('overview.graph.read'),
+      id: bindingId('overview.sankey.read'),
       kind: 'read',
       surface: 'cruciblql',
-      op: 'overview_graph_v1',
-      viewModel: 'OverviewGraph',
+      op: 'connectivity_graph_v1',
+      viewModel: 'OverviewSankey',
       status: { kind: 'live' },
     };
     expect(isPending(b)).toBe(false);
@@ -160,37 +158,35 @@ describe('binding manifest shape', () => {
   });
 });
 
-describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connectivity DTO', () => {
-  it('projects a WireConnectivityGraph to the camelCase OverviewGraph (the cross-module guard)', () => {
-    // A drifted wire field would fail this projection at COMPILE time (the DTO is the generated type).
-    const wire: WireConnectivityGraph = {
-      sources: [
-        { class: 'devices', count: 3 },
-        { class: 'agents', count: 1 },
+describe('the shared risk-level narrowing (fail-closed on an unknown engine tag)', () => {
+  it('narrows the engine risk-level tag and fails the Sankey projection closed on an unknown tag', () => {
+    expect(toRiskLevel('red')).toBe('red');
+    expect(toRiskLevel('green')).toBe('green');
+    expect(toRiskLevel('chartreuse')).toBeNull();
+    // An unknown VTZ level fails the whole Sankey projection closed (the resolver maps null to the
+    // unavailable state, never a mis-colored zone).
+    const bad: WireConnectivityGraph = {
+      sources: [],
+      destinations: [],
+      edges: [],
+      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      vtzs: [
+        {
+          id: 'x',
+          name: 'X',
+          profile: 'observe',
+          risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+        },
       ],
-      destinations: [
-        { class: 'network', count: 2 },
-        { class: 'saas', count: 1 },
-      ],
-      edges: [{ source_class: 'devices', dest_class: 'network', weight: 2 }],
-      risk: { level: 'yellow', escalate: 0, candidate: 1, observe: 4 },
-      vtzs: [],
       source_edges: [],
       dest_edges: [],
       top_destinations: [],
       truncated: false,
     };
-    const view: OverviewGraph | null = toOverviewGraph(wire);
-    expect(view).not.toBeNull();
-    expect(view?.sources).toEqual([
-      { class: 'devices', count: 3 },
-      { class: 'agents', count: 1 },
-    ]);
-    expect(view?.edges).toEqual([{ sourceClass: 'devices', destClass: 'network', weight: 2 }]);
-    expect(view?.risk).toEqual({ level: 'yellow', escalate: 0, candidate: 1, observe: 4 });
+    expect(toOverviewSankey(bad)).toBeNull();
   });
 
-  it('renders an empty tenant as an empty, green graph (INV-CONSOLE-NO-STUB: no fabricated node)', () => {
+  it('renders an empty tenant as an empty Sankey (INV-CONSOLE-NO-STUB: no fabricated node)', () => {
     const empty: WireConnectivityGraph = {
       sources: [],
       destinations: [],
@@ -202,33 +198,12 @@ describe('IP-CONSOLE-01 O1.1: the Overview graph view model projects the connect
       top_destinations: [],
       truncated: false,
     };
-    const view = toOverviewGraph(empty);
-    expect(view).toEqual({
-      sources: [],
-      destinations: [],
-      edges: [],
-      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
-      truncated: false,
-    });
-  });
-
-  it('narrows the engine risk-level tag and fails closed on an unknown tag', () => {
-    expect(toRiskLevel('red')).toBe('red');
-    expect(toRiskLevel('green')).toBe('green');
-    expect(toRiskLevel('chartreuse')).toBeNull();
-    // An unknown level fails the whole projection closed (the resolver maps null to the unavailable state).
-    const bad: WireConnectivityGraph = {
-      sources: [],
-      destinations: [],
-      edges: [],
-      risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
-      vtzs: [],
-      source_edges: [],
-      dest_edges: [],
-      top_destinations: [],
-      truncated: false,
-    };
-    expect(toOverviewGraph(bad)).toBeNull();
+    const view = toOverviewSankey(empty);
+    expect(view).not.toBeNull();
+    expect(view?.sources).toEqual([]);
+    expect(view?.vtzs).toEqual([]);
+    expect(view?.sourceEdges).toEqual([]);
+    expect(view?.destEdges).toEqual([]);
   });
 });
 

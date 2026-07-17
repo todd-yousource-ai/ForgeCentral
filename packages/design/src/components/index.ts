@@ -9,5 +9,4 @@ export * from './ConfirmDialog.js';
 export * from './Sparkline.js';
 export * from './EntityDrawer.js';
 export * from './DataTable.js';
-export * from './OverviewFlow.js';
 export * from './OverviewSankeyFlow.js';

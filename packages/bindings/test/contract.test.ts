@@ -6,11 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { assertReleaseReady, bindings, validateManifest } from '../src/index.js';
 
 const liveRead: ReadBinding = {
-  id: bindingId('overview.graph.read'),
+  id: bindingId('overview.sankey.read'),
   kind: 'read',
   surface: 'cruciblql',
-  op: 'overview_graph_v1',
-  viewModel: 'OverviewGraph',
+  op: 'connectivity_graph_v1',
+  viewModel: 'OverviewSankey',
   status: { kind: 'live' },
 };
 
