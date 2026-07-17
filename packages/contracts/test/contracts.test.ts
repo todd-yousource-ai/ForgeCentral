@@ -23,6 +23,7 @@ import {
   overviewVtzPage,
   overviewVtzPageCount,
   principalId,
+  toConnectionList,
   toOverviewSankey,
   toVtzProfile,
   requestId,
@@ -36,6 +37,7 @@ import type {
   OverviewSankey,
   ReadBinding,
   TenantId,
+  WireConnectionList,
   WireConnectivityGraph,
   WireReply,
   WireStreamEvent,
@@ -504,5 +506,41 @@ describe('toOverviewSankey (RD.4 wire -> Sankey projection)', () => {
       ],
     };
     expect(toOverviewSankey(bad)).toBeNull();
+  });
+});
+
+describe('toConnectionList (O1.6a entity-connections projection)', () => {
+  it('projects a WireConnectionList to camelCase, preserving order and an unknown kind', () => {
+    const reply: WireConnectionList = {
+      connections: [
+        {
+          destination_id: '93.184.216.34:443',
+          destination_kind: 'network',
+          observed_at: 1_700_000_000,
+        },
+        {
+          destination_id: 'aig:agent:codex',
+          destination_kind: 'agent',
+          observed_at: 1_700_000_060,
+        },
+        // An unknown kind passes through honestly (the drawer labels what the engine attributed).
+        { destination_id: 'x', destination_kind: 'quantum-relay', observed_at: 1_700_000_120 },
+      ],
+    };
+    expect(toConnectionList(reply)).toEqual({
+      connections: [
+        {
+          destinationId: '93.184.216.34:443',
+          destinationKind: 'network',
+          observedAt: 1_700_000_000,
+        },
+        { destinationId: 'aig:agent:codex', destinationKind: 'agent', observedAt: 1_700_000_060 },
+        { destinationId: 'x', destinationKind: 'quantum-relay', observedAt: 1_700_000_120 },
+      ],
+    });
+  });
+
+  it('yields an empty list for an entity with no observed connections (no fabricated row)', () => {
+    expect(toConnectionList({ connections: [] })).toEqual({ connections: [] });
   });
 });

@@ -447,6 +447,107 @@ describe('BFF HTTP surface', () => {
     expect((await fetch(`${base}/api/overview/sankey`)).status).toBe(401);
   });
 
+  it('GET /api/overview/entity-connections brokers ENTITY_CONNECTIONS + projects the list (O1.6a)', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      entityConnections: () =>
+        Promise.resolve({
+          connections: [
+            {
+              destination_id: '93.184.216.34:443',
+              destination_kind: 'network',
+              observed_at: 1_700_000_000,
+            },
+          ],
+        }),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/overview/entity-connections?id=host-9&kind=device`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      connections: [
+        {
+          destinationId: '93.184.216.34:443',
+          destinationKind: 'network',
+          observedAt: 1_700_000_000,
+        },
+      ],
+    });
+  });
+
+  it('GET /api/overview/entity-connections is 400 without id + kind, 401 without a session', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    // Missing kind (and missing id) -> a sanitized 400, never a broker with a blank subject.
+    expect((await fetch(`${base}/api/overview/entity-connections?id=host-9`)).status).toBe(400);
+    expect((await fetch(`${base}/api/overview/entity-connections`)).status).toBe(400);
+    const noSession = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+    expect(
+      (await fetch(`${noSession}/api/overview/entity-connections?id=host-9&kind=device`)).status,
+    ).toBe(401);
+  });
+
+  it('GET /api/overview/entity-connections is 503 unwired and sanitizes a refusal to 403', async () => {
+    const noEngine = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession) },
+    );
+    expect(
+      (await fetch(`${noEngine}/api/overview/entity-connections?id=host-9&kind=device`)).status,
+    ).toBe(503);
+
+    const refusing: OperatorEngine = {
+      ...operatorEngineWith(),
+      entityConnections: () =>
+        Promise.reject(
+          new EngineRefusedError({ class: 'Denied', code: 0, retry: 'Never', correlation_id: 0 }),
+        ),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: refusing },
+    );
+    const res = await fetch(`${base}/api/overview/entity-connections?id=host-9&kind=device`);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'refused', class: 'Denied' });
+  });
+
+  it('GET /api/overview/entity-connections keys the cache by tenant + entity (no cross-entity reuse)', async () => {
+    let hits = 0;
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      entityConnections: () => {
+        hits += 1;
+        return Promise.resolve({ connections: [] });
+      },
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    // Same entity twice -> one engine hit (served warm the second time).
+    expect(
+      (await fetch(`${base}/api/overview/entity-connections?id=host-9&kind=device`)).status,
+    ).toBe(200);
+    expect(
+      (await fetch(`${base}/api/overview/entity-connections?id=host-9&kind=device`)).status,
+    ).toBe(200);
+    expect(hits).toBe(1);
+    // A different entity is a distinct key -> a fresh engine read.
+    expect(
+      (await fetch(`${base}/api/overview/entity-connections?id=host-8&kind=device`)).status,
+    ).toBe(200);
+    expect(hits).toBe(2);
+  });
+
   it('GET /api/overview/sankey is 503 when the operator engine is not wired', async () => {
     const base = await start(
       mockClient(() => Promise.resolve()),

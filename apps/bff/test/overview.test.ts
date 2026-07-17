@@ -1,10 +1,19 @@
 // apps/bff/test/overview.test.ts -- the Overview connectivity-graph resolver (RD.4; O1.3 route retired).
 
-import type { WireConnectivityGraph, WireConnectivityQuery } from '@forge/contracts';
+import type {
+  WireConnectionList,
+  WireConnectivityGraph,
+  WireConnectivityQuery,
+  WireEntityConnections,
+} from '@forge/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
-import { OverviewUnavailableError, resolveOverviewSankey } from '../src/engine/overview.js';
+import {
+  OverviewUnavailableError,
+  resolveEntityConnections,
+  resolveOverviewSankey,
+} from '../src/engine/overview.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
 
 const principal: OperatorPrincipal = {
@@ -159,5 +168,63 @@ describe('resolveOverviewSankey (RD.4)', () => {
     await resolveOverviewSankey(engine, principal, { limit: 1000 });
     expect(seen[0]?.since).toBeNull();
     expect(seen[0]?.until).toBeNull();
+  });
+});
+
+describe('resolveEntityConnections (O1.6a)', () => {
+  /** A mock engine whose ENTITY_CONNECTIONS read is scripted + captures the wire request it saw. */
+  function connEngine(reply: WireConnectionList): {
+    engine: OperatorEngine;
+    seen: WireEntityConnections[];
+  } {
+    const unused = () => Promise.reject(new Error('unused'));
+    const seen: WireEntityConnections[] = [];
+    const engine: OperatorEngine = {
+      querySubmit: unused,
+      cursorFetch: unused,
+      cursorClose: unused,
+      listAgents: unused,
+      entityDecisions: unused,
+      entityConnections: (_p, request) => {
+        seen.push(request);
+        return Promise.resolve(reply);
+      },
+      connectivityGraph: unused,
+      contain: unused,
+      logQuery: unused,
+      logExplain: unused,
+      logExport: unused,
+    };
+    return { engine, seen };
+  }
+
+  it('brokers the subject id + kind and projects the engine list to the view model', async () => {
+    const { engine, seen } = connEngine({
+      connections: [
+        {
+          destination_id: '93.184.216.34:443',
+          destination_kind: 'network',
+          observed_at: 1_700_000_000,
+        },
+      ],
+    });
+    const view = await resolveEntityConnections(engine, principal, 'host-9', 'device');
+    expect(view.connections).toEqual([
+      { destinationId: '93.184.216.34:443', destinationKind: 'network', observedAt: 1_700_000_000 },
+    ]);
+    // The wire request carries the subject id + kind; operator + request_id are server-injected.
+    expect(seen[0]).toEqual({
+      request_id: 0,
+      operator: null,
+      subject_id: 'host-9',
+      subject_kind: 'device',
+      limit: 500,
+    });
+  });
+
+  it('yields an empty list for an entity with no observed connections (no stub)', async () => {
+    const { engine } = connEngine({ connections: [] });
+    const view = await resolveEntityConnections(engine, principal, 'host-9', 'device');
+    expect(view.connections).toEqual([]);
   });
 });

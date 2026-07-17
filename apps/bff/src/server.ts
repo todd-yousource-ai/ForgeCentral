@@ -29,7 +29,11 @@ import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
 import { resolveIsolate } from './engine/isolate.js';
 import { resolveLogExplain, resolveLogExport, resolveLogQuery } from './engine/logs.js';
-import { OverviewUnavailableError, resolveOverviewSankey } from './engine/overview.js';
+import {
+  OverviewUnavailableError,
+  resolveEntityConnections,
+  resolveOverviewSankey,
+} from './engine/overview.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
 import type { ReverseDnsResolver } from './engine/reverse-dns.js';
 import { principalFromSession } from './engine/principal.js';
@@ -525,7 +529,66 @@ async function handleOverview(
     );
     return true;
   }
+  if (path === '/api/overview/entity-connections') {
+    await serveEntityConnections(deps, req, res);
+    return true;
+  }
   return false;
+}
+
+/**
+ * Serve one entity's outbound connections (`GET /api/overview/entity-connections?id=&kind=`, O1.6a): the
+ * PR-2 hover prefetch + drawer read. Session-gated (401), engine-gated (503); `id` + `kind` identify the
+ * Sankey node's entity and are required (400 without them). The engine bounds + tier-redacts; the result
+ * is served from a tenant + entity-scoped short-TTL cache. Fails CLOSED: a query-gate refusal is a
+ * sanitized 403, any other engine error a 502.
+ */
+async function serveEntityConnections(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return;
+  }
+  const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+  const id = params.get('id')?.trim();
+  const kind = params.get('kind')?.trim();
+  if (!id || !kind) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  // Tenant + entity scoped key: a warm list never crosses tenants or entities.
+  const cacheKey = `overview:connections:${principal.tenant}:${kind}:${id}`;
+  const cached = deps.cache.get(cacheKey, OVERVIEW_CACHE_VERSION);
+  if (cached !== undefined) {
+    sendJson(res, 200, cached);
+    return;
+  }
+  try {
+    const view = await resolveEntityConnections(deps.operatorEngine, principal, id, kind, {
+      timeoutMs: deps.config.requestTimeoutMs,
+    });
+    deps.cache.set(cacheKey, view, OVERVIEW_CACHE_VERSION);
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn(
+        { err: err instanceof Error ? err.name : 'unknown' },
+        'entity connections read failed',
+      );
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
