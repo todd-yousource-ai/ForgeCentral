@@ -16,50 +16,21 @@
 //   * The nodes + edges are the tenant-wide roll-up of the LEG `ConnectsTo` graph fed by torch's 4-octet
 //     TCP/IP capture (netflow enriches later). The engine aggregates; the browser never gets raw edges.
 //
-// O1.1 lands the TYPES only; no renderer, no live data. Each view model is a camelCase projection of the
-// generated `WireConnectivityGraph` family (`WireConnClass` / `WireConnEdge` / `WireRiskBand`); the DTO ->
-// view-model mapping lives in the O1.3 resolver, and the contract test proves the projection is well-typed
-// against the generated DTOs.
+// Each view model is a camelCase projection of the generated `WireConnectivityGraph` family; the DTO ->
+// view-model mapping lives in the BFF resolver, and the contract test proves the projection is well-typed
+// against the generated DTOs. (The O1.1/O1.3 flat `OverviewGraph` view model + `toOverviewGraph` were
+// retired with the pre-redesign `/api/overview/graph` route after RD.4b migrated the surface to the
+// Sankey below -- an unconsumed projection is a stub in reverse, INV-CONSOLE-NO-STUB.)
 
-import type {
-  WireConnClass,
-  WireConnEdge,
-  WireConnectivityGraph,
-  WireRiskBand,
-} from './generated/wire-dto.js';
+import type { WireConnectivityGraph, WireRiskBand } from './generated/wire-dto.js';
 
 /**
  * The risk level a zone is colored by, derived from detected alerts (the decision LOG): `red` if any
  * `escalate`, else `yellow` if any `candidate`, else `green`. Replaces the removed trust score. Narrowed
- * from the engine's open `WireRiskBand.level` string in the O1.3 resolver (an unknown tag is a resolver
+ * from the engine's open `WireRiskBand.level` string in the BFF resolver (an unknown tag is a resolver
  * error, never a silently-mis-colored zone).
  */
 export type RiskLevel = 'green' | 'yellow' | 'red';
-
-/**
- * One source-class or destination-class node of the connectivity flow, projected from a `WireConnClass`.
- * `count` is the number of DISTINCT classified entities in the class (`INV-CONNECTIVITY-NODE-DISTINCT`:
- * a device with forty flows is one device; edge multiplicity/volume lives on the edge weights).
- */
-export interface OverviewClassNode {
-  /**
-   * The class tag. Source classes: `users` / `devices` / `agents`. Destination classes: `network` / `saas`
-   * / `private-apps` / `servers` / `data-stores`. Derived engine-side from the LEG node kind.
-   */
-  readonly class: string;
-  /** How many DISTINCT classified entities this class holds. */
-  readonly count: number;
-}
-
-/**
- * One weighted source-class -> destination-class flow, projected from a `WireConnEdge`. `weight` is the
- * count of classified `ConnectsTo` edges from `sourceClass` to `destClass` (the flow's thickness).
- */
-export interface OverviewEdge {
-  readonly sourceClass: string;
-  readonly destClass: string;
-  readonly weight: number;
-}
 
 /**
  * The risk band the Console colors the "Public" zone by, projected from a `WireRiskBand`. The counts are
@@ -76,26 +47,7 @@ export interface OverviewRiskBand {
 }
 
 /**
- * The tenant-wide connectivity flow (`overview.graph`), projected from a `WireConnectivityGraph`. The
- * source + destination class nodes and the weighted edges are REAL engine facts; the "Public" placeholder
- * VTZ is a Console render concept inserted between the columns and colored by {@link risk}. An empty
- * platform yields empty `sources`/`destinations`/`edges` and a green {@link risk} ("no connectivity
- * observed"), never a fabricated node (INV-CONSOLE-NO-STUB).
- */
-export interface OverviewGraph {
-  readonly sources: readonly OverviewClassNode[];
-  readonly destinations: readonly OverviewClassNode[];
-  readonly edges: readonly OverviewEdge[];
-  readonly risk: OverviewRiskBand;
-  /**
-   * True iff the engine's edge scan hit its ceiling (`INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED`): the
-   * graph is a prefix, and the surface must say so rather than present the prefix as the whole.
-   */
-  readonly truncated: boolean;
-}
-
-/**
- * The filter for a tenant-wide connectivity read (`overview.graph` -> crdb `CONNECTIVITY_GRAPH`). The time
+ * The filter for a tenant-wide connectivity read (crdb `CONNECTIVITY_GRAPH`). The time
  * bounds scope the risk-window decisions; `limit` bounds the aggregation scan (further clamped by the
  * engine's per-tenant ceiling). `since`/`until` are unix MILLISECONDS (the resolver converts to the
  * engine's unix seconds, matching {@link LogQueryFilter}).
@@ -107,22 +59,9 @@ export interface OverviewQuery {
 }
 
 /**
- * Project a generated `WireConnClass` to the {@link OverviewClassNode} view model. The identity mapping the
- * O1.3 resolver applies; exported so the resolver and the contract test share ONE definition (a drifted DTO
- * field fails compilation here, the cross-module guard).
- */
-export function toClassNode(node: WireConnClass): OverviewClassNode {
-  return { class: node.class, count: node.count };
-}
-
-/** Project a generated `WireConnEdge` to the {@link OverviewEdge} view model. */
-export function toEdge(edge: WireConnEdge): OverviewEdge {
-  return { sourceClass: edge.source_class, destClass: edge.dest_class, weight: edge.weight };
-}
-
-/**
  * Narrow the engine's open `WireRiskBand.level` string to a {@link RiskLevel}, or `null` if the engine
- * emitted a tag the Console does not know (the resolver treats that as an error rather than mis-coloring).
+ * emitted a tag the Console does not know (the BFF resolver treats that as an error rather than
+ * mis-coloring).
  */
 export function toRiskLevel(level: string): RiskLevel | null {
   return level === 'green' || level === 'yellow' || level === 'red' ? level : null;
@@ -155,29 +94,9 @@ export function toVtzProfile(profile: string): VtzProfile {
   return profile === 'standard' || profile === 'quarantine' ? profile : 'observe';
 }
 
-/**
- * Project a generated `WireConnectivityGraph` to the {@link OverviewGraph} view model, or `null` if the
- * risk band's level is unknown (fail-closed to the unavailable state). This is the whole O1.1 DTO ->
- * view-model projection; the O1.3 resolver calls it, and the contract test proves it is well-typed against
- * the generated DTO so a drifted wire field is a compile error on both tiers.
- */
-export function toOverviewGraph(graph: WireConnectivityGraph): OverviewGraph | null {
-  const risk = toRiskBand(graph.risk);
-  if (risk === null) {
-    return null;
-  }
-  return {
-    sources: graph.sources.map(toClassNode),
-    destinations: graph.destinations.map(toClassNode),
-    edges: graph.edges.map(toEdge),
-    risk,
-    truncated: graph.truncated,
-  };
-}
-
 // ---------------------------------------------------------------------------------------------------------
-// Overview REDESIGN (Sankey) view model -- the locked 2026-07-14 design (supersedes the single "Public"
-// zone above; the old `OverviewGraph` stays until the surface migrates). The graphic is a true three-column
+// Overview REDESIGN (Sankey) view model -- the locked 2026-07-14 design (the pre-redesign flat
+// `OverviewGraph` is retired; the Sankey is THE Overview view model). The graphic is a true three-column
 // Sankey: source-class nodes -> up to 3 VTZ nodes (each with its OWN detection-driven risk band) ->
 // destination-category nodes (each carrying its top named apps). Flows are two-stage and weighted:
 // source -> VTZ (`OverviewSourceEdge`) and VTZ -> destination (`OverviewDestEdge`). Every value is a real

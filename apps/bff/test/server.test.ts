@@ -398,30 +398,6 @@ describe('BFF HTTP surface', () => {
     ).toBe(400);
   });
 
-  it('GET /api/overview/graph brokers CONNECTIVITY_GRAPH + projects the camelCase graph (O1.3)', async () => {
-    const base = await start(
-      mockClient(() => Promise.resolve()),
-      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
-    );
-    const res = await fetch(`${base}/api/overview/graph?limit=100`);
-    expect(res.status).toBe(200);
-    const graph = (await res.json()) as {
-      sources: { class: string; count: number }[];
-      destinations: { class: string; count: number }[];
-      edges: { sourceClass: string; destClass: string; weight: number }[];
-      risk: { level: string; candidate: number; observe: number };
-    };
-    // The DTO's snake_case edge fields project to the camelCase view model, real engine facts throughout.
-    expect(graph.sources).toEqual([
-      { class: 'agents', count: 3 },
-      { class: 'users', count: 1 },
-    ]);
-    expect(graph.edges).toEqual([{ sourceClass: 'agents', destClass: 'saas', weight: 4 }]);
-    // The "Public" zone is colored by the risk band derived from detected alerts (no trust score).
-    expect(graph.risk.level).toBe('yellow');
-    expect(graph.risk.candidate).toBe(2);
-  });
-
   it('GET /api/overview/sankey projects the VTZ-routed two-stage view model (RD.4)', async () => {
     const base = await start(
       mockClient(() => Promise.resolve()),
@@ -463,25 +439,25 @@ describe('BFF HTTP surface', () => {
     ]);
   });
 
-  it('GET /api/overview/graph is 401 without an operator session (fail-closed)', async () => {
+  it('GET /api/overview/sankey is 401 without an operator session (fail-closed)', async () => {
     const base = await start(
       mockClient(() => Promise.resolve()),
       { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
     );
-    expect((await fetch(`${base}/api/overview/graph`)).status).toBe(401);
+    expect((await fetch(`${base}/api/overview/sankey`)).status).toBe(401);
   });
 
-  it('GET /api/overview/graph is 503 when the operator engine is not wired', async () => {
+  it('GET /api/overview/sankey is 503 when the operator engine is not wired', async () => {
     const base = await start(
       mockClient(() => Promise.resolve()),
       { authRouter: authRouterWith(operatorSession) },
     );
-    const res = await fetch(`${base}/api/overview/graph`);
+    const res = await fetch(`${base}/api/overview/sankey`);
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: 'engine_unavailable' });
   });
 
-  it('GET /api/overview/graph fails closed to 503 unavailable on an unknown risk-band tag (O1.3)', async () => {
+  it('GET /api/overview/sankey fails closed to 503 unavailable on an unknown VTZ risk-band tag', async () => {
     const engine: OperatorEngine = {
       ...operatorEngineWith(),
       // An engine risk-band level the Console does not know must never be silently mis-colored.
@@ -490,8 +466,15 @@ describe('BFF HTTP surface', () => {
           sources: [],
           destinations: [],
           edges: [],
-          risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
-          vtzs: [],
+          risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+          vtzs: [
+            {
+              id: 'demo-public-agent',
+              name: 'Demo.Public.Agent',
+              profile: 'observe',
+              risk: { level: 'chartreuse', escalate: 0, candidate: 0, observe: 0 },
+            },
+          ],
           source_edges: [],
           dest_edges: [],
           top_destinations: [],
@@ -502,12 +485,12 @@ describe('BFF HTTP surface', () => {
       mockClient(() => Promise.resolve()),
       { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
     );
-    const res = await fetch(`${base}/api/overview/graph`);
+    const res = await fetch(`${base}/api/overview/sankey`);
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: 'unavailable' });
   });
 
-  it('GET /api/overview/graph serves an identical query from the short-TTL cache (O1.3)', async () => {
+  it('GET /api/overview/sankey serves an identical query from the short-TTL cache', async () => {
     let hits = 0;
     const engine: OperatorEngine = {
       ...operatorEngineWith(),
@@ -530,16 +513,16 @@ describe('BFF HTTP surface', () => {
       mockClient(() => Promise.resolve()),
       { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
     );
-    expect((await fetch(`${base}/api/overview/graph?limit=100`)).status).toBe(200);
-    expect((await fetch(`${base}/api/overview/graph?limit=100`)).status).toBe(200);
+    expect((await fetch(`${base}/api/overview/sankey?limit=100`)).status).toBe(200);
+    expect((await fetch(`${base}/api/overview/sankey?limit=100`)).status).toBe(200);
     // The second identical read is served from the cache; the engine is hit exactly once.
     expect(hits).toBe(1);
     // A different window is a distinct cache key -> a fresh engine read.
-    expect((await fetch(`${base}/api/overview/graph?limit=200`)).status).toBe(200);
+    expect((await fetch(`${base}/api/overview/sankey?limit=200`)).status).toBe(200);
     expect(hits).toBe(2);
   });
 
-  it('GET /api/overview/graph keys the cache by tenant so a graph never leaks across tenants (O1.3)', async () => {
+  it('GET /api/overview/sankey keys the cache by tenant so a graph never leaks across tenants', async () => {
     let hits = 0;
     const engine: OperatorEngine = {
       ...operatorEngineWith(),
@@ -581,9 +564,9 @@ describe('BFF HTTP surface', () => {
         resolve(`http://127.0.0.1:${String(address.port)}`);
       });
     });
-    expect((await fetch(`${base}/api/overview/graph?limit=100`)).status).toBe(200);
+    expect((await fetch(`${base}/api/overview/sankey?limit=100`)).status).toBe(200);
     current = { ...operatorSession, tenant: 'tenant-two' };
-    expect((await fetch(`${base}/api/overview/graph?limit=100`)).status).toBe(200);
+    expect((await fetch(`${base}/api/overview/sankey?limit=100`)).status).toBe(200);
     // Same bounds, different tenant -> a distinct cache key -> the engine is read again (no cross-tenant reuse).
     expect(hits).toBe(2);
   });

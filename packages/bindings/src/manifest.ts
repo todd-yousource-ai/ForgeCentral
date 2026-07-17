@@ -208,12 +208,13 @@ const logReads: readonly ReadBinding[] = [
 // -- IP-CONSOLE-01 (Overview, P1.3) the `overview.*` connectivity-graph bindings --------------------
 //
 // The flagship home surface: the tenant-wide connectivity flow. `overview.graph` is LIVE against the crdb
-// IP-CONSOLE-CONNECTIVITY producer (CONNECTIVITY_GRAPH over :7878, landed CN.1-CN.N) -- the O1.2 "LOG
-// aggregation" the original plan marked PENDING is now the real engine substrate, so the binding ships
-// live. `overview.entityConnections` is LIVE over the crdb ENTITY_CONNECTIONS read (ER.5). `overview.live`
-// (the real push stream) is an honest PENDING deferral naming its gating engine task -- v1 liveness polls
-// `overview.graph` on the F0.6 live-store. Trust score was removed; the zone is colored by the risk band
-// carried on the graph (green/yellow/red from detected alerts).
+// IP-CONSOLE-CONNECTIVITY producer (CONNECTIVITY_GRAPH over :7878, landed CN.1-CN.N); since RD.4b the
+// consumer is the Sankey route (`GET /api/overview/sankey` -> `OverviewSankey`) -- the pre-redesign flat
+// `OverviewGraph` view model and its `/api/overview/graph` route are retired (an unconsumed route is a
+// stub in reverse). `overview.entityConnections` is LIVE over the crdb ENTITY_CONNECTIONS read (ER.5).
+// `overview.live` (the real push stream) is an honest PENDING deferral naming its gating engine task --
+// v1 liveness polls `/api/overview/sankey` on the F0.6 live-store. Trust score was removed; each VTZ is
+// colored by its own detection-driven risk band (green/yellow/red).
 
 const overviewReads: readonly ReadBinding[] = [
   {
@@ -224,7 +225,7 @@ const overviewReads: readonly ReadBinding[] = [
     kind: 'read',
     surface: 'cruciblql',
     op: 'connectivity_graph_v1',
-    viewModel: 'OverviewGraph',
+    viewModel: 'OverviewSankey',
     status: { kind: 'live' },
   },
   {
@@ -238,13 +239,13 @@ const overviewReads: readonly ReadBinding[] = [
     status: { kind: 'live' },
   },
   {
-    // Live deltas. v1 polls `overview.graph` over the recent window (F0.6 live-store); the dedicated
-    // bounded push SUBSCRIBE op is crdb Part B and swaps in without changing the surface.
+    // Live deltas. v1 polls `/api/overview/sankey` over the recent window (F0.6 live-store); the
+    // dedicated bounded push SUBSCRIBE op is crdb Part B and swaps in without changing the surface.
     id: bindingId('overview.live'),
     kind: 'read',
     surface: 'cruciblql',
     op: 'overview_live_v1',
-    viewModel: 'OverviewGraph',
+    viewModel: 'OverviewSankey',
     status: {
       kind: 'pending',
       owningRepo: 'crdb',

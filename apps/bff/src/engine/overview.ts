@@ -1,21 +1,17 @@
-// apps/bff/src/engine/overview.ts -- the Overview (connectivity graph) read resolver (IP-CONSOLE-01 O1.3).
+// apps/bff/src/engine/overview.ts -- the Overview (connectivity graph) read resolver (RD.4; the O1.3
+// flat-graph resolver retired with its route).
 //
 // Brokers the flagship Overview surface's tenant-wide connectivity read to crdb's CONNECTIVITY_GRAPH verb
-// over the OperatorEngine (crdb IP-CONSOLE-CONNECTIVITY): the source-class/destination-class nodes +
-// weighted edges + the risk band, aggregated + bounded + tenant-private engine-side. The OperatorEngine
+// over the OperatorEngine (crdb IP-CONSOLE-CONNECTIVITY): the VTZ-routed two-stage nodes + weighted edges
+// + per-VTZ detection-driven risk, aggregated + bounded + tenant-private engine-side. The OperatorEngine
 // injects the operator delegation server-side; this resolver only PROJECTS the returned DTO into the
-// `OverviewGraph` view model via the ONE shared `toOverviewGraph` projection (INV-CONSOLE-NO-STUB: the
+// `OverviewSankey` view model via the ONE shared `toOverviewSankey` projection (INV-CONSOLE-NO-STUB: the
 // nodes/edges/risk are real engine facts, never fabricated). It fails CLOSED to the unavailable state: if
 // the engine emits a risk-band tag the Console does not know, the projection returns null and this raises
-// `OverviewUnavailableError` rather than mis-coloring the "Public" zone.
+// `OverviewUnavailableError` rather than mis-coloring a zone.
 
-import { toOverviewGraph, toOverviewSankey } from '@forge/contracts';
-import type {
-  OverviewGraph,
-  OverviewQuery,
-  OverviewSankey,
-  WireConnectivityQuery,
-} from '@forge/contracts';
+import { toOverviewSankey } from '@forge/contracts';
+import type { OverviewQuery, OverviewSankey, WireConnectivityQuery } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import { classifyDestination } from './destination-classifier.js';
@@ -44,25 +40,6 @@ function queryToWire(query: OverviewQuery): WireConnectivityQuery {
     until: query.until !== undefined ? Math.floor(query.until / 1000) : null,
     limit: query.limit,
   };
-}
-
-/**
- * Resolve the tenant-wide connectivity graph for `query`, brokered on behalf of `principal`. The engine
- * aggregates + bounds + time-windows (CONNECTIVITY_GRAPH); this only projects the DTO into the view model.
- * Throws {@link OverviewUnavailableError} when the projection fails closed on an unknown risk-band tag.
- */
-export async function resolveOverviewGraph(
-  engine: OperatorEngine,
-  principal: OperatorPrincipal,
-  query: OverviewQuery,
-  opts?: EngineCallOptions,
-): Promise<OverviewGraph> {
-  const graph = await engine.connectivityGraph(principal, queryToWire(query), opts);
-  const view = toOverviewGraph(graph);
-  if (view === null) {
-    throw new OverviewUnavailableError();
-  }
-  return view;
 }
 
 /**

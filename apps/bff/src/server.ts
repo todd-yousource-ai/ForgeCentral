@@ -29,11 +29,7 @@ import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
 import { resolveIsolate } from './engine/isolate.js';
 import { resolveLogExplain, resolveLogExport, resolveLogQuery } from './engine/logs.js';
-import {
-  OverviewUnavailableError,
-  resolveOverviewGraph,
-  resolveOverviewSankey,
-} from './engine/overview.js';
+import { OverviewUnavailableError, resolveOverviewSankey } from './engine/overview.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
 import type { ReverseDnsResolver } from './engine/reverse-dns.js';
 import { principalFromSession } from './engine/principal.js';
@@ -429,7 +425,7 @@ const MAX_OVERVIEW_LIMIT = 10_000;
 // the bump guarantees no pre-upgrade cached projection (old shape/semantics) is ever served.
 const OVERVIEW_CACHE_VERSION = 'overview-v2';
 
-/** Parse the `/api/overview/graph` query string into a bounded `OverviewQuery`. `since`/`until` are millis. */
+/** Parse the `/api/overview/sankey` query string into a bounded `OverviewQuery`. `since`/`until` are millis. */
 function parseOverviewQuery(params: URLSearchParams): OverviewQuery {
   const num = (key: string): number | undefined => {
     const value = params.get(key);
@@ -451,14 +447,7 @@ function parseOverviewQuery(params: URLSearchParams): OverviewQuery {
   };
 }
 
-/**
- * Serve the Overview connectivity graph (`GET /api/overview/graph`): resolve the operator session
- * (fail-closed 401), broker the tenant-wide CONNECTIVITY_GRAPH read through the OperatorEngine, and project
- * it to an `OverviewGraph`. Served from a tenant-scoped, short-TTL cache when warm (bounded, non-authoritative).
- * Fails CLOSED to the unavailable state: an unknown risk-band tag is a 503, a query-gate refusal a sanitized
- * 403. Returns true iff it claimed the request.
- */
-/** The shape of an overview resolver (graph or sankey): brokers the read + projects to a view model. */
+/** The shape of an overview resolver: brokers the read + projects to a view model. */
 type OverviewResolver = (
   engine: OperatorEngine,
   principal: ReturnType<typeof principalFromSession>,
@@ -519,8 +508,9 @@ async function serveOverviewRead(
 }
 
 /**
- * The Overview reads: `GET /api/overview/graph` (the flat pre-redesign view) and `GET /api/overview/sankey`
- * (the RD.4 VTZ-routed two-stage view). Both broker the same engine verb, projected differently. Returns
+ * The Overview read: `GET /api/overview/sankey`, the RD.4 VTZ-routed two-stage view. (The O1.3 flat
+ * `GET /api/overview/graph` was the pre-redesign route; RD.4b retired its SPA consumer and the route
+ * itself is retired with it -- an unconsumed route is a stub in reverse, INV-CONSOLE-NO-STUB.) Returns
  * true iff it claimed the request.
  */
 async function handleOverview(
@@ -529,10 +519,6 @@ async function handleOverview(
   path: string,
   res: ServerResponse,
 ): Promise<boolean> {
-  if (path === '/api/overview/graph') {
-    await serveOverviewRead(deps, req, res, 'graph', resolveOverviewGraph);
-    return true;
-  }
   if (path === '/api/overview/sankey') {
     await serveOverviewRead(deps, req, res, 'sankey', (engine, principal, query, opts) =>
       resolveOverviewSankey(engine, principal, query, opts, deps.reverseDns),
