@@ -6,7 +6,6 @@ import type { LogDetailView, LogPage } from '@forge/contracts';
 
 import { DESTINATIONS } from '../ia/destinations.js';
 import { Shell } from '../shell/Shell.js';
-import { LiveStore } from '../live/live-store.js';
 import { renderWithProviders, TEST_OPERATOR } from './render.js';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -167,16 +166,26 @@ describe('the SPA shell', () => {
     });
   });
 
-  it('shows a staleness marker on the live home surface while the live channel is deferred', () => {
+  it('the home Overview drives the shell live indicator to Live once its poll succeeds (O1.7)', async () => {
     renderWithProviders(<Shell operator={TEST_OPERATOR} />, { route: '/' });
-    expect(screen.getByText('Live channel not enabled yet')).toBeInTheDocument();
+    // The home Overview polls the Sankey; a healthy tick drives the shared freshness store live, so the
+    // shell indicator + the surface badge both read "Live" (never a fabricated pill -- the poll is real).
+    await waitFor(() => {
+      expect(screen.getAllByText('Live').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText('Not live')).not.toBeInTheDocument();
+    expect(screen.queryByText('Live channel not enabled yet')).not.toBeInTheDocument();
   });
 
-  it('drops the staleness marker when the live store reports a fresh stream', () => {
-    const store = new LiveStore({ status: 'live', reason: '' });
-    renderWithProviders(<Shell operator={TEST_OPERATOR} />, { route: '/', liveStore: store });
-    expect(screen.queryByText('Live channel not enabled yet')).not.toBeInTheDocument();
-    expect(screen.getByText('Live')).toBeInTheDocument();
+  it('leaves the live indicator honest (Not live) on a surface that does not drive freshness', async () => {
+    vi.stubGlobal('fetch', logsRoutedFetch());
+    renderWithProviders(<Shell operator={TEST_OPERATOR} />, { route: '/logs' });
+    await waitFor(() => {
+      expect(screen.getByText('Suspicious command')).toBeInTheDocument();
+    });
+    // Logs polls its own data but does not drive the SHARED store, so the shell indicator stays honestly
+    // "Not live" (the Logs surface may carry its own tail badge; the shell-level freshness is what matters).
+    expect(screen.getByText('Not live')).toBeInTheDocument();
   });
 
   it('renders an explicit not-found state for an unknown route', () => {

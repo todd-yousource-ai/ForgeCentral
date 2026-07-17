@@ -29,3 +29,15 @@ export function useLive(): LiveState {
   }
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
 }
+
+/**
+ * The live-store INSTANCE, for a surface that DRIVES freshness (the v1 poll writes its outcome here so the
+ * shell + surface read one source; the F0.6 push swaps in as the writer later). Throws outside a provider.
+ */
+export function useLiveStore(): LiveStore {
+  const store = useContext(LiveContext);
+  if (store === null) {
+    throw new Error('useLiveStore must be used within a LiveProvider');
+  }
+  return store;
+}

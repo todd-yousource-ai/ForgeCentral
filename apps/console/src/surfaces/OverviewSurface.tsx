@@ -9,7 +9,7 @@
 // summarizes the worst VTZ risk band as a glanceable. Loading and empty are the flow's own honest states;
 // only a hard engine failure degrades to an ErrorState.
 
-import { useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Badge, OverviewSankeyFlow, type BadgeVariant } from '@forge/design';
 import {
   overviewVtzPageCount,
@@ -19,9 +19,9 @@ import {
 } from '@forge/contracts';
 
 import { ErrorState, StaleBanner } from '../states/States.js';
-import { useLive } from '../live/LiveProvider.js';
+import { useLive, useLiveStore } from '../live/LiveProvider.js';
 import { useDrawer } from '../shell/DrawerHost.js';
-import { useOverview } from './useOverview.js';
+import { overviewLiveness, useOverview } from './useOverview.js';
 
 // The human label for each container the graph can open (the drawer title). Source lanes + dest rings;
 // an unknown tag (never expected) falls back to the raw class, never a fabricated name.
@@ -72,7 +72,27 @@ export function OverviewSurface(): ReactElement {
   const query = useMemo<OverviewQuery>(() => ({ limit: SCAN_LIMIT }), []);
   const overview = useOverview(query);
   const live = useLive();
+  const liveStore = useLiveStore();
   const drawer = useDrawer();
+
+  // O1.7 (INV-CONSOLE-LIVE): the poll drives the shared freshness store, so the shell indicator + this
+  // surface read ONE source. A healthy tick is `live`; a failed tick with a last-known graph is
+  // `reconnecting` (the graph stays); the first read is `connecting`. Reset to unavailable on unmount so
+  // the shell honestly shows "not live" once no surface is driving freshness.
+  const liveness = overviewLiveness({
+    hasData: overview.data !== undefined,
+    isError: overview.isError,
+  });
+  useEffect(() => {
+    if (liveness === 'live') {
+      liveStore.set({ status: 'live', reason: '' });
+    } else if (liveness === 'reconnecting') {
+      liveStore.set({ status: 'stale', reason: 'Reconnecting to the live graph' });
+    } else {
+      liveStore.set({ status: 'connecting', reason: 'Connecting to the live graph' });
+    }
+  }, [liveness, liveStore]);
+  useEffect(() => () => liveStore.reset(), [liveStore]);
 
   const graph = overview.data;
   const pageCount = graph ? overviewVtzPageCount(graph.vtzs.length) : 1;
@@ -89,13 +109,17 @@ export function OverviewSurface(): ReactElement {
           Overview
         </h2>
         {badge !== null ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+        {/* O1.7 (INV-CONSOLE-LIVE): the surface polls the Sankey in place, so a healthy tick reads as a
+            real Live badge; a lagging/failed tick degrades to the reconnecting marker below (never a fake
+            Live). The first read shows no badge until data arrives. */}
+        {live.status === 'live' ? <Badge variant="good">Live</Badge> : null}
         {/* INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED: the engine reports when its edge scan hit the
             ceiling; the surface says so rather than presenting a prefix of the graph as the whole. */}
         {graph?.truncated === true ? <Badge variant="caution">Partial graph</Badge> : null}
       </div>
 
-      {/* The graph reads live, but the delta stream (O1.7) is not wired yet -- mark it honestly. */}
-      {live.status !== 'live' ? <StaleBanner reason={live.reason} /> : null}
+      {/* A lagging/failed poll (with a last-known graph still shown) reads as reconnecting, not a wipe. */}
+      {live.status === 'stale' ? <StaleBanner reason={live.reason} /> : null}
 
       {graph !== undefined && pageCount > 1 ? (
         <nav className="fcx-ov-pager" aria-label="Trust zone pages">

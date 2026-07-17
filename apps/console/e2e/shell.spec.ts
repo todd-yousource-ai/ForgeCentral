@@ -61,13 +61,15 @@ test('authenticated: the shell, the IA, empty states, and the drawer frame', asy
   await expect(rail.getByRole('link')).toHaveCount(11);
 
   // The home Overview surface renders live: the heading, the honest empty connectivity flow (the mocked
-  // tenant has none), and the "not live" indicator (the delta stream is not wired yet).
+  // tenant has none), and -- since the O1.7 poll succeeds -- a real Live indicator driven by the poll.
   await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
   await expect(page.getByText('No connectivity observed')).toBeVisible();
-  await expect(page.getByText('Not live')).toBeVisible();
+  await expect(page.locator('.fcx-topbar').getByText('Live')).toBeVisible();
 
-  // One-click navigation to another destination, still an honest empty placeholder.
+  // One-click navigation to another destination, still an honest empty placeholder. The Overview unmounts,
+  // so it stops driving freshness and the shell indicator returns to the honest deferred "Not live".
   await rail.getByRole('link', { name: 'Policies' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Policies' })).toBeVisible();
   await expect(page.getByText('No Policies data yet')).toBeVisible();
+  await expect(page.getByText('Not live')).toBeVisible();
 });
