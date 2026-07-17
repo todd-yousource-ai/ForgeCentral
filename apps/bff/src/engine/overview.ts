@@ -10,17 +10,27 @@
 // the engine emits a risk-band tag the Console does not know, the projection returns null and this raises
 // `OverviewUnavailableError` rather than mis-coloring a zone.
 
-import { toConnectionList, toOverviewSankey } from '@forge/contracts';
+import {
+  OVERVIEW_DEST_CATEGORIES,
+  OVERVIEW_SOURCE_CATEGORIES,
+  toConnectionList,
+  toMemberList,
+  toOverviewSankey,
+} from '@forge/contracts';
 import type {
   OverviewConnectionList,
+  OverviewMember,
+  OverviewMemberList,
   OverviewQuery,
   OverviewSankey,
+  WireConnectivityMembers,
   WireConnectivityQuery,
   WireEntityConnections,
 } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import { classifyDestination } from './destination-classifier.js';
+import type { DestCategory } from './destination-classifier.js';
 import type { OperatorEngine } from './operator-engine.js';
 import type { OperatorPrincipal } from './principal.js';
 import type { ReverseDnsResolver } from './reverse-dns.js';
@@ -104,4 +114,98 @@ export async function resolveEntityConnections(
   };
   const reply = await engine.entityConnections(principal, request, opts);
   return toConnectionList(reply);
+}
+
+/** The largest member list a single class read returns (the engine clamps further per-tenant). */
+const MAX_MEMBERS_LIMIT = 500;
+
+/** The engine class the four destination rings are re-bucketed from (all network endpoints, RD.5). */
+const NETWORK_DEST_CLASS = 'network';
+
+/** A clicked Overview container: a source-class lane (left) or a destination-category ring (right). */
+export type OverviewContainer =
+  (typeof OVERVIEW_SOURCE_CATEGORIES)[number] | (typeof OVERVIEW_DEST_CATEGORIES)[number];
+
+/** Raised when a `container` is not one of the seven known Overview containers (the route maps it to 400). */
+export class UnknownContainerError extends Error {
+  constructor(readonly container: string) {
+    super(`unknown overview container: ${container}`);
+    this.name = 'UnknownContainerError';
+  }
+}
+
+/** True when `value` is a source-class lane (agents/users/devices). */
+function isSourceContainer(value: string): value is (typeof OVERVIEW_SOURCE_CATEGORIES)[number] {
+  return (OVERVIEW_SOURCE_CATEGORIES as readonly string[]).includes(value);
+}
+
+/** True when `value` is a destination-category ring (network/saas/private-apps/data-stores). */
+function isDestContainer(value: string): value is DestCategory {
+  return (OVERVIEW_DEST_CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
+ * Resolve the member entities of one clicked Overview container (`overview.connectivityMembers`, O1.6b),
+ * brokered on behalf of `principal`, so the drawer can list a container and open one member.
+ *
+ * A SOURCE lane (agents/users/devices) maps to the engine class directly. A DESTINATION ring
+ * (network/saas/private-apps/data-stores) is a BFF re-bucket, not an engine class (RD.5): the engine is
+ * asked for its flat `network` members, each endpoint is reclassified via {@link classifyDestination}
+ * (using reverse-DNS names, cached + background) and kept only when it lands in the requested ring, with
+ * its display name relabeled to the ring's simple brand (`GitHub`, `Postgres`...). The engine already
+ * bounded + tier-redacted + ordered the set; the re-bucket preserves that order. Fails to
+ * {@link UnknownContainerError} for an unknown container (the route maps it to 400).
+ */
+export async function resolveClassMembers(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  container: string,
+  opts?: EngineCallOptions,
+  reverseDns?: ReverseDnsResolver,
+): Promise<OverviewMemberList> {
+  if (isSourceContainer(container)) {
+    const reply = await engine.connectivityMembers(principal, membersRequest(container), opts);
+    return toMemberList(reply);
+  }
+  if (isDestContainer(container)) {
+    const reply = await engine.connectivityMembers(
+      principal,
+      membersRequest(NETWORK_DEST_CLASS),
+      opts,
+    );
+    return rebucketDestMembers(toMemberList(reply), container, reverseDns);
+  }
+  throw new UnknownContainerError(container);
+}
+
+/** A `WireConnectivityMembers` for one engine class; the OperatorEngine injects the operator delegation. */
+function membersRequest(engineClass: string): WireConnectivityMembers {
+  return {
+    request_id: 0,
+    operator: null,
+    class: engineClass,
+    limit: MAX_MEMBERS_LIMIT,
+  };
+}
+
+/**
+ * Reclassify the engine's flat `network` members into the four destination rings and keep only those in
+ * `ring`, relabeling each kept member's name to its simple brand. Order is preserved (the engine's
+ * connection-count desc), so the drawer list mirrors the ring's ranking.
+ */
+function rebucketDestMembers(
+  list: OverviewMemberList,
+  ring: DestCategory,
+  reverseDns?: ReverseDnsResolver,
+): OverviewMemberList {
+  const names = reverseDns?.namesFor(list.members.map((m) => m.id));
+  const members: OverviewMember[] = [];
+  for (const member of list.members) {
+    const resolved = names?.get(member.id);
+    const classified = classifyDestination(member.id, resolved);
+    if (classified.category === ring) {
+      members.push({ ...member, name: classified.name });
+    }
+  }
+  return { members };
 }

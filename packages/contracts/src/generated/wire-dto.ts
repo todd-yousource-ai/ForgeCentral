@@ -55,6 +55,11 @@ export interface WireAuditEntry {
   timestamp: number;
 }
 
+export interface WireClassUsage {
+  class: string;
+  octets: number;
+}
+
 export interface WireConnClass {
   class: string;
   count: number;
@@ -86,6 +91,20 @@ export interface WireConnectivityGraph {
   top_destinations: Array<WireNamedDest>;
   truncated: boolean;
   vtzs: Array<WireVtzNode>;
+}
+
+export interface WireConnectivityMember {
+  connection_count: number;
+  display_name: string;
+  id: string;
+  kind: string;
+}
+
+export interface WireConnectivityMembers {
+  class: string;
+  limit: number;
+  operator?: OperatorDelegation | null;
+  request_id: number;
 }
 
 export interface WireConnectivityQuery {
@@ -223,6 +242,10 @@ export interface WireLogQuery {
   until?: number | null;
 }
 
+export interface WireMemberList {
+  members: Array<WireConnectivityMember>;
+}
+
 export interface WireNamedDest {
   address: string;
   count: number;
@@ -261,7 +284,9 @@ export type WireReply =
   | { Contained: WireContainEffect; }
   | { DecisionDetail: WireDecisionDetail; }
   | { LogExported: WireLogExportEffect; }
-  | { ConnectivityGraph: WireConnectivityGraph; };
+  | { ConnectivityGraph: WireConnectivityGraph; }
+  | { MemberList: WireMemberList; }
+  | { UsageOverview: WireUsageOverviewResult; };
 
 export type WireRequest =
   | { QuerySubmit: WireQuerySubmit; }
@@ -281,7 +306,9 @@ export type WireRequest =
   | { LogQuery: WireLogQuery; }
   | { LogExplain: WireLogExplain; }
   | { LogExport: WireLogExport; }
-  | { ConnectivityGraph: WireConnectivityQuery; };
+  | { ConnectivityGraph: WireConnectivityQuery; }
+  | { ConnectivityMembers: WireConnectivityMembers; }
+  | { UsageOverview: WireUsageOverview; };
 
 export interface WireRiskBand {
   candidate: number;
@@ -308,6 +335,26 @@ export interface WireStreamEvent {
 export interface WireStreamSubscribe {
   from_watermark: number | null;
   kinds: Array<StreamKind>;
+}
+
+export interface WireTalkerUsage {
+  flows: number;
+  host: string;
+  octets: number;
+}
+
+export interface WireUsageOverview {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  since?: number | null;
+  until?: number | null;
+}
+
+export interface WireUsageOverviewResult {
+  active_endpoints: number;
+  class_octets: Array<WireClassUsage>;
+  top_talkers: Array<WireTalkerUsage>;
+  total_octets: number;
 }
 
 export type WireValue =

@@ -3,14 +3,18 @@
 import type {
   WireConnectionList,
   WireConnectivityGraph,
+  WireConnectivityMembers,
   WireConnectivityQuery,
   WireEntityConnections,
+  WireMemberList,
 } from '@forge/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import {
   OverviewUnavailableError,
+  UnknownContainerError,
+  resolveClassMembers,
   resolveEntityConnections,
   resolveOverviewSankey,
 } from '../src/engine/overview.js';
@@ -41,6 +45,7 @@ function engineWith(graph: WireConnectivityGraph): {
       seen.push(request);
       return Promise.resolve(graph);
     },
+    connectivityMembers: unused,
     contain: unused,
     logQuery: unused,
     logExplain: unused,
@@ -190,6 +195,7 @@ describe('resolveEntityConnections (O1.6a)', () => {
         return Promise.resolve(reply);
       },
       connectivityGraph: unused,
+      connectivityMembers: unused,
       contain: unused,
       logQuery: unused,
       logExplain: unused,
@@ -226,5 +232,124 @@ describe('resolveEntityConnections (O1.6a)', () => {
     const { engine } = connEngine({ connections: [] });
     const view = await resolveEntityConnections(engine, principal, 'host-9', 'device');
     expect(view.connections).toEqual([]);
+  });
+});
+
+describe('resolveClassMembers (O1.6b)', () => {
+  /** A mock engine whose CONNECTIVITY_MEMBERS read is scripted per class + captures the request it saw. */
+  function membersEngine(byClass: Record<string, WireMemberList>): {
+    engine: OperatorEngine;
+    seen: WireConnectivityMembers[];
+  } {
+    const unused = () => Promise.reject(new Error('unused'));
+    const seen: WireConnectivityMembers[] = [];
+    const engine: OperatorEngine = {
+      querySubmit: unused,
+      cursorFetch: unused,
+      cursorClose: unused,
+      listAgents: unused,
+      entityDecisions: unused,
+      entityConnections: unused,
+      connectivityGraph: unused,
+      connectivityMembers: (_p, request) => {
+        seen.push(request);
+        return Promise.resolve(byClass[request.class] ?? { members: [] });
+      },
+      contain: unused,
+      logQuery: unused,
+      logExplain: unused,
+      logExport: unused,
+    };
+    return { engine, seen };
+  }
+
+  it('maps a SOURCE lane to the engine class directly and projects the members', async () => {
+    const { engine, seen } = membersEngine({
+      devices: {
+        members: [
+          { id: 'host-7', kind: 'endpoint', display_name: 'host-7', connection_count: 12 },
+          { id: 'host-9', kind: 'endpoint', display_name: 'host-9', connection_count: 3 },
+        ],
+      },
+    });
+    const view = await resolveClassMembers(engine, principal, 'devices');
+    expect(view.members).toEqual([
+      { id: 'host-7', kind: 'endpoint', name: 'host-7', connectionCount: 12 },
+      { id: 'host-9', kind: 'endpoint', name: 'host-9', connectionCount: 3 },
+    ]);
+    // The engine read is the container class directly; operator + request_id are server-injected.
+    expect(seen[0]).toEqual({ request_id: 0, operator: null, class: 'devices', limit: 500 });
+  });
+
+  it('re-buckets a DESTINATION ring from the engine network members, filtering + relabeling', async () => {
+    // The engine only knows a flat `network` class; the ring is a BFF re-bucket (RD.5). These three
+    // network endpoints classify by port/IP: 5432 -> data-stores (Postgres), 127.* -> private-apps
+    // (Localhost), a public IP -> network. Requesting `data-stores` keeps only the Postgres endpoint.
+    const { engine, seen } = membersEngine({
+      network: {
+        members: [
+          {
+            id: '10.0.0.5:5432',
+            kind: 'network_destination',
+            display_name: '10.0.0.5:5432',
+            connection_count: 9,
+          },
+          {
+            id: '127.0.0.1:8787',
+            kind: 'network_destination',
+            display_name: '127.0.0.1:8787',
+            connection_count: 4,
+          },
+          {
+            id: '93.184.216.34:443',
+            kind: 'network_destination',
+            display_name: '93.184.216.34:443',
+            connection_count: 2,
+          },
+        ],
+      },
+    });
+    const stores = await resolveClassMembers(engine, principal, 'data-stores');
+    expect(stores.members).toEqual([
+      { id: '10.0.0.5:5432', kind: 'network_destination', name: 'Postgres', connectionCount: 9 },
+    ]);
+    // The engine was asked for the flat `network` class, not the ring name.
+    expect(seen[0]?.class).toBe('network');
+
+    // The same network members re-bucketed to `network` keep only the public endpoint (named by IP host).
+    const { engine: engine2 } = membersEngine({
+      network: {
+        members: [
+          {
+            id: '10.0.0.5:5432',
+            kind: 'network_destination',
+            display_name: '10.0.0.5:5432',
+            connection_count: 9,
+          },
+          {
+            id: '93.184.216.34:443',
+            kind: 'network_destination',
+            display_name: '93.184.216.34:443',
+            connection_count: 2,
+          },
+        ],
+      },
+    });
+    const network = await resolveClassMembers(engine2, principal, 'network');
+    expect(network.members).toEqual([
+      {
+        id: '93.184.216.34:443',
+        kind: 'network_destination',
+        name: '93.184.216.34',
+        connectionCount: 2,
+      },
+    ]);
+  });
+
+  it('throws UnknownContainerError for a container that is neither a source lane nor a dest ring', async () => {
+    const { engine } = membersEngine({});
+    await expect(resolveClassMembers(engine, principal, 'not-a-container')).rejects.toBeInstanceOf(
+      UnknownContainerError,
+    );
   });
 });

@@ -77,6 +77,11 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         truncated: false,
       });
     },
+    connectivityMembers: (req) => {
+      calls.push('connectivityMembers');
+      reads.push(req);
+      return Promise.resolve({ members: [] });
+    },
     contain: (req) => {
       calls.push('contain');
       reads.push(req);
@@ -304,6 +309,34 @@ describe('createOperatorEngine', () => {
         tier: 'Admin',
         action: 'connectivityGraph',
         requestId: 9,
+        tenant: 'tenant-op',
+      },
+    ]);
+  });
+
+  it('records the delegation + injects the operator on the connectivity members read (O1.6b)', async () => {
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    await engine.connectivityMembers(admin, {
+      request_id: 7,
+      operator: null,
+      class: 'devices',
+      limit: 500,
+    });
+    expect(calls).toEqual(['connectivityMembers']);
+    // The facade injects the operator delegation onto the class read (never client-asserted).
+    expect((reads[0] as { operator?: unknown }).operator).toEqual({
+      principal: 'principal-op',
+      tenant: 'tenant-op',
+    });
+    expect(recorded).toEqual([
+      {
+        operator: 'auth0|op',
+        tier: 'Admin',
+        action: 'connectivityMembers',
+        requestId: 7,
         tenant: 'tenant-op',
       },
     ]);

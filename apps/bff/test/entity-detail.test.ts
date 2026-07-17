@@ -49,6 +49,7 @@ function engineWith(parts: {
     entityDecisions: () => Promise.resolve(parts.decisions ?? { decisions: [] }),
     entityConnections: (): Promise<WireConnectionList> => Promise.resolve({ connections: [] }),
     connectivityGraph: unused,
+    connectivityMembers: unused,
     contain: unused,
     logQuery: unused,
     logExplain: unused,

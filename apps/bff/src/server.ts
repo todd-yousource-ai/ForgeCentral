@@ -31,6 +31,8 @@ import { resolveIsolate } from './engine/isolate.js';
 import { resolveLogExplain, resolveLogExport, resolveLogQuery } from './engine/logs.js';
 import {
   OverviewUnavailableError,
+  UnknownContainerError,
+  resolveClassMembers,
   resolveEntityConnections,
   resolveOverviewSankey,
 } from './engine/overview.js';
@@ -533,6 +535,10 @@ async function handleOverview(
     await serveEntityConnections(deps, req, res);
     return true;
   }
+  if (path === '/api/overview/members') {
+    await serveClassMembers(deps, req, res);
+    return true;
+  }
   return false;
 }
 
@@ -585,6 +591,68 @@ async function serveEntityConnections(
       deps.log.warn(
         { err: err instanceof Error ? err.name : 'unknown' },
         'entity connections read failed',
+      );
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+}
+
+/**
+ * Serve one clicked container's member entities (`GET /api/overview/members?container=<...>`, O1.6b): the
+ * PR-2c drawer LIST -> detail read. Session-gated (401), engine-gated (503); `container` is one of the
+ * seven Overview containers (three source lanes + four destination rings) and is required + validated
+ * (400 for a missing or unknown container). A source lane maps to the engine class directly; a
+ * destination ring is re-bucketed from the engine's flat `network` members (RD.5). The engine bounds +
+ * tier-redacts; the result is served from a tenant + container-scoped short-TTL cache. Fails CLOSED: a
+ * query-gate refusal is a sanitized 403, any other engine error a 502.
+ */
+async function serveClassMembers(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return;
+  }
+  const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+  const container = params.get('container')?.trim();
+  if (!container) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  // Tenant + container scoped key: a warm list never crosses tenants or containers.
+  const cacheKey = `overview:members:${principal.tenant}:${container}`;
+  const cached = deps.cache.get(cacheKey, OVERVIEW_CACHE_VERSION);
+  if (cached !== undefined) {
+    sendJson(res, 200, cached);
+    return;
+  }
+  try {
+    const view = await resolveClassMembers(
+      deps.operatorEngine,
+      principal,
+      container,
+      { timeoutMs: deps.config.requestTimeoutMs },
+      deps.reverseDns,
+    );
+    deps.cache.set(cacheKey, view, OVERVIEW_CACHE_VERSION);
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof UnknownContainerError) {
+      sendJson(res, 400, { error: 'bad_request' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn(
+        { err: err instanceof Error ? err.name : 'unknown' },
+        'class members read failed',
       );
       sendJson(res, 502, { error: 'engine_error' });
     }

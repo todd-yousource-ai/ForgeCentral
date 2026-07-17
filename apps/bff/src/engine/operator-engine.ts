@@ -16,6 +16,7 @@ import type {
   WireAgentList,
   WireConnectionList,
   WireConnectivityGraph,
+  WireConnectivityMembers,
   WireConnectivityQuery,
   WireContain,
   WireContainEffect,
@@ -28,6 +29,7 @@ import type {
   WireLogExport,
   WireLogExportEffect,
   WireLogQuery,
+  WireMemberList,
   WireQueryRows,
   WireQuerySubmit,
 } from '@forge/contracts';
@@ -43,6 +45,7 @@ export type EngineAction =
   | 'entityDecisions'
   | 'entityConnections'
   | 'connectivityGraph'
+  | 'connectivityMembers'
   | 'contain'
   | 'logQuery'
   | 'logExplain'
@@ -112,6 +115,12 @@ export interface OperatorEngine {
     request: WireConnectivityQuery,
     opts?: EngineCallOptions,
   ): Promise<WireConnectivityGraph>;
+  /** List the member entities of one connectivity class (CONNECTIVITY_MEMBERS) on behalf of `principal`. */
+  connectivityMembers(
+    principal: OperatorPrincipal,
+    request: WireConnectivityMembers,
+    opts?: EngineCallOptions,
+  ): Promise<WireMemberList>;
   /** Issue an operator containment disposition (CONTAIN) on behalf of `principal`. The operator
    * delegation is set from `principal` server-side (never client-asserted), honored under the peer's
    * Delegation grant; returns the honest effect (`enforcement_active` false today). */
@@ -202,6 +211,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'connectivityGraph', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.connectivityGraph({ ...request, operator }, opts);
+    },
+    connectivityMembers: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'connectivityMembers', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.connectivityMembers({ ...request, operator }, opts);
     },
     contain: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'contain'));

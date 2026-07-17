@@ -194,6 +194,22 @@
       ],
       "type": "object"
     },
+    "WireClassUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "octets": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "class",
+        "octets"
+      ],
+      "type": "object"
+    },
     "WireConnClass": {
       "additionalProperties": false,
       "properties": {
@@ -327,6 +343,60 @@
         "dest_edges",
         "top_destinations",
         "truncated"
+      ],
+      "type": "object"
+    },
+    "WireConnectivityMember": {
+      "additionalProperties": false,
+      "properties": {
+        "connection_count": {
+          "type": "integer"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "display_name",
+        "connection_count"
+      ],
+      "type": "object"
+    },
+    "WireConnectivityMembers": {
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "class",
+        "limit"
       ],
       "type": "object"
     },
@@ -964,6 +1034,21 @@
       ],
       "type": "object"
     },
+    "WireMemberList": {
+      "additionalProperties": false,
+      "properties": {
+        "members": {
+          "items": {
+            "$ref": "#/$defs/WireConnectivityMember"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "members"
+      ],
+      "type": "object"
+    },
     "WireNamedDest": {
       "additionalProperties": false,
       "properties": {
@@ -1418,6 +1503,30 @@
             "ConnectivityGraph"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "MemberList": {
+              "$ref": "#/$defs/WireMemberList"
+            }
+          },
+          "required": [
+            "MemberList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "UsageOverview": {
+              "$ref": "#/$defs/WireUsageOverviewResult"
+            }
+          },
+          "required": [
+            "UsageOverview"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -1793,6 +1902,30 @@
             "ConnectivityGraph"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ConnectivityMembers": {
+              "$ref": "#/$defs/WireConnectivityMembers"
+            }
+          },
+          "required": [
+            "ConnectivityMembers"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "UsageOverview": {
+              "$ref": "#/$defs/WireUsageOverview"
+            }
+          },
+          "required": [
+            "UsageOverview"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -1907,6 +2040,98 @@
       "required": [
         "kinds",
         "from_watermark"
+      ],
+      "type": "object"
+    },
+    "WireTalkerUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "flows": {
+          "type": "integer"
+        },
+        "host": {
+          "type": "string"
+        },
+        "octets": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "octets",
+        "flows"
+      ],
+      "type": "object"
+    },
+    "WireUsageOverview": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "since": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "until": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WireUsageOverviewResult": {
+      "additionalProperties": false,
+      "properties": {
+        "active_endpoints": {
+          "type": "integer"
+        },
+        "class_octets": {
+          "items": {
+            "$ref": "#/$defs/WireClassUsage"
+          },
+          "type": "array"
+        },
+        "top_talkers": {
+          "items": {
+            "$ref": "#/$defs/WireTalkerUsage"
+          },
+          "type": "array"
+        },
+        "total_octets": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "top_talkers",
+        "class_octets",
+        "active_endpoints",
+        "total_octets"
       ],
       "type": "object"
     },

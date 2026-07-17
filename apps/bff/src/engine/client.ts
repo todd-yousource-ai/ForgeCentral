@@ -10,6 +10,7 @@ import type {
   WireAgentList,
   WireConnectionList,
   WireConnectivityGraph,
+  WireConnectivityMembers,
   WireConnectivityQuery,
   WireContain,
   WireContainEffect,
@@ -22,6 +23,7 @@ import type {
   WireLogExport,
   WireLogExportEffect,
   WireLogQuery,
+  WireMemberList,
   WireQueryRows,
   WireQuerySubmit,
 } from '@forge/contracts';
@@ -62,6 +64,13 @@ export interface CrucibleClient {
     request: WireConnectivityQuery,
     opts?: EngineCallOptions,
   ): Promise<WireConnectivityGraph>;
+  /** List the distinct member entities of one connectivity class (CONNECTIVITY_MEMBERS, crdb
+   * IP-CONSOLE-01 O1.6b): the members of a clicked Sankey container, each with its outbound-connection
+   * count, bounded top-N engine-side. */
+  connectivityMembers(
+    request: WireConnectivityMembers,
+    opts?: EngineCallOptions,
+  ): Promise<WireMemberList>;
   /** Issue an operator containment disposition (CONTAIN, crdb IP-CONTAIN-COMMAND): record a
    * `Quarantine`/`Deny` on a subject through the audited path. Returns the honest effect
    * (`enforcement_active` is `false` today, AG.7). A data-plane write, honored under the peer's
