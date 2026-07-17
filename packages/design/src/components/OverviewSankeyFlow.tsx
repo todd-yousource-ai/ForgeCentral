@@ -17,6 +17,7 @@ import { useState } from 'react';
 
 import {
   overviewHighlight,
+  overviewHighlightSource,
   overviewVtzPage,
   sourceEdgeKey,
   destEdgeKey,
@@ -40,6 +41,13 @@ export interface OverviewSankeyFlowProps {
    * name already enumerates every node, so this is a mouse-only enhancement, never the sole affordance).
    */
   readonly onHoverDest?: (destClass: string | null) => void;
+  /** The source class currently hovered -> the flows collapse to only the paths out of it (else all). */
+  readonly hoveredSource?: string | null;
+  /**
+   * Pointer-hover callback for the source lanes: the class on enter, `null` on leave (the mirror of
+   * {@link onHoverDest}). A mouse-only visual enhancement over the enumerated accessible name.
+   */
+  readonly onHoverSource?: (sourceClass: string | null) => void;
   /**
    * Open a clicked container's member list (O1.6b): a source-class lane or a destination-category ring.
    * The visible rings are mouse-clickable (a pointer enhancement over the `role=img` graphic); a
@@ -108,6 +116,10 @@ function titleCase(tag: string): string {
 }
 const sourceLabel = (cls: string): string => SOURCE_LABEL[cls] ?? titleCase(cls).toUpperCase();
 const destLabel = (cls: string): string => DEST_LABEL[cls] ?? titleCase(cls).toUpperCase();
+
+/** A node's hover-tooltip count phrase, pluralized honestly (1 connection, N connections). */
+const nodeTip = (count: number): string =>
+  `${String(count)} ${count === 1 ? 'connection' : 'connections'}`;
 
 /** Evenly distribute `n` vertical centers in `[top, bottom]` (single item centered). */
 function distribute(n: number, top: number, bottom: number): number[] {
@@ -249,6 +261,8 @@ export function OverviewSankeyFlow({
   vtzPage = 0,
   hoveredDest = null,
   onHoverDest,
+  hoveredSource = null,
+  onHoverSource,
   onSelectContainer,
 }: OverviewSankeyFlowProps): ReactElement {
   // Which destination category has its apps fanned out (top-N -> full list). Local UI state; the graph
@@ -389,8 +403,14 @@ export function OverviewSankeyFlow({
     ]),
   );
 
-  // Highlight (hover a destination -> keep only its contributing paths).
-  const hl = hoveredDest ? overviewHighlight(graph, hoveredDest) : null;
+  // Highlight (hover a node -> keep only its contributing source->VTZ->dest paths). A hovered
+  // destination and a hovered source are mirror computations; a destination hover takes precedence when
+  // both are somehow set.
+  const hl = hoveredDest
+    ? overviewHighlight(graph, hoveredDest)
+    : hoveredSource
+      ? overviewHighlightSource(graph, hoveredSource)
+      : null;
   const dim = (on: boolean): number => (hl && !on ? 0.12 : 1);
 
   // Dissolve mask: one hole per node (hidden inside the ring, rounding up to visible ~48px out).
@@ -482,8 +502,22 @@ export function OverviewSankeyFlow({
                   style: { cursor: 'pointer' as const },
                 }
               : {};
+            const hover = onHoverSource
+              ? {
+                  onMouseEnter: () => onHoverSource(s.class),
+                  onMouseLeave: () => onHoverSource(null),
+                }
+              : {};
+            const on = !hl || hl.sourceClasses.has(s.class);
             return (
-              <g key={s.class} {...clickable}>
+              <g
+                key={s.class}
+                className="fc-ov__src"
+                opacity={on ? 1 : 0.4}
+                {...hover}
+                {...clickable}
+              >
+                <title>{`${sourceLabel(s.class)}: ${nodeTip(s.count)}`}</title>
                 <circle
                   className={`fc-ov__ring fc-ov__ring--${LANE_MOD(s.class)}`}
                   cx={s.x}
@@ -502,6 +536,7 @@ export function OverviewSankeyFlow({
             const on = !hl || hl.vtzIds.has(v.id);
             return (
               <g key={v.id} className={`fc-ov__vtz fc-ov__vtz--${mod}`} opacity={on ? 1 : 0.4}>
+                <title>{`${v.name}: ${RISK_LABEL[v.risk.level]} risk, ${PROFILE_LABEL[v.profile]}`}</title>
                 <g className="fc-ov__corona">{coronaRays(v.x, v.y, VTZ_R)}</g>
                 <circle className="fc-ov__rim" cx={v.x} cy={v.y} r={VTZ_R + 11} fill="none" />
                 <circle className="fc-ov__vtz-disc" cx={v.x} cy={v.y} r={VTZ_R} />
@@ -546,7 +581,7 @@ export function OverviewSankeyFlow({
           })}
 
           {dests.map((d) => {
-            const on = !hl || hl.destEdgeKeys.size === 0 || d.class === hoveredDest;
+            const on = !hl || hl.destClasses.has(d.class);
             const isExpanded = expandedDest === d.class;
             const shownApps = isExpanded ? d.apps : d.apps.slice(0, APPS_COLLAPSED);
             const hiddenApps = d.apps.length - shownApps.length;
@@ -584,6 +619,7 @@ export function OverviewSankeyFlow({
             return (
               <g key={d.class} className="fc-ov__dest" opacity={on ? 1 : 0.4} {...hover}>
                 <g {...ringClick}>
+                  <title>{`${destLabel(d.class)}: ${nodeTip(d.count)}`}</title>
                   <circle
                     className="fc-ov__ring fc-ov__ring--objects"
                     cx={d.x}
