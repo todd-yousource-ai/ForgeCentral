@@ -242,6 +242,10 @@ export interface OverviewHighlight {
   readonly vtzIds: ReadonlySet<string>;
   readonly sourceEdgeKeys: ReadonlySet<string>;
   readonly destEdgeKeys: ReadonlySet<string>;
+  /** The source-lane classes on a highlighted path (so the renderer keeps those source rings lit). */
+  readonly sourceClasses: ReadonlySet<string>;
+  /** The destination-ring classes on a highlighted path (so the renderer keeps those dest rings lit). */
+  readonly destClasses: ReadonlySet<string>;
 }
 
 /** A stable key for a source edge (`sourceClass>vtzId`), matching {@link overviewHighlight}. */
@@ -266,6 +270,29 @@ export function overviewHighlight(graph: OverviewSankey, destClass: string): Ove
     vtzIds,
     sourceEdgeKeys: new Set(sourceEdges.map(sourceEdgeKey)),
     destEdgeKeys: new Set(destEdges.map(destEdgeKey)),
+    sourceClasses: new Set(sourceEdges.map((e) => e.sourceClass)),
+    destClasses: new Set([destClass]),
+  };
+}
+
+/**
+ * Compute the highlight set for a hovered SOURCE lane (the mirror of {@link overviewHighlight}): the
+ * source->VTZ edges out of `sourceClass`, the VTZs they reach, and the VTZ->dest edges out of those VTZs,
+ * so the renderer keeps the whole source->VTZ->dest path lit and dims the rest.
+ */
+export function overviewHighlightSource(
+  graph: OverviewSankey,
+  sourceClass: string,
+): OverviewHighlight {
+  const sourceEdges = graph.sourceEdges.filter((e) => e.sourceClass === sourceClass);
+  const vtzIds = new Set(sourceEdges.map((e) => e.vtzId));
+  const destEdges = graph.destEdges.filter((e) => vtzIds.has(e.vtzId));
+  return {
+    vtzIds,
+    sourceEdgeKeys: new Set(sourceEdges.map(sourceEdgeKey)),
+    destEdgeKeys: new Set(destEdges.map(destEdgeKey)),
+    sourceClasses: new Set([sourceClass]),
+    destClasses: new Set(destEdges.map((e) => e.destClass)),
   };
 }
 

@@ -20,6 +20,7 @@ import {
   decisionId,
   isPending,
   overviewHighlight,
+  overviewHighlightSource,
   overviewVtzPage,
   overviewVtzPageCount,
   memberEntityRef,
@@ -318,6 +319,25 @@ describe('Overview redesign (Sankey) view model', () => {
     expect([...hl.vtzIds].sort()).toEqual(['vpub', 'vpubag']);
     expect(hl.sourceEdgeKeys.has('agents>vpubag')).toBe(true);
     expect(hl.sourceEdgeKeys.has('users>vpub')).toBe(true);
+  });
+
+  it('a dest highlight carries its node-class sets (the hovered dest + its feeding sources)', () => {
+    const hl = overviewHighlight(graph, 'private-apps');
+    expect([...hl.destClasses]).toEqual(['private-apps']);
+    expect([...hl.sourceClasses].sort()).toEqual(['devices', 'users']);
+  });
+
+  it('computes the mirror source highlight: only the source->VTZ->dest paths OUT of the hovered lane', () => {
+    // Hover "agents": it feeds vpriv + vpubag, which reach only "network" (vpubag>network).
+    const hl = overviewHighlightSource(graph, 'agents');
+    expect([...hl.vtzIds].sort()).toEqual(['vpriv', 'vpubag']);
+    expect([...hl.sourceClasses]).toEqual(['agents']);
+    expect(hl.sourceEdgeKeys.has('agents>vpriv')).toBe(true);
+    expect(hl.sourceEdgeKeys.has('agents>vpubag')).toBe(true);
+    // Only the destinations those VTZs reach are lit; users/devices lanes are NOT.
+    expect([...hl.destClasses]).toEqual(['network']);
+    expect(hl.destEdgeKeys.has('vpubag>network')).toBe(true);
+    expect(hl.sourceEdgeKeys.has('users>vpub')).toBe(false);
   });
 });
 

@@ -223,4 +223,37 @@ describe('OverviewSankeyFlow', () => {
       screen.queryByRole('button', { name: /Open AI AGENTS members/ }),
     ).not.toBeInTheDocument();
   });
+
+  it('gives every node a hover tooltip (title) with its label + connection count (PR-2c-2)', () => {
+    const { container } = render(<OverviewSankeyFlow graph={graph} />);
+    const titles = [...container.querySelectorAll('title')].map((t) => t.textContent);
+    expect(titles).toContain('AI AGENTS: 3 connections');
+    expect(titles).toContain('DEVICES: 47 connections');
+    expect(titles).toContain('NETWORK: 101 connections');
+    // The VTZ tooltip names the zone + its risk + posture.
+    expect(titles).toContain('Demo.Public.Agent: Critical risk, Watching');
+  });
+
+  it('hovering a source lane highlights only the paths out of it and dims the rest (PR-2c-2)', () => {
+    const onHoverSource = vi.fn();
+    const { container, rerender } = render(
+      <OverviewSankeyFlow graph={graph} onHoverSource={onHoverSource} />,
+    );
+    // Enter the agents source ring -> the parent is told to set hoveredSource.
+    const agentsRing = container.querySelector('.fc-ov__ring--agents')?.closest('.fc-ov__src');
+    expect(agentsRing).not.toBeNull();
+    fireEvent.mouseEnter(agentsRing as Element);
+    expect(onHoverSource).toHaveBeenCalledWith('agents');
+
+    // Feed it back: agents feeds vpriv + vpubag, which reach only network. Only the source->VTZ->dest
+    // edges on those paths stay full; the users/devices ribbons dim.
+    rerender(
+      <OverviewSankeyFlow graph={graph} onHoverSource={onHoverSource} hoveredSource="agents" />,
+    );
+    const full = [...container.querySelectorAll('.fc-ov__ribbons path')].filter(
+      (p) => p.getAttribute('opacity') === '1',
+    );
+    // agents>vpriv, agents>vpubag, vpubag>network = 3 full paths (vpriv has no dest edge here).
+    expect(full).toHaveLength(3);
+  });
 });

@@ -68,6 +68,7 @@ export function worstRisk(graph: OverviewSankey): RiskLevel | null {
 export function OverviewSurface(): ReactElement {
   const [vtzPage, setVtzPage] = useState(0);
   const [hoveredDest, setHoveredDest] = useState<string | null>(null);
+  const [hoveredSource, setHoveredSource] = useState<string | null>(null);
   const query = useMemo<OverviewQuery>(() => ({ limit: SCAN_LIMIT }), []);
   const overview = useOverview(query);
   const live = useLive();
@@ -133,6 +134,8 @@ export function OverviewSurface(): ReactElement {
             vtzPage={activePage}
             hoveredDest={hoveredDest}
             onHoverDest={setHoveredDest}
+            hoveredSource={hoveredSource}
+            onHoverSource={setHoveredSource}
             onSelectContainer={(container) =>
               drawer.openContainer(container, CONTAINER_LABEL[container] ?? container)
             }
