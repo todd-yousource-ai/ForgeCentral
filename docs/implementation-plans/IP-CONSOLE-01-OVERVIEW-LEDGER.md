@@ -62,6 +62,7 @@ Real work that shipped after RD.4b and belongs to P1.3's Overview surface; recor
 | Request bound 10k | Raise the Console connectivity request bound 1000 -> 10k (operator steer) | `84cfff8` | crdb scan ceiling 25k (`3aef2160`) |
 | Volume-weighted edges (INV-CROSS) | Ribbon width by real octets/packets | (consumes) | crdb PR-A `19e35097` + PR-B `a2c0fbaa` |
 | Live overlay (INV-CROSS, O1.7 substrate) | Scan-free Overview reads from an in-memory commit-observer overlay | (consumes at O1.7) | crdb `81b6d2d2` |
+| Retire `/api/overview/graph` (O1.3/O1.5 route) | The pre-redesign flat route + its whole chain removed: BFF route arm + `resolveOverviewGraph`, contracts `OverviewGraph`/`OverviewClassNode`/`OverviewEdge`/`toClassNode`/`toEdge`/`toOverviewGraph`, design `OverviewFlow`; bindings `overview.graph`/`overview.live` view models re-pointed to `OverviewSankey` (the engine op `connectivity_graph_v1` is unchanged -- the Sankey route brokers it). RD.4b retired the SPA consumer; an unconsumed route is a stub in reverse (`INV-CONSOLE-NO-STUB`), so the route follows. The shared-behavior coverage (401 / 503 / unknown-tag / cache identity / cache tenant-keying) migrated to `/api/overview/sankey`, never deleted. O1.3/O1.5 stay LANDED above as history. | (this PR) | -- |
 
 ---
 
