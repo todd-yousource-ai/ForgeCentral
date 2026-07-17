@@ -5,6 +5,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OverviewSurface, worstRisk } from '../surfaces/OverviewSurface.js';
+import { overviewLiveness } from '../surfaces/useOverview.js';
 import { renderWithProviders } from './render.js';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -207,6 +208,61 @@ describe('the Overview surface (RD.4b)', () => {
       { timeout: 5000 },
     );
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+});
+
+// O1.7 (INV-CONSOLE-LIVE): the surface polls the Sankey in place and surfaces its own freshness.
+describe('the Overview live poll (O1.7)', () => {
+  it('maps the poll state to a freshness status (connecting / live / reconnecting)', () => {
+    expect(overviewLiveness({ hasData: false, isError: false })).toBe('connecting');
+    expect(overviewLiveness({ hasData: false, isError: true })).toBe('connecting');
+    expect(overviewLiveness({ hasData: true, isError: false })).toBe('live');
+    // Last-known data with a failed latest poll = reconnecting (the graph stays, never a wipe).
+    expect(overviewLiveness({ hasData: true, isError: true })).toBe('reconnecting');
+  });
+
+  it('shows a real Live badge once the poll succeeds (never a fabricated pill)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        if (input.startsWith('/api/overview/sankey'))
+          return Promise.resolve(jsonResponse(200, graph));
+        throw new Error(`unexpected fetch ${input}`);
+      }),
+    );
+    renderWithProviders(<OverviewSurface />, { route: '/' });
+    await waitFor(() => expect(screen.getByText('Live')).toBeInTheDocument());
+    // A healthy poll is not stale: no reconnecting/deferred marker.
+    expect(screen.queryByText('Reconnecting to the live graph')).not.toBeInTheDocument();
+    expect(screen.queryByText('Live channel not enabled yet')).not.toBeInTheDocument();
+  });
+
+  it('degrades to a reconnecting marker but KEEPS the last-known graph when a poll fails', async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        if (input.startsWith('/api/overview/sankey')) {
+          calls += 1;
+          return calls === 1
+            ? Promise.resolve(jsonResponse(200, graph))
+            : Promise.resolve(jsonResponse(503, { error: 'unavailable' }));
+        }
+        throw new Error(`unexpected fetch ${input}`);
+      }),
+    );
+    renderWithProviders(<OverviewSurface />, { route: '/' });
+    // First poll succeeds -> Live + the graph.
+    await waitFor(() => expect(screen.getByText('Live')).toBeInTheDocument());
+    // The 2 s re-poll fails -> the reconnecting marker appears, but the last-known graph stays (no wipe).
+    await waitFor(
+      () => {
+        expect(screen.getByText('Reconnecting to the live graph')).toBeInTheDocument();
+      },
+      { timeout: 6000 },
+    );
+    expect(screen.getByText('NETWORK')).toBeInTheDocument();
+    expect(screen.queryByText('Live')).not.toBeInTheDocument();
   });
 });
 

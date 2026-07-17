@@ -53,6 +53,11 @@ export class LiveStore {
     this.state = next;
     for (const listener of this.listeners) listener(next);
   }
+
+  /** Return to the deferred `unavailable` state (e.g. the last live-driving surface unmounted). */
+  reset(): void {
+    this.set(INITIAL);
+  }
 }
 
 /** Whether a status should render a staleness marker (anything but a fresh, connected stream). */

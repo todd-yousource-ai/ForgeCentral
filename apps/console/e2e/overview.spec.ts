@@ -56,15 +56,18 @@ function json(route: Route, body: unknown): Promise<void> {
 }
 
 /** Mock the whole BFF for the Overview journey. Disjoint matchers; the isolate route is registered after
- *  the entity route so it wins for the `/isolate` POST (Playwright's last-registered match takes precedence). */
-async function mockBff(page: Page): Promise<void> {
+ *  the entity route so it wins for the `/isolate` POST (Playwright's last-registered match takes precedence).
+ *  `state.graph` is mutable so a test can seed a change and let the O1.7 live poll pick it up in place. */
+async function mockBff(page: Page): Promise<{ state: { graph: typeof GRAPH } }> {
+  const state = { graph: GRAPH };
   await page.route('**/auth/me', (route) => json(route, { operator: OPERATOR }));
-  await page.route(/\/api\/overview\/sankey/, (route) => json(route, GRAPH));
+  await page.route(/\/api\/overview\/sankey/, (route) => json(route, state.graph));
   await page.route(/\/api\/overview\/members/, (route) => json(route, MEMBERS));
   await page.route(/\/api\/entity\//, (route) => json(route, ENTITY));
   await page.route(/\/api\/entity\/.*\/isolate$/, (route) =>
     json(route, { posture: 'quarantine', enforcementActive: false, summary: 'recorded' }),
   );
+  return { state };
 }
 
 test('task 1: container -> member -> inspect, then back to the list (<= 3 clicks)', async ({
@@ -115,4 +118,26 @@ test('task 2: container -> agent -> Isolate -> confirm -> audited receipt (<= 3 
   await expect(confirm).toContainText(/Live enforcement is OFF/);
   await confirm.getByRole('button', { name: 'Isolate' }).click();
   await expect(page.getByText(/Isolation recorded/)).toBeVisible();
+});
+
+test('O1.7: the live poll updates the graph in place, showing a real Live badge', async ({
+  page,
+}) => {
+  const bff = await mockBff(page);
+  await page.goto('/');
+  // The poll is real, so the surface shows a live badge (not a fabricated pill). The graph's accessible
+  // name enumerates the AI Agents count (3) -- a robust, color-free assertion.
+  await expect(page.locator('.fcx-surface__header').getByText('Live')).toBeVisible();
+  await expect(page.getByRole('img', { name: /AI AGENTS 3/ })).toBeVisible();
+
+  // Seed a newer graph; the 2 s live poll refetches and the count updates IN PLACE (no reload, no wipe).
+  bff.state.graph = {
+    ...GRAPH,
+    sources: [
+      { class: 'users', count: 515 },
+      { class: 'devices', count: 47 },
+      { class: 'agents', count: 9 },
+    ],
+  };
+  await expect(page.getByRole('img', { name: /AI AGENTS 9/ })).toBeVisible({ timeout: 8000 });
 });
