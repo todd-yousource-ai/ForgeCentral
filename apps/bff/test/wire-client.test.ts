@@ -229,6 +229,24 @@ describe('WireCrucibleClient', () => {
     await client.close();
   });
 
+  it('connectivityMembers dispatches and returns the decoded member list (O1.6b)', async () => {
+    const reply = encode({
+      MemberList: {
+        members: [{ id: 'host-7', kind: 'endpoint', display_name: 'host-7', connection_count: 12 }],
+      },
+    });
+    const client = new WireCrucibleClient(config, () => Promise.resolve(mockTransport(reply)));
+    const list = await client.connectivityMembers({
+      request_id: 1,
+      operator: null,
+      class: 'devices',
+      limit: 500,
+    });
+    expect(list.members[0]?.id).toBe('host-7');
+    expect(list.members[0]?.connection_count).toBe(12);
+    await client.close();
+  });
+
   it('reconnects and retries once after a transport failure (self-heals, never fails open)', async () => {
     const good = encode({
       AgentList: { agents: [{ agent_id: 'a', status: 'active', enrolled_at: 1, attributes: [] }] },

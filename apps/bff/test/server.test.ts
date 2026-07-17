@@ -44,6 +44,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     entityDecisions: unused,
     entityConnections: unused,
     connectivityGraph: unused,
+    connectivityMembers: unused,
     contain: unused,
     logQuery: unused,
     logExplain: unused,
@@ -114,6 +115,7 @@ function operatorEngineWith(): OperatorEngine {
         top_destinations: [],
         truncated: false,
       }),
+    connectivityMembers: unused,
     // This route test does not exercise CONTAIN; fail loudly if it is reached (not a canned success).
     contain: unused,
     logQuery: () =>
@@ -545,6 +547,152 @@ describe('BFF HTTP surface', () => {
     expect(
       (await fetch(`${base}/api/overview/entity-connections?id=host-8&kind=device`)).status,
     ).toBe(200);
+    expect(hits).toBe(2);
+  });
+
+  it('GET /api/overview/members brokers CONNECTIVITY_MEMBERS + projects a source lane (O1.6b)', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      connectivityMembers: () =>
+        Promise.resolve({
+          members: [
+            { id: 'host-7', kind: 'endpoint', display_name: 'host-7', connection_count: 12 },
+          ],
+        }),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: engine,
+      },
+    );
+    const res = await fetch(`${base}/api/overview/members?container=devices`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      members: [{ id: 'host-7', kind: 'endpoint', name: 'host-7', connectionCount: 12 }],
+    });
+  });
+
+  it('GET /api/overview/members re-buckets a dest ring from the engine network members (O1.6b)', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      connectivityMembers: (_p, request) =>
+        Promise.resolve(
+          request.class === 'network'
+            ? {
+                members: [
+                  {
+                    id: '10.0.0.5:5432',
+                    kind: 'network_destination',
+                    display_name: '10.0.0.5:5432',
+                    connection_count: 9,
+                  },
+                  {
+                    id: '93.184.216.34:443',
+                    kind: 'network_destination',
+                    display_name: '93.184.216.34:443',
+                    connection_count: 2,
+                  },
+                ],
+              }
+            : { members: [] },
+        ),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: engine,
+      },
+    );
+    // The `data-stores` ring keeps only the Postgres endpoint (port 5432), relabeled to its brand.
+    const res = await fetch(`${base}/api/overview/members?container=data-stores`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      members: [
+        {
+          id: '10.0.0.5:5432',
+          kind: 'network_destination',
+          name: 'Postgres',
+          connectionCount: 9,
+        },
+      ],
+    });
+  });
+
+  it('GET /api/overview/members is 400 for a missing or unknown container, 401 without a session', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    // Missing container -> 400, never a broker with a blank class.
+    expect((await fetch(`${base}/api/overview/members`)).status).toBe(400);
+    // A container that is neither a source lane nor a dest ring -> 400 (validated before broker).
+    expect((await fetch(`${base}/api/overview/members?container=servers`)).status).toBe(400);
+    const noSession = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(undefined),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    expect((await fetch(`${noSession}/api/overview/members?container=devices`)).status).toBe(401);
+  });
+
+  it('GET /api/overview/members is 503 unwired and sanitizes a refusal to 403', async () => {
+    const noEngine = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+      },
+    );
+    expect((await fetch(`${noEngine}/api/overview/members?container=devices`)).status).toBe(503);
+
+    const refusing: OperatorEngine = {
+      ...operatorEngineWith(),
+      connectivityMembers: () =>
+        Promise.reject(
+          new EngineRefusedError({ class: 'Denied', code: 0, retry: 'Never', correlation_id: 0 }),
+        ),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: refusing,
+      },
+    );
+    const res = await fetch(`${base}/api/overview/members?container=devices`);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'refused', class: 'Denied' });
+  });
+
+  it('GET /api/overview/members keys the cache by tenant + container (no cross-container reuse)', async () => {
+    let hits = 0;
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      connectivityMembers: () => {
+        hits += 1;
+        return Promise.resolve({ members: [] });
+      },
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: engine,
+      },
+    );
+    // Same container twice -> one engine hit (served warm the second time).
+    expect((await fetch(`${base}/api/overview/members?container=devices`)).status).toBe(200);
+    expect((await fetch(`${base}/api/overview/members?container=devices`)).status).toBe(200);
+    expect(hits).toBe(1);
+    // A different container is a distinct key -> a fresh engine read.
+    expect((await fetch(`${base}/api/overview/members?container=agents`)).status).toBe(200);
     expect(hits).toBe(2);
   });
 

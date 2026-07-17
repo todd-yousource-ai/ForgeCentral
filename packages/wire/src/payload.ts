@@ -8,6 +8,7 @@
 
 import type {
   OperatorDelegation,
+  WireConnectivityMembers,
   WireConnectivityQuery,
   WireEntityConnections,
   WireEntityDecisions,
@@ -100,6 +101,21 @@ function connectivityQueryToCbor(request: WireConnectivityQuery): unknown {
 }
 
 /**
+ * The per-container class-members read (CONNECTIVITY_MEMBERS, crdb IP-CONSOLE-01 O1.6b). Fields in the
+ * Rust struct order (request_id, class, limit, operator?); `operator` carries
+ * `skip_serializing_if = "Option::is_none"`, so an absent operator is OMITTED, matching the byte shape.
+ */
+function connectivityMembersToCbor(request: WireConnectivityMembers): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    class: request.class,
+    limit: request.limit,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
  * Encode a WireRequest to its CBOR frame payload. The read + cursor variants (what the Console's reads
  * need) are supported; the write-path variants throw a clear error rather than emit a wrong shape.
  */
@@ -118,6 +134,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('ConnectivityGraph' in request) {
     return encode({ ConnectivityGraph: connectivityQueryToCbor(request.ConnectivityGraph) });
+  }
+  if ('ConnectivityMembers' in request) {
+    return encode({ ConnectivityMembers: connectivityMembersToCbor(request.ConnectivityMembers) });
   }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });

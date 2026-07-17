@@ -25,6 +25,7 @@
 import type {
   WireConnectionList,
   WireConnectivityGraph,
+  WireMemberList,
   WireRiskBand,
 } from './generated/wire-dto.js';
 
@@ -506,6 +507,52 @@ export function toConnectionList(reply: WireConnectionList): OverviewConnectionL
       destinationId: c.destination_id,
       destinationKind: c.destination_kind,
       observedAt: c.observed_at,
+    })),
+  };
+}
+
+// Class members (overview.connectivityMembers, O1.6b) -- the distinct member entities of one clicked
+// Sankey container (a source class or a destination bucket), for the PR-2c drawer LIST -> detail flow.
+// A camelCase projection of the engine's WireMemberList; PR-2b is the DATA PATH only (no UI). The engine
+// bounds (top-N by connection count) + tier-redacts the set, so this projection is total: it maps fields
+// and never fabricates, drops, or reorders (INV-CONSOLE-NO-STUB).
+
+/** One member entity of a connectivity class, projected from a `WireConnectivityMember`. */
+export interface OverviewMember {
+  /** The entity's stable id (a LEG node id: a host, an agent instance, an ip:port endpoint, ...). The
+   * drawer opens this entity when the member is clicked. */
+  readonly id: string;
+  /** The entity's kind, verbatim from the engine (e.g. `endpoint`, `agent_instance`,
+   * `network_destination`). An unknown kind passes through honestly, never dropped or guessed. */
+  readonly kind: string;
+  /** A human-readable display name (the entity's own id today; Console enrichment refines it, e.g.
+   * reverse-DNS on a network destination). */
+  readonly name: string;
+  /** The entity's outbound `ConnectsTo` connection count (the list sort key, highest first). */
+  readonly connectionCount: number;
+}
+
+/**
+ * The member entities of one connectivity class (`overview.connectivityMembers`), projected from a
+ * `WireMemberList`. Bounded (top-N by connection count) + tier-redacted engine-side; a class with no
+ * members yields an empty list (the honest empty state, never a fabricated row).
+ */
+export interface OverviewMemberList {
+  readonly members: readonly OverviewMember[];
+}
+
+/**
+ * Project a generated `WireMemberList` to the {@link OverviewMemberList} view model. Total (never null):
+ * the engine already bounded + tier-redacted + ordered the set, so this only renames fields to camelCase.
+ * A drifted wire field is a compile error here (the cross-module guard); the BFF resolver calls this.
+ */
+export function toMemberList(reply: WireMemberList): OverviewMemberList {
+  return {
+    members: reply.members.map((m) => ({
+      id: m.id,
+      kind: m.kind,
+      name: m.display_name,
+      connectionCount: m.connection_count,
     })),
   };
 }

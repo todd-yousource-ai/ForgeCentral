@@ -31,6 +31,9 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // The tenant-wide connectivity roll-up (CONNECTIVITY_GRAPH, crdb IP-CONSOLE-CONNECTIVITY) rides the
       // QuerySubmit opcode too; the engine discriminates it by its CBOR enum tag.
       'ConnectivityGraph' in request ||
+      // The per-container class-members read (CONNECTIVITY_MEMBERS, crdb IP-CONSOLE-01 O1.6b) rides the
+      // QuerySubmit opcode too; the engine discriminates it by its CBOR enum tag.
+      'ConnectivityMembers' in request ||
       // The decision-LOG reads (LOG_QUERY / LOG_EXPLAIN, crdb IP-CONSOLE-LOG-QUERY) ride the QuerySubmit
       // opcode too; the engine discriminates them by their CBOR enum tag.
       'LogQuery' in request ||

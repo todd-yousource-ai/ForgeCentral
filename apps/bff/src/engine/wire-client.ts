@@ -30,6 +30,7 @@ import type {
   WireDecisionList,
   WireLogExportEffect,
   WireError,
+  WireMemberList,
   WireQueryRows,
   WireReply,
 } from '@forge/contracts';
@@ -97,6 +98,14 @@ export function replyToConnectivityGraph(reply: WireReply): WireConnectivityGrap
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a connectivity-graph read');
+}
+
+/** Map an engine `WireReply` to `WireMemberList` (CONNECTIVITY_MEMBERS), throwing a typed error on a refusal. */
+export function replyToMemberList(reply: WireReply): WireMemberList {
+  if (typeof reply === 'object' && 'MemberList' in reply) return reply.MemberList;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a connectivity-members read');
 }
 
 /** Map an engine `WireReply` to `WireContainEffect` (CONTAIN), throwing a typed error on a refusal. */
@@ -314,6 +323,17 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToConnectivityGraph(await dispatch(transport, { ConnectivityGraph: request })),
+      opts,
+    );
+  }
+
+  async connectivityMembers(
+    request: Parameters<CrucibleClient['connectivityMembers']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireMemberList> {
+    return this.call(
+      async (transport) =>
+        replyToMemberList(await dispatch(transport, { ConnectivityMembers: request })),
       opts,
     );
   }

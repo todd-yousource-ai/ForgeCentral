@@ -24,6 +24,7 @@ import {
   overviewVtzPageCount,
   principalId,
   toConnectionList,
+  toMemberList,
   toOverviewSankey,
   toVtzProfile,
   requestId,
@@ -39,6 +40,7 @@ import type {
   TenantId,
   WireConnectionList,
   WireConnectivityGraph,
+  WireMemberList,
   WireReply,
   WireStreamEvent,
 } from '../src/index.js';
@@ -542,5 +544,34 @@ describe('toConnectionList (O1.6a entity-connections projection)', () => {
 
   it('yields an empty list for an entity with no observed connections (no fabricated row)', () => {
     expect(toConnectionList({ connections: [] })).toEqual({ connections: [] });
+  });
+});
+
+describe('toMemberList (O1.6b class-members projection)', () => {
+  it('projects a WireMemberList to camelCase, preserving the engine order and an unknown kind', () => {
+    const reply: WireMemberList = {
+      members: [
+        { id: 'host-7', kind: 'endpoint', display_name: 'host-7', connection_count: 12 },
+        {
+          id: 'aig:agent:codex',
+          kind: 'agent_instance',
+          display_name: 'Codex',
+          connection_count: 5,
+        },
+        // An unknown kind passes through honestly (the drawer labels what the engine attributed).
+        { id: 'x', kind: 'quantum-relay', display_name: 'x', connection_count: 1 },
+      ],
+    };
+    expect(toMemberList(reply)).toEqual({
+      members: [
+        { id: 'host-7', kind: 'endpoint', name: 'host-7', connectionCount: 12 },
+        { id: 'aig:agent:codex', kind: 'agent_instance', name: 'Codex', connectionCount: 5 },
+        { id: 'x', kind: 'quantum-relay', name: 'x', connectionCount: 1 },
+      ],
+    });
+  });
+
+  it('yields an empty list for a class with no members (no fabricated row)', () => {
+    expect(toMemberList({ members: [] })).toEqual({ members: [] });
   });
 });

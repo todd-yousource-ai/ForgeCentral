@@ -111,6 +111,32 @@ describe('encodeWireRequest', () => {
     expect(encoded).toContain('6f70657261746f72'); // the "operator" key is present
   });
 
+  it('encodes ConnectivityMembers byte-identically to ciborium, omitting an absent operator (crdb O1.6b)', () => {
+    // Matches the crdb `WireRequest::ConnectivityMembers byte shape` golden: class "devices", limit 100,
+    // operator None -> the CBOR map is exactly { request_id, class, limit } in the Rust struct order.
+    const request: WireRequest = {
+      ConnectivityMembers: { request_id: 42, operator: null, class: 'devices', limit: 100 },
+    };
+    expect(hex(encodeWireRequest(request))).toBe(
+      'a173436f6e6e65637469766974794d656d62657273a36a726571756573745f6964182a65636c6173736764657669636573656c696d69741864',
+    );
+  });
+
+  it('includes the operator on ConnectivityMembers when present (appended after limit, Rust order)', () => {
+    const request: WireRequest = {
+      ConnectivityMembers: {
+        request_id: 42,
+        class: 'devices',
+        limit: 100,
+        operator: { principal: 'principal-op', tenant: 'tenant-op' },
+      },
+    };
+    // Fields emit in struct order (request_id, class, limit, operator) -> a 4-key inner map (0xa4).
+    const encoded = hex(encodeWireRequest(request));
+    expect(encoded).toContain('a46a726571756573745f6964182a'); // 4-key map opening on request_id = 42
+    expect(encoded).toContain('6f70657261746f72'); // the "operator" key is present
+  });
+
   it('throws on an unsupported (write-path) variant rather than emitting a wrong shape', () => {
     const request = { TxnCommit: { txn: [], request_id: 1 } } as unknown as WireRequest;
     expect(() => encodeWireRequest(request)).toThrow(/not yet supported/);
