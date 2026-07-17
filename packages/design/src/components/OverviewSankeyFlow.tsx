@@ -40,6 +40,12 @@ export interface OverviewSankeyFlowProps {
    * name already enumerates every node, so this is a mouse-only enhancement, never the sole affordance).
    */
   readonly onHoverDest?: (destClass: string | null) => void;
+  /**
+   * Open a clicked container's member list (O1.6b): a source-class lane or a destination-category ring.
+   * The visible rings are mouse-clickable (a pointer enhancement over the `role=img` graphic); a
+   * screen-reader + keyboard nav of real buttons renders alongside so the affordance is never mouse-only.
+   */
+  readonly onSelectContainer?: (container: string) => void;
 }
 
 // Fixed SVG coordinate system; the rendered size is responsive (viewBox + CSS width:100%).
@@ -243,6 +249,7 @@ export function OverviewSankeyFlow({
   vtzPage = 0,
   hoveredDest = null,
   onHoverDest,
+  onSelectContainer,
 }: OverviewSankeyFlowProps): ReactElement {
   // Which destination category has its apps fanned out (top-N -> full list). Local UI state; the graph
   // is unchanged. Hooks precede the early returns below (Rules of Hooks).
@@ -440,166 +447,214 @@ export function OverviewSankeyFlow({
   });
 
   return (
-    <div className="fc-ov" role="img" aria-label={name}>
-      <svg {...svgBase} aria-hidden="true">
-        <defs>
-          {(['users', 'devices', 'agents', 'objects', 'muted'] as const).map((lane) => (
-            <linearGradient key={lane} id={`ovg-${lane}`} x1="0" y1="0" x2="1" y2="0">
-              {stop(0, `var(--fc-color-flow-${lane === 'muted' ? 'objects' : lane})`, 0.62)}
-              {stop(1, `var(--fc-color-flow-${lane === 'muted' ? 'objects' : lane})`, 0.5, 22)}
-            </linearGradient>
-          ))}
-          {holeDefs}
-          <mask
-            id="ov-dissolve"
-            maskUnits="userSpaceOnUse"
-            x={0}
-            y={0}
-            width={VIEW_W}
-            height={VIEW_H}
-          >
-            <rect width={VIEW_W} height={VIEW_H} fill="white" />
-            {holes}
-          </mask>
-        </defs>
+    <div className="fc-ov-wrap">
+      <div className="fc-ov" role="img" aria-label={name}>
+        <svg {...svgBase} aria-hidden="true">
+          <defs>
+            {(['users', 'devices', 'agents', 'objects', 'muted'] as const).map((lane) => (
+              <linearGradient key={lane} id={`ovg-${lane}`} x1="0" y1="0" x2="1" y2="0">
+                {stop(0, `var(--fc-color-flow-${lane === 'muted' ? 'objects' : lane})`, 0.62)}
+                {stop(1, `var(--fc-color-flow-${lane === 'muted' ? 'objects' : lane})`, 0.5, 22)}
+              </linearGradient>
+            ))}
+            {holeDefs}
+            <mask
+              id="ov-dissolve"
+              maskUnits="userSpaceOnUse"
+              x={0}
+              y={0}
+              width={VIEW_W}
+              height={VIEW_H}
+            >
+              <rect width={VIEW_W} height={VIEW_H} fill="white" />
+              {holes}
+            </mask>
+          </defs>
 
-        <g className="fc-ov__ribbons" mask="url(#ov-dissolve)">
-          {ribbons}
-        </g>
-
-        {sources.map((s) => (
-          <g key={s.class}>
-            <circle
-              className={`fc-ov__ring fc-ov__ring--${LANE_MOD(s.class)}`}
-              cx={s.x}
-              cy={s.y}
-              r={s.r}
-            />
-            {ringText(s.x, s.y, s.count, sourceLabel(s.class), 'fc-ov__label')}
+          <g className="fc-ov__ribbons" mask="url(#ov-dissolve)">
+            {ribbons}
           </g>
-        ))}
 
-        {vtzNodes.map((v) => {
-          const mod = RISK_MOD[v.risk.level];
-          const first = v.name.split('.')[0];
-          const rest = v.name.split('.').slice(1).join('.');
-          const on = !hl || hl.vtzIds.has(v.id);
-          return (
-            <g key={v.id} className={`fc-ov__vtz fc-ov__vtz--${mod}`} opacity={on ? 1 : 0.4}>
-              <g className="fc-ov__corona">{coronaRays(v.x, v.y, VTZ_R)}</g>
-              <circle className="fc-ov__rim" cx={v.x} cy={v.y} r={VTZ_R + 11} fill="none" />
-              <circle className="fc-ov__vtz-disc" cx={v.x} cy={v.y} r={VTZ_R} />
-              <text
-                className="fc-ov__vtz-org"
-                x={v.x}
-                y={v.y - 15}
-                textAnchor="middle"
-                fontSize={11}
-              >
-                {first}
-              </text>
-              <text
-                className="fc-ov__vtz-name"
-                x={v.x}
-                y={v.y + 1}
-                textAnchor="middle"
-                fontSize={12.5}
-              >
-                {rest}
-              </text>
-              <text
-                className="fc-ov__vtz-risk"
-                x={v.x}
-                y={v.y + 18}
-                textAnchor="middle"
-                fontSize={9.5}
-              >
-                {RISK_LABEL[v.risk.level]}
-              </text>
-              <text
-                className="fc-ov__vtz-profile"
-                x={v.x}
-                y={v.y + 31}
-                textAnchor="middle"
-                fontSize={8.5}
-              >
-                {PROFILE_LABEL[v.profile]}
-              </text>
-            </g>
-          );
-        })}
+          {sources.map((s) => {
+            const clickable = onSelectContainer
+              ? {
+                  onClick: () => onSelectContainer(s.class),
+                  style: { cursor: 'pointer' as const },
+                }
+              : {};
+            return (
+              <g key={s.class} {...clickable}>
+                <circle
+                  className={`fc-ov__ring fc-ov__ring--${LANE_MOD(s.class)}`}
+                  cx={s.x}
+                  cy={s.y}
+                  r={s.r}
+                />
+                {ringText(s.x, s.y, s.count, sourceLabel(s.class), 'fc-ov__label')}
+              </g>
+            );
+          })}
 
-        {dests.map((d) => {
-          const on = !hl || hl.destEdgeKeys.size === 0 || d.class === hoveredDest;
-          const isExpanded = expandedDest === d.class;
-          const shownApps = isExpanded ? d.apps : d.apps.slice(0, APPS_COLLAPSED);
-          const hiddenApps = d.apps.length - shownApps.length;
-          const rows: { key: string; label: string; kind: 'app' | 'toggle' | 'tail' }[] =
-            shownApps.map((a) => ({ key: a.address, label: a.name, kind: 'app' }));
-          // One "more" affordance at a time: collapsed with hidden apps shows a single fan-out toggle
-          // (it stands in for both the hidden named apps and the unclassified tail). Fully shown, the
-          // unclassified-tail count (connections beyond the engine's bounded top-N) reads as its own row,
-          // alongside a "show fewer" affordance when the list was fanned out.
-          if (hiddenApps > 0) {
-            rows.push({ key: '__toggle', label: `+${hiddenApps} more`, kind: 'toggle' });
-          } else {
-            if (isExpanded && d.apps.length > APPS_COLLAPSED) {
-              rows.push({ key: '__toggle', label: 'show fewer', kind: 'toggle' });
-            }
-            if (d.moreCount > 0) {
-              rows.push({ key: '__tail', label: `+${d.moreCount} more`, kind: 'tail' });
-            }
-          }
-          const rowH = 23;
-          const top = d.y - ((rows.length - 1) * rowH) / 2;
-          const hover = onHoverDest
-            ? {
-                onMouseEnter: () => onHoverDest(d.class),
-                onMouseLeave: () => onHoverDest(null),
-                style: { cursor: 'pointer' as const },
+          {vtzNodes.map((v) => {
+            const mod = RISK_MOD[v.risk.level];
+            const first = v.name.split('.')[0];
+            const rest = v.name.split('.').slice(1).join('.');
+            const on = !hl || hl.vtzIds.has(v.id);
+            return (
+              <g key={v.id} className={`fc-ov__vtz fc-ov__vtz--${mod}`} opacity={on ? 1 : 0.4}>
+                <g className="fc-ov__corona">{coronaRays(v.x, v.y, VTZ_R)}</g>
+                <circle className="fc-ov__rim" cx={v.x} cy={v.y} r={VTZ_R + 11} fill="none" />
+                <circle className="fc-ov__vtz-disc" cx={v.x} cy={v.y} r={VTZ_R} />
+                <text
+                  className="fc-ov__vtz-org"
+                  x={v.x}
+                  y={v.y - 15}
+                  textAnchor="middle"
+                  fontSize={11}
+                >
+                  {first}
+                </text>
+                <text
+                  className="fc-ov__vtz-name"
+                  x={v.x}
+                  y={v.y + 1}
+                  textAnchor="middle"
+                  fontSize={12.5}
+                >
+                  {rest}
+                </text>
+                <text
+                  className="fc-ov__vtz-risk"
+                  x={v.x}
+                  y={v.y + 18}
+                  textAnchor="middle"
+                  fontSize={9.5}
+                >
+                  {RISK_LABEL[v.risk.level]}
+                </text>
+                <text
+                  className="fc-ov__vtz-profile"
+                  x={v.x}
+                  y={v.y + 31}
+                  textAnchor="middle"
+                  fontSize={8.5}
+                >
+                  {PROFILE_LABEL[v.profile]}
+                </text>
+              </g>
+            );
+          })}
+
+          {dests.map((d) => {
+            const on = !hl || hl.destEdgeKeys.size === 0 || d.class === hoveredDest;
+            const isExpanded = expandedDest === d.class;
+            const shownApps = isExpanded ? d.apps : d.apps.slice(0, APPS_COLLAPSED);
+            const hiddenApps = d.apps.length - shownApps.length;
+            const rows: { key: string; label: string; kind: 'app' | 'toggle' | 'tail' }[] =
+              shownApps.map((a) => ({ key: a.address, label: a.name, kind: 'app' }));
+            // One "more" affordance at a time: collapsed with hidden apps shows a single fan-out toggle
+            // (it stands in for both the hidden named apps and the unclassified tail). Fully shown, the
+            // unclassified-tail count (connections beyond the engine's bounded top-N) reads as its own row,
+            // alongside a "show fewer" affordance when the list was fanned out.
+            if (hiddenApps > 0) {
+              rows.push({ key: '__toggle', label: `+${hiddenApps} more`, kind: 'toggle' });
+            } else {
+              if (isExpanded && d.apps.length > APPS_COLLAPSED) {
+                rows.push({ key: '__toggle', label: 'show fewer', kind: 'toggle' });
               }
-            : {};
-          return (
-            <g key={d.class} className="fc-ov__dest" opacity={on ? 1 : 0.4} {...hover}>
-              <circle className="fc-ov__ring fc-ov__ring--objects" cx={d.x} cy={d.y} r={DEST_R} />
-              {ringText(d.x, d.y, d.count, destLabel(d.class), 'fc-ov__dest-label')}
-              {rows.map((row, i) => {
-                const ly = top + i * rowH;
-                const ax = appsArch(ly);
-                const isMore = row.kind !== 'app';
-                const click =
-                  row.kind === 'toggle'
-                    ? {
-                        onClick: () => {
-                          setExpandedDest(isExpanded ? null : d.class);
-                        },
-                        style: { cursor: 'pointer' as const },
-                      }
-                    : {};
-                return (
-                  <g key={row.key} {...click}>
-                    <circle
-                      className={`fc-ov__app-dot${isMore ? ' fc-ov__app-dot--more' : ''}`}
-                      cx={ax}
-                      cy={ly}
-                      r={2.5}
-                      fill="none"
-                    />
-                    <text
-                      className={`fc-ov__app${isMore ? ' fc-ov__app--more' : ''}`}
-                      x={ax + 14}
-                      y={ly + 4}
-                      fontSize={14}
-                    >
-                      {row.label}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          );
-        })}
-      </svg>
+              if (d.moreCount > 0) {
+                rows.push({ key: '__tail', label: `+${d.moreCount} more`, kind: 'tail' });
+              }
+            }
+            const rowH = 23;
+            const top = d.y - ((rows.length - 1) * rowH) / 2;
+            const hover = onHoverDest
+              ? {
+                  onMouseEnter: () => onHoverDest(d.class),
+                  onMouseLeave: () => onHoverDest(null),
+                  style: { cursor: 'pointer' as const },
+                }
+              : {};
+            const ringClick = onSelectContainer
+              ? {
+                  onClick: () => onSelectContainer(d.class),
+                  style: { cursor: 'pointer' as const },
+                }
+              : {};
+            return (
+              <g key={d.class} className="fc-ov__dest" opacity={on ? 1 : 0.4} {...hover}>
+                <g {...ringClick}>
+                  <circle
+                    className="fc-ov__ring fc-ov__ring--objects"
+                    cx={d.x}
+                    cy={d.y}
+                    r={DEST_R}
+                  />
+                  {ringText(d.x, d.y, d.count, destLabel(d.class), 'fc-ov__dest-label')}
+                </g>
+                {rows.map((row, i) => {
+                  const ly = top + i * rowH;
+                  const ax = appsArch(ly);
+                  const isMore = row.kind !== 'app';
+                  const click =
+                    row.kind === 'toggle'
+                      ? {
+                          onClick: () => {
+                            setExpandedDest(isExpanded ? null : d.class);
+                          },
+                          style: { cursor: 'pointer' as const },
+                        }
+                      : {};
+                  return (
+                    <g key={row.key} {...click}>
+                      <circle
+                        className={`fc-ov__app-dot${isMore ? ' fc-ov__app-dot--more' : ''}`}
+                        cx={ax}
+                        cy={ly}
+                        r={2.5}
+                        fill="none"
+                      />
+                      <text
+                        className={`fc-ov__app${isMore ? ' fc-ov__app--more' : ''}`}
+                        x={ax + 14}
+                        y={ly + 4}
+                        fontSize={14}
+                      >
+                        {row.label}
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      {onSelectContainer ? (
+        <nav className="fc-ov__containers" aria-label="Open a container's members">
+          {[
+            ...graph.sources.map((s) => ({
+              cls: s.class,
+              label: sourceLabel(s.class),
+              count: s.count,
+            })),
+            ...graph.destinations.map((d) => ({
+              cls: d.class,
+              label: destLabel(d.class),
+              count: d.count,
+            })),
+          ].map((c) => (
+            <button
+              key={c.cls}
+              type="button"
+              className="fc-ov__container-nav"
+              onClick={() => onSelectContainer(c.cls)}
+            >
+              {`Open ${c.label} members (${String(c.count)} ${c.count === 1 ? 'connection' : 'connections'})`}
+            </button>
+          ))}
+        </nav>
+      ) : null}
     </div>
   );
 }

@@ -22,6 +22,8 @@
 // retired with the pre-redesign `/api/overview/graph` route after RD.4b migrated the surface to the
 // Sankey below -- an unconsumed projection is a stub in reverse, INV-CONSOLE-NO-STUB.)
 
+import type { EntityRef } from './entity.js';
+import { objectId, principalId } from './ids.js';
 import type {
   WireConnectionList,
   WireConnectivityGraph,
@@ -555,4 +557,25 @@ export function toMemberList(reply: WireMemberList): OverviewMemberList {
       connectionCount: m.connection_count,
     })),
   };
+}
+
+/** The engine LEG kinds that are principals in the entity drawer (agents + users are agent-directory ids). */
+const PRINCIPAL_MEMBER_KINDS: ReadonlySet<string> = new Set([
+  'agent_instance',
+  'mcp_server',
+  'user',
+]);
+
+/**
+ * The entity-drawer {@link EntityRef} a clicked member opens (O1.6b). An agent/user member is a `principal`
+ * (its id addresses the agent directory the drawer reads); every other member kind -- a device endpoint, a
+ * network destination, a data store -- is an `object` (the kind-aware drawer shows the sections that apply
+ * and marks the rest not-applicable, never a fabricated principal row). The engine kind is passed through
+ * verbatim into the id brand; the drawer never guesses a kind the engine did not attribute.
+ */
+export function memberEntityRef(member: OverviewMember): EntityRef {
+  if (PRINCIPAL_MEMBER_KINDS.has(member.kind)) {
+    return { kind: 'principal', id: principalId(member.id) };
+  }
+  return { kind: 'object', id: objectId(member.id) };
 }

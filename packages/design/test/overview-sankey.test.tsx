@@ -195,4 +195,32 @@ describe('OverviewSankeyFlow', () => {
     expect(region).toHaveAccessibleName('Loading connectivity flow');
     expect(region).toHaveAttribute('aria-busy', 'true');
   });
+
+  it('opens a container via the accessible nav buttons and via a mouse ring click (O1.6b)', () => {
+    const onSelectContainer = vi.fn();
+    const { container } = render(
+      <OverviewSankeyFlow graph={graph} onSelectContainer={onSelectContainer} />,
+    );
+    // The accessible (keyboard/screen-reader) path: a real button per source lane + dest ring, named
+    // with the container label + its connection count -- never mouse-only.
+    const agents = screen.getByRole('button', { name: 'Open AI AGENTS members (3 connections)' });
+    agents.click();
+    expect(onSelectContainer).toHaveBeenCalledWith('agents');
+    screen.getByRole('button', { name: 'Open USERS members (515 connections)' }).click();
+    expect(onSelectContainer).toHaveBeenCalledWith('users');
+    screen.getByRole('button', { name: 'Open DATA STORES members (18 connections)' }).click();
+    expect(onSelectContainer).toHaveBeenCalledWith('data-stores');
+    // The mouse enhancement: the visible source ring is clickable too.
+    const ring = container.querySelector('.fc-ov__ring--agents');
+    expect(ring).not.toBeNull();
+    fireEvent.click(ring as Element);
+    expect(onSelectContainer).toHaveBeenCalledTimes(4);
+  });
+
+  it('renders no container nav when onSelectContainer is absent (mouse/keyboard affordance is opt-in)', () => {
+    render(<OverviewSankeyFlow graph={graph} />);
+    expect(
+      screen.queryByRole('button', { name: /Open AI AGENTS members/ }),
+    ).not.toBeInTheDocument();
+  });
 });

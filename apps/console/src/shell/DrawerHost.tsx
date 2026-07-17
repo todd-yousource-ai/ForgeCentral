@@ -1,17 +1,20 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ConfirmDialog, Drawer, EntityDrawer } from '@forge/design';
-import type { EntityRef } from '@forge/contracts';
+import { ConfirmDialog, ContainerMembersView, Drawer, EntityDrawer } from '@forge/design';
+import { memberEntityRef, type EntityRef, type OverviewMember } from '@forge/contracts';
 
 import { entityQueryKey, fetchEntityDetail, useEntityDetail } from '../entity/useEntityDetail.js';
 import { useIsolate } from '../entity/useIsolate.js';
+import { useClassMembers } from '../surfaces/useClassMembers.js';
 
 // The drawer host: the shell-level slide-over that realizes the select-then-act pattern (Section 5.3).
-// Clicking any entity anywhere (graph node, table row, decision card) opens a right drawer. Two modes:
+// Clicking any entity anywhere (graph node, table row, decision card) opens a right drawer. Three modes:
 // `openEntity(ref)` opens the LIVE entity drawer (IP-CONSOLE-12 DR.3d) -- it fetches the aggregated detail
-// from the BFF and renders every section from its SectionState; `open(request)` opens a generic titled
-// drawer with caller-supplied content. The host owns open/close and mounts exactly one drawer at a time.
+// from the BFF and renders every section from its SectionState; `openContainer(container, label)` opens the
+// LIST of a clicked Sankey container's members (O1.6b), and picking one swaps to its entity detail with a
+// BACK affordance to the list; `open(request)` opens a generic titled drawer with caller-supplied content.
+// The host owns open/close and mounts exactly one drawer at a time.
 
 export interface DrawerRequest {
   /** The drawer heading (usually the entity name). */
@@ -20,9 +23,19 @@ export interface DrawerRequest {
   readonly content?: ReactNode;
 }
 
+/** A clicked Overview container whose members the drawer lists (O1.6b). */
+interface ContainerRequest {
+  /** The container id passed to the members read (a source lane or a destination ring). */
+  readonly container: string;
+  /** The human label shown as the drawer title (e.g. "AI Agents", "Data Stores"). */
+  readonly label: string;
+}
+
 interface DrawerApi {
   /** Open the LIVE entity drawer for an entity ref (fetches its detail from the BFF). */
   readonly openEntity: (ref: EntityRef) => void;
+  /** Open the LIST of a clicked container's member entities (O1.6b); picking one opens its detail. */
+  readonly openContainer: (container: string, label: string) => void;
   /** Warm the cache for an entity on hover/focus (DR.6), so a subsequent openEntity opens instantly (the
    * detail is served from the cache, no loading flash). Idempotent + cheap: TanStack skips a fresh entity
    * that is already fetching or fresh. */
@@ -37,8 +50,11 @@ const DrawerContext = createContext<DrawerApi | null>(null);
 
 export function DrawerHost({ children }: { readonly children: ReactNode }): ReactElement {
   const [request, setRequest] = useState<DrawerRequest | null>(null);
+  const [container, setContainer] = useState<ContainerRequest | null>(null);
   const [entityRef, setEntityRef] = useState<EntityRef | null>(null);
   const detail = useEntityDetail(entityRef);
+  // The members read for the open container (idle when no container is open). Its own honest states.
+  const members = useClassMembers(container === null ? null : container.container);
   const queryClient = useQueryClient();
 
   // The Isolate quick action (DR.5d): a confirm-gate holding a stable command id (idempotent re-submit),
@@ -49,11 +65,31 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   const openEntity = useCallback(
     (ref: EntityRef) => {
       setRequest(null);
+      setContainer(null);
       setEntityRef(ref);
       isolate.reset();
     },
     [isolate],
   );
+  const openContainer = useCallback((next: string, label: string) => {
+    setRequest(null);
+    setEntityRef(null);
+    setContainer({ container: next, label });
+  }, []);
+  // Open a member's detail from the container list, KEEPING the container so back returns to the list.
+  const openMember = useCallback(
+    (member: OverviewMember) => {
+      setEntityRef(memberEntityRef(member));
+      isolate.reset();
+    },
+    [isolate],
+  );
+  // Step back from a member's detail to the container list it was opened from (never closes the drawer).
+  const backToList = useCallback(() => {
+    setEntityRef(null);
+    setConfirm(null);
+    isolate.reset();
+  }, [isolate]);
   const prefetchEntity = useCallback(
     (ref: EntityRef) => {
       void queryClient.prefetchQuery({
@@ -65,10 +101,12 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   );
   const open = useCallback((next: DrawerRequest) => {
     setEntityRef(null);
+    setContainer(null);
     setRequest(next);
   }, []);
   const close = useCallback(() => {
     setRequest(null);
+    setContainer(null);
     setEntityRef(null);
     setConfirm(null);
   }, []);
@@ -76,20 +114,24 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   const api = useMemo<DrawerApi>(
     () => ({
       openEntity,
+      openContainer,
       prefetchEntity,
       open,
       close,
-      isOpen: request !== null || entityRef !== null,
+      isOpen: request !== null || container !== null || entityRef !== null,
     }),
-    [openEntity, prefetchEntity, open, close, request, entityRef],
+    [openEntity, openContainer, prefetchEntity, open, close, request, container, entityRef],
   );
+
+  // The member detail was reached from a container list -> its back affordance returns to that list.
+  const onBack = container !== null ? backToList : undefined;
 
   return (
     <DrawerContext.Provider value={api}>
       {children}
       {entityRef !== null ? (
         detail.isError ? (
-          <Drawer open title="Entity" onClose={close}>
+          <Drawer open title="Entity" onClose={close} onBack={onBack}>
             <p className="fcx-drawer__empty">Could not load this entity.</p>
           </Drawer>
         ) : (
@@ -99,6 +141,7 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
               detail={detail.data}
               loading={detail.isLoading}
               onClose={close}
+              onBack={onBack}
               actions={{ onIsolate: () => setConfirm({ commandId: crypto.randomUUID() }) }}
             />
             <ConfirmDialog
@@ -130,6 +173,16 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
             ) : null}
           </>
         )
+      ) : container !== null ? (
+        <Drawer open title={container.label} onClose={close}>
+          <ContainerMembersView
+            members={members.data?.members}
+            loading={members.isLoading}
+            error={members.isError}
+            onSelectMember={openMember}
+            onRetry={() => void members.refetch()}
+          />
+        </Drawer>
       ) : (
         <Drawer open={request !== null} title={request?.title ?? ''} onClose={close}>
           {request?.content ?? (

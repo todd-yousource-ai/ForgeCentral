@@ -110,7 +110,44 @@ export function componentStyles(): string {
 }
 .fc-drawer__close:hover { color: var(--fc-color-text-primary); }
 .fc-drawer__close:focus-visible { outline: 2px solid var(--fc-color-status-info); outline-offset: 2px; }
+.fc-drawer__title { flex: 1; }
+.fc-drawer__back {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: var(--fc-space-xs) var(--fc-space-sm);
+  font-size: var(--fc-font-size-xl);
+  line-height: var(--fc-font-lineHeight-tight);
+  color: var(--fc-color-text-muted);
+  cursor: pointer;
+}
+.fc-drawer__back:hover { color: var(--fc-color-text-primary); }
+.fc-drawer__back:focus-visible { outline: 2px solid var(--fc-color-status-info); outline-offset: 2px; }
 .fc-drawer__body { flex: 1; overflow-y: auto; padding: var(--fc-space-lg); }
+
+.fc-members__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--fc-space-xs); }
+.fc-members__row {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--fc-space-md);
+  padding: var(--fc-space-sm) var(--fc-space-md);
+  border-radius: var(--fc-radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--fc-color-text-primary);
+}
+.fc-members__row:hover { background: color-mix(in srgb, var(--fc-color-text-muted) 12%, transparent); }
+.fc-members__row:focus-visible { outline: 2px solid var(--fc-color-status-info); outline-offset: 2px; }
+.fc-members__name { font-weight: var(--fc-font-weight-medium); overflow-wrap: anywhere; }
+.fc-members__count { color: var(--fc-color-text-muted); font-size: var(--fc-font-size-sm); white-space: nowrap; }
+.fc-members__note { margin: 0; color: var(--fc-color-text-muted); }
+.fc-members__skeleton { height: 40px; border-radius: var(--fc-radius-sm); background: color-mix(in srgb, var(--fc-color-text-muted) 12%, transparent); }
+.fc-members--error { display: flex; flex-direction: column; gap: var(--fc-space-md); align-items: flex-start; }
 
 .fc-dialog {
   position: relative;
@@ -259,8 +296,40 @@ export function componentStyles(): string {
 .fc-overview-flow__skeleton { fill: var(--fc-color-surface-border); animation: fc-skeleton-pulse var(--fc-motion-duration-base) var(--fc-motion-easing-standard) infinite alternate; }
 
 /* Overview redesign (Sankey) -- IP-CONSOLE-01 RD.2. Colours are tokens only. */
+.fc-ov-wrap { position: relative; display: block; width: 100%; }
 .fc-ov { display: block; width: 100%; }
 .fc-ov svg { display: block; width: 100%; height: auto; }
+/* The keyboard/screen-reader path to open a container's members: each button is visually hidden (the
+   visible affordance is the clickable ring) but reachable by tab, and reveals itself on focus. */
+.fc-ov__container-nav {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.fc-ov__container-nav:focus-visible {
+  position: absolute;
+  top: var(--fc-space-sm);
+  left: var(--fc-space-sm);
+  z-index: 1;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: var(--fc-space-xs) var(--fc-space-sm);
+  overflow: visible;
+  clip: auto;
+  background: var(--fc-color-surface-raised);
+  color: var(--fc-color-text-primary);
+  border-radius: var(--fc-radius-sm);
+  outline: 2px solid var(--fc-color-status-info);
+  outline-offset: 2px;
+  cursor: pointer;
+}
 .fc-ov__ribbons { mix-blend-mode: screen; }
 .fc-ov__ring { fill: none; stroke-width: 1; stroke-dasharray: 0.5 4; stroke-linecap: round; opacity: 0.38; }
 .fc-ov__ring--users { stroke: var(--fc-color-flow-users); }

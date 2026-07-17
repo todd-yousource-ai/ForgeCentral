@@ -20,7 +20,20 @@ import {
 
 import { ErrorState, StaleBanner } from '../states/States.js';
 import { useLive } from '../live/LiveProvider.js';
+import { useDrawer } from '../shell/DrawerHost.js';
 import { useOverview } from './useOverview.js';
+
+// The human label for each container the graph can open (the drawer title). Source lanes + dest rings;
+// an unknown tag (never expected) falls back to the raw class, never a fabricated name.
+const CONTAINER_LABEL: Readonly<Record<string, string>> = {
+  agents: 'AI Agents',
+  users: 'Users',
+  devices: 'Devices',
+  network: 'Network',
+  saas: 'SaaS Apps',
+  'private-apps': 'Private Apps',
+  'data-stores': 'Data Stores',
+};
 
 // TUNE(IP-CONSOLE-01 RD.4b, operator steer 2026-07-16): the request bound (the engine clamps to its
 // per-tenant ceiling). Matches the BFF default (10k, raised to build out the current environment);
@@ -58,6 +71,7 @@ export function OverviewSurface(): ReactElement {
   const query = useMemo<OverviewQuery>(() => ({ limit: SCAN_LIMIT }), []);
   const overview = useOverview(query);
   const live = useLive();
+  const drawer = useDrawer();
 
   const graph = overview.data;
   const pageCount = graph ? overviewVtzPageCount(graph.vtzs.length) : 1;
@@ -119,6 +133,9 @@ export function OverviewSurface(): ReactElement {
             vtzPage={activePage}
             hoveredDest={hoveredDest}
             onHoverDest={setHoveredDest}
+            onSelectContainer={(container) =>
+              drawer.openContainer(container, CONTAINER_LABEL[container] ?? container)
+            }
           />
         </div>
       )}

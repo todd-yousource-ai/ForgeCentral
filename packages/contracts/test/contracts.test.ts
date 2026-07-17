@@ -22,6 +22,7 @@ import {
   overviewHighlight,
   overviewVtzPage,
   overviewVtzPageCount,
+  memberEntityRef,
   principalId,
   toConnectionList,
   toMemberList,
@@ -573,5 +574,28 @@ describe('toMemberList (O1.6b class-members projection)', () => {
 
   it('yields an empty list for a class with no members (no fabricated row)', () => {
     expect(toMemberList({ members: [] })).toEqual({ members: [] });
+  });
+});
+
+describe('memberEntityRef (O1.6b member -> drawer ref)', () => {
+  it('maps agent/user members to a principal ref (the agent directory the drawer reads)', () => {
+    for (const kind of ['agent_instance', 'mcp_server', 'user']) {
+      const ref = memberEntityRef({
+        id: 'aig:agent:codex',
+        kind,
+        name: 'Codex',
+        connectionCount: 1,
+      });
+      expect(ref.kind).toBe('principal');
+      expect(ref.id).toBe('aig:agent:codex');
+    }
+  });
+
+  it('maps every other member kind (device, network, store) to an object ref', () => {
+    for (const kind of ['endpoint', 'network_destination', 'data_object']) {
+      const ref = memberEntityRef({ id: '10.0.0.1:443', kind, name: 'x', connectionCount: 1 });
+      expect(ref.kind).toBe('object');
+      expect(ref.id).toBe('10.0.0.1:443');
+    }
   });
 });

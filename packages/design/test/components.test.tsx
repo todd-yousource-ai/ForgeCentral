@@ -128,6 +128,27 @@ describe('Drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+
+  it('renders a back control only when onBack is given, and it steps back (never closes) (O1.6b)', () => {
+    const onBack = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <Drawer open title="Agent detail" onClose={onClose}>
+        <p>body</p>
+      </Drawer>,
+    );
+    // No back affordance for a standalone drawer.
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+
+    rerender(
+      <Drawer open title="Agent detail" onClose={onClose} onBack={onBack}>
+        <p>body</p>
+      </Drawer>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
 
 describe('ConfirmDialog', () => {

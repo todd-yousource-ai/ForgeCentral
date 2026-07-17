@@ -43,6 +43,9 @@ export interface EntityDrawerProps {
   readonly loading?: boolean;
   /** Quick-action handlers; only provided actions render a button. */
   readonly actions?: EntityQuickActions;
+  /** When provided, a back control renders in the header (the drawer was opened from a container list, so
+   * back returns to that list rather than closing). Absent = no back affordance (opened standalone). */
+  readonly onBack?: (() => void) | undefined;
   /** Click-through for a connected VTZ (navigation; wired by the surface). */
   readonly onOpenZone?: (id: VtzId) => void;
   /** Click-through for an effective policy. */
@@ -165,6 +168,7 @@ export function EntityDrawer({
   detail,
   loading,
   actions,
+  onBack,
   onOpenZone,
   onOpenPolicy,
   onOpenDecision,
@@ -173,7 +177,7 @@ export function EntityDrawer({
   const title = headerOk ? headerOk.displayName : 'Entity detail';
 
   return (
-    <Drawer open={open} title={title} onClose={onClose}>
+    <Drawer open={open} title={title} onClose={onClose} onBack={onBack}>
       <div className="fc-entity-detail">
         <Section title="Status" state={detail?.header} loading={loading}>
           {(header) => (
