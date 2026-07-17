@@ -122,7 +122,9 @@ describe('OverviewSankeyFlow', () => {
       address: `10.0.0.${i}`,
       count: 1,
     }));
-    // 7 named apps (2 hidden) AND an unclassified tail: collapsed must show ONLY the fan-out toggle.
+    // 7 named apps (2 hidden) AND an unnamed tail of 33: 5 shown + 2 hidden-named + 33 unnamed = 40 = the
+    // ring count. Collapsed shows ONE fan-out toggle that accounts for BOTH tails (2 + 33 = 35), never the
+    // hidden-named 2 alone (INV-CONSOLE-OVERFLOW-HONEST: shown + overflow == count).
     const withTail: OverviewSankey = {
       ...graph,
       destinations: [
@@ -131,13 +133,35 @@ describe('OverviewSankeyFlow', () => {
       ],
     };
     render(<OverviewSankeyFlow graph={withTail} />);
-    expect(screen.getByText('+2 more')).toBeInTheDocument();
-    // The tail is NOT a second "+N more" row while collapsed.
+    expect(screen.getByText('+35 more')).toBeInTheDocument();
+    // NOT the under-telling "+2 more" (hidden named only), and no second "+N more" row while collapsed.
+    expect(screen.queryByText('+2 more')).not.toBeInTheDocument();
     expect(screen.queryByText('+33 more')).not.toBeInTheDocument();
-    // Fan out: the tail now reads as its own row, next to "show fewer".
-    fireEvent.click(screen.getByText('+2 more'));
+    // Fan out: the named apps all show + the unnamed remainder reads as its own row, next to "show fewer".
+    fireEvent.click(screen.getByText('+35 more'));
     expect(screen.getByText('+33 more')).toBeInTheDocument();
     expect(screen.getByText('show fewer')).toBeInTheDocument();
+  });
+
+  it('the ring overflow label accounts for EVERY entity: shown + overflow == count (O1.7 honesty)', () => {
+    // A 910-endpoint ring with only 21 named (5 shown, 16 hidden-named) + 889 unnamed: the single
+    // collapsed overflow must read "+905 more" (16 + 889), never "+16 more" (the named tail alone).
+    const named = Array.from({ length: 21 }, (_, i) => ({
+      name: `svc-${i}.example`,
+      address: `10.1.0.${i}`,
+      count: 1,
+    }));
+    const big: OverviewSankey = {
+      ...graph,
+      destinations: [
+        { class: 'network', count: 910, apps: named, moreCount: 889 },
+        ...graph.destinations.filter((d) => d.class !== 'network'),
+      ],
+    };
+    render(<OverviewSankeyFlow graph={big} />);
+    // 5 shown + 905 overflow = 910 = the ring count. The under-telling "+16 more" is never shown.
+    expect(screen.getByText('+905 more')).toBeInTheDocument();
+    expect(screen.queryByText('+16 more')).not.toBeInTheDocument();
   });
 
   it('hovering a destination dims the ribbons not on a path that feeds it (linked highlight)', () => {

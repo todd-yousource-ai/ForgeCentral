@@ -587,12 +587,19 @@ export function OverviewSankeyFlow({
             const hiddenApps = d.apps.length - shownApps.length;
             const rows: { key: string; label: string; kind: 'app' | 'toggle' | 'tail' }[] =
               shownApps.map((a) => ({ key: a.address, label: a.name, kind: 'app' }));
-            // One "more" affordance at a time: collapsed with hidden apps shows a single fan-out toggle
-            // (it stands in for both the hidden named apps and the unclassified tail). Fully shown, the
-            // unclassified-tail count (connections beyond the engine's bounded top-N) reads as its own row,
+            // One "more" affordance at a time, and it accounts for EVERY entity in the ring
+            // (INV-CONSOLE-OVERFLOW-HONEST: shown + overflow == the ring's count). Collapsed with hidden
+            // apps, the single fan-out toggle stands for BOTH tails -- the hidden NAMED apps AND the
+            // unnamed remainder below the engine's naming cutoff (`moreCount`) -- so it never under-tells
+            // (e.g. a 910-endpoint ring showing 5 reads "+905 more", not "+16 more" for the named tail
+            // alone). Fully shown, the unnamed remainder reads as its own row (those have no names to list),
             // alongside a "show fewer" affordance when the list was fanned out.
             if (hiddenApps > 0) {
-              rows.push({ key: '__toggle', label: `+${hiddenApps} more`, kind: 'toggle' });
+              rows.push({
+                key: '__toggle',
+                label: `+${hiddenApps + d.moreCount} more`,
+                kind: 'toggle',
+              });
             } else {
               if (isExpanded && d.apps.length > APPS_COLLAPSED) {
                 rows.push({ key: '__toggle', label: 'show fewer', kind: 'toggle' });
