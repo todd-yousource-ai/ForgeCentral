@@ -15,9 +15,9 @@ const band = (level: 'green' | 'yellow' | 'red') => ({
 
 const graph: OverviewSankey = {
   sources: [
-    { class: 'devices', count: 47 },
-    { class: 'users', count: 515 },
     { class: 'agents', count: 3 },
+    { class: 'users', count: 515 },
+    { class: 'devices', count: 47 },
   ],
   vtzs: [
     { id: 'vpub', name: 'Demo.Users.Public', profile: 'observe', risk: band('green') },
@@ -61,7 +61,7 @@ describe('OverviewSankeyFlow', () => {
   it('enumerates sources, VTZs + risk, and destinations in the accessible name (not color alone)', () => {
     render(<OverviewSankeyFlow graph={graph} />);
     const name = screen.getByRole('img').getAttribute('aria-label') ?? '';
-    expect(name).toMatch(/Sources: DEVICES 47, USERS 515, AI AGENTS 3\./);
+    expect(name).toMatch(/Sources: AI AGENTS 3, USERS 515, DEVICES 47\./);
     expect(name).toMatch(
       /Zones: Demo\.Users\.Public Nominal, Demo\.Private\.Agent Elevated, Demo\.Public\.Agent Critical\./,
     );

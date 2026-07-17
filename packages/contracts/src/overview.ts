@@ -110,14 +110,14 @@ export interface OverviewSourceNode {
 }
 
 /**
- * The left column's source-class lanes, in the prototype's fixed top-to-bottom order (Devices, Users,
- * AI Agents). Like {@link OVERVIEW_DEST_CATEGORIES} on the right, these ANCHOR: all three render every
- * time in this order regardless of what the engine returned, so the arch is stable and a lane a tenant
- * has no data for is an honest empty container, never omitted or reordered. `users` has no engine
- * substrate yet (no user directory), so it anchors at count 0 until that lands -- exactly as a quiet
- * `data-stores` ring does -- never a fabricated count (INV-CONSOLE-NO-STUB).
+ * The left column's source-class lanes, in the fixed top-to-bottom order (AI Agents, Users, Devices).
+ * Like {@link OVERVIEW_DEST_CATEGORIES} on the right, these ANCHOR: all three render every time in this
+ * order regardless of what the engine returned, so the arch is stable and a lane a tenant has no data
+ * for is an honest empty container, never omitted or reordered. `users` has no engine substrate yet
+ * (no user directory), so it anchors at count 0 until that lands -- exactly as a quiet `data-stores`
+ * ring does -- never a fabricated count (INV-CONSOLE-NO-STUB).
  */
-export const OVERVIEW_SOURCE_CATEGORIES = ['devices', 'users', 'agents'] as const;
+export const OVERVIEW_SOURCE_CATEGORIES = ['agents', 'users', 'devices'] as const;
 export type OverviewSourceCategory = (typeof OVERVIEW_SOURCE_CATEGORIES)[number];
 
 /**
