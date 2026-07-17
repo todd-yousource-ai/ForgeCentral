@@ -2,11 +2,18 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import type { ReactElement, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ConfirmDialog, ContainerMembersView, Drawer, EntityDrawer } from '@forge/design';
-import { memberEntityRef, type EntityRef, type OverviewMember } from '@forge/contracts';
+import {
+  memberEntityRef,
+  type EntityRef,
+  type OverviewConnectionList,
+  type OverviewMember,
+  type SectionState,
+} from '@forge/contracts';
 
 import { entityQueryKey, fetchEntityDetail, useEntityDetail } from '../entity/useEntityDetail.js';
 import { useIsolate } from '../entity/useIsolate.js';
 import { useClassMembers } from '../surfaces/useClassMembers.js';
+import { useEntityConnections, type ConnectionSubject } from '../surfaces/useEntityConnections.js';
 
 // The drawer host: the shell-level slide-over that realizes the select-then-act pattern (Section 5.3).
 // Clicking any entity anywhere (graph node, table row, decision card) opens a right drawer. Three modes:
@@ -52,7 +59,11 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   const [request, setRequest] = useState<DrawerRequest | null>(null);
   const [container, setContainer] = useState<ContainerRequest | null>(null);
   const [entityRef, setEntityRef] = useState<EntityRef | null>(null);
+  // The connectivity subject (LEG id + kind) when the open entity was reached from a connectivity context
+  // (a Sankey member), so the drawer can show its outbound connections; null for a non-connectivity open.
+  const [connectionSubject, setConnectionSubject] = useState<ConnectionSubject | null>(null);
   const detail = useEntityDetail(entityRef);
+  const connections = useEntityConnections(entityRef === null ? null : connectionSubject);
   // The members read for the open container (idle when no container is open). Its own honest states.
   const members = useClassMembers(container === null ? null : container.container);
   const queryClient = useQueryClient();
@@ -66,6 +77,7 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
     (ref: EntityRef) => {
       setRequest(null);
       setContainer(null);
+      setConnectionSubject(null);
       setEntityRef(ref);
       isolate.reset();
     },
@@ -74,11 +86,14 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   const openContainer = useCallback((next: string, label: string) => {
     setRequest(null);
     setEntityRef(null);
+    setConnectionSubject(null);
     setContainer({ container: next, label });
   }, []);
-  // Open a member's detail from the container list, KEEPING the container so back returns to the list.
+  // Open a member's detail from the container list, KEEPING the container so back returns to the list. The
+  // member carries its LEG kind + id, the connectivity subject, so the drawer shows its outbound connections.
   const openMember = useCallback(
     (member: OverviewMember) => {
+      setConnectionSubject({ id: member.id, kind: member.kind });
       setEntityRef(memberEntityRef(member));
       isolate.reset();
     },
@@ -102,12 +117,14 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   const open = useCallback((next: DrawerRequest) => {
     setEntityRef(null);
     setContainer(null);
+    setConnectionSubject(null);
     setRequest(next);
   }, []);
   const close = useCallback(() => {
     setRequest(null);
     setContainer(null);
     setEntityRef(null);
+    setConnectionSubject(null);
     setConfirm(null);
   }, []);
 
@@ -126,6 +143,19 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
   // The member detail was reached from a container list -> its back affordance returns to that list.
   const onBack = container !== null ? backToList : undefined;
 
+  // Project the connections read into a drawer SectionState (undefined = no connectivity subject -> the
+  // section does not render; an empty list is the honest "no outbound connections" state).
+  const connectionsSection: SectionState<OverviewConnectionList> | undefined =
+    connectionSubject === null
+      ? undefined
+      : connections.isError
+        ? { status: 'error', message: 'Could not load connections.' }
+        : connections.data === undefined
+          ? { status: 'empty' }
+          : connections.data.connections.length === 0
+            ? { status: 'empty' }
+            : { status: 'ok', data: connections.data };
+
   return (
     <DrawerContext.Provider value={api}>
       {children}
@@ -142,6 +172,8 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
               loading={detail.isLoading}
               onClose={close}
               onBack={onBack}
+              connections={connectionsSection}
+              connectionsLoading={connectionSubject !== null && connections.isLoading}
               actions={{ onIsolate: () => setConfirm({ commandId: crypto.randomUUID() }) }}
             />
             <ConfirmDialog
