@@ -10,8 +10,14 @@
 // the engine emits a risk-band tag the Console does not know, the projection returns null and this raises
 // `OverviewUnavailableError` rather than mis-coloring a zone.
 
-import { toOverviewSankey } from '@forge/contracts';
-import type { OverviewQuery, OverviewSankey, WireConnectivityQuery } from '@forge/contracts';
+import { toConnectionList, toOverviewSankey } from '@forge/contracts';
+import type {
+  OverviewConnectionList,
+  OverviewQuery,
+  OverviewSankey,
+  WireConnectivityQuery,
+  WireEntityConnections,
+} from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import { classifyDestination } from './destination-classifier.js';
@@ -70,4 +76,32 @@ export async function resolveOverviewSankey(
     throw new OverviewUnavailableError();
   }
   return view;
+}
+
+/** The largest connection list a single entity read returns (the engine clamps further per-tenant). */
+const MAX_CONNECTIONS_LIMIT = 500;
+
+/**
+ * Resolve one subject entity's outbound connections (`overview.entityConnections`, O1.6a), brokered on
+ * behalf of `principal`. The engine bounds + tier-redacts the set (`ENTITY_CONNECTIONS`); this only
+ * projects the DTO into the {@link OverviewConnectionList} view model via the shared `toConnectionList`.
+ * `subjectKind` is the Sankey node's entity kind; the OperatorEngine injects the operator delegation.
+ * This is the PR-1 DATA PATH -- the PR-2 hover prefetch + click-through to the drawer consume it.
+ */
+export async function resolveEntityConnections(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  subjectId: string,
+  subjectKind: string,
+  opts?: EngineCallOptions,
+): Promise<OverviewConnectionList> {
+  const request: WireEntityConnections = {
+    request_id: 0,
+    operator: null,
+    subject_id: subjectId,
+    subject_kind: subjectKind,
+    limit: MAX_CONNECTIONS_LIMIT,
+  };
+  const reply = await engine.entityConnections(principal, request, opts);
+  return toConnectionList(reply);
 }

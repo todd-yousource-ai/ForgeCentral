@@ -22,7 +22,11 @@
 // retired with the pre-redesign `/api/overview/graph` route after RD.4b migrated the surface to the
 // Sankey below -- an unconsumed projection is a stub in reverse, INV-CONSOLE-NO-STUB.)
 
-import type { WireConnectivityGraph, WireRiskBand } from './generated/wire-dto.js';
+import type {
+  WireConnectionList,
+  WireConnectivityGraph,
+  WireRiskBand,
+} from './generated/wire-dto.js';
 
 /**
  * The risk level a zone is colored by, derived from detected alerts (the decision LOG): `red` if any
@@ -462,5 +466,46 @@ export function toOverviewSankey(
     })),
     destEdges,
     truncated: graph.truncated,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Entity connections (overview.entityConnections, O1.6a) -- one Sankey node's outbound connections, for
+// the PR-2 hover prefetch + click-through to the entity drawer. A camelCase projection of the engine's
+// WireConnectionList; PR-1 is the DATA PATH only (no UI). The engine bounds + tier-redacts the list, so
+// this projection is total: it maps fields and never fabricates, drops, or reorders (INV-CONSOLE-NO-STUB).
+
+/** One outbound connection from a subject entity to a destination, projected from a `WireConnection`. */
+export interface OverviewConnection {
+  /** The destination entity's stable id (a LEG node id: an ip:port endpoint, a host, an agent, ...). */
+  readonly destinationId: string;
+  /** The destination's entity kind, verbatim from the engine (an unknown kind passes through honestly,
+   * never dropped or guessed -- the drawer labels what the engine attributed). */
+  readonly destinationKind: string;
+  /** When the connection was observed (unix seconds, the engine's clock). */
+  readonly observedAt: number;
+}
+
+/**
+ * A subject entity's outbound connections (`overview.entityConnections`), projected from a
+ * `WireConnectionList`. Bounded + tier-redacted engine-side; an entity with no observed connections
+ * yields an empty list (the honest empty state, never a fabricated row).
+ */
+export interface OverviewConnectionList {
+  readonly connections: readonly OverviewConnection[];
+}
+
+/**
+ * Project a generated `WireConnectionList` to the {@link OverviewConnectionList} view model. Total (never
+ * null): the engine already bounded + tier-redacted the set, so this only renames fields to camelCase.
+ * A drifted wire field is a compile error here (the cross-module guard); the BFF resolver calls this.
+ */
+export function toConnectionList(reply: WireConnectionList): OverviewConnectionList {
+  return {
+    connections: reply.connections.map((c) => ({
+      destinationId: c.destination_id,
+      destinationKind: c.destination_kind,
+      observedAt: c.observed_at,
+    })),
   };
 }
