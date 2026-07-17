@@ -16,11 +16,20 @@ export interface DrawerProps {
   readonly title: string;
   /** Asked to close (Escape, the close button, or a scrim click). The parent flips `open`. */
   readonly onClose: () => void;
+  /** When provided, a back control renders before the title (e.g. a member detail returns to its container
+   * list). Absent = no back affordance. This never closes the drawer; it steps the parent back one view. */
+  readonly onBack?: (() => void) | undefined;
   /** The drawer body -- the host slot a surface fills with its detail content. */
   readonly children?: ReactNode;
 }
 
-export function Drawer({ open, title, onClose, children }: DrawerProps): ReactElement | null {
+export function Drawer({
+  open,
+  title,
+  onClose,
+  onBack,
+  children,
+}: DrawerProps): ReactElement | null {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -43,6 +52,11 @@ export function Drawer({ open, title, onClose, children }: DrawerProps): ReactEl
       <div className="fc-scrim__catch" aria-hidden="true" onClick={onClose} />
       <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="fc-drawer">
         <div className="fc-drawer__header">
+          {onBack ? (
+            <button type="button" className="fc-drawer__back" aria-label="Back" onClick={onBack}>
+              {'‹'}
+            </button>
+          ) : null}
           <h2 id={titleId} className="fc-drawer__title">
             {title}
           </h2>

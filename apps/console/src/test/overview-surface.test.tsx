@@ -1,6 +1,6 @@
 // apps/console/src/test/overview-surface.test.tsx -- IP-CONSOLE-01 RD.4b the live Overview Sankey surface.
 
-import type { OverviewSankey } from '@forge/contracts';
+import type { EntityDetailView, OverviewMemberList, OverviewSankey } from '@forge/contracts';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -207,5 +207,103 @@ describe('the Overview surface (RD.4b)', () => {
       { timeout: 5000 },
     );
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+});
+
+// The O1.6b select-then-act flow: click a Sankey container -> its member LIST -> a member's detail, with
+// a back affordance. Proves the two <= 3-click operator tasks by contract (INV-CONSOLE-3-CLICKS).
+describe('the Overview container -> members -> detail flow (O1.6b)', () => {
+  const agentMembers: OverviewMemberList = {
+    members: [
+      { id: 'aig:agent:codex', kind: 'agent_instance', name: 'Codex', connectionCount: 5 },
+      { id: 'aig:agent:claude', kind: 'agent_instance', name: 'Claude', connectionCount: 2 },
+    ],
+  };
+  const codexDetail: EntityDetailView = {
+    ref: { kind: 'principal', id: 'aig:agent:codex' } as EntityDetailView['ref'],
+    header: { status: 'ok', data: { displayName: 'Codex', kindLabel: 'Agent', status: 'active' } },
+    info: {
+      status: 'ok',
+      data: { role: 'operator', clearance: 'secret', enrolledAt: 1, tags: [] },
+    },
+    zones: { status: 'pending', owningRepo: 'forge', gatingTask: 'x' },
+    capabilities: { status: 'pending', owningRepo: 'torch', gatingTask: 'x' },
+    effectivePolicies: { status: 'pending', owningRepo: 'forge', gatingTask: 'x' },
+    recentDecisions: { status: 'empty' },
+  };
+
+  function mockFlow(): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn((input: string) => {
+      if (input.startsWith('/api/overview/sankey'))
+        return Promise.resolve(jsonResponse(200, graph));
+      if (input.startsWith('/api/overview/members?container=agents'))
+        return Promise.resolve(jsonResponse(200, agentMembers));
+      if (input.startsWith('/api/entity/principal/'))
+        return Promise.resolve(jsonResponse(200, codexDetail));
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('task 1: container -> member -> inspect opens the member detail in <= 3 clicks', async () => {
+    const fetchMock = mockFlow();
+    renderWithProviders(<OverviewSurface />, { route: '/' });
+    await waitFor(() => expect(screen.getByText('AI AGENTS')).toBeInTheDocument());
+
+    // Click 1: open the AI Agents container -> the drawer lists its members (loaded async).
+    fireEvent.click(screen.getByRole('button', { name: /Open AI AGENTS members/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Codex/ })).toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: 'AI Agents' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Claude/ })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/overview/members?container=agents',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+
+    // Click 2: open a member -> the drawer swaps to that entity's live detail.
+    fireEvent.click(screen.getByRole('button', { name: /Codex/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Codex' })).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/entity/principal/aig%3Aagent%3Acodex',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
+  it('back from a member detail returns to the container list (never closes the drawer)', async () => {
+    mockFlow();
+    renderWithProviders(<OverviewSurface />, { route: '/' });
+    await waitFor(() => expect(screen.getByText('AI AGENTS')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Open AI AGENTS members/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Codex/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Codex/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Codex' })).toBeInTheDocument());
+
+    // Back steps to the LIST (the drawer stays open, now titled by the container again).
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'AI Agents' })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /Codex/ })).toBeInTheDocument();
+  });
+
+  it('task 2: container -> agent -> Isolate -> confirm reaches the audited confirm in <= 3 clicks', async () => {
+    mockFlow();
+    renderWithProviders(<OverviewSurface />, { route: '/' });
+    await waitFor(() => expect(screen.getByText('AI AGENTS')).toBeInTheDocument());
+
+    // Click 1: container. Click 2: the agent member. Click 3: Isolate.
+    fireEvent.click(screen.getByRole('button', { name: /Open AI AGENTS members/ }));
+    await waitFor(() => screen.getByRole('button', { name: /Codex/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Codex/ }));
+    await waitFor(() => screen.getByRole('dialog', { name: 'Codex' }));
+    fireEvent.click(screen.getByRole('button', { name: /Isolate/i }));
+
+    // The audited confirm gate appears (enforcement OFF, said honestly).
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Isolate' })).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Live enforcement is OFF/)).toBeInTheDocument();
   });
 });

@@ -8,9 +8,11 @@ import { createQueryClient } from '../query/client.js';
 import { LiveProvider } from '../live/LiveProvider.js';
 import type { LiveStore } from '../live/live-store.js';
 import type { OperatorDto } from '../auth/api.js';
+import { DrawerHost } from '../shell/DrawerHost.js';
 
 // Shared test harness: render a tree inside the same providers the app mounts (QueryClient + Router +
-// LiveProvider), with the initial route and (optionally) an injected live-store controllable by the test.
+// LiveProvider + DrawerHost), with the initial route and (optionally) an injected live-store controllable by
+// the test. DrawerHost is included so any surface that opens the select-then-act drawer (O1.6b) works here.
 
 export const TEST_OPERATOR: OperatorDto = {
   subject: 'auth0|op-123',
@@ -31,7 +33,7 @@ export function renderWithProviders(ui: ReactElement, options: HarnessOptions = 
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={[route]}>
           <LiveProvider {...(liveStore !== undefined ? { store: liveStore } : {})}>
-            {children}
+            <DrawerHost>{children}</DrawerHost>
           </LiveProvider>
         </MemoryRouter>
       </QueryClientProvider>
