@@ -76,6 +76,13 @@ describe('resolveOverviewSankey (RD.4)', () => {
   it('projects the wire graph to the VTZ-routed OverviewSankey view model', async () => {
     const { engine } = engineWith(zoned);
     const view = await resolveOverviewSankey(engine, principal, { limit: 1000 });
+    // The left column anchors all three lanes in the fixed prototype order; the engine returned only
+    // agents, so devices + users are honest empty containers (Users has no directory substrate yet).
+    expect(view.sources).toEqual([
+      { class: 'devices', count: 0 },
+      { class: 'users', count: 0 },
+      { class: 'agents', count: 3 },
+    ]);
     expect(view.vtzs).toEqual([
       {
         id: 'demo-public-agent',
@@ -100,7 +107,12 @@ describe('resolveOverviewSankey (RD.4)', () => {
   it('yields an empty graph for a platform with no observed connectivity (no stub)', async () => {
     const { engine } = engineWith(empty);
     const view = await resolveOverviewSankey(engine, principal, { limit: 1000 });
-    expect(view.sources).toEqual([]);
+    // The three source lanes still ANCHOR in the fixed prototype order as honest empty containers.
+    expect(view.sources).toEqual([
+      { class: 'devices', count: 0 },
+      { class: 'users', count: 0 },
+      { class: 'agents', count: 0 },
+    ]);
     expect(view.vtzs).toEqual([]);
     expect(view.sourceEdges).toEqual([]);
     expect(view.destEdges).toEqual([]);

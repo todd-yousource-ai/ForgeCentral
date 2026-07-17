@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import { renderWireDtoTypes } from '../scripts/generate.mjs';
 import {
+  OVERVIEW_SOURCE_CATEGORIES,
   OVERVIEW_VTZS_PER_PAGE,
   WIRE_DTO_SCHEMA_ID,
   bindingId,
@@ -200,10 +201,41 @@ describe('the shared risk-level narrowing (fail-closed on an unknown engine tag)
     };
     const view = toOverviewSankey(empty);
     expect(view).not.toBeNull();
-    expect(view?.sources).toEqual([]);
+    // The three source lanes anchor in the fixed prototype order as honest empty containers.
+    expect(view?.sources).toEqual([
+      { class: 'devices', count: 0 },
+      { class: 'users', count: 0 },
+      { class: 'agents', count: 0 },
+    ]);
     expect(view?.vtzs).toEqual([]);
     expect(view?.sourceEdges).toEqual([]);
     expect(view?.destEdges).toEqual([]);
+  });
+
+  it('anchors all three source lanes in the fixed prototype order (Devices, Users, AI Agents)', () => {
+    // The engine returned only agents + devices, alphabetically; the projection anchors all three in
+    // the prototype order, and Users (no engine substrate yet) is an honest empty container at count 0.
+    const graph: WireConnectivityGraph = {
+      sources: [
+        { class: 'agents', count: 3 },
+        { class: 'devices', count: 47 },
+      ],
+      destinations: [],
+      edges: [],
+      risk: { level: 'green', escalate: 0, candidate: 0, observe: 0 },
+      vtzs: [],
+      source_edges: [],
+      dest_edges: [],
+      top_destinations: [],
+      truncated: false,
+    };
+    const view = toOverviewSankey(graph);
+    expect(view?.sources).toEqual([
+      { class: 'devices', count: 47 },
+      { class: 'users', count: 0 },
+      { class: 'agents', count: 3 },
+    ]);
+    expect(OVERVIEW_SOURCE_CATEGORIES).toEqual(['devices', 'users', 'agents']);
   });
 });
 

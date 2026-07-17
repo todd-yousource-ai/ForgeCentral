@@ -110,6 +110,17 @@ export interface OverviewSourceNode {
 }
 
 /**
+ * The left column's source-class lanes, in the prototype's fixed top-to-bottom order (Devices, Users,
+ * AI Agents). Like {@link OVERVIEW_DEST_CATEGORIES} on the right, these ANCHOR: all three render every
+ * time in this order regardless of what the engine returned, so the arch is stable and a lane a tenant
+ * has no data for is an honest empty container, never omitted or reordered. `users` has no engine
+ * substrate yet (no user directory), so it anchors at count 0 until that lands -- exactly as a quiet
+ * `data-stores` ring does -- never a fabricated count (INV-CONSOLE-NO-STUB).
+ */
+export const OVERVIEW_SOURCE_CATEGORIES = ['devices', 'users', 'agents'] as const;
+export type OverviewSourceCategory = (typeof OVERVIEW_SOURCE_CATEGORIES)[number];
+
+/**
  * One Virtual Trust Zone node (center column). `risk` is its OWN band, computed from the detections on the
  * entities assigned to it (green Nominal / yellow Elevated / red Critical) -- it shifts live and is never a
  * fixed property of the zone. At most 3 render per page (the surface pages the rest, "swipe for more").
@@ -425,8 +436,23 @@ export function toOverviewSankey(
       weight: e.weight,
     }));
 
+  // Anchor the left column: emit all three source lanes in the fixed prototype order (Devices, Users,
+  // AI Agents), zero-count when the engine returned no such class, so the arch is stable and Users
+  // renders as an honest empty container until its directory exists. An engine source class outside
+  // the fixed set (none today) passes through after them, mirroring the destination pass-through.
+  const sourceCount = new Map(graph.sources.map((s) => [s.class, s.count]));
+  const sources: OverviewSourceNode[] = OVERVIEW_SOURCE_CATEGORIES.map((c) => ({
+    class: c,
+    count: sourceCount.get(c) ?? 0,
+  }));
+  for (const s of graph.sources) {
+    if (!OVERVIEW_SOURCE_CATEGORIES.some((c) => c === s.class)) {
+      sources.push({ class: s.class, count: s.count });
+    }
+  }
+
   return {
-    sources: graph.sources.map((s) => ({ class: s.class, count: s.count })),
+    sources,
     vtzs,
     destinations,
     sourceEdges: graph.source_edges.map((e) => ({
