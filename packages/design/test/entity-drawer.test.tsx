@@ -146,6 +146,56 @@ describe('EntityDrawer: the quick-action bar', () => {
   });
 });
 
+describe('EntityDrawer: the Connections section (O1.6a)', () => {
+  it('is ABSENT when no connections are passed (not a connectivity entity)', () => {
+    render(<EntityDrawer open onClose={vi.fn()} detail={fixture()} />);
+    expect(screen.queryByText('Connections')).not.toBeInTheDocument();
+  });
+
+  it('lists the outbound connections (destination + kind) when provided', () => {
+    render(
+      <EntityDrawer
+        open
+        onClose={vi.fn()}
+        detail={fixture()}
+        connections={{
+          status: 'ok',
+          data: {
+            connections: [
+              { destinationId: '93.184.216.34:443', destinationKind: 'network', observedAt: 1 },
+              { destinationId: 's3.amazonaws.com', destinationKind: 'saas', observedAt: 2 },
+            ],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText('Connections')).toBeInTheDocument();
+    expect(screen.getByText('93.184.216.34:443')).toBeInTheDocument();
+    expect(screen.getByText('s3.amazonaws.com')).toBeInTheDocument();
+  });
+
+  it('shows the honest empty state for a subject with no outbound connections (a sink)', () => {
+    render(
+      <EntityDrawer open onClose={vi.fn()} detail={fixture()} connections={{ status: 'empty' }} />,
+    );
+    expect(screen.getByText('Connections')).toBeInTheDocument();
+    expect(screen.getByText('No outbound connections observed.')).toBeInTheDocument();
+  });
+
+  it('degrades the section (not the drawer) when the connections read errors', () => {
+    render(
+      <EntityDrawer
+        open
+        onClose={vi.fn()}
+        detail={fixture()}
+        connections={{ status: 'error', message: 'Could not load connections.' }}
+      />,
+    );
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Inventory-Bot');
+    expect(screen.getByText('Could not load connections.')).toBeInTheDocument();
+  });
+});
+
 describe('Sparkline: the trend micro-chart', () => {
   it('carries the from/to values + point count in its accessible name (not color alone)', () => {
     render(

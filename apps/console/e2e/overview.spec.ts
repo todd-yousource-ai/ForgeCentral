@@ -43,6 +43,10 @@ const ENTITY = {
   recentDecisions: { status: 'empty' },
 };
 
+const CONNECTIONS = {
+  connections: [{ destinationId: '93.184.216.34:443', destinationKind: 'network', observedAt: 1 }],
+};
+
 function band(level: 'green' | 'yellow' | 'red') {
   return { level, escalate: level === 'red' ? 1 : 0, candidate: 0, observe: 0 };
 }
@@ -63,6 +67,7 @@ async function mockBff(page: Page): Promise<{ state: { graph: typeof GRAPH } }> 
   await page.route('**/auth/me', (route) => json(route, { operator: OPERATOR }));
   await page.route(/\/api\/overview\/sankey/, (route) => json(route, state.graph));
   await page.route(/\/api\/overview\/members/, (route) => json(route, MEMBERS));
+  await page.route(/\/api\/overview\/entity-connections/, (route) => json(route, CONNECTIONS));
   await page.route(/\/api\/entity\//, (route) => json(route, ENTITY));
   await page.route(/\/api\/entity\/.*\/isolate$/, (route) =>
     json(route, { posture: 'quarantine', enforcementActive: false, summary: 'recorded' }),
@@ -85,10 +90,12 @@ test('task 1: container -> member -> inspect, then back to the list (<= 3 clicks
   await expect(list).toBeVisible();
   await expect(list.getByRole('button', { name: /Codex/ })).toBeVisible();
 
-  // Click 2: a member -> the drawer swaps to that entity's live detail.
+  // Click 2: a member -> the drawer swaps to that entity's live detail + its live connections (O1.6a).
   await list.getByRole('button', { name: /Codex/ }).click();
   const detail = page.getByRole('dialog', { name: 'Codex' });
   await expect(detail).toBeVisible();
+  await expect(detail.getByText('Connections')).toBeVisible();
+  await expect(detail.getByText('93.184.216.34:443')).toBeVisible();
 
   // Back returns to the container list (the drawer stays open, never closes).
   await detail.getByRole('button', { name: 'Back' }).click();

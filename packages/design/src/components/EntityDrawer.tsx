@@ -16,6 +16,7 @@ import type {
   DecisionId,
   EntityDetailView,
   EntityStatus,
+  OverviewConnectionList,
   PolicyId,
   SectionState,
   VtzId,
@@ -46,6 +47,12 @@ export interface EntityDrawerProps {
   /** When provided, a back control renders in the header (the drawer was opened from a container list, so
    * back returns to that list rather than closing). Absent = no back affordance (opened standalone). */
   readonly onBack?: (() => void) | undefined;
+  /** The entity's outbound connections (O1.6a), when it was opened from a connectivity context. When
+   * ABSENT (undefined) the Connections section does not render (the entity is not a connectivity subject);
+   * a `SectionState` drives its live/empty/error states like every other section. */
+  readonly connections?: SectionState<OverviewConnectionList> | undefined;
+  /** Loading flag for the Connections section's own (separate) read. */
+  readonly connectionsLoading?: boolean | undefined;
   /** Click-through for a connected VTZ (navigation; wired by the surface). */
   readonly onOpenZone?: (id: VtzId) => void;
   /** Click-through for an effective policy. */
@@ -169,6 +176,8 @@ export function EntityDrawer({
   loading,
   actions,
   onBack,
+  connections,
+  connectionsLoading,
   onOpenZone,
   onOpenPolicy,
   onOpenDecision,
@@ -301,6 +310,30 @@ export function EntityDrawer({
             </ul>
           )}
         </Section>
+
+        {/* Connections (O1.6a): the entity's outbound connections, when opened from a connectivity
+            context. Absent entirely for a non-connectivity entity (a network SINK yields an empty list). */}
+        {connections !== undefined ? (
+          <Section
+            title="Connections"
+            state={connections}
+            loading={connectionsLoading}
+            emptyLabel="No outbound connections observed."
+          >
+            {(list) => (
+              <ul className="fc-entity-list">
+                {list.connections.map((conn) => (
+                  <li key={`${conn.destinationKind}:${conn.destinationId}`}>
+                    <div className="fc-entity-conn">
+                      <span className="fc-entity-conn__dest">{conn.destinationId}</span>
+                      <span className="fc-entity-conn__kind">{conn.destinationKind}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        ) : null}
 
         <div className="fc-entity-actions" role="group" aria-label="Quick actions">
           {actions?.onIsolate ? (

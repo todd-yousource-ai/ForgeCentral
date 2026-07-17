@@ -288,12 +288,20 @@ describe('the Overview container -> members -> detail flow (O1.6b)', () => {
     recentDecisions: { status: 'empty' },
   };
 
+  const codexConnections = {
+    connections: [
+      { destinationId: '93.184.216.34:443', destinationKind: 'network', observedAt: 1 },
+    ],
+  };
+
   function mockFlow(): ReturnType<typeof vi.fn> {
     const fetchMock = vi.fn((input: string) => {
       if (input.startsWith('/api/overview/sankey'))
         return Promise.resolve(jsonResponse(200, graph));
       if (input.startsWith('/api/overview/members?container=agents'))
         return Promise.resolve(jsonResponse(200, agentMembers));
+      if (input.startsWith('/api/overview/entity-connections'))
+        return Promise.resolve(jsonResponse(200, codexConnections));
       if (input.startsWith('/api/entity/principal/'))
         return Promise.resolve(jsonResponse(200, codexDetail));
       throw new Error(`unexpected fetch ${input}`);
@@ -317,11 +325,18 @@ describe('the Overview container -> members -> detail flow (O1.6b)', () => {
       expect.objectContaining({ credentials: 'include' }),
     );
 
-    // Click 2: open a member -> the drawer swaps to that entity's live detail.
+    // Click 2: open a member -> the drawer swaps to that entity's live detail + its live connections.
     fireEvent.click(screen.getByRole('button', { name: /Codex/ }));
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'Codex' })).toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/entity/principal/aig%3Aagent%3Acodex',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+    // The Connections section (O1.6a) reads the member's LEG kind + id and lists its outbound connections.
+    await waitFor(() => expect(screen.getByText('93.184.216.34:443')).toBeInTheDocument());
+    expect(screen.getByText('Connections')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/overview/entity-connections?id=aig%3Aagent%3Acodex&kind=agent_instance',
       expect.objectContaining({ credentials: 'include' }),
     );
   });

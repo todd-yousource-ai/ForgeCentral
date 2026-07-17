@@ -226,6 +226,9 @@ export function componentStyles(): string {
 .fc-entity-decision { display: flex; align-items: center; gap: var(--fc-space-sm); }
 .fc-entity-decision__summary { flex: 1; }
 .fc-entity-decision__time { font-size: var(--fc-font-size-xs); color: var(--fc-color-text-muted); }
+.fc-entity-conn { display: flex; align-items: baseline; justify-content: space-between; gap: var(--fc-space-md); padding: var(--fc-space-xs) 0; }
+.fc-entity-conn__dest { overflow-wrap: anywhere; }
+.fc-entity-conn__kind { color: var(--fc-color-text-muted); font-size: var(--fc-font-size-sm); white-space: nowrap; }
 
 .fc-entity-actions { display: flex; flex-wrap: wrap; gap: var(--fc-space-sm); padding-top: var(--fc-space-sm); border-top: 1px solid var(--fc-color-surface-border); }
 .fc-entity-action {
