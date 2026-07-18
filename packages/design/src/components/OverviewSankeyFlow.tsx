@@ -56,17 +56,19 @@ export interface OverviewSankeyFlowProps {
   readonly onSelectContainer?: (container: string) => void;
 }
 
-// Fixed SVG coordinate system; the rendered size is responsive (viewBox + CSS width:100%).
-const VIEW_W = 1360;
+// Fixed SVG coordinate system; the rendered size is responsive (viewBox + CSS width:100%). The columns
+// are spread toward the edges (sources hug the left, destination rings + the app list hug the right) so
+// the flow fills its container rather than clustering inward; the VTZ column stays centered where it is.
+const VIEW_W = 1400;
 const VIEW_H = 900;
-const SRC_BASE = 172;
+const SRC_BASE = 74;
 const SRC_BULGE = 58;
 const VTZ_X = 560;
 const VTZ_R = 46;
-const DEST_A = 1000;
+const DEST_A = 1090;
 const DEST_BULGE = 34;
 const DEST_R = 64;
-const APPX = 1120;
+const APPX = 1210;
 const APPS_BULGE = 32;
 // The apps arch lists this many named destinations collapsed; the rest fan out on click ("+N more").
 const APPS_COLLAPSED = 5;
@@ -316,7 +318,10 @@ export function OverviewSankeyFlow({
   const sourceEdges = graph.sourceEdges.filter((e) => vtzIds.has(e.vtzId));
   const destEdges = graph.destEdges.filter((e) => vtzIds.has(e.vtzId));
 
-  const srcYs = distribute(graph.sources.length, 150, 700);
+  // The source column is ANCHORED at the bottom (DEVICES, the last lane, stays at 700) and the rings
+  // above (Users, AI Agents) spread up into the top headroom, giving the left circles more breathing
+  // room between them. The top bound (70) keeps the AI Agents ring clear of the canvas top.
+  const srcYs = distribute(graph.sources.length, 70, 700);
   const sources = graph.sources.map((s, i) => {
     const rel = graph.sources.length > 1 ? i / (graph.sources.length - 1) : 0.5;
     const r = sourceRingR(s.count);
@@ -324,7 +329,11 @@ export function OverviewSankeyFlow({
   });
   const vtzYs = distribute(vtzs.length, 220, 680);
   const vtzNodes = vtzs.map((v, i) => ({ ...v, x: VTZ_X, y: vtzYs[i] ?? VIEW_H / 2 }));
-  const destYs = distribute(graph.destinations.length, 150, 760);
+  // The destination column carries one more ring than the sources plus an app list per ring. It is
+  // ANCHORED at the bottom (DATA STORES, the last category, stays at 705) and the rings above spread up
+  // into the top headroom. The top bound (66) is the highest NETWORK can sit before its 6-row app list
+  // would clip the top of the canvas.
+  const destYs = distribute(graph.destinations.length, 66, 705);
   const dests = graph.destinations.map((d, i) => {
     const y = destYs[i] ?? VIEW_H / 2;
     return { ...d, y, x: DEST_A - DEST_BULGE * bulge((y - 140) / (760 - 140 || 1)) };
