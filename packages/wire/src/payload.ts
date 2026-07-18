@@ -13,6 +13,9 @@ import type {
   WireEntityConnections,
   WireEntityDecisions,
   WireListAgents,
+  WireLogExplain,
+  WireLogExport,
+  WireLogQuery,
   WireQuerySubmit,
   WireReply,
   WireRequest,
@@ -116,6 +119,56 @@ function connectivityMembersToCbor(request: WireConnectivityMembers): unknown {
 }
 
 /**
+ * The tenant-wide decision-LOG read (LOG_QUERY, crdb IP-CONSOLE-LOG-QUERY LQ.2). Fields in the Rust
+ * struct order (request_id, since?, until?, technique?, tactic?, rule_id?, confidence?, action?, search?,
+ * limit, operator?); every `Option` filter carries `skip_serializing_if = "Option::is_none"`, so an unset
+ * filter is OMITTED (never emitted as null), matching the engine's byte shape exactly.
+ */
+function logQueryToCbor(request: WireLogQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  if (request.since != null) out['since'] = request.since;
+  if (request.until != null) out['until'] = request.until;
+  if (request.technique != null) out['technique'] = request.technique;
+  if (request.tactic != null) out['tactic'] = request.tactic;
+  if (request.rule_id != null) out['rule_id'] = request.rule_id;
+  if (request.confidence != null) out['confidence'] = request.confidence;
+  if (request.action != null) out['action'] = request.action;
+  if (request.search != null) out['search'] = request.search;
+  out['limit'] = request.limit;
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * The decision-by-id EXPLAIN read (LOG_EXPLAIN, crdb LQ.3). Fields in the Rust struct order (request_id,
+ * decision_id, operator?); `operator` carries `skip_serializing_if = "Option::is_none"`.
+ */
+function logExplainToCbor(request: WireLogExplain): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    decision_id: request.decision_id,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * The audited export of the filtered LOG (LOG_EXPORT, crdb LQ.4). Fields in the Rust struct order
+ * (operator?, query, command_id, issued_at); `operator` is first and carries
+ * `skip_serializing_if = "Option::is_none"`, so an absent operator is OMITTED. The embedded `query` is a
+ * nested `WireLogQuery` map; its own `operator` is ignored by the engine (the top-level one is
+ * authoritative) but still serialized per its skip-if-none rule.
+ */
+function logExportToCbor(request: WireLogExport): unknown {
+  const out: Record<string, unknown> = {};
+  applyOperator(out, request.operator);
+  out['query'] = logQueryToCbor(request.query);
+  out['command_id'] = request.command_id;
+  out['issued_at'] = request.issued_at;
+  return out;
+}
+
+/**
  * Encode a WireRequest to its CBOR frame payload. The read + cursor variants (what the Console's reads
  * need) are supported; the write-path variants throw a clear error rather than emit a wrong shape.
  */
@@ -138,6 +191,11 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   if ('ConnectivityMembers' in request) {
     return encode({ ConnectivityMembers: connectivityMembersToCbor(request.ConnectivityMembers) });
   }
+  if ('LogQuery' in request) return encode({ LogQuery: logQueryToCbor(request.LogQuery) });
+  if ('LogExplain' in request) {
+    return encode({ LogExplain: logExplainToCbor(request.LogExplain) });
+  }
+  if ('LogExport' in request) return encode({ LogExport: logExportToCbor(request.LogExport) });
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });
   if ('CursorClose' in request)
