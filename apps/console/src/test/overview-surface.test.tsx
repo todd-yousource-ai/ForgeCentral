@@ -5,7 +5,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OverviewSurface, worstRisk } from '../surfaces/OverviewSurface.js';
-import { overviewLiveness } from '../surfaces/useOverview.js';
+import { OVERVIEW_FIRST_PAINT_LIMIT, overviewLiveness } from '../surfaces/useOverview.js';
 import { renderWithProviders } from './render.js';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -115,6 +115,33 @@ describe('the Overview surface (RD.4b)', () => {
     );
     // INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED: a complete graph shows no truncation badge.
     expect(screen.queryByText('Partial graph')).not.toBeInTheDocument();
+  });
+
+  it('paints the first read at the small first-paint budget, then escalates to the full limit in the background', async () => {
+    const limits: string[] = [];
+    const fetchMock = vi.fn((input: string) => {
+      if (input.startsWith('/api/overview/sankey')) {
+        limits.push(new URL(input, 'http://localhost').searchParams.get('limit') ?? '');
+        return Promise.resolve(jsonResponse(200, graph));
+      }
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithProviders(<OverviewSurface />, { route: '/' });
+    // The graph paints from the first-paint read.
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toHaveAccessibleName(/Connectivity flow\. Sources:/);
+    });
+    // First paint: the FIRST read used the small first-paint budget, not the full scan -- fast first paint.
+    expect(limits[0]).toBe(String(OVERVIEW_FIRST_PAINT_LIMIT));
+    // Then it escalates to the caller's full limit in the background (a distinct, larger limit).
+    await waitFor(() => {
+      expect(
+        limits.some((l) => Number(l) > OVERVIEW_FIRST_PAINT_LIMIT),
+        `escalated past the first-paint limit; saw ${JSON.stringify(limits)}`,
+      ).toBe(true);
+    });
   });
 
   it('badges a truncated graph as partial (INV-CONNECTIVITY-SCAN-COMPLETE-OR-FLAGGED)', async () => {
@@ -244,7 +271,9 @@ describe('the Overview live poll (O1.7)', () => {
       vi.fn((input: string) => {
         if (input.startsWith('/api/overview/sankey')) {
           calls += 1;
-          return calls === 1
+          // Progressive load: read 1 is the fast first paint, read 2 is the background escalation to the
+          // full limit -- both succeed. The steady poll (read 3+) then fails, which is the case under test.
+          return calls <= 2
             ? Promise.resolve(jsonResponse(200, graph))
             : Promise.resolve(jsonResponse(503, { error: 'unavailable' }));
         }
