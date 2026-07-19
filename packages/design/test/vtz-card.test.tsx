@@ -17,6 +17,7 @@ const base = {
   parent: 'YouSource.Corp',
   archetype: { label: 'Standard', variant: 'neutral' as const },
   risk: { label: 'Elevated', variant: 'caution' as const },
+  riskLevel: 'yellow' as const,
   draft: false,
   subZoneCount: 3,
   memberCount: { unavailable: 'Zone membership is not stored by the engine yet.' },
@@ -45,6 +46,19 @@ describe('VtzZoneCard', () => {
     const { container } = render(<VtzZoneCard {...base} />);
     expect(container.querySelector('.fc-score-ring')).toBeNull();
     expect(container.textContent).not.toMatch(/trust/i);
+  });
+
+  it('draws the zone glyph in the REAL risk color, reusing the Overview node class', () => {
+    // The same disc the Overview graph draws, so the two surfaces read as one system -- and it carries a
+    // real signal rather than the mockup's invented score.
+    const { container } = render(<VtzZoneCard {...base} riskLevel="red" />);
+    expect(container.querySelector('.fc-vtz-glyph.fc-ov__vtz--critical')).not.toBeNull();
+  });
+
+  it('draws the glyph neutral when no decision drives a band, never a reassuring green', () => {
+    const { container } = render(<VtzZoneCard {...base} risk={null} riskLevel={null} />);
+    expect(container.querySelector('.fc-ov__vtz--unknown')).not.toBeNull();
+    expect(container.querySelector('.fc-ov__vtz--good')).toBeNull();
   });
 
   it('renders an unavailable count as an explicit absence, never a fabricated zero', () => {

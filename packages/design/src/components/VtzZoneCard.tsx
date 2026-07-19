@@ -16,6 +16,39 @@ import type { ReactElement } from 'react';
 
 import { Badge, type BadgeVariant } from './Badge.js';
 
+/** The risk band a zone's glyph is colored by. `null` when no decision drives one (absent by design). */
+export type VtzRiskLevel = 'green' | 'yellow' | 'red';
+
+/** The risk level -> the Overview's own zone-node modifier, so the two surfaces read as one system. */
+const RISK_MOD: Readonly<Record<VtzRiskLevel, string>> = {
+  green: 'good',
+  yellow: 'caution',
+  red: 'critical',
+};
+
+/**
+ * The zone glyph: the SAME disc the Overview graph draws for a VTZ node, at card scale, colored by the
+ * zone's REAL risk band. It replaces the mockup's trust-score ring -- the shape the operator already
+ * associates with a zone, carrying a real signal instead of a number the substrate does not have. A zone
+ * with no band renders the neutral disc (honest absence, never a reassuring green).
+ */
+function ZoneGlyph({ risk }: { risk: VtzRiskLevel | null }): ReactElement {
+  const mod = risk === null ? 'unknown' : RISK_MOD[risk];
+  return (
+    <svg
+      className={`fc-vtz-glyph fc-ov__vtz fc-ov__vtz--${mod}`}
+      viewBox="0 0 64 64"
+      width={56}
+      height={56}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle className="fc-ov__rim" cx={32} cy={32} r={27} fill="none" />
+      <circle className="fc-ov__vtz-disc" cx={32} cy={32} r={20} />
+    </svg>
+  );
+}
+
 /** An already-resolved badge: the caller maps its domain enum to a label + semantic variant. */
 export interface VtzBadge {
   readonly label: string;
@@ -30,10 +63,12 @@ export interface VtzZoneCardProps {
   readonly name: string;
   /** The parent zone's dotted name, or `null` for a root zone. */
   readonly parent: string | null;
-  /** The archetype badge (`zone_type`): the zone's coarse posture preset. */
+  /** The archetype badge (`zone_type`): which kind of policy the zone is meant to receive. */
   readonly archetype: VtzBadge;
   /** The detection-driven risk band, or `null` when no decision drives one (absent by design). */
   readonly risk: VtzBadge | null;
+  /** The risk LEVEL the glyph is colored by; `null` colors it neutral. */
+  readonly riskLevel: VtzRiskLevel | null;
   /** Shown only for a zone that is not yet published, so a draft is never mistaken for one in force. */
   readonly draft: boolean;
   /** How many zones are this zone's direct children. A real engine count. */
@@ -81,6 +116,7 @@ export function VtzZoneCard({
   parent,
   archetype,
   risk,
+  riskLevel,
   draft,
   subZoneCount,
   memberCount,
@@ -109,6 +145,7 @@ export function VtzZoneCard({
           {draft ? <Badge variant="neutral">Draft</Badge> : null}
         </span>
       </header>
+      <ZoneGlyph risk={riskLevel} />
       <dl className="fc-vtz-card__stats">
         <div className="fc-vtz-card__stat">
           <dt className="fc-vtz-card__stat-label">Sub-zones</dt>

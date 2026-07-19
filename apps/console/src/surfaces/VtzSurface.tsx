@@ -26,7 +26,6 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Badge, KpiCard, TabStrip, VtzZoneCard, type BadgeVariant } from '@forge/design';
-import { failClosedRootPostures } from '@forge/contracts';
 import type { RiskLevel, VtzArchetype, VtzSpecInput, VtzZone } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
@@ -35,16 +34,17 @@ import { useVtzMutation, VtzCommandError, type VtzCommandFailure } from './useVt
 import { useVtzDetail, useVtzRiskBands, useVtzTree } from './useVtzTree.js';
 
 /**
- * The archetype badge for a zone (`zone_type`). The label is the archetype itself -- this is a
- * CLASSIFICATION, not a judgement, so the variant conveys the kind of zone rather than "good/bad":
- * `isolation` reuses the quarantine token (that is exactly what it is), `public` is the exposed boundary
- * (caution), `trusted` is informational, and `standard` is the unremarkable default.
+ * The archetype badge for a zone (`zone_type`). A VTZ is the policy EDGE, so the archetype names which
+ * KIND of policy the zone is meant to receive -- a classification, not a judgement. The variant conveys
+ * that kind: `quarantine` and `isolation` are the restrictive dispositions, `public` is the exposed
+ * boundary, `observability` is informational (visibility first), `standard` the unremarkable default.
  */
 const ARCHETYPE_BADGE: Readonly<Record<VtzArchetype, { label: string; variant: BadgeVariant }>> = {
   standard: { label: 'Standard', variant: 'neutral' },
-  trusted: { label: 'Trusted', variant: 'info' },
-  isolation: { label: 'Isolation', variant: 'quarantine' },
+  quarantine: { label: 'Quarantine', variant: 'quarantine' },
+  isolation: { label: 'Isolation', variant: 'critical' },
   public: { label: 'Public', variant: 'caution' },
+  observability: { label: 'Observability', variant: 'info' },
 };
 
 /** The risk band -> the card badge (the same vocabulary the Overview header uses, one meaning). */
@@ -85,11 +85,6 @@ export function matchZones(zones: readonly VtzZone[], search: string): readonly 
   return zones.filter((z) => z.name.toLowerCase().includes(needle));
 }
 
-/** The parent zone's dotted name for `zone` (the lexical prefix the engine derived), or null at a root. */
-function parentIdOf(zone: VtzZone | null): string | null {
-  return zone?.parent ?? null;
-}
-
 /** The typed failure of the last command, or null when it was not one the Console classified. */
 function failureOf(error: Error | null): VtzCommandFailure | null {
   if (error === null) return null;
@@ -103,18 +98,17 @@ function failureOf(error: Error | null): VtzCommandFailure | null {
  */
 function ZoneAuthoring({
   zoneId,
+  parents,
   onMoved,
   onDeleted,
 }: {
   readonly zoneId: string;
+  readonly parents: readonly VtzZone[];
   readonly onMoved: (newId: string) => void;
   readonly onDeleted: () => void;
 }): ReactElement {
   const detail = useVtzDetail(zoneId);
   const zone = detail.data?.zone ?? null;
-  // The parent's EFFECTIVE postures already carry the whole ancestor chain, so composing the operator's
-  // edit against them is exact -- no reconstruction, no guessing what an ancestor set.
-  const parentDetail = useVtzDetail(parentIdOf(zone));
   const mutation = useVtzMutation();
 
   if (detail.isLoading) {
@@ -142,8 +136,7 @@ function ZoneAuthoring({
       key={zone.id}
       mode="edit"
       zone={zone}
-      inherited={parentDetail.data?.zone?.effectivePostures ?? []}
-      parentName={zone.parent}
+      parents={parents}
       busy={mutation.isPending}
       failure={failureOf(mutation.error)}
       onSubmit={(spec: VtzSpecInput) => mutation.mutate({ kind: 'edit', id: zone.id, spec })}
@@ -158,15 +151,7 @@ function ZoneAuthoring({
   );
 }
 
-/** The `Parent zone` value meaning "no parent": author a ROOT zone. */
-const ROOT_PARENT = '';
-
-/**
- * The create form. A child seeds its matrix from the chosen parent's REAL effective postures (the
- * tightest legal start). A ROOT zone has no parent to learn from -- which is the only case where the
- * Console proposes a matrix itself: the fail-closed all-deny bootstrap, the same thing the engine's own
- * seed produces. Without this an empty tenant could never author its first zone.
- */
+/** The create form: authors a zone, optionally nested under a parent chosen in the form. */
 function ZoneCreate({
   parents,
   onCreated,
@@ -176,61 +161,20 @@ function ZoneCreate({
   readonly onCreated: (id: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-  // Default to a root zone when the tenant has no zones at all; otherwise nest under the first.
-  const [parentId, setParentId] = useState<string>(parents[0]?.id ?? ROOT_PARENT);
-  const parentDetail = useVtzDetail(parentId === ROOT_PARENT ? null : parentId);
   const mutation = useVtzMutation();
-  const parent = parents.find((p) => p.id === parentId) ?? null;
-  // A child's matrix seeds from the parent's REAL effective postures, so the editor only mounts once they
-  // have arrived (mounting early would seed it empty and need a state-sync effect to correct itself). A
-  // root has no parent read to wait for, so it seeds from the fail-closed bootstrap immediately.
-  const inherited =
-    parentId === ROOT_PARENT
-      ? failClosedRootPostures()
-      : parentDetail.data?.zone?.effectivePostures;
-
   return (
     <div className="fcx-vtz-create" aria-label="Create a trust zone">
-      <label className="fcx-field">
-        <span className="fcx-field__label">Parent zone</span>
-        <select
-          className="fcx-input"
-          value={parentId}
-          onChange={(e) => setParentId(e.target.value)}
-        >
-          <option value={ROOT_PARENT}>None (root zone)</option>
-          {parents.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {parentId === ROOT_PARENT ? (
-        <p className="fcx-vtz-config__note">
-          A root zone has no ancestor to inherit from, so it starts fail-closed: every domain
-          denied, which is exactly what the engine seeds. Relax what this zone needs, and the engine
-          re-validates the catastrophic floor on commit.
-        </p>
-      ) : null}
-      {inherited === undefined ? (
-        <LoadingState label="Loading the parent zone posture" />
-      ) : (
-        <VtzEditor
-          // Remount when the parent changes so the matrix re-seeds from that parent's real postures.
-          key={parentId}
-          mode="create"
-          zone={null}
-          inherited={inherited}
-          parentName={parent?.name ?? null}
-          busy={mutation.isPending}
-          failure={failureOf(mutation.error)}
-          onSubmit={(spec: VtzSpecInput) =>
-            mutation.mutate({ kind: 'create', spec }, { onSuccess: (r) => onCreated(r.id) })
-          }
-          onCancel={onCancel}
-        />
-      )}
+      <VtzEditor
+        mode="create"
+        zone={null}
+        parents={parents}
+        busy={mutation.isPending}
+        failure={failureOf(mutation.error)}
+        onSubmit={(spec: VtzSpecInput) =>
+          mutation.mutate({ kind: 'create', spec }, { onSuccess: (r) => onCreated(r.id) })
+        }
+        onCancel={onCancel}
+      />
     </div>
   );
 }
@@ -350,6 +294,7 @@ export function VtzSurface(): ReactElement {
                     parent={zone.parent}
                     archetype={ARCHETYPE_BADGE[zone.zoneType]}
                     risk={risk !== undefined ? RISK_BADGE[risk] : null}
+                    riskLevel={risk ?? null}
                     draft={zone.lifecycle === 'draft'}
                     subZoneCount={zone.subZoneCount}
                     memberCount={{ unavailable: MEMBERS_UNAVAILABLE }}
@@ -388,6 +333,7 @@ export function VtzSurface(): ReactElement {
           <h3 className="fcx-vtz-detail__title">{selected.name}</h3>
           <ZoneAuthoring
             zoneId={selected.id}
+            parents={zones}
             onMoved={(newId) => setSelectedId(newId)}
             onDeleted={() => {
               setSelectedId(null);

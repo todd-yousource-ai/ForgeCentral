@@ -191,27 +191,26 @@ test('a VTZ ring on the Overview graph lands on that zone (<= 3 clicks)', async 
   await expect(page.getByRole('heading', { name: 'YouSource.Corp.Finance' })).toBeVisible();
 });
 
-test('the editor shows tighten-only inheritance and will not let the floor be edited away', async ({
+test('the zone configuration authors the zone, never the policy applied to it', async ({
   page,
 }) => {
   await mockBff(page);
   await page.goto('/vtz');
   await page.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }).click();
 
-  await expect(page.getByText(/Inherits from YouSource.Corp/)).toBeVisible();
+  // The seven authoring fields -- identity, nesting, operational settings. A VTZ is the policy EDGE.
+  await expect(page.getByLabel('VTZ name')).toBeVisible();
+  await expect(page.getByLabel('VTZ type')).toBeVisible();
+  await expect(page.getByLabel('Parent VTZ (optional)')).toBeVisible();
+  await expect(page.getByLabel('Description')).toBeVisible();
+  await expect(page.getByLabel('Session duration (hours)')).toBeVisible();
+  await expect(page.getByLabel('Telemetry mode')).toBeVisible();
+  await expect(page.getByLabel('Micro-segmentation')).toBeVisible();
 
-  // The two catastrophic-floor domains offer NO control at all, and say why.
-  await expect(page.getByText('Locked: catastrophic floor')).toHaveCount(2);
-  await expect(page.getByLabel('Posture for governed-egress')).toHaveCount(0);
-  await expect(page.getByLabel('Posture for execution')).toHaveCount(0);
-
-  // The zone set ordinary-network laxer than its parent; the effective column shows the ancestor won.
-  await expect(page.getByText('Tightened by an ancestor')).toBeVisible();
-  const control = page.getByLabel('Posture for ordinary-network');
-  await expect(control).toHaveValue('permit-deny-risky');
-  // Relaxing it further still cannot produce a relaxed effective posture.
-  await control.selectOption('permit-deny-risky');
-  await expect(page.getByText('Tightened by an ancestor')).toBeVisible();
+  // Nothing here grants or denies: no posture matrix, and the surface says where the rules live.
+  await expect(page.getByText('Locked: catastrophic floor')).toHaveCount(0);
+  await expect(page.getByLabel('Posture for ordinary-network')).toHaveCount(0);
+  await expect(page.getByText(/authored against it on the Policies surface/)).toBeVisible();
 });
 
 test('an edit commits through the audited path only after an explicit confirm', async ({
@@ -220,9 +219,9 @@ test('an edit commits through the audited path only after an explicit confirm', 
   const state = await mockBff(page);
   await page.goto('/vtz');
   await page.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }).click();
-  await expect(page.getByLabel('Posture for ipc')).toBeVisible();
+  await expect(page.getByLabel('Session duration (hours)')).toBeVisible();
 
-  await page.getByLabel('Posture for ipc').selectOption('deny');
+  await page.getByLabel('Session duration (hours)').fill('12');
   await page.getByRole('button', { name: 'Save changes' }).click();
 
   // Nothing has been written yet.
@@ -235,8 +234,10 @@ test('an edit commits through the audited path only after an explicit confirm', 
   await expect.poll(() => state.sent.length).toBe(1);
   expect(state.sent[0]?.method).toBe('PUT');
   expect(state.sent[0]?.url).toBe('/api/vtz/YouSource.Corp.Finance');
-  const spec = state.sent[0]?.body as { ownPostures: { domain: string; posture: string }[] };
-  expect(spec.ownPostures.find((p) => p.domain === 'ipc')?.posture).toBe('deny');
+  const spec = state.sent[0]?.body as { reauthIntervalHours: number; ownPostures: unknown[] };
+  expect(spec.reauthIntervalHours).toBe(12);
+  // No policy travels from this surface; the engine fail-closes every unauthored domain.
+  expect(spec.ownPostures).toEqual([]);
 });
 
 test('an engine refusal is surfaced honestly, never silently accepted', async ({ page }) => {
@@ -251,7 +252,7 @@ test('an engine refusal is surfaced honestly, never silently accepted', async ({
   await page.getByRole('alertdialog').getByRole('button', { name: 'Commit' }).click();
 
   const alert = page.getByRole('alert');
-  await expect(alert).toContainText('read-only catastrophic floor');
+  await expect(alert).toContainText('contradicts a rule the platform enforces');
   await expect(alert).toContainText('Nothing was committed.');
 });
 
@@ -283,20 +284,19 @@ test('a re-scope and a delete are separate audited acts, each separately confirm
   expect(state.sent[1]?.method).toBe('DELETE');
 });
 
-test('a new zone is authored from a real parent posture matrix and committed on confirm', async ({
-  page,
-}) => {
+test('a new zone nests under the chosen parent and commits on confirm', async ({ page }) => {
   const state = await mockBff(page);
   state.mutation = { status: 200, body: { id: 'YouSource.Corp.New', lifecycle: 'draft' } };
   await page.goto('/vtz');
   await expect(page.getByRole('button', { name: 'New zone' })).toBeEnabled();
 
   await page.getByRole('button', { name: 'New zone' }).click();
-  await expect(page.getByLabel('Parent zone')).toBeVisible();
-  // The matrix seeds from the chosen parent's real effective postures, never a hardcoded default.
-  await expect(page.getByText('Locked: catastrophic floor')).toHaveCount(2);
+  await expect(page.getByLabel('Parent VTZ (optional)')).toBeVisible();
 
-  await page.getByLabel('Zone name').fill('YouSource.Corp.New');
+  // Parent VTZ is what nests: pick a parent, name the leaf, and the dotted name is composed.
+  await page.getByLabel('Parent VTZ (optional)').selectOption('YouSource.Corp');
+  await page.getByLabel('VTZ name').fill('New');
+  await expect(page.getByText('YouSource.Corp.New')).toBeVisible();
   await page.getByRole('button', { name: 'Create zone' }).click();
   await expect(page.getByRole('alertdialog')).toContainText('Create YouSource.Corp.New?');
   await page.getByRole('alertdialog').getByRole('button', { name: 'Commit' }).click();

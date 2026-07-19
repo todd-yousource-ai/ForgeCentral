@@ -75,10 +75,14 @@ export type VtzPosture = 'deny' | 'permit-deny-risky';
 export type VtzLifecycle = 'draft' | 'published';
 
 /**
- * The coarse posture archetype badge a zone carries. A preset label over the per-domain matrix, NOT a
- * substitute for it: two `standard` zones can hold different per-domain postures.
+ * The zone's archetype badge. A VTZ is the POLICY EDGE -- a virtual construct that policies target -- so
+ * the archetype declares what KIND of policy the zone is meant to receive, and grants nothing by itself:
+ * `standard` takes general policy, `quarantine` holds members under restriction while a disposition is
+ * worked, `isolation` is the deny-all quick cut-off, `public` is for the future full-kernel policy, and
+ * `observability` fully onboards and wraps an agent under a permissive (any/any) policy. The governing
+ * rules are authored against the zone on the Policies surface, not here.
  */
-export type VtzArchetype = 'standard' | 'trusted' | 'isolation' | 'public';
+export type VtzArchetype = 'standard' | 'quarantine' | 'isolation' | 'public' | 'observability';
 
 /** How much telemetry the zone's members emit. */
 export type VtzTelemetry = 'full' | 'sampled' | 'off';
@@ -180,14 +184,18 @@ export function toVtzLifecycle(lifecycle: string): VtzLifecycle | null {
   return lifecycle === 'draft' || lifecycle === 'published' ? lifecycle : null;
 }
 
+/** Every archetype, in the order the authoring form lists them. */
+export const VTZ_ARCHETYPES: readonly VtzArchetype[] = [
+  'standard',
+  'quarantine',
+  'isolation',
+  'public',
+  'observability',
+];
+
 /** Narrow an engine zone-type tag to a {@link VtzArchetype}, or `null` if unknown. */
 export function toVtzArchetype(zoneType: string): VtzArchetype | null {
-  return zoneType === 'standard' ||
-    zoneType === 'trusted' ||
-    zoneType === 'isolation' ||
-    zoneType === 'public'
-    ? zoneType
-    : null;
+  return VTZ_ARCHETYPES.find((known) => known === zoneType) ?? null;
 }
 
 /** Narrow an engine telemetry tag to a {@link VtzTelemetry}, or `null` if unknown. */
@@ -335,10 +343,11 @@ export const MAX_REAUTH_INTERVAL_HOURS = 24;
  * `name` is the dotted `VtzName` and IS the identity + the hierarchy, so an edit that changes it is a
  * re-scope ({@link VtzRescopeInput}), not an edit.
  *
- * `ownPostures` carries the full per-domain matrix INCLUDING the catastrophic-floor rows. The `floor` flag
- * on each entry is the engine's to determine: whatever the Console sends, the engine re-derives it from the
- * domain and refuses any spec that relaxes a floor. The Console sends the flag back verbatim so a
- * round-trip of an unmodified zone is byte-identical, never to assert what is or is not a floor.
+ * `ownPostures` is EMPTY from this surface. A VTZ is the policy edge, not the policy: the Console authors
+ * the zone's identity, nesting, and operational settings, and the governing rules are authored against it
+ * on the Policies surface. An empty matrix is not a gap -- the engine resolves every unauthored domain to
+ * `deny` (fail-closed), which is exactly what its own zone seed produces. The field stays on the type
+ * because the wire carries it and a future policy-aware caller may populate it.
  */
 export interface VtzSpecInput {
   readonly name: string;
@@ -403,8 +412,10 @@ export function toVtzSpecInput(body: unknown): VtzSpecInput | null {
   ) {
     return null;
   }
-  const rawPostures = b['ownPostures'];
-  if (!Array.isArray(rawPostures) || rawPostures.length === 0) return null;
+  // Absent or empty is the normal case now: this surface authors no policy (see VtzSpecInput). A
+  // PRESENT list is still narrowed fail-closed -- a malformed entry refuses the whole spec.
+  const rawPostures = b['ownPostures'] ?? [];
+  if (!Array.isArray(rawPostures)) return null;
   const ownPostures: DomainPosture[] = [];
   for (const raw of rawPostures) {
     if (typeof raw !== 'object' || raw === null) return null;
@@ -426,85 +437,9 @@ export function toVtzSpecInput(body: unknown): VtzSpecInput | null {
   };
 }
 
-// ---------------------------------------------------------------------------------------------------------
-// TIGHTEN-ONLY COMPOSITION (IP-CONSOLE-02 V2.5). The engine composes a zone's effective posture up its
-// lexical ancestor chain and DENY WINS -- a child can tighten what an ancestor set, never relax it. The
-// editor previews the result of an in-progress edit before the operator commits, so this mirrors the rule
-// the engine will apply. It is a PREVIEW, not an authority: the engine recomposes and re-validates on
-// commit and refuses a contradiction, so a preview that ever disagreed would be a Console bug, not a new
-// policy. The exactness comes from feeding it the PARENT zone's effective postures (a real `vtz.detail`
-// read), which already carry the whole chain above this zone.
-
-/** The tighter of two postures. `deny` beats `permit-deny-risky`; equal is itself. */
-export function tighterPosture(a: VtzPosture, b: VtzPosture): VtzPosture {
-  return a === 'deny' || b === 'deny' ? 'deny' : 'permit-deny-risky';
-}
-
-/**
- * Compose an authored posture matrix with the inherited one (the parent zone's EFFECTIVE postures, which
- * already carry the full ancestor chain), producing what would actually apply. A domain the parent does
- * not carry inherits nothing and stands on its own; a domain only the parent carries passes through, so
- * an inherited deny is never lost by omission. `floor` is preserved from whichever entry carries it -- the
- * engine owns that flag and composition cannot clear it.
- */
-export function composeEffectivePostures(
-  own: readonly DomainPosture[],
-  inherited: readonly DomainPosture[],
-): readonly DomainPosture[] {
-  const byDomain = new Map<VtzObjectDomain, DomainPosture>();
-  for (const entry of inherited) {
-    byDomain.set(entry.domain, entry);
-  }
-  const composed: DomainPosture[] = [];
-  const seen = new Set<VtzObjectDomain>();
-  for (const entry of own) {
-    seen.add(entry.domain);
-    const parent = byDomain.get(entry.domain);
-    composed.push({
-      domain: entry.domain,
-      posture: parent === undefined ? entry.posture : tighterPosture(entry.posture, parent.posture),
-      floor: entry.floor || (parent?.floor ?? false),
-    });
-  }
-  // A domain the child did not author still applies from the ancestor chain.
-  for (const entry of inherited) {
-    if (!seen.has(entry.domain)) composed.push(entry);
-  }
-  const rank = new Map(VTZ_OBJECT_DOMAINS.map((domain, index) => [domain, index]));
-  return composed.sort((a, b) => (rank.get(a.domain) ?? 0) - (rank.get(b.domain) ?? 0));
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// BOOTSTRAP (IP-CONSOLE-02 V2.5b). A tenant with no zones has nothing for the editor to learn a posture
-// matrix from -- no parent to inherit, no sibling to copy -- so the very first zone cannot be authored
-// against real engine data. This is the ONE place the Console carries a posture table, and it is a
-// deliberate, labelled bootstrap value rather than a rendering of engine state.
-
-/**
- * The two object domains TRD-32 v2 pins as the read-only catastrophic floor. Used ONLY to seed the first
- * zone of an empty tenant (see {@link failClosedRootPostures}); everywhere else the floor flag is read
- * from the ENGINE's own per-row `floor`, never from this list, so a change engine-side needs no change
- * here. The engine re-derives and re-enforces the floor on commit regardless of what the Console sends.
- */
-export const CATASTROPHIC_FLOOR_DOMAINS: readonly VtzObjectDomain[] = [
-  'governed-egress',
-  'execution',
-];
-
-/**
- * The fail-closed posture matrix for bootstrapping the first zone of an empty tenant: every domain
- * `deny`, with the two catastrophic domains flagged.
- *
- * This mirrors exactly what the engine's own seed does (`cdb_cyber::seed_default_zones`: a zone authored
- * with no postures is all-Deny with the floor intact), so the Console is not inventing a posture -- it is
- * proposing the tightest legal zone, which is also the only safe default for a boundary the operator has
- * not yet described. Nothing here is ever DISPLAYED as engine state: the moment the zone commits, the
- * next read returns the engine's own matrix and flags, which replace these.
- */
-export function failClosedRootPostures(): readonly DomainPosture[] {
-  return VTZ_OBJECT_DOMAINS.map((domain) => ({
-    domain,
-    posture: 'deny' as const,
-    floor: CATASTROPHIC_FLOOR_DOMAINS.includes(domain),
-  }));
-}
+// NOTE (2026-07-19): the tighten-only composition preview and the fail-closed bootstrap matrix that used
+// to live here were removed with the per-domain posture editor. A VTZ is the policy edge, so this surface
+// no longer authors posture at all -- the engine resolves an unauthored domain to `deny` on its own, and
+// the composed effective postures still arrive on a zone READ (they drive the high-sensitivity KPI). They
+// return, against real policy objects, when the Policies surface (CONSOLE-05) lands. Keeping unconsumed
+// helpers around would be a stub in reverse.

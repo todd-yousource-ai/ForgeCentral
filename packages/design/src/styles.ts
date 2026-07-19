@@ -49,26 +49,6 @@ export function componentStyles(): string {
 .fc-kpi__label { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-sm); color: var(--fc-color-text-muted); }
 .fc-kpi__value { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-2xl); font-weight: var(--fc-font-weight-bold); color: var(--fc-color-text-primary); }
 
-/* The per-domain posture editor (IP-CONSOLE-02 V2.5): own vs effective, floored rows locked. */
-.fc-posture-matrix { width: 100%; border-collapse: collapse; font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-sm); }
-.fc-posture-matrix caption { text-align: left; padding-bottom: var(--fc-space-sm); font-size: var(--fc-font-size-xs); color: var(--fc-color-text-muted); }
-.fc-posture-matrix th, .fc-posture-matrix td { text-align: left; padding: var(--fc-space-sm) var(--fc-space-md); border-bottom: 1px solid var(--fc-color-surface-border); color: var(--fc-color-text-primary); }
-.fc-posture-matrix thead th { font-size: var(--fc-font-size-xs); color: var(--fc-color-text-muted); }
-.fc-posture-matrix tbody th { font-weight: var(--fc-font-weight-regular); }
-.fc-posture-matrix__row--floor { background: color-mix(in srgb, var(--fc-color-status-critical) 8%, transparent); }
-.fc-posture-matrix__locked { display: flex; flex-direction: column; gap: var(--fc-space-xs); }
-.fc-posture-matrix__lock-note { font-size: var(--fc-font-size-xs); color: var(--fc-color-status-critical); }
-.fc-posture-matrix__inherited { display: block; font-size: var(--fc-font-size-xs); color: var(--fc-color-status-info); }
-.fc-posture-matrix__select {
-  padding: var(--fc-space-xs) var(--fc-space-sm);
-  border-radius: var(--fc-radius-md);
-  border: 1px solid var(--fc-color-surface-border);
-  background: var(--fc-color-surface-card);
-  color: var(--fc-color-text-primary);
-  font: inherit;
-}
-.fc-posture-matrix__select:disabled { opacity: 0.6; cursor: not-allowed; }
-
 /* Virtual Trust Zones grid (IP-CONSOLE-02 V2.4): one card per zone, archetype + risk focal, no gauge. */
 .fc-vtz-card {
   display: flex;
@@ -88,6 +68,9 @@ export function componentStyles(): string {
   border-color: var(--fc-color-brand-primary);
   background: color-mix(in srgb, var(--fc-color-brand-primary) 8%, var(--fc-color-surface-card));
 }
+.fc-vtz-glyph { align-self: center; }
+.fc-ov__vtz--unknown .fc-ov__rim { stroke: var(--fc-color-surface-border); stroke-opacity: 0.6; }
+.fc-ov__vtz--unknown .fc-ov__vtz-disc { fill: var(--fc-color-surface-panel); stroke: var(--fc-color-surface-border); }
 .fc-vtz-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--fc-space-md); }
 .fc-vtz-card__name { display: flex; flex-direction: column; gap: var(--fc-space-xs); }
 .fc-vtz-card__leaf { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-lg); font-weight: var(--fc-font-weight-bold); color: var(--fc-color-text-primary); }
