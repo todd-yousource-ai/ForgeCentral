@@ -473,3 +473,38 @@ export function composeEffectivePostures(
   const rank = new Map(VTZ_OBJECT_DOMAINS.map((domain, index) => [domain, index]));
   return composed.sort((a, b) => (rank.get(a.domain) ?? 0) - (rank.get(b.domain) ?? 0));
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// BOOTSTRAP (IP-CONSOLE-02 V2.5b). A tenant with no zones has nothing for the editor to learn a posture
+// matrix from -- no parent to inherit, no sibling to copy -- so the very first zone cannot be authored
+// against real engine data. This is the ONE place the Console carries a posture table, and it is a
+// deliberate, labelled bootstrap value rather than a rendering of engine state.
+
+/**
+ * The two object domains TRD-32 v2 pins as the read-only catastrophic floor. Used ONLY to seed the first
+ * zone of an empty tenant (see {@link failClosedRootPostures}); everywhere else the floor flag is read
+ * from the ENGINE's own per-row `floor`, never from this list, so a change engine-side needs no change
+ * here. The engine re-derives and re-enforces the floor on commit regardless of what the Console sends.
+ */
+export const CATASTROPHIC_FLOOR_DOMAINS: readonly VtzObjectDomain[] = [
+  'governed-egress',
+  'execution',
+];
+
+/**
+ * The fail-closed posture matrix for bootstrapping the first zone of an empty tenant: every domain
+ * `deny`, with the two catastrophic domains flagged.
+ *
+ * This mirrors exactly what the engine's own seed does (`cdb_cyber::seed_default_zones`: a zone authored
+ * with no postures is all-Deny with the floor intact), so the Console is not inventing a posture -- it is
+ * proposing the tightest legal zone, which is also the only safe default for a boundary the operator has
+ * not yet described. Nothing here is ever DISPLAYED as engine state: the moment the zone commits, the
+ * next read returns the engine's own matrix and flags, which replace these.
+ */
+export function failClosedRootPostures(): readonly DomainPosture[] {
+  return VTZ_OBJECT_DOMAINS.map((domain) => ({
+    domain,
+    posture: 'deny' as const,
+    floor: CATASTROPHIC_FLOOR_DOMAINS.includes(domain),
+  }));
+}

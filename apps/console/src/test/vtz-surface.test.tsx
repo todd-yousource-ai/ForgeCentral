@@ -503,3 +503,61 @@ describe('the VTZ authoring editor (V2.5)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('the empty-tenant bootstrap (V2.5b)', () => {
+  it('lets an empty tenant author its FIRST zone as a fail-closed root', async () => {
+    // Regression: the create form used to require picking a parent from the tree, so a tenant with no
+    // zones could never author one -- the surface dead-ended on its own empty state.
+    const sent = stubFetch({ treeBody: { zones: [], truncated: false } });
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await waitFor(() => {
+      expect(screen.getByText('No trust zones yet')).toBeInTheDocument();
+    });
+    // The empty state points at the bootstrap instead of dead-ending, and the control is available.
+    expect(screen.getByText(/Use New zone to author the first one/)).toBeInTheDocument();
+    const create = screen.getByRole('button', { name: 'New zone' });
+    expect(create).toBeEnabled();
+
+    fireEvent.click(create);
+    await waitFor(() => {
+      expect(screen.getByLabelText('Zone name')).toBeInTheDocument();
+    });
+    // With no zones there is nothing to nest under, so it defaults to a root and says what that means.
+    expect(screen.getByLabelText('Parent zone')).toHaveValue('');
+    expect(screen.getByText(/starts fail-closed: every domain denied/)).toBeInTheDocument();
+    // The floor rows are locked even on the bootstrap matrix.
+    expect(screen.getAllByText('Locked: catastrophic floor')).toHaveLength(2);
+
+    fireEvent.change(screen.getByLabelText('Zone name'), { target: { value: 'YouSource' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create zone' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }));
+
+    await waitFor(() => {
+      expect(sent).toHaveLength(1);
+    });
+    const spec = sent[0]?.body as {
+      name: string;
+      ownPostures: { domain: string; posture: string }[];
+    };
+    expect(spec.name).toBe('YouSource');
+    // Every domain denied: the tightest legal zone, never a permissive guess.
+    expect(spec.ownPostures).toHaveLength(11);
+    expect(spec.ownPostures.every((p) => p.posture === 'deny')).toBe(true);
+  });
+
+  it('still offers a root option when zones DO exist, without waiting on a parent read', async () => {
+    stubFetch({});
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'New zone' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'New zone' }));
+    await waitFor(() => {
+      expect(screen.getByLabelText('Parent zone')).toBeInTheDocument();
+    });
+    // Defaults to nesting under the first real zone, but a root is selectable.
+    expect(screen.getByLabelText('Parent zone')).toHaveValue('YouSource.Corp.Finance');
+    fireEvent.change(screen.getByLabelText('Parent zone'), { target: { value: '' } });
+    expect(screen.getByText(/starts fail-closed: every domain denied/)).toBeInTheDocument();
+  });
+});

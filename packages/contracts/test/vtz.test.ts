@@ -10,7 +10,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   VTZ_OBJECT_DOMAINS,
+  CATASTROPHIC_FLOOR_DOMAINS,
   composeEffectivePostures,
+  failClosedRootPostures,
   tighterPosture,
   toVtzSpecInput,
   toWireVtzSpec,
@@ -382,5 +384,29 @@ describe('tighten-only composition (V2.5 effective-posture preview)', () => {
       [{ domain: 'governed-egress', posture: 'deny', floor: true }],
     );
     expect(composed[0]?.floor).toBe(true);
+  });
+});
+
+describe('the empty-tenant bootstrap (V2.5b)', () => {
+  it('proposes the tightest legal zone: every domain denied', () => {
+    // The ONE posture table the Console carries, and only because an empty tenant has no parent and no
+    // sibling to learn from. It mirrors what `cdb_cyber::seed_default_zones` produces.
+    const seed = failClosedRootPostures();
+    expect(seed).toHaveLength(VTZ_OBJECT_DOMAINS.length);
+    expect(seed.every((p) => p.posture === 'deny')).toBe(true);
+    expect(seed.map((p) => p.domain)).toEqual([...VTZ_OBJECT_DOMAINS]);
+  });
+
+  it('flags exactly the two catastrophic-floor domains', () => {
+    expect(CATASTROPHIC_FLOOR_DOMAINS).toEqual(['governed-egress', 'execution']);
+    const floored = failClosedRootPostures()
+      .filter((p) => p.floor)
+      .map((p) => p.domain);
+    expect(floored).toEqual(['governed-egress', 'execution']);
+  });
+
+  it('composes to itself (a root inherits nothing), so the preview is stable', () => {
+    const seed = failClosedRootPostures();
+    expect(composeEffectivePostures(seed, [])).toEqual(seed);
   });
 });
