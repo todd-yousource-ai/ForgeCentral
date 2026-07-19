@@ -24,6 +24,7 @@
 // of record instead of trusting the form.
 
 import { useMemo, useState, type ReactElement } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Badge, KpiCard, TabStrip, VtzZoneCard, type BadgeVariant } from '@forge/design';
 import type { RiskLevel, VtzArchetype, VtzSpecInput, VtzZone } from '@forge/contracts';
 
@@ -215,9 +216,13 @@ function ZoneCreate({
 
 /** The Virtual Trust Zones surface: the Active grid + the read-only zone configuration + honest states. */
 export function VtzSurface(): ReactElement {
-  const [tab, setTab] = useState('active');
+  // A `?zone=` deep link is how the Overview's VTZ ring lands here (TRD-CONSOLE-02 acceptance). It seeds
+  // the selection on first render; the operator's own clicks take over from there.
+  const [params] = useSearchParams();
+  const linkedZone = params.get('zone');
+  const [tab, setTab] = useState(linkedZone !== null ? 'configure' : 'active');
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(linkedZone);
   const [creating, setCreating] = useState(false);
 
   const zonesQuery = useVtzTree();

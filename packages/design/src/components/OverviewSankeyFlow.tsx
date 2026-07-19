@@ -54,6 +54,14 @@ export interface OverviewSankeyFlowProps {
    * screen-reader + keyboard nav of real buttons renders alongside so the affordance is never mouse-only.
    */
   readonly onSelectContainer?: (container: string) => void;
+  /**
+   * Open a clicked VTZ node's zone on the governance surface (IP-CONSOLE-02 V2.N). Closes the
+   * `TRD-CONSOLE-02` acceptance row that a VTZ ring lands on that zone inside the 3-click budget -- the
+   * leg IP-CONSOLE-01 deferred until the VTZ surface existed. Like the container rings, the visible node
+   * is a pointer enhancement and a real button renders in the nav below, so the affordance is never
+   * mouse-only.
+   */
+  readonly onSelectVtz?: (vtzId: string) => void;
 }
 
 // Fixed SVG coordinate system; the rendered size is responsive (viewBox + CSS width:100%). The columns
@@ -266,6 +274,7 @@ export function OverviewSankeyFlow({
   hoveredSource = null,
   onHoverSource,
   onSelectContainer,
+  onSelectVtz,
 }: OverviewSankeyFlowProps): ReactElement {
   // Which destination category has its apps fanned out (top-N -> full list). Local UI state; the graph
   // is unchanged. Hooks precede the early returns below (Rules of Hooks).
@@ -543,8 +552,16 @@ export function OverviewSankeyFlow({
             const first = v.name.split('.')[0];
             const rest = v.name.split('.').slice(1).join('.');
             const on = !hl || hl.vtzIds.has(v.id);
+            const zoneClick = onSelectVtz
+              ? { onClick: () => onSelectVtz(v.id), style: { cursor: 'pointer' } }
+              : {};
             return (
-              <g key={v.id} className={`fc-ov__vtz fc-ov__vtz--${mod}`} opacity={on ? 1 : 0.4}>
+              <g
+                key={v.id}
+                className={`fc-ov__vtz fc-ov__vtz--${mod}`}
+                opacity={on ? 1 : 0.4}
+                {...zoneClick}
+              >
                 <title>{`${v.name}: ${RISK_LABEL[v.risk.level]} risk, ${PROFILE_LABEL[v.profile]}`}</title>
                 <g className="fc-ov__corona">{coronaRays(v.x, v.y, VTZ_R)}</g>
                 <circle className="fc-ov__rim" cx={v.x} cy={v.y} r={VTZ_R + 11} fill="none" />
@@ -705,6 +722,18 @@ export function OverviewSankeyFlow({
               {`Open ${c.label} members (${String(c.count)} ${c.count === 1 ? 'connection' : 'connections'})`}
             </button>
           ))}
+          {onSelectVtz
+            ? graph.vtzs.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  className="fc-ov__container-nav"
+                  onClick={() => onSelectVtz(v.id)}
+                >
+                  {`Open trust zone ${v.name}`}
+                </button>
+              ))
+            : null}
         </nav>
       ) : null}
     </div>
