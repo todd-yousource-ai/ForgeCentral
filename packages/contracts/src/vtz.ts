@@ -425,3 +425,51 @@ export function toVtzSpecInput(body: unknown): VtzSpecInput | null {
     lifecycle: state,
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// TIGHTEN-ONLY COMPOSITION (IP-CONSOLE-02 V2.5). The engine composes a zone's effective posture up its
+// lexical ancestor chain and DENY WINS -- a child can tighten what an ancestor set, never relax it. The
+// editor previews the result of an in-progress edit before the operator commits, so this mirrors the rule
+// the engine will apply. It is a PREVIEW, not an authority: the engine recomposes and re-validates on
+// commit and refuses a contradiction, so a preview that ever disagreed would be a Console bug, not a new
+// policy. The exactness comes from feeding it the PARENT zone's effective postures (a real `vtz.detail`
+// read), which already carry the whole chain above this zone.
+
+/** The tighter of two postures. `deny` beats `permit-deny-risky`; equal is itself. */
+export function tighterPosture(a: VtzPosture, b: VtzPosture): VtzPosture {
+  return a === 'deny' || b === 'deny' ? 'deny' : 'permit-deny-risky';
+}
+
+/**
+ * Compose an authored posture matrix with the inherited one (the parent zone's EFFECTIVE postures, which
+ * already carry the full ancestor chain), producing what would actually apply. A domain the parent does
+ * not carry inherits nothing and stands on its own; a domain only the parent carries passes through, so
+ * an inherited deny is never lost by omission. `floor` is preserved from whichever entry carries it -- the
+ * engine owns that flag and composition cannot clear it.
+ */
+export function composeEffectivePostures(
+  own: readonly DomainPosture[],
+  inherited: readonly DomainPosture[],
+): readonly DomainPosture[] {
+  const byDomain = new Map<VtzObjectDomain, DomainPosture>();
+  for (const entry of inherited) {
+    byDomain.set(entry.domain, entry);
+  }
+  const composed: DomainPosture[] = [];
+  const seen = new Set<VtzObjectDomain>();
+  for (const entry of own) {
+    seen.add(entry.domain);
+    const parent = byDomain.get(entry.domain);
+    composed.push({
+      domain: entry.domain,
+      posture: parent === undefined ? entry.posture : tighterPosture(entry.posture, parent.posture),
+      floor: entry.floor || (parent?.floor ?? false),
+    });
+  }
+  // A domain the child did not author still applies from the ancestor chain.
+  for (const entry of inherited) {
+    if (!seen.has(entry.domain)) composed.push(entry);
+  }
+  const rank = new Map(VTZ_OBJECT_DOMAINS.map((domain, index) => [domain, index]));
+  return composed.sort((a, b) => (rank.get(a.domain) ?? 0) - (rank.get(b.domain) ?? 0));
+}

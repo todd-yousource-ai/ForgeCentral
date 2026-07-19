@@ -90,17 +90,36 @@ const sankey: Partial<OverviewSankey> = {
   ],
 };
 
-/** Stub fetch: the VTZ tree, the zone detail, and the Overview join, each with its own scripted reply. */
+/** One recorded authoring request (the audited write path the editor drives). */
+interface SentCommand {
+  readonly url: string;
+  readonly method: string;
+  readonly body: unknown;
+}
+
+/**
+ * Stub fetch: the VTZ tree, the zone detail (per id), the Overview join, and the four authoring routes.
+ * Returns the list every mutation was recorded into, so a test can assert WHAT was committed.
+ */
 function stubFetch(opts: {
   readonly treeStatus?: number;
   readonly treeBody?: unknown;
   readonly detailBody?: unknown;
-}): void {
-  const fetchMock = vi.fn((input: string) => {
+  readonly detailById?: Readonly<Record<string, unknown>>;
+  readonly mutationStatus?: number;
+  readonly mutationBody?: unknown;
+}): SentCommand[] {
+  const sent: SentCommand[] = [];
+  const fetchMock = vi.fn((input: string, init?: RequestInit) => {
     if (input.startsWith('/api/vtz/tree')) {
       return Promise.resolve(jsonResponse(opts.treeStatus ?? 200, opts.treeBody ?? tree));
     }
     if (input.startsWith('/api/vtz/detail')) {
+      const id = decodeURIComponent(
+        new URL(input, 'http://localhost').searchParams.get('id') ?? '',
+      );
+      const scripted = opts.detailById?.[id];
+      if (scripted !== undefined) return Promise.resolve(jsonResponse(200, scripted));
       return Promise.resolve(
         jsonResponse(200, opts.detailBody ?? { zone: tree.zones[0], ancestors: [] }),
       );
@@ -108,9 +127,36 @@ function stubFetch(opts: {
     if (input.startsWith('/api/overview/sankey')) {
       return Promise.resolve(jsonResponse(200, sankey));
     }
+    if (input.startsWith('/api/vtz')) {
+      sent.push({
+        url: input,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      });
+      return Promise.resolve(
+        jsonResponse(
+          opts.mutationStatus ?? 200,
+          opts.mutationBody ?? { id: 'YouSource.Corp.Finance', lifecycle: 'published' },
+        ),
+      );
+    }
     throw new Error(`unexpected fetch ${input}`);
   });
   vi.stubGlobal('fetch', fetchMock);
+  return sent;
+}
+
+/** Open the editor for the Finance zone and wait for the posture matrix to render. */
+async function openFinanceEditor(): Promise<void> {
+  await waitFor(() => {
+    expect(
+      screen.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }),
+    ).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }));
+  await waitFor(() => {
+    expect(screen.getByLabelText('Posture for ordinary-network')).toBeInTheDocument();
+  });
 }
 
 afterEach(() => {
@@ -223,13 +269,8 @@ describe('the VTZ surface (V2.4)', () => {
     });
   });
 
-  it('reaches a zone own-vs-effective posture in two clicks, naming the contributing ancestor', async () => {
-    stubFetch({
-      detailBody: {
-        zone: tree.zones[0],
-        ancestors: [{ id: 'YouSource.Corp', name: 'YouSource.Corp' }],
-      },
-    });
+  it('reaches the zone posture editor in one click, naming the contributing ancestor', async () => {
+    stubFetch({});
     renderWithProviders(<VtzSurface />, { route: '/vtz' });
     await waitFor(() => {
       expect(
@@ -239,13 +280,14 @@ describe('the VTZ surface (V2.4)', () => {
     // Click 1: the zone card -> selects it and switches to Configure.
     fireEvent.click(screen.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }));
     await waitFor(() => {
-      expect(
-        screen.getByText(/Effective posture composes this zone with YouSource.Corp/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Inherits from YouSource.Corp/)).toBeInTheDocument();
     });
-    // The engine-flagged catastrophic floor renders locked, and the inherited tightening is marked.
-    expect(screen.getAllByText('Floor')).toHaveLength(2);
-    expect(screen.getByText('Inherited')).toBeInTheDocument();
+    // The engine-flagged catastrophic floor rows render locked, not as editable controls.
+    expect(screen.getAllByText('Locked: catastrophic floor')).toHaveLength(2);
+    expect(screen.queryByLabelText('Posture for governed-egress')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Posture for execution')).not.toBeInTheDocument();
+    // A non-floored domain IS editable.
+    expect(screen.getByLabelText('Posture for ordinary-network')).toBeInTheDocument();
   });
 
   it('prompts for a selection rather than guessing one when Configure is opened directly', async () => {
@@ -276,5 +318,188 @@ describe('the VTZ surface derivations (pure)', () => {
     expect(matchZones(zones, 'FINANCE').map((z) => z.name)).toEqual(['YouSource.Corp.Finance']);
     expect(matchZones(zones, 'yousource').length).toBe(2);
     expect(matchZones(zones, 'zzz')).toEqual([]);
+  });
+});
+
+describe('the VTZ authoring editor (V2.5)', () => {
+  it('commits an edit only after a confirm, and sends the operator edited matrix', async () => {
+    const sent = stubFetch({});
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+
+    fireEvent.change(screen.getByLabelText('Posture for ordinary-network'), {
+      target: { value: 'deny' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    // Nothing is committed until the operator authorizes the audited act.
+    expect(sent).toHaveLength(0);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Save changes to YouSource.Corp.Finance?');
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    await waitFor(() => {
+      expect(sent).toHaveLength(1);
+    });
+    expect(sent[0]?.method).toBe('PUT');
+    expect(sent[0]?.url).toBe('/api/vtz/YouSource.Corp.Finance');
+    const spec = sent[0]?.body as { ownPostures: { domain: string; posture: string }[] };
+    expect(spec.ownPostures.find((p) => p.domain === 'ordinary-network')?.posture).toBe('deny');
+  });
+
+  it('abandons the act when the confirm is cancelled (nothing is committed)', async () => {
+    const sent = stubFetch({});
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(sent).toHaveLength(0);
+  });
+
+  it('re-scopes through its own verb, separately confirmed from a save', async () => {
+    const sent = stubFetch({ mutationBody: { id: 'YouSource.Ops.Finance', lifecycle: '' } });
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+
+    fireEvent.change(screen.getByLabelText('Re-scope (move) to'), {
+      target: { value: 'YouSource.Ops.Finance' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Re-scope' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      'Move YouSource.Corp.Finance to YouSource.Ops.Finance?',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    await waitFor(() => {
+      expect(sent).toHaveLength(1);
+    });
+    // A rename is the engine RESCOPE verb, not an edit of the name field.
+    expect(sent[0]?.method).toBe('POST');
+    expect(sent[0]?.url).toBe('/api/vtz/YouSource.Corp.Finance/rescope');
+    expect(sent[0]?.body).toEqual({ newName: 'YouSource.Ops.Finance' });
+  });
+
+  it('does not offer a re-scope that would be a no-op', async () => {
+    stubFetch({});
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+    // The field starts at the zone current name, so there is nothing to move.
+    expect(screen.getByRole('button', { name: 'Re-scope' })).toBeDisabled();
+  });
+
+  it('deletes behind a critical confirm through the delete verb', async () => {
+    const sent = stubFetch({});
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete zone' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Delete YouSource.Corp.Finance?');
+    expect(dialog).toHaveTextContent('refuses to delete a zone that still has sub-zones');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(sent).toHaveLength(1);
+    });
+    expect(sent[0]?.method).toBe('DELETE');
+  });
+
+  it('reports an engine refusal honestly and states that nothing was committed', async () => {
+    // 403 with reason `denied` = a floor relaxation or an inheritance contradiction.
+    stubFetch({ mutationStatus: 403, mutationBody: { error: 'refused', reason: 'denied' } });
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('read-only catastrophic floor');
+    expect(alert).toHaveTextContent('Nothing was committed.');
+  });
+
+  it('reports a state conflict distinctly from a rule refusal', async () => {
+    stubFetch({ mutationStatus: 409, mutationBody: { error: 'refused', reason: 'conflict' } });
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete zone' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('still has sub-zones');
+    expect(alert).toHaveTextContent('Nothing was committed.');
+  });
+
+  it('previews the effective posture live, composed against the real parent zone', async () => {
+    // The PARENT denies ordinary-network. Relaxing the child own posture must NOT show a relaxed
+    // effective value -- inheritance only tightens, and the preview has to say so before the commit.
+    const parentZone = {
+      ...tree.zones[0],
+      id: 'YouSource.Corp',
+      name: 'YouSource.Corp',
+      effectivePostures: postures('deny'),
+    };
+    stubFetch({
+      detailById: {
+        'YouSource.Corp.Finance': { zone: tree.zones[0], ancestors: [] },
+        'YouSource.Corp': { zone: parentZone, ancestors: [] },
+      },
+    });
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tightened by an ancestor')).toBeInTheDocument();
+    });
+    // Set the child laxer still: the effective column stays deny because the ancestor denies.
+    fireEvent.change(screen.getByLabelText('Posture for ordinary-network'), {
+      target: { value: 'permit-deny-risky' },
+    });
+    expect(screen.getByText('Tightened by an ancestor')).toBeInTheDocument();
+  });
+
+  it('creates a zone seeded from the chosen parent real postures, never a hardcoded default', async () => {
+    const sent = stubFetch({ mutationBody: { id: 'YouSource.Corp.New', lifecycle: 'draft' } });
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    // The control stays disabled until the real tree loads (a create needs a real parent to seed from).
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'New zone' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'New zone' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Parent zone')).toBeInTheDocument();
+    });
+    // The form only mounts once the parent's real postures have arrived to seed the matrix.
+    await waitFor(() => {
+      expect(screen.getByLabelText('Zone name')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText('Zone name'), {
+      target: { value: '  YouSource.Corp.New  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create zone' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('Create YouSource.Corp.New?');
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    await waitFor(() => {
+      expect(sent).toHaveLength(1);
+    });
+    expect(sent[0]?.method).toBe('POST');
+    expect(sent[0]?.url).toBe('/api/vtz');
+    const spec = sent[0]?.body as { name: string; ownPostures: unknown[] };
+    expect(spec.name).toBe('YouSource.Corp.New');
+    // Seeded from the parent's real effective matrix, so the new zone starts legally tight.
+    expect(spec.ownPostures.length).toBeGreaterThan(0);
+  });
+
+  it('says plainly that saving replaces the description the engine does not return', async () => {
+    // NAMED GAP: `WireVtzTreeNode` carries no description, so the Console cannot show the stored value.
+    // It must not silently overwrite it without telling the operator.
+    stubFetch({});
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openFinanceEditor();
+    expect(
+      screen.getByText(/does not return the stored description, so saving replaces it/),
+    ).toBeInTheDocument();
   });
 });

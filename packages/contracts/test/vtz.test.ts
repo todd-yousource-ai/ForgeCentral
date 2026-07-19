@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   VTZ_OBJECT_DOMAINS,
+  composeEffectivePostures,
+  tighterPosture,
   toVtzSpecInput,
   toWireVtzSpec,
   toDomainPosture,
@@ -31,7 +33,7 @@ import type {
 } from '../src/index.js';
 
 /** The engine's full eleven-domain matrix, floors flagged, in the engine's own (unsorted) order. */
-const wirePostures = (network: string = 'permit-deny-risky'): WireDomainPosture[] => [
+const wirePostures = (network = 'permit-deny-risky'): WireDomainPosture[] => [
   { domain: 'ordinary-network', posture: network, floor: false },
   { domain: 'execution', posture: 'deny', floor: true },
   { domain: 'file-and-config', posture: 'permit-deny-risky', floor: false },
@@ -320,5 +322,65 @@ describe('the authoring spec (V2.3 write side)', () => {
     expect(
       toVtzSpecInput({ ...body, ownPostures: [{ domain: 'ipc', posture: 'deny' }] }),
     ).toBeNull();
+  });
+});
+
+describe('tighten-only composition (V2.5 effective-posture preview)', () => {
+  it('picks the tighter posture: deny always wins', () => {
+    expect(tighterPosture('deny', 'permit-deny-risky')).toBe('deny');
+    expect(tighterPosture('permit-deny-risky', 'deny')).toBe('deny');
+    expect(tighterPosture('deny', 'deny')).toBe('deny');
+    expect(tighterPosture('permit-deny-risky', 'permit-deny-risky')).toBe('permit-deny-risky');
+  });
+
+  it('a child can tighten what an ancestor set but can NEVER relax it', () => {
+    const own: WireDomainPosture[] = [
+      { domain: 'ordinary-network', posture: 'permit-deny-risky', floor: false },
+      { domain: 'ipc', posture: 'deny', floor: false },
+    ];
+    const inherited: WireDomainPosture[] = [
+      { domain: 'ordinary-network', posture: 'deny', floor: false },
+      { domain: 'ipc', posture: 'permit-deny-risky', floor: false },
+    ];
+    const composed = composeEffectivePostures(
+      own.map((p) => toDomainPosture(p)).flatMap((p) => (p === null ? [] : [p])),
+      inherited.map((p) => toDomainPosture(p)).flatMap((p) => (p === null ? [] : [p])),
+    );
+    const byDomain = new Map(composed.map((p) => [p.domain, p.posture]));
+    // The child tried to permit what the ancestor denies -- the ancestor wins.
+    expect(byDomain.get('ordinary-network')).toBe('deny');
+    // The child tightened what the ancestor permitted -- tightening is allowed.
+    expect(byDomain.get('ipc')).toBe('deny');
+  });
+
+  it('reproduces the engine own+effective pair for a real zone (the preview matches the store)', () => {
+    // The parent denies ordinary-network; the child sets it laxer. The engine's effective_postures for
+    // that child is exactly what composing own against the parent's effective postures produces.
+    const child = toVtzZone(wireZone());
+    const parentEffective = toVtzZone(wireZone({ own_postures: wirePostures('deny') }));
+    expect(child).not.toBeNull();
+    expect(parentEffective).not.toBeNull();
+    if (child === null || parentEffective === null) throw new Error('fixtures must narrow');
+    const preview = composeEffectivePostures(child.ownPostures, parentEffective.ownPostures);
+    expect(preview.map((p) => ({ domain: p.domain, posture: p.posture }))).toEqual(
+      child.effectivePostures.map((p) => ({ domain: p.domain, posture: p.posture })),
+    );
+  });
+
+  it('never loses an inherited deny for a domain the child did not author', () => {
+    const composed = composeEffectivePostures(
+      [{ domain: 'ipc', posture: 'permit-deny-risky', floor: false }],
+      [{ domain: 'governed-egress', posture: 'deny', floor: true }],
+    );
+    expect(composed).toHaveLength(2);
+    expect(composed[0]).toEqual({ domain: 'governed-egress', posture: 'deny', floor: true });
+  });
+
+  it('composition can never clear the engine floor flag', () => {
+    const composed = composeEffectivePostures(
+      [{ domain: 'governed-egress', posture: 'deny', floor: false }],
+      [{ domain: 'governed-egress', posture: 'deny', floor: true }],
+    );
+    expect(composed[0]?.floor).toBe(true);
   });
 });
