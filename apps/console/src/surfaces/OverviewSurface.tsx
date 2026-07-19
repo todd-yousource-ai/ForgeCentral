@@ -10,6 +10,7 @@
 // only a hard engine failure degrades to an ErrorState.
 
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge, OverviewSankeyFlow, type BadgeVariant } from '@forge/design';
 import {
   overviewVtzPageCount,
@@ -74,6 +75,7 @@ export function OverviewSurface(): ReactElement {
   const live = useLive();
   const liveStore = useLiveStore();
   const drawer = useDrawer();
+  const navigate = useNavigate();
 
   // O1.7 (INV-CONSOLE-LIVE): the poll drives the shared freshness store, so the shell indicator + this
   // surface read ONE source. A healthy tick is `live`; a failed tick with a last-known graph is
@@ -163,6 +165,11 @@ export function OverviewSurface(): ReactElement {
             onSelectContainer={(container) =>
               drawer.openContainer(container, CONTAINER_LABEL[container] ?? container)
             }
+            // A VTZ ring lands on that zone's governance surface (TRD-CONSOLE-02 acceptance; the leg
+            // IP-CONSOLE-01 deferred until the VTZ surface existed). One click from the Overview graph.
+            onSelectVtz={(zoneId) => {
+              void navigate(`/vtz?zone=${encodeURIComponent(zoneId)}`);
+            }}
           />
         </div>
       )}
