@@ -26,6 +26,7 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Badge, KpiCard, TabStrip, VtzZoneCard, type BadgeVariant } from '@forge/design';
+import { failClosedRootPostures } from '@forge/contracts';
 import type { RiskLevel, VtzArchetype, VtzSpecInput, VtzZone } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
@@ -157,7 +158,15 @@ function ZoneAuthoring({
   );
 }
 
-/** The create form: authors a new child of the chosen parent, seeded from that parent's real postures. */
+/** The `Parent zone` value meaning "no parent": author a ROOT zone. */
+const ROOT_PARENT = '';
+
+/**
+ * The create form. A child seeds its matrix from the chosen parent's REAL effective postures (the
+ * tightest legal start). A ROOT zone has no parent to learn from -- which is the only case where the
+ * Console proposes a matrix itself: the fail-closed all-deny bootstrap, the same thing the engine's own
+ * seed produces. Without this an empty tenant could never author its first zone.
+ */
 function ZoneCreate({
   parents,
   onCreated,
@@ -167,14 +176,18 @@ function ZoneCreate({
   readonly onCreated: (id: string) => void;
   readonly onCancel: () => void;
 }): ReactElement {
-  const [parentId, setParentId] = useState<string>(parents[0]?.id ?? '');
-  const parentDetail = useVtzDetail(parentId === '' ? null : parentId);
+  // Default to a root zone when the tenant has no zones at all; otherwise nest under the first.
+  const [parentId, setParentId] = useState<string>(parents[0]?.id ?? ROOT_PARENT);
+  const parentDetail = useVtzDetail(parentId === ROOT_PARENT ? null : parentId);
   const mutation = useVtzMutation();
   const parent = parents.find((p) => p.id === parentId) ?? null;
-  // The matrix seeds from the parent's REAL effective postures, so the editor only mounts once they have
-  // arrived. Mounting early would seed it empty and then need a state-sync effect to correct itself --
-  // and an empty matrix is not a legal spec anyway.
-  const inherited = parentDetail.data?.zone?.effectivePostures;
+  // A child's matrix seeds from the parent's REAL effective postures, so the editor only mounts once they
+  // have arrived (mounting early would seed it empty and need a state-sync effect to correct itself). A
+  // root has no parent read to wait for, so it seeds from the fail-closed bootstrap immediately.
+  const inherited =
+    parentId === ROOT_PARENT
+      ? failClosedRootPostures()
+      : parentDetail.data?.zone?.effectivePostures;
 
   return (
     <div className="fcx-vtz-create" aria-label="Create a trust zone">
@@ -185,6 +198,7 @@ function ZoneCreate({
           value={parentId}
           onChange={(e) => setParentId(e.target.value)}
         >
+          <option value={ROOT_PARENT}>None (root zone)</option>
           {parents.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -192,6 +206,13 @@ function ZoneCreate({
           ))}
         </select>
       </label>
+      {parentId === ROOT_PARENT ? (
+        <p className="fcx-vtz-config__note">
+          A root zone has no ancestor to inherit from, so it starts fail-closed: every domain
+          denied, which is exactly what the engine seeds. Relax what this zone needs, and the engine
+          re-validates the catastrophic floor on commit.
+        </p>
+      ) : null}
       {inherited === undefined ? (
         <LoadingState label="Loading the parent zone posture" />
       ) : (
@@ -250,10 +271,11 @@ export function VtzSurface(): ReactElement {
         {/* The engine reports when its zone scan hit the ceiling; the surface says so rather than
             presenting a prefix of the store as the whole (the same rule the Overview follows). */}
         {zonesQuery.data?.truncated === true ? <Badge variant="caution">Partial tree</Badge> : null}
+        {/* Always available: an empty tenant MUST be able to author its first (root) zone. */}
         <button
           type="button"
           className="fcx-btn"
-          disabled={zones.length === 0}
+          disabled={zonesQuery.data === undefined}
           onClick={() => {
             setCreating(true);
             setTab('configure');
@@ -314,7 +336,7 @@ export function VtzSurface(): ReactElement {
               hint={
                 search.trim() !== ''
                   ? `No zone name contains "${search.trim()}".`
-                  : 'The engine holds no trust zone for this tenant.'
+                  : 'The engine holds no trust zone for this tenant yet. Use New zone to author the first one.'
               }
             />
           ) : (
