@@ -16,21 +16,20 @@
 // way the Overview's hover-to-filter is a view over the already-real graph. The count of matches is always
 // stated against the true total so a narrowed grid is never mistaken for the whole store.
 //
-// The Configure tab is READ-ONLY here: it shows the selected zone's own vs effective posture and names the
-// ancestor that tightened it (the `vtz.detail` binding, live since V2.2). Authoring -- the editable
-// per-domain form, the floor lock, the effective-posture preview, draft/publish -- is V2.5.
+// AUTHORING (V2.5). The Configure tab is the editor: settings, the per-domain posture matrix with the
+// engine-flagged floor rows locked, and a live effective-posture preview composed against the PARENT
+// zone's real effective postures (a second `vtz.detail` read, so the preview is exact rather than
+// guessed). Save / Re-scope / Delete are three separate confirm-gated audited acts, because the engine
+// models them as three separate verbs. Every commit invalidates the tree, so the grid re-reads the system
+// of record instead of trusting the form.
 
 import { useMemo, useState, type ReactElement } from 'react';
 import { Badge, KpiCard, TabStrip, VtzZoneCard, type BadgeVariant } from '@forge/design';
-import {
-  VTZ_OBJECT_DOMAINS,
-  type DomainPosture,
-  type RiskLevel,
-  type VtzArchetype,
-  type VtzZone,
-} from '@forge/contracts';
+import type { RiskLevel, VtzArchetype, VtzSpecInput, VtzZone } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { VtzEditor } from './VtzEditor.js';
+import { useVtzMutation, VtzCommandError, type VtzCommandFailure } from './useVtzMutation.js';
 import { useVtzDetail, useVtzRiskBands, useVtzTree } from './useVtzTree.js';
 
 /**
@@ -84,20 +83,38 @@ export function matchZones(zones: readonly VtzZone[], search: string): readonly 
   return zones.filter((z) => z.name.toLowerCase().includes(needle));
 }
 
-/** Order the postures for display by the fixed domain order, so every zone reads the same way. */
-function orderPostures(postures: readonly DomainPosture[]): readonly DomainPosture[] {
-  const rank = new Map(VTZ_OBJECT_DOMAINS.map((domain, index) => [domain, index]));
-  return [...postures].sort((a, b) => (rank.get(a.domain) ?? 0) - (rank.get(b.domain) ?? 0));
+/** The parent zone's dotted name for `zone` (the lexical prefix the engine derived), or null at a root. */
+function parentIdOf(zone: VtzZone | null): string | null {
+  return zone?.parent ?? null;
 }
 
-/** The human label for a posture value. */
-function postureLabel(posture: DomainPosture['posture']): string {
-  return posture === 'deny' ? 'Deny' : 'Permit, deny risky';
+/** The typed failure of the last command, or null when it was not one the Console classified. */
+function failureOf(error: Error | null): VtzCommandFailure | null {
+  if (error === null) return null;
+  return error instanceof VtzCommandError ? error.failure : 'unavailable';
 }
 
-/** The read-only configuration panel for the selected zone: own vs effective posture + contributors. */
-function ZoneConfiguration({ zoneId }: { zoneId: string }): ReactElement {
+/**
+ * The authoring container for one selected zone: reads the zone AND its parent (whose effective postures
+ * are the exact inherited contribution the preview composes against), then renders the editor bound to the
+ * audited commands.
+ */
+function ZoneAuthoring({
+  zoneId,
+  onMoved,
+  onDeleted,
+}: {
+  readonly zoneId: string;
+  readonly onMoved: (newId: string) => void;
+  readonly onDeleted: () => void;
+}): ReactElement {
   const detail = useVtzDetail(zoneId);
+  const zone = detail.data?.zone ?? null;
+  // The parent's EFFECTIVE postures already carry the whole ancestor chain, so composing the operator's
+  // edit against them is exact -- no reconstruction, no guessing what an ancestor set.
+  const parentDetail = useVtzDetail(parentIdOf(zone));
+  const mutation = useVtzMutation();
+
   if (detail.isLoading) {
     return <LoadingState label="Loading the zone configuration" />;
   }
@@ -109,7 +126,6 @@ function ZoneConfiguration({ zoneId }: { zoneId: string }): ReactElement {
       />
     );
   }
-  const zone = detail.data.zone;
   if (zone === null) {
     return (
       <EmptyState
@@ -118,70 +134,81 @@ function ZoneConfiguration({ zoneId }: { zoneId: string }): ReactElement {
       />
     );
   }
-  const own = new Map(zone.ownPostures.map((p) => [p.domain, p]));
   return (
-    <div className="fcx-vtz-config">
-      <dl className="fcx-vtz-config__settings">
-        <div>
-          <dt>Session duration</dt>
-          <dd>{zone.reauthIntervalHours} hour(s)</dd>
-        </div>
-        <div>
-          <dt>Micro-segmentation</dt>
-          <dd>{zone.microSegmentation ? 'On' : 'Off'}</dd>
-        </div>
-        <div>
-          <dt>Telemetry</dt>
-          <dd>{zone.telemetry}</dd>
-        </div>
-        <div>
-          <dt>Lifecycle</dt>
-          <dd>{zone.lifecycle}</dd>
-        </div>
-      </dl>
+    <VtzEditor
+      // Remount on a zone change so the form initializes from the new zone with no state-sync effect.
+      key={zone.id}
+      mode="edit"
+      zone={zone}
+      inherited={parentDetail.data?.zone?.effectivePostures ?? []}
+      parentName={zone.parent}
+      busy={mutation.isPending}
+      failure={failureOf(mutation.error)}
+      onSubmit={(spec: VtzSpecInput) => mutation.mutate({ kind: 'edit', id: zone.id, spec })}
+      onRescope={(newName) =>
+        mutation.mutate(
+          { kind: 'rescope', id: zone.id, newName },
+          { onSuccess: (result) => onMoved(result.id) },
+        )
+      }
+      onDelete={() => mutation.mutate({ kind: 'delete', id: zone.id }, { onSuccess: onDeleted })}
+    />
+  );
+}
 
-      <p className="fcx-vtz-config__note">
-        {detail.data.ancestors.length > 0
-          ? `Effective posture composes this zone with ${detail.data.ancestors
-              .map((a) => a.name)
-              .join(', ')}. Inheritance only tightens: an ancestor's deny always wins.`
-          : 'This is a root zone, so its effective posture is its own.'}
-      </p>
+/** The create form: authors a new child of the chosen parent, seeded from that parent's real postures. */
+function ZoneCreate({
+  parents,
+  onCreated,
+  onCancel,
+}: {
+  readonly parents: readonly VtzZone[];
+  readonly onCreated: (id: string) => void;
+  readonly onCancel: () => void;
+}): ReactElement {
+  const [parentId, setParentId] = useState<string>(parents[0]?.id ?? '');
+  const parentDetail = useVtzDetail(parentId === '' ? null : parentId);
+  const mutation = useVtzMutation();
+  const parent = parents.find((p) => p.id === parentId) ?? null;
+  // The matrix seeds from the parent's REAL effective postures, so the editor only mounts once they have
+  // arrived. Mounting early would seed it empty and then need a state-sync effect to correct itself --
+  // and an empty matrix is not a legal spec anyway.
+  const inherited = parentDetail.data?.zone?.effectivePostures;
 
-      <table className="fcx-vtz-postures">
-        <caption>Per-domain posture: what this zone set, and what actually applies</caption>
-        <thead>
-          <tr>
-            <th scope="col">Domain</th>
-            <th scope="col">Own</th>
-            <th scope="col">Effective</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orderPostures(zone.effectivePostures).map((effective) => {
-            const ownPosture = own.get(effective.domain);
-            const tightened = ownPosture !== undefined && ownPosture.posture !== effective.posture;
-            return (
-              <tr key={effective.domain}>
-                <th scope="row">
-                  {effective.domain}
-                  {/* The engine flags the read-only catastrophic floor; the Console never decides it. */}
-                  {effective.floor ? <Badge variant="critical">Floor</Badge> : null}
-                </th>
-                <td>{ownPosture === undefined ? '--' : postureLabel(ownPosture.posture)}</td>
-                <td>
-                  {postureLabel(effective.posture)}
-                  {tightened ? <Badge variant="info">Inherited</Badge> : null}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      <p className="fcx-vtz-config__note" role="note">
-        Editing a zone lands with the authoring form; this view is read-only.
-      </p>
+  return (
+    <div className="fcx-vtz-create" aria-label="Create a trust zone">
+      <label className="fcx-field">
+        <span className="fcx-field__label">Parent zone</span>
+        <select
+          className="fcx-input"
+          value={parentId}
+          onChange={(e) => setParentId(e.target.value)}
+        >
+          {parents.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {inherited === undefined ? (
+        <LoadingState label="Loading the parent zone posture" />
+      ) : (
+        <VtzEditor
+          // Remount when the parent changes so the matrix re-seeds from that parent's real postures.
+          key={parentId}
+          mode="create"
+          zone={null}
+          inherited={inherited}
+          parentName={parent?.name ?? null}
+          busy={mutation.isPending}
+          failure={failureOf(mutation.error)}
+          onSubmit={(spec: VtzSpecInput) =>
+            mutation.mutate({ kind: 'create', spec }, { onSuccess: (r) => onCreated(r.id) })
+          }
+          onCancel={onCancel}
+        />
+      )}
     </div>
   );
 }
@@ -191,6 +218,7 @@ export function VtzSurface(): ReactElement {
   const [tab, setTab] = useState('active');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const zonesQuery = useVtzTree();
   // The per-zone risk band is a JOIN over the already-live connectivity read (`vtz.riskBand`), not a new
@@ -217,6 +245,17 @@ export function VtzSurface(): ReactElement {
         {/* The engine reports when its zone scan hit the ceiling; the surface says so rather than
             presenting a prefix of the store as the whole (the same rule the Overview follows). */}
         {zonesQuery.data?.truncated === true ? <Badge variant="caution">Partial tree</Badge> : null}
+        <button
+          type="button"
+          className="fcx-btn"
+          disabled={zones.length === 0}
+          onClick={() => {
+            setCreating(true);
+            setTab('configure');
+          }}
+        >
+          New zone
+        </button>
       </div>
 
       <div className="fcx-vtz-kpis">
@@ -290,6 +329,7 @@ export function VtzSurface(): ReactElement {
                     policyCount={{ unavailable: POLICIES_UNAVAILABLE }}
                     selected={selectedId === zone.id}
                     onOpen={() => {
+                      setCreating(false);
                       setSelectedId(zone.id);
                       setTab('configure');
                     }}
@@ -299,6 +339,18 @@ export function VtzSurface(): ReactElement {
             </div>
           )}
         </>
+      ) : creating ? (
+        <div className="fcx-vtz-detail">
+          <h3 className="fcx-vtz-detail__title">New trust zone</h3>
+          <ZoneCreate
+            parents={zones}
+            onCreated={(id) => {
+              setCreating(false);
+              setSelectedId(id);
+            }}
+            onCancel={() => setCreating(false)}
+          />
+        </div>
       ) : selected === undefined ? (
         <EmptyState
           title="Select a zone to configure"
@@ -307,7 +359,14 @@ export function VtzSurface(): ReactElement {
       ) : (
         <div className="fcx-vtz-detail" aria-label={`Configuration for ${selected.name}`}>
           <h3 className="fcx-vtz-detail__title">{selected.name}</h3>
-          <ZoneConfiguration zoneId={selected.id} />
+          <ZoneAuthoring
+            zoneId={selected.id}
+            onMoved={(newId) => setSelectedId(newId)}
+            onDeleted={() => {
+              setSelectedId(null);
+              setTab('active');
+            }}
+          />
         </div>
       )}
     </section>

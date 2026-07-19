@@ -658,3 +658,52 @@ body {
   gap: var(--fc-space-sm);
   font-weight: var(--fc-font-weight-regular);
 }
+
+/* The zone authoring form (IP-CONSOLE-02 V2.5). */
+.fcx-vtz-editor__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--fc-space-lg);
+  margin-bottom: var(--fc-space-lg);
+}
+
+.fcx-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-field__note {
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-vtz-editor__note {
+  margin: var(--fc-space-md) 0;
+  font-size: var(--fc-font-size-sm);
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-vtz-editor__failure {
+  margin: 0 0 var(--fc-space-lg);
+  padding: var(--fc-space-md);
+  border-radius: var(--fc-radius-md);
+  border: 1px solid var(--fc-color-status-critical);
+  font-size: var(--fc-font-size-sm);
+  color: var(--fc-color-text-primary);
+}
+
+.fcx-vtz-editor__actions {
+  display: flex;
+  gap: var(--fc-space-md);
+  margin: var(--fc-space-lg) 0;
+}
+
+.fcx-vtz-editor__rescope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fc-space-md);
+  padding-top: var(--fc-space-lg);
+  border-top: 1px solid var(--fc-color-surface-border);
+}
