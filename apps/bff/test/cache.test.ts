@@ -44,4 +44,20 @@ describe('EphemeralCache', () => {
     cache.clear();
     expect(cache.size).toBe(0);
   });
+
+  it('drops only the entries under a prefix (a tenant-scoped write never evicts another tenant)', () => {
+    const cache = new EphemeralCache<string>(1000, 10);
+    cache.set('vtz:ten-a:tree:200', 'a-tree', 'v1');
+    cache.set('vtz:ten-a:detail:Zone', 'a-detail', 'v1');
+    cache.set('vtz:ten-b:tree:200', 'b-tree', 'v1');
+    cache.set('overview:sankey:ten-a', 'a-graph', 'v1');
+
+    cache.deletePrefix('vtz:ten-a:');
+
+    expect(cache.get('vtz:ten-a:tree:200', 'v1')).toBeUndefined();
+    expect(cache.get('vtz:ten-a:detail:Zone', 'v1')).toBeUndefined();
+    // Another tenant's zones and this tenant's other surfaces are untouched.
+    expect(cache.get('vtz:ten-b:tree:200', 'v1')).toBe('b-tree');
+    expect(cache.get('overview:sankey:ten-a', 'v1')).toBe('a-graph');
+  });
 });

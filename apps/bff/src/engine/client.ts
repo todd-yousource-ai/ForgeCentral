@@ -26,8 +26,13 @@ import type {
   WireMemberList,
   WireQueryRows,
   WireQuerySubmit,
+  WireVtzCreate,
+  WireVtzDelete,
   WireVtzDetail,
   WireVtzDetailQuery,
+  WireVtzEdit,
+  WireVtzMutation,
+  WireVtzRescope,
   WireVtzTree,
   WireVtzTreeQuery,
 } from '@forge/contracts';
@@ -95,6 +100,16 @@ export interface CrucibleClient {
   /** Read one zone plus the ancestor chain contributing to its effective posture (VTZ_DETAIL, crdb
    * VZ.3b). An id naming no zone in the tenant returns an absent zone, not an error. */
   vtzDetail(request: WireVtzDetailQuery, opts?: EngineCallOptions): Promise<WireVtzDetail>;
+  /** Author a new trust zone (VTZ_CREATE, crdb VZ.4b). An audited write: the engine re-validates the
+   * name, the catastrophic floor, and tighten-only inheritance, commits through the Committer, and
+   * refuses rather than silently correcting. */
+  vtzCreate(request: WireVtzCreate, opts?: EngineCallOptions): Promise<WireVtzMutation>;
+  /** Edit a zone's own postures + settings, incl. the draft -> published transition (VTZ_EDIT). Audited. */
+  vtzEdit(request: WireVtzEdit, opts?: EngineCallOptions): Promise<WireVtzMutation>;
+  /** Re-scope a zone: a rename, since the dotted name IS the hierarchy (VTZ_RESCOPE). Audited. */
+  vtzRescope(request: WireVtzRescope, opts?: EngineCallOptions): Promise<WireVtzMutation>;
+  /** Delete a zone (VTZ_DELETE). Audited; the engine refuses a zone that still has children. */
+  vtzDelete(request: WireVtzDelete, opts?: EngineCallOptions): Promise<WireVtzMutation>;
   /** Fetch the next page for an open cursor. */
   cursorFetch(handle: EngineHandle, opts?: EngineCallOptions): Promise<WireQueryRows>;
   /** Close an open cursor (releases engine-side resources). */

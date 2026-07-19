@@ -36,6 +36,7 @@ import type {
   WireDomainPosture,
   WireVtzDetail,
   WireVtzMutation,
+  WireVtzSpec,
   WireVtzTree,
   WireVtzTreeNode,
 } from './generated/wire-dto.js';
@@ -314,4 +315,113 @@ export function toVtzMutation(reply: WireVtzMutation): VtzMutationResult | null 
     return null;
   }
   return { id: vtzId(reply.id), lifecycle };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The WRITE side (IP-CONSOLE-02 V2.3): what the operator authors. The engine is the authority on every rule
+// here -- it re-validates the name shape, the re-auth bound, the read-only catastrophic floor, and
+// tighten-only inheritance on commit, and refuses rather than silently correcting. The Console validates
+// the same things first only so a malformed edit fails fast at the boundary with a useful message instead
+// of burning an engine round-trip; it never relaxes a rule the engine enforces.
+
+/** The lowest re-authentication interval a zone may carry, in hours (the engine re-validates). */
+export const MIN_REAUTH_INTERVAL_HOURS = 1;
+
+/** The highest re-authentication interval a zone may carry, in hours (the engine re-validates). */
+export const MAX_REAUTH_INTERVAL_HOURS = 24;
+
+/**
+ * A zone as the operator authored it (`vtz.create` / `vtz.edit`). The camelCase mirror of `WireVtzSpec`.
+ * `name` is the dotted `VtzName` and IS the identity + the hierarchy, so an edit that changes it is a
+ * re-scope ({@link VtzRescopeInput}), not an edit.
+ *
+ * `ownPostures` carries the full per-domain matrix INCLUDING the catastrophic-floor rows. The `floor` flag
+ * on each entry is the engine's to determine: whatever the Console sends, the engine re-derives it from the
+ * domain and refuses any spec that relaxes a floor. The Console sends the flag back verbatim so a
+ * round-trip of an unmodified zone is byte-identical, never to assert what is or is not a floor.
+ */
+export interface VtzSpecInput {
+  readonly name: string;
+  readonly description: string;
+  readonly zoneType: VtzArchetype;
+  readonly ownPostures: readonly DomainPosture[];
+  readonly microSegmentation: boolean;
+  readonly telemetry: VtzTelemetry;
+  /** Re-authentication interval in hours, 1-24 ("Session Duration" on the surface). */
+  readonly reauthIntervalHours: number;
+  /** `draft` keeps the zone unpublished; `published` is a real state transition the engine commits. */
+  readonly lifecycle: VtzLifecycle;
+}
+
+/** A re-scope: move a zone to a new dotted name (which is what changes its parent). */
+export interface VtzRescopeInput {
+  readonly id: string;
+  readonly newName: string;
+}
+
+/** Compile an authored {@link VtzSpecInput} into the engine's `WireVtzSpec`. Total: field renaming only. */
+export function toWireVtzSpec(spec: VtzSpecInput): WireVtzSpec {
+  return {
+    name: spec.name,
+    description: spec.description,
+    zone_type: spec.zoneType,
+    own_postures: spec.ownPostures.map((p) => ({
+      domain: p.domain,
+      posture: p.posture,
+      floor: p.floor,
+    })),
+    micro_segmentation: spec.microSegmentation,
+    telemetry: spec.telemetry,
+    reauth_interval_hours: spec.reauthIntervalHours,
+    lifecycle: spec.lifecycle,
+  };
+}
+
+/**
+ * Narrow an untrusted authoring payload (a parsed request body) into a {@link VtzSpecInput}, or `null` if
+ * ANY field is missing, mistyped, or carries a tag the Console does not know. Fail-closed and total: there
+ * is no partial accept and no defaulting, so a malformed edit can never reach the engine as a
+ * half-understood spec. The engine re-validates everything regardless; this is the boundary check.
+ */
+export function toVtzSpecInput(body: unknown): VtzSpecInput | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const b = body as Record<string, unknown>;
+  const { name, description, zoneType, telemetry, lifecycle } = b;
+  if (typeof name !== 'string' || name.trim() === '') return null;
+  if (typeof description !== 'string') return null;
+  if (typeof b['microSegmentation'] !== 'boolean') return null;
+  const archetype = typeof zoneType === 'string' ? toVtzArchetype(zoneType) : null;
+  const mode = typeof telemetry === 'string' ? toVtzTelemetry(telemetry) : null;
+  const state = typeof lifecycle === 'string' ? toVtzLifecycle(lifecycle) : null;
+  if (archetype === null || mode === null || state === null) return null;
+  const hours = b['reauthIntervalHours'];
+  if (
+    typeof hours !== 'number' ||
+    !Number.isInteger(hours) ||
+    hours < MIN_REAUTH_INTERVAL_HOURS ||
+    hours > MAX_REAUTH_INTERVAL_HOURS
+  ) {
+    return null;
+  }
+  const rawPostures = b['ownPostures'];
+  if (!Array.isArray(rawPostures) || rawPostures.length === 0) return null;
+  const ownPostures: DomainPosture[] = [];
+  for (const raw of rawPostures) {
+    if (typeof raw !== 'object' || raw === null) return null;
+    const p = raw as Record<string, unknown>;
+    const domain = typeof p['domain'] === 'string' ? toVtzObjectDomain(p['domain']) : null;
+    const posture = typeof p['posture'] === 'string' ? toVtzPosture(p['posture']) : null;
+    if (domain === null || posture === null || typeof p['floor'] !== 'boolean') return null;
+    ownPostures.push({ domain, posture, floor: p['floor'] });
+  }
+  return {
+    name: name.trim(),
+    description,
+    zoneType: archetype,
+    ownPostures,
+    microSegmentation: b['microSegmentation'],
+    telemetry: mode,
+    reauthIntervalHours: hours,
+    lifecycle: state,
+  };
 }

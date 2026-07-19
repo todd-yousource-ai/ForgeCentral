@@ -56,6 +56,10 @@ function engineWith(parts: {
     logExport: unused,
     vtzTree: unused,
     vtzDetail: unused,
+    vtzCreate: unused,
+    vtzEdit: unused,
+    vtzRescope: unused,
+    vtzDelete: unused,
   };
 }
 

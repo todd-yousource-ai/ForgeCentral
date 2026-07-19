@@ -32,8 +32,13 @@ import type {
   WireMemberList,
   WireQueryRows,
   WireQuerySubmit,
+  WireVtzCreate,
+  WireVtzDelete,
   WireVtzDetail,
   WireVtzDetailQuery,
+  WireVtzEdit,
+  WireVtzMutation,
+  WireVtzRescope,
   WireVtzTree,
   WireVtzTreeQuery,
 } from '@forge/contracts';
@@ -56,6 +61,10 @@ export type EngineAction =
   | 'logExport'
   | 'vtzTree'
   | 'vtzDetail'
+  | 'vtzCreate'
+  | 'vtzEdit'
+  | 'vtzRescope'
+  | 'vtzDelete'
   | 'cursorFetch'
   | 'cursorClose';
 
@@ -165,6 +174,30 @@ export interface OperatorEngine {
     request: WireVtzDetailQuery,
     opts?: EngineCallOptions,
   ): Promise<WireVtzDetail>;
+  /** Author a new zone (VTZ_CREATE) on behalf of `principal`. Audited engine-side. */
+  vtzCreate(
+    principal: OperatorPrincipal,
+    request: WireVtzCreate,
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzMutation>;
+  /** Edit a zone (VTZ_EDIT) on behalf of `principal`. Audited engine-side. */
+  vtzEdit(
+    principal: OperatorPrincipal,
+    request: WireVtzEdit,
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzMutation>;
+  /** Re-scope a zone (VTZ_RESCOPE) on behalf of `principal`. Audited engine-side. */
+  vtzRescope(
+    principal: OperatorPrincipal,
+    request: WireVtzRescope,
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzMutation>;
+  /** Delete a zone (VTZ_DELETE) on behalf of `principal`. Audited engine-side. */
+  vtzDelete(
+    principal: OperatorPrincipal,
+    request: WireVtzDelete,
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzMutation>;
   /** Fetch the next page of an open cursor on behalf of `principal`. */
   cursorFetch(
     principal: OperatorPrincipal,
@@ -267,6 +300,29 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'vtzDetail', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.vtzDetail({ ...request, operator }, opts);
+    },
+    // The four audited zone mutations. The operator delegation is injected from the authenticated
+    // principal, never client-asserted: the engine attributes the audit entry to THIS operator, in THIS
+    // tenant, under the peer's Delegation grant.
+    vtzCreate: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'vtzCreate', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.vtzCreate({ ...request, operator }, opts);
+    },
+    vtzEdit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'vtzEdit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.vtzEdit({ ...request, operator }, opts);
+    },
+    vtzRescope: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'vtzRescope', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.vtzRescope({ ...request, operator }, opts);
+    },
+    vtzDelete: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'vtzDelete', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.vtzDelete({ ...request, operator }, opts);
     },
     cursorFetch: (principal, handle, opts) => {
       delegation.record(delegationFor(principal, 'cursorFetch'));

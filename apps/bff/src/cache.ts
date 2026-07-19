@@ -48,6 +48,17 @@ export class EphemeralCache<V> {
     this.entries.set(key, { value, version, expiresAt: this.now() + this.ttlMs });
   }
 
+  /**
+   * Drop every entry whose key starts with `prefix`. Used after an audited mutation: the projection of a
+   * store the operator just changed must not be served again from cache, or their own edit would appear
+   * not to have taken. Callers scope the prefix by tenant so one tenant's write never evicts another's.
+   */
+  deletePrefix(prefix: string): void {
+    for (const key of [...this.entries.keys()]) {
+      if (key.startsWith(prefix)) this.entries.delete(key);
+    }
+  }
+
   /** Drop everything (e.g. on session end). */
   clear(): void {
     this.entries.clear();

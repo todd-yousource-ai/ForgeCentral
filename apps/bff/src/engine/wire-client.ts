@@ -34,6 +34,7 @@ import type {
   WireQueryRows,
   WireReply,
   WireVtzDetail,
+  WireVtzMutation,
   WireVtzTree,
 } from '@forge/contracts';
 
@@ -148,6 +149,18 @@ export function replyToVtzDetail(reply: WireReply): WireVtzDetail {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a vtz-detail read');
+}
+
+/**
+ * Map an engine `WireReply` to `WireVtzMutation` (the audited VTZ writes), throwing a typed error on a
+ * refusal. A refusal here is meaningful, not noise: the engine refuses a floor relaxation, an inheritance
+ * contradiction, or a state conflict, and the resolver classifies it for the operator.
+ */
+export function replyToVtzMutation(reply: WireReply): WireVtzMutation {
+  if (typeof reply === 'object' && 'VtzMutated' in reply) return reply.VtzMutated;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a vtz mutation');
 }
 
 /** Reject `op` if it does not settle within `ms` (a per-call bound; every engine call is bounded). */
@@ -413,6 +426,46 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireVtzDetail> {
     return this.call(
       async (transport) => replyToVtzDetail(await dispatch(transport, { VtzDetail: request })),
+      opts,
+    );
+  }
+
+  async vtzCreate(
+    request: Parameters<CrucibleClient['vtzCreate']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzMutation> {
+    return this.call(
+      async (transport) => replyToVtzMutation(await dispatch(transport, { VtzCreate: request })),
+      opts,
+    );
+  }
+
+  async vtzEdit(
+    request: Parameters<CrucibleClient['vtzEdit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzMutation> {
+    return this.call(
+      async (transport) => replyToVtzMutation(await dispatch(transport, { VtzEdit: request })),
+      opts,
+    );
+  }
+
+  async vtzRescope(
+    request: Parameters<CrucibleClient['vtzRescope']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzMutation> {
+    return this.call(
+      async (transport) => replyToVtzMutation(await dispatch(transport, { VtzRescope: request })),
+      opts,
+    );
+  }
+
+  async vtzDelete(
+    request: Parameters<CrucibleClient['vtzDelete']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzMutation> {
+    return this.call(
+      async (transport) => replyToVtzMutation(await dispatch(transport, { VtzDelete: request })),
       opts,
     );
   }
