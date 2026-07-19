@@ -32,3 +32,4 @@ pnpm-debug.log*
 
 # generated build artifacts
 sbom.cdx.json
+.bff-deploy/
