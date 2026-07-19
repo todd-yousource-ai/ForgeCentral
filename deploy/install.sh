@@ -21,6 +21,14 @@
 #                             the wire planes the console service peer is granted
 #   CONSOLE_NODE_CBOR         [4b] optional, default `/etc/cdb/node.cbor`: the node config to pin into
 #   CONSOLE_CDB_MKCONFIG      [4b] optional, default `/usr/local/bin/cdb-mkconfig`: the pinning tool
+#   CONSOLE_OPERATOR_TENANT   [5] optional: the operator read tenant (FC_RBAC_CONFIG.defaultTenant);
+#                             defaults to the same fixed tenant the crdb installer hardcodes
+#   CONSOLE_OPERATOR_SUB      [5] optional: the OIDC subject granted global-admin in localRbac.
+#                             resolveAuthority() requires a MATCHED grant before the defaultTenant
+#                             branch, so an empty map refuses EVERY operator login (fail-closed)
+#   CONSOLE_OIDC_ISSUER       [5] optional: the BFF OIDC issuer; defaults to the pinned dev IdP.
+#   CONSOLE_OIDC_CLIENT_ID    [5] Set CONSOLE_OIDC_ISSUER=none to leave auth unmounted (API-only).
+#   CONSOLE_OIDC_ROLE_CLAIM   [5] All three are written together when the issuer is set.
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -137,17 +145,42 @@ install -d -m 0750 "$BFF_ETC"
 # wire/enrollment tenant (df46dcb7). The Console's CONNECTIVITY_GRAPH read scans session.tenant, so the
 # operator MUST read the tenant torch ships to; a per-install random tenant is why the Overview kept
 # coming up empty. Deterministic across rebuilds; overridable via CONSOLE_OPERATOR_TENANT. Idempotent:
-# replace any existing (commented or live) FC_RBAC_CONFIG line -- the operator is a global-admin on this
-# single tenant, groupRoles/localRbac stay empty for the single-node console.
+# replace any existing (commented or live) FC_RBAC_CONFIG line. The operator subject MUST hold a
+# localRbac grant: resolveAuthority() (apps/bff/src/auth/rbac.ts) requires a matched grant BEFORE the
+# global-admin/defaultTenant branch, so the empty map this script used to write refused every login
+# (incident 2026-07-18 "operator has no resolvable authority").
 OPERATOR_TENANT="${CONSOLE_OPERATOR_TENANT:-df46dcb7-2e91-448c-a406-42e492b85e36}"
+OPERATOR_SUB="${CONSOLE_OPERATOR_SUB:-auth0|6a3abf93a1c6aeb8baddbc94}"
 sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_RBAC_CONFIG=/d' "$BFF_ETC/config.env"
-printf 'FC_RBAC_CONFIG={"groupRoles":{},"localRbac":{},"defaultTenant":"%s"}\n' "$OPERATOR_TENANT" >>"$BFF_ETC/config.env"
-log "  operator read tenant pinned to $OPERATOR_TENANT (FC_RBAC_CONFIG.defaultTenant)"
+printf 'FC_RBAC_CONFIG={"groupRoles":{},"localRbac":{"%s":{"role":"global-admin"}},"defaultTenant":"%s"}\n' \
+  "$OPERATOR_SUB" "$OPERATOR_TENANT" >>"$BFF_ETC/config.env"
+log "  operator grant: localRbac[$OPERATOR_SUB]=global-admin, read tenant $OPERATOR_TENANT"
+
+# The OIDC block: the BFF mounts operator auth only when FC_OIDC_ISSUER is set, so an install without
+# it renders the SPA but can never complete a login. Default to the pinned dev IdP (the same
+# device-code client the enrollment MFA uses); CONSOLE_OIDC_ISSUER=none leaves auth unmounted.
+OIDC_ISSUER="${CONSOLE_OIDC_ISSUER:-https://dev-6rcwumbp1tsae8me.us.auth0.com/}"
+sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_OIDC_(ISSUER|CLIENT_ID|ROLE_CLAIM)=/d' "$BFF_ETC/config.env"
+if [ "$OIDC_ISSUER" != "none" ]; then
+  OIDC_CLIENT_ID="${CONSOLE_OIDC_CLIENT_ID:-G0ve3f1ooy2kZUFg8nK5VALvmOdqXGVV}"
+  OIDC_ROLE_CLAIM="${CONSOLE_OIDC_ROLE_CLAIM:-https://forgecentral.io/roles}"
+  {
+    printf 'FC_OIDC_ISSUER=%s\n' "$OIDC_ISSUER"
+    printf 'FC_OIDC_CLIENT_ID=%s\n' "$OIDC_CLIENT_ID"
+    printf 'FC_OIDC_ROLE_CLAIM=%s\n' "$OIDC_ROLE_CLAIM"
+  } >>"$BFF_ETC/config.env"
+  log "  operator OIDC mounted (issuer $OIDC_ISSUER)"
+else
+  log "  operator OIDC left unmounted (CONSOLE_OIDC_ISSUER=none -- API-only)"
+fi
 chown -R console-bff:console-bff "$BFF_ETC"
 install -m 0644 "$repo_root/sidecar/deploy/console-crypto-sidecar.service" /etc/systemd/system/
 install -m 0644 "$repo_root/apps/bff/deploy/console-bff.service"           /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now console-crypto-sidecar console-bff
+# enable + restart (not `--now`): a re-run rewrites config.env, and an already-active unit under
+# `--now` keeps serving the stale environment.
+systemctl enable console-crypto-sidecar console-bff
+systemctl restart console-crypto-sidecar console-bff
 
 # ---- [6] validate (the CS.N proofs) --------------------------------------------------------------
 log "[6] validate"

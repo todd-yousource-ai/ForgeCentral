@@ -20,8 +20,15 @@ systemctl is-active --quiet console-bff            || fail "console-bff is not a
 ok "both units active"
 
 echo "==> [2/4] engine leg: BFF /readyz (BFF -> sidecar -> mTLS :7878, Node doing no TLS)"
-ready=$(curl -fsS -m 15 "http://127.0.0.1:${BFF_HTTP_PORT}/readyz" 2>/dev/null || true)
-echo "$ready" | grep -q '"ready":true' || fail "/readyz not green (got: ${ready:-<none>}) -- the sidecar could not reach the engine with the enrolled identity"
+# Retry: install.sh [4b] restarts cdb when it pins the console peer, and the engine takes tens of
+# seconds to serve the wire again -- a single immediate probe races that boot and fails a good install.
+ready=""
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  ready=$(curl -fsS -m 15 "http://127.0.0.1:${BFF_HTTP_PORT}/readyz" 2>/dev/null || true)
+  if echo "$ready" | grep -q '"ready":true'; then break; fi
+  sleep 5
+done
+echo "$ready" | grep -q '"ready":true' || fail "/readyz not green after 60s (got: ${ready:-<none>}) -- the sidecar could not reach the engine with the enrolled identity"
 ok "engine leg green"
 
 echo "==> [3/4] admin floor: classical P-384 handshake on ${NODE_IP}:${ADMIN_PORT}"
