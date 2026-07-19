@@ -6,7 +6,7 @@
 // with the session cookie; the SPA never holds a token. TanStack Query owns caching/loading/error.
 
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { LogDetailView, LogPage, LogQueryFilter } from '@forge/contracts';
+import type { LogDetailView, LogPage, LogQueryFilter, LogRow } from '@forge/contracts';
 
 // TUNE(IP-CONSOLE-09 LG.4): the live-tail poll interval. v1 polls the recent window so a new decision
 // appears within ~1 interval; the real push-stream (crdb Part B / F0.6 SSE) gives true < 2 s and swaps in
@@ -25,6 +25,7 @@ export function logsQueryString(filter: LogQueryFilter): string {
   if (filter.action !== undefined) params.set('action', filter.action);
   if (filter.search !== undefined) params.set('search', filter.search);
   params.set('limit', String(filter.limit));
+  if (filter.offset !== undefined && filter.offset > 0) params.set('offset', String(filter.offset));
   return params.toString();
 }
 
@@ -45,12 +46,89 @@ export async function fetchLogs(filter: LogQueryFilter): Promise<LogPage> {
  * poll for a historical view.
  */
 export function useLogs(filter: LogQueryFilter, live = true): UseQueryResult<LogPage> {
+  const backfill = useLogsBackfill(filter.limit);
   return useQuery({
     queryKey: ['logs', filter],
     queryFn: () => fetchLogs(filter),
-    placeholderData: keepPreviousData,
+    // SQ.8b (INV-CONSOLE-LOGS-INSTANT): a filter change answers INSTANTLY from the background-
+    // loaded cache (client-filtered placeholder) while the engine's authoritative result loads and
+    // replaces it -- the engine predicate remains the source of truth (INV-CONSOLE-LOGS-REAL); the
+    // cache is only ever a complete, real, already-fetched superset shown early.
+    placeholderData: (previous) => {
+      if (previous !== undefined) return previous;
+      if (!backfill.complete) return undefined;
+      return { rows: backfill.rows.filter((row) => matchesFilter(row, filter)) };
+    },
     refetchInterval: live ? LIVE_POLL_MS : false,
   });
+}
+
+// TUNE(SQ.8b): the background pager's page size and refresh cadence. Pages walk `offset` until a
+// short page (the working set is bounded, so this converges fast); the cache refreshes on the slow
+// interval -- freshness comes from the live page-0 poll above, not from re-walking the backfill.
+const BACKFILL_PAGE_SIZE = 100;
+const BACKFILL_REFRESH_MS = 30_000;
+const BACKFILL_MAX_PAGES = 50;
+
+/** The background-loaded LOG cache: every row the engine holds, walked one page at a time. */
+export interface LogsBackfill {
+  /** Every cached row, newest-first (page order preserved). */
+  readonly rows: LogPage['rows'];
+  /** True once the walk hit a short page -- only then may filters answer from the cache. */
+  readonly complete: boolean;
+}
+
+/**
+ * Background-loads the whole LOG one page at a time (SQ.8b): page 0 is the working set the surface
+ * already shows; subsequent pages walk `offset` until a short page. The result feeds `useLogs`'s
+ * instant-filter placeholder; it never replaces the engine's filtered read.
+ */
+export function useLogsBackfill(pageSize: number = BACKFILL_PAGE_SIZE): LogsBackfill {
+  const query = useQuery({
+    queryKey: ['logsBackfill', pageSize],
+    queryFn: async (): Promise<LogsBackfill> => {
+      const rows: LogRow[] = [];
+      for (let page = 0; page < BACKFILL_MAX_PAGES; page += 1) {
+        // Sequential on purpose: one in-flight request, engine-friendly.
+        // eslint-disable-next-line no-await-in-loop
+        const fetched = await fetchLogs({ limit: pageSize, offset: page * pageSize });
+        rows.push(...fetched.rows);
+        if (fetched.rows.length < pageSize) {
+          return { rows, complete: true };
+        }
+      }
+      // The cap bound the walk (an unusually deep store): the cache is honest but incomplete, so
+      // filters keep going to the engine.
+      return { rows, complete: false };
+    },
+    refetchInterval: BACKFILL_REFRESH_MS,
+    staleTime: BACKFILL_REFRESH_MS,
+  });
+  return query.data ?? { rows: [], complete: false };
+}
+
+/**
+ * The client-side mirror of the engine's LOG predicate, used ONLY for the instant placeholder over a
+ * COMPLETE cache (the engine's own filtered result replaces it). `search` matches the summary, rule
+ * id, and technique (the row does not carry the evidence body).
+ */
+export function matchesFilter(row: LogPage['rows'][number], filter: LogQueryFilter): boolean {
+  if (filter.since !== undefined && row.at < filter.since) return false;
+  if (filter.until !== undefined && row.at > filter.until) return false;
+  if (filter.technique !== undefined && row.technique !== filter.technique) return false;
+  if (filter.tactic !== undefined && !row.tactics.includes(filter.tactic)) return false;
+  if (filter.ruleId !== undefined && row.ruleId !== filter.ruleId) return false;
+  if (filter.confidence !== undefined && row.confidence !== filter.confidence) return false;
+  if (filter.action !== undefined && row.outcome !== filter.action) return false;
+  if (filter.search !== undefined) {
+    const needle = filter.search.toLowerCase();
+    const hit =
+      row.summary.toLowerCase().includes(needle) ||
+      row.ruleId.toLowerCase().includes(needle) ||
+      row.technique.toLowerCase().includes(needle);
+    if (!hit) return false;
+  }
+  return true;
 }
 
 /** The cache key for one decision's EXPLAIN detail (its id), shared by the query + the imperative fetch. */

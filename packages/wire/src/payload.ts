@@ -135,6 +135,8 @@ function logQueryToCbor(request: WireLogQuery): unknown {
   if (request.action != null) out['action'] = request.action;
   if (request.search != null) out['search'] = request.search;
   out['limit'] = request.limit;
+  // SQ.8b: the page offset rides the wire only when set (byte-compatible with offset-less peers).
+  if (request.offset != null && request.offset > 0) out['offset'] = request.offset;
   applyOperator(out, request.operator);
   return out;
 }

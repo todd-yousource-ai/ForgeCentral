@@ -240,6 +240,8 @@ function parseLogExportRequest(body: unknown): LogExportRequest | null {
   const confidence = str(f['confidence']);
   const action = str(f['action']);
   const search = str(f['search']);
+  const offsetRaw = Number(f['offset'] ?? 0);
+  const offset = Number.isFinite(offsetRaw) && offsetRaw > 0 ? Math.floor(offsetRaw) : undefined;
   const filter: LogQueryFilter = {
     ...(since !== undefined ? { since } : {}),
     ...(until !== undefined ? { until } : {}),
@@ -250,6 +252,7 @@ function parseLogExportRequest(body: unknown): LogExportRequest | null {
     ...(action !== undefined ? { action } : {}),
     ...(search !== undefined ? { search } : {}),
     limit,
+    ...(offset !== undefined ? { offset } : {}),
   };
   return { commandId, filter };
 }
