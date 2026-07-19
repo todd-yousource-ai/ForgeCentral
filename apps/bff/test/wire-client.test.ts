@@ -20,6 +20,8 @@ import {
   replyToConnectivityGraph,
   replyToDecisionList,
   replyToQueryRows,
+  replyToVtzDetail,
+  replyToVtzTree,
 } from '../src/engine/wire-client.js';
 
 const config: BffConfig = {
@@ -142,6 +144,17 @@ describe('the entity-read reply helpers (DR.3c)', () => {
     };
     expect(replyToConnectivityGraph({ ConnectivityGraph: graph }).risk.level).toBe('green');
     expect(() => replyToConnectivityGraph(refused)).toThrow(EngineRefusedError);
+  });
+
+  it('replyToVtzTree / replyToVtzDetail return the read, or throw on a refusal (V2.2)', () => {
+    expect(replyToVtzTree({ VtzTree: { nodes: [], truncated: true } }).truncated).toBe(true);
+    expect(replyToVtzDetail({ VtzDetail: { zone: null, ancestors: [] } }).zone).toBeNull();
+    expect(() => replyToVtzTree(refused)).toThrow(EngineRefusedError);
+    expect(() => replyToVtzDetail(refused)).toThrow(EngineRefusedError);
+    // A reply of the wrong variant is a hard error, never coerced into an empty tree.
+    expect(() => replyToVtzTree({ VtzDetail: { zone: null, ancestors: [] } })).toThrow(
+      'unexpected reply',
+    );
   });
 });
 

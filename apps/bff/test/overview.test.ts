@@ -50,6 +50,8 @@ function engineWith(graph: WireConnectivityGraph): {
     logQuery: unused,
     logExplain: unused,
     logExport: unused,
+    vtzTree: unused,
+    vtzDetail: unused,
   };
   return { engine, seen };
 }
@@ -200,6 +202,8 @@ describe('resolveEntityConnections (O1.6a)', () => {
       logQuery: unused,
       logExplain: unused,
       logExport: unused,
+      vtzTree: unused,
+      vtzDetail: unused,
     };
     return { engine, seen };
   }
@@ -259,6 +263,8 @@ describe('resolveClassMembers (O1.6b)', () => {
       logQuery: unused,
       logExplain: unused,
       logExport: unused,
+      vtzTree: unused,
+      vtzDetail: unused,
     };
     return { engine, seen };
   }

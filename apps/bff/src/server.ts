@@ -37,6 +37,13 @@ import {
   resolveOverviewSankey,
 } from './engine/overview.js';
 import type { OperatorEngine } from './engine/operator-engine.js';
+import {
+  DEFAULT_VTZ_TREE_LIMIT,
+  MAX_VTZ_TREE_LIMIT,
+  VtzUnavailableError,
+  resolveVtzDetail,
+  resolveVtzTree,
+} from './engine/vtz.js';
 import type { ReverseDnsResolver } from './engine/reverse-dns.js';
 import { principalFromSession } from './engine/principal.js';
 import { EngineRefusedError } from './engine/wire-client.js';
@@ -662,6 +669,86 @@ async function serveClassMembers(
   }
 }
 
+// The VTZ read cache generation. Same discipline as the Overview: a tenant-scoped, short-TTL projection
+// cache over a stateless BFF (INV-CONSOLE-NO-2ND-DB -- the crdb VTZ store remains the system of record,
+// this is a bounded-staleness projection, never a second copy of the truth). Bump the generation whenever
+// the view-model shape or semantics change, so no pre-upgrade projection is ever served.
+const VTZ_CACHE_VERSION = 'vtz-v1';
+
+/**
+ * Serve the VTZ reads (`GET /api/vtz/tree` -> the tenant zone tree; `GET /api/vtz/detail?id=<zone>` -> one
+ * zone + its effective-posture ancestors). Session-gated (401) and engine-gated (503). Fails CLOSED: an
+ * enum tag the Console does not know is a 503 (never a defaulted posture on a governance surface), a
+ * query-gate refusal a sanitized 403, any other engine error a 502. Returns true iff it claimed the
+ * request.
+ */
+async function handleVtz(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/vtz/tree' && path !== '/api/vtz/detail') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  // The detail read needs its zone id up front, so a malformed request never reaches the engine.
+  const zoneId = params.get('id')?.trim();
+  if (path === '/api/vtz/detail' && !zoneId) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return true;
+  }
+  const limit = parseVtzLimit(params);
+  // Tenant-scoped key: a warm projection is never served across tenants (INV-CONSOLE-ENGINE-AUTHZ).
+  const cacheKey =
+    path === '/api/vtz/tree'
+      ? `vtz:tree:${principal.tenant}:${String(limit)}`
+      : `vtz:detail:${principal.tenant}:${zoneId ?? ''}`;
+  const cached = deps.cache.get(cacheKey, VTZ_CACHE_VERSION);
+  if (cached !== undefined) {
+    sendJson(res, 200, cached);
+    return true;
+  }
+  const engine = deps.operatorEngine;
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    const view =
+      path === '/api/vtz/tree'
+        ? await resolveVtzTree(engine, principal, limit, opts)
+        : await resolveVtzDetail(engine, principal, zoneId ?? '', opts);
+    deps.cache.set(cacheKey, view, VTZ_CACHE_VERSION);
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof VtzUnavailableError) {
+      // The engine returned a zone the Console cannot render honestly; surface the unavailable state.
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'vtz read failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
+/** Parse the `limit` query param into a bounded zone-tree limit (absent/malformed -> the default). */
+function parseVtzLimit(params: URLSearchParams): number {
+  const raw = params.get('limit');
+  if (raw === null || raw === '') return DEFAULT_VTZ_TREE_LIMIT;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_VTZ_TREE_LIMIT;
+  return Math.min(parsed, MAX_VTZ_TREE_LIMIT);
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -715,6 +802,9 @@ async function route(
     return;
   }
   if (await handleOverview(deps, req, path, res)) {
+    return;
+  }
+  if (await handleVtz(deps, req, path, res)) {
     return;
   }
   // The Console SPA (served behind the admin plane) owns every other GET path -- a static asset or a
