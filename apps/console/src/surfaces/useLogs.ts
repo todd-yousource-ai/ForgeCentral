@@ -5,7 +5,7 @@
 // query key is the filter -- changing a control refetches with the engine-compiled predicate. Same-origin
 // with the session cookie; the SPA never holds a token. TanStack Query owns caching/loading/error.
 
-import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { LogDetailView, LogPage, LogQueryFilter, LogRow } from '@forge/contracts';
 
 // TUNE(IP-CONSOLE-09 LG.4): the live-tail poll interval. v1 polls the recent window so a new decision
@@ -90,7 +90,6 @@ export function useLogsBackfill(pageSize: number = BACKFILL_PAGE_SIZE): LogsBack
       const rows: LogRow[] = [];
       for (let page = 0; page < BACKFILL_MAX_PAGES; page += 1) {
         // Sequential on purpose: one in-flight request, engine-friendly.
-        // eslint-disable-next-line no-await-in-loop
         const fetched = await fetchLogs({ limit: pageSize, offset: page * pageSize });
         rows.push(...fetched.rows);
         if (fetched.rows.length < pageSize) {
