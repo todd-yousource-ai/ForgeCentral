@@ -80,5 +80,13 @@ source of truth.
 
 ## Status
 
-Specification in progress; no application code yet. Per `TRD-CONSOLE-00`, the data contract (real
-bindings, no stubs) and the design system land before any surface is built.
+Active development. **Phase 0 (Foundation)** and **Phase 1 (Overview + Entity drawer + Logs)** are
+built and live: the AWS-LC crypto sidecar and the BFF speak the platform wire protocols over a
+dedicated control plane, and the flagship live connectivity graph, the shared entity drawer, and the
+decision-LOG surface render real engine data (contract-tested, no stubs, Playwright-capstoned).
+
+**Phase 3 (Governance)** is starting engine-first. The **Virtual Trust Zones** surface
+(`IP-CONSOLE-02-VTZ`) is planned over the now-live CrucibleDB VTZ system of record (VtzTree/VtzDetail
+reads and audited create/edit/re-scope/delete over `:7878`); the roadmap is resequenced so AIOps lands
+last. Every surface ships against real bindings PR by PR -- a binding without a real backing engine
+operation is a tracked `PENDING`, never a stub.
