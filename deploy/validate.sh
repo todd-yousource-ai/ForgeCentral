@@ -31,6 +31,11 @@ done
 echo "$ready" | grep -q '"ready":true' || fail "/readyz not green after 60s (got: ${ready:-<none>}) -- the sidecar could not reach the engine with the enrolled identity"
 ok "engine leg green"
 
+echo "==> [2b] SPA: the BFF root serves the console UI (not the API 404)"
+curl -fsS -m 15 "http://127.0.0.1:${BFF_HTTP_PORT}/" 2>/dev/null | grep -qi "<!doctype html" \
+  || fail "the BFF root does not serve the SPA (FC_SPA_DIST missing or empty) -- the operator would get {\"error\":\"not_found\"}"
+ok "SPA served at the root"
+
 echo "==> [3/4] admin floor: classical P-384 handshake on ${NODE_IP}:${ADMIN_PORT}"
 if printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' \
     | openssl s_client -connect "${NODE_IP}:${ADMIN_PORT}" -groups secp384r1 -tls1_3 -quiet 2>/dev/null \

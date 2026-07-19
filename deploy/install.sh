@@ -74,6 +74,16 @@ fi
 install -d -m 0755 "$BFF_LIB"
 cp -a "$BFF_DIST/." "$BFF_LIB/"
 
+# The SPA: the BFF serves the built console from FC_SPA_DIST; without it the root answers the API 404
+# ({"error":"not_found"}) instead of the UI. `pnpm -r build` above already produced apps/console/dist;
+# a prebuilt CONSOLE_SPA_DIST dir is accepted for the no-pnpm path.
+SPA_SRC="${CONSOLE_SPA_DIST:-$repo_root/apps/console/dist}"
+[ -f "$SPA_SRC/index.html" ] || die "SPA build not found at $SPA_SRC (set CONSOLE_SPA_DIST to a prebuilt console dist)"
+rm -rf "$BFF_LIB/spa"
+install -d -m 0755 "$BFF_LIB/spa"
+cp -a "$SPA_SRC/." "$BFF_LIB/spa/"
+log "  SPA installed at $BFF_LIB/spa"
+
 # ---- [3] provision the sidecar (D.2): admin P-384 leaf + config.json -----------------------------
 log "[3] sidecar provisioning (admin cert + config)"
 install -d -m 0750 "$SIDECAR_ETC"
@@ -173,6 +183,9 @@ if [ "$OIDC_ISSUER" != "none" ]; then
 else
   log "  operator OIDC left unmounted (CONSOLE_OIDC_ISSUER=none -- API-only)"
 fi
+# Pin FC_SPA_DIST at the installed SPA (idempotent; an older config.env may predate the line).
+sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_SPA_DIST=/d' "$BFF_ETC/config.env"
+printf 'FC_SPA_DIST=%s\n' "$BFF_LIB/spa" >>"$BFF_ETC/config.env"
 chown -R console-bff:console-bff "$BFF_ETC"
 install -m 0644 "$repo_root/sidecar/deploy/console-crypto-sidecar.service" /etc/systemd/system/
 install -m 0644 "$repo_root/apps/bff/deploy/console-bff.service"           /etc/systemd/system/
