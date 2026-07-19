@@ -32,6 +32,10 @@ import type {
   WireMemberList,
   WireQueryRows,
   WireQuerySubmit,
+  WireVtzDetail,
+  WireVtzDetailQuery,
+  WireVtzTree,
+  WireVtzTreeQuery,
 } from '@forge/contracts';
 
 import type { ExplainTier } from '../auth/tier.js';
@@ -50,6 +54,8 @@ export type EngineAction =
   | 'logQuery'
   | 'logExplain'
   | 'logExport'
+  | 'vtzTree'
+  | 'vtzDetail'
   | 'cursorFetch'
   | 'cursorClose';
 
@@ -147,6 +153,18 @@ export interface OperatorEngine {
     request: WireLogExport,
     opts?: EngineCallOptions,
   ): Promise<WireLogExportEffect>;
+  /** Read the tenant's VTZ tree (VTZ_TREE) on behalf of `principal`. */
+  vtzTree(
+    principal: OperatorPrincipal,
+    request: WireVtzTreeQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzTree>;
+  /** Read one zone + its effective-posture ancestors (VTZ_DETAIL) on behalf of `principal`. */
+  vtzDetail(
+    principal: OperatorPrincipal,
+    request: WireVtzDetailQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzDetail>;
   /** Fetch the next page of an open cursor on behalf of `principal`. */
   cursorFetch(
     principal: OperatorPrincipal,
@@ -239,6 +257,16 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'logExport', request.query.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.logExport({ ...request, operator }, opts);
+    },
+    vtzTree: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'vtzTree', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.vtzTree({ ...request, operator }, opts);
+    },
+    vtzDetail: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'vtzDetail', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.vtzDetail({ ...request, operator }, opts);
     },
     cursorFetch: (principal, handle, opts) => {
       delegation.record(delegationFor(principal, 'cursorFetch'));

@@ -8,6 +8,8 @@ import { EphemeralCache } from '../src/cache.js';
 import type { BffConfig } from '../src/config.js';
 import type { AuthRouter } from '../src/auth/router.js';
 import type { OperatorSession } from '../src/auth/session.js';
+import type { WireVtzTreeNode } from '@forge/contracts';
+
 import type { CrucibleClient } from '../src/engine/client.js';
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import { EngineRefusedError } from '../src/engine/wire-client.js';
@@ -49,6 +51,8 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     logQuery: unused,
     logExplain: unused,
     logExport: unused,
+    vtzTree: unused,
+    vtzDetail: unused,
     cursorFetch: unused,
     cursorClose: unused,
     close: () => Promise.resolve(),
@@ -175,6 +179,39 @@ function operatorEngineWith(): OperatorEngine {
           },
         ],
       }),
+    vtzTree: () => Promise.resolve({ nodes: [wireZone()], truncated: false }),
+    vtzDetail: () => Promise.resolve({ zone: wireZone(), ancestors: [] }),
+  };
+}
+
+/** One engine zone: the full eleven-domain matrix with the catastrophic floor pair flagged by the engine. */
+function wireZone(overrides: Partial<WireVtzTreeNode> = {}): WireVtzTreeNode {
+  const postures = [
+    { domain: 'governed-egress', posture: 'deny', floor: true },
+    { domain: 'execution', posture: 'deny', floor: true },
+    { domain: 'privilege-escalation', posture: 'deny', floor: false },
+    { domain: 'kernel-module', posture: 'deny', floor: false },
+    { domain: 'credential-store', posture: 'deny', floor: false },
+    { domain: 'persistence', posture: 'permit-deny-risky', floor: false },
+    { domain: 'ordinary-network', posture: 'permit-deny-risky', floor: false },
+    { domain: 'file-and-config', posture: 'permit-deny-risky', floor: false },
+    { domain: 'memory', posture: 'permit-deny-risky', floor: false },
+    { domain: 'ipc', posture: 'permit-deny-risky', floor: false },
+    { domain: 'device', posture: 'permit-deny-risky', floor: false },
+  ];
+  return {
+    id: 'YouSource.Corp',
+    name: 'YouSource.Corp',
+    parent: 'YouSource',
+    zone_type: 'standard',
+    lifecycle: 'published',
+    micro_segmentation: true,
+    telemetry: 'full',
+    reauth_interval_hours: 8,
+    own_postures: postures,
+    effective_postures: postures,
+    sub_zone_count: 1,
+    ...overrides,
   };
 }
 
@@ -439,6 +476,153 @@ describe('BFF HTTP surface', () => {
       { class: 'private-apps', count: 0, apps: [], moreCount: 0 },
       { class: 'data-stores', count: 0, apps: [], moreCount: 0 },
     ]);
+  });
+
+  it('GET /api/vtz/tree projects the zone tree from the crdb VTZ system of record (V2.2)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    const res = await fetch(`${base}/api/vtz/tree`);
+    expect(res.status).toBe(200);
+    const tree = (await res.json()) as {
+      zones: {
+        id: string;
+        name: string;
+        parent: string | null;
+        zoneType: string;
+        lifecycle: string;
+        subZoneCount: number;
+        ownPostures: { domain: string; posture: string; floor: boolean }[];
+      }[];
+      truncated: boolean;
+    };
+    expect(tree.truncated).toBe(false);
+    expect(tree.zones).toHaveLength(1);
+    expect(tree.zones[0]?.name).toBe('YouSource.Corp');
+    expect(tree.zones[0]?.zoneType).toBe('standard');
+    expect(tree.zones[0]?.subZoneCount).toBe(1);
+    // The catastrophic floor arrives flagged by the engine, floor pair first in render order.
+    expect(tree.zones[0]?.ownPostures.slice(0, 2)).toEqual([
+      { domain: 'governed-egress', posture: 'deny', floor: true },
+      { domain: 'execution', posture: 'deny', floor: true },
+    ]);
+    // INV-CONSOLE-VTZ-REAL: no trust score is served on this surface, because the wire carries none.
+    expect(JSON.stringify(tree)).not.toContain('trustScore');
+  });
+
+  it('GET /api/vtz/detail returns the zone + its ancestors, and 400 without an id', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    const res = await fetch(`${base}/api/vtz/detail?id=YouSource.Corp`);
+    expect(res.status).toBe(200);
+    const detail = (await res.json()) as { zone: { name: string } | null; ancestors: unknown[] };
+    expect(detail.zone?.name).toBe('YouSource.Corp');
+    expect(detail.ancestors).toEqual([]);
+    // A detail read without a zone id never reaches the engine.
+    expect((await fetch(`${base}/api/vtz/detail`)).status).toBe(400);
+  });
+
+  it('GET /api/vtz/detail reports an unknown zone as an honest not-found, never an empty zone', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      vtzDetail: () => Promise.resolve({ zone: null, ancestors: [] }),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/vtz/detail?id=No.Such.Zone`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ zone: null, ancestors: [] });
+  });
+
+  it('the VTZ reads are 401 without a session and 503 without an engine (fail-closed)', async () => {
+    const noSession = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+    expect((await fetch(`${noSession}/api/vtz/tree`)).status).toBe(401);
+    expect((await fetch(`${noSession}/api/vtz/detail?id=YouSource.Corp`)).status).toBe(401);
+
+    const noEngine = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+      },
+    );
+    expect((await fetch(`${noEngine}/api/vtz/tree`)).status).toBe(503);
+  });
+
+  it('GET /api/vtz/tree is 503 when the engine emits an enum tag the Console does not know', async () => {
+    // Fail-closed: a governance surface reports unavailability rather than a guessed posture.
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      vtzTree: () =>
+        Promise.resolve({ nodes: [wireZone({ zone_type: 'restricted' })], truncated: false }),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/vtz/tree`);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'unavailable' });
+  });
+
+  it('GET /api/vtz/tree maps an engine refusal to a sanitized 403', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      vtzTree: () =>
+        Promise.reject(
+          new EngineRefusedError({
+            class: 'Denied',
+            code: 7,
+            retry: 'Never',
+            correlation_id: 1234,
+          }),
+        ),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/vtz/tree`);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'refused', class: 'Denied' });
+  });
+
+  it('caches the VTZ tree per tenant so a warm projection never crosses tenants', async () => {
+    // INV-CONSOLE-ENGINE-AUTHZ + INV-CONSOLE-NO-2ND-DB: the cache is a bounded-staleness projection keyed
+    // by tenant, never a second copy of the store shared across them.
+    const seen: string[] = [];
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      vtzTree: (principal) => {
+        seen.push(principal.tenant ?? '');
+        return Promise.resolve({
+          nodes: [wireZone({ id: principal.tenant ?? 'x', name: principal.tenant ?? 'x' })],
+          truncated: false,
+        });
+      },
+    };
+    const globalAdminSession: OperatorSession = { ...operatorSession, role: 'global-admin' };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(globalAdminSession), operatorEngine: engine },
+    );
+    const first = await fetch(`${base}/api/vtz/tree`, { headers: { 'x-active-tenant': 'ten-a' } });
+    const warm = await fetch(`${base}/api/vtz/tree`, { headers: { 'x-active-tenant': 'ten-a' } });
+    const other = await fetch(`${base}/api/vtz/tree`, { headers: { 'x-active-tenant': 'ten-b' } });
+    const names = async (r: Response) =>
+      ((await r.json()) as { zones: { name: string }[] }).zones.map((z) => z.name);
+    expect(await names(first)).toEqual(['ten-a']);
+    expect(await names(warm)).toEqual(['ten-a']);
+    expect(await names(other)).toEqual(['ten-b']);
+    // The second ten-a read was served warm; ten-b never saw ten-a's projection.
+    expect(seen).toEqual(['ten-a', 'ten-b']);
   });
 
   it('GET /api/overview/sankey is 401 without an operator session (fail-closed)', async () => {

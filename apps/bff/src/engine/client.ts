@@ -26,6 +26,10 @@ import type {
   WireMemberList,
   WireQueryRows,
   WireQuerySubmit,
+  WireVtzDetail,
+  WireVtzDetailQuery,
+  WireVtzTree,
+  WireVtzTreeQuery,
 } from '@forge/contracts';
 
 /** Per-call bounds. At least one of `timeoutMs`/`signal` should be set; the caller passes the config default. */
@@ -84,6 +88,13 @@ export interface CrucibleClient {
   /** Export the filtered decision LOG (LOG_EXPORT, crdb LQ.4): the rows + an audited receipt (an
    * audited data-plane write; the receipt lands on the TRD-04 audit chain). */
   logExport(request: WireLogExport, opts?: EngineCallOptions): Promise<WireLogExportEffect>;
+  /** Read the tenant's Virtual Trust Zone tree (VTZ_TREE, crdb IP-CONSOLE-VTZ-SUBSTRATE VZ.3b): every
+   * zone with its own + effective (tighten-only composed) per-domain postures, archetype, lifecycle, and
+   * direct-child count, bounded engine-side. The VTZ store is the system of record; the Console reads it. */
+  vtzTree(request: WireVtzTreeQuery, opts?: EngineCallOptions): Promise<WireVtzTree>;
+  /** Read one zone plus the ancestor chain contributing to its effective posture (VTZ_DETAIL, crdb
+   * VZ.3b). An id naming no zone in the tenant returns an absent zone, not an error. */
+  vtzDetail(request: WireVtzDetailQuery, opts?: EngineCallOptions): Promise<WireVtzDetail>;
   /** Fetch the next page for an open cursor. */
   cursorFetch(handle: EngineHandle, opts?: EngineCallOptions): Promise<WireQueryRows>;
   /** Close an open cursor (releases engine-side resources). */

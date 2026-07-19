@@ -106,6 +106,16 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         rows: [],
       });
     },
+    vtzTree: (req) => {
+      calls.push('vtzTree');
+      reads.push(req);
+      return Promise.resolve({ nodes: [], truncated: false });
+    },
+    vtzDetail: (req) => {
+      calls.push('vtzDetail');
+      reads.push(req);
+      return Promise.resolve({ zone: null, ancestors: [] });
+    },
     logExplain: (req) => {
       calls.push('logExplain');
       reads.push(req);
@@ -362,6 +372,23 @@ describe('createOperatorEngine', () => {
       expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
     }
     expect(recorded.map((d) => d.action)).toEqual(['logQuery', 'logExplain', 'logExport']);
+  });
+
+  it('records the delegation + injects the operator on the VTZ reads (V2.2)', async () => {
+    // The VTZ store is tenant-scoped governance data: the engine must narrow every zone read to the
+    // acting operator's tenant, so the delegation is injected server-side and never client-asserted.
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    await engine.vtzTree(admin, { request_id: 7, operator: null, limit: 50 });
+    await engine.vtzDetail(admin, { request_id: 8, operator: null, vtz_id: 'YouSource.Corp' });
+
+    expect(calls).toEqual(['vtzTree', 'vtzDetail']);
+    for (const read of reads) {
+      expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
+    }
+    expect(recorded.map((d) => d.action)).toEqual(['vtzTree', 'vtzDetail']);
   });
 
   it('records cursorFetch + cursorClose delegations and delegates', async () => {

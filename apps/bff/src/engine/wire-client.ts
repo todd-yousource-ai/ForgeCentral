@@ -33,6 +33,8 @@ import type {
   WireMemberList,
   WireQueryRows,
   WireReply,
+  WireVtzDetail,
+  WireVtzTree,
 } from '@forge/contracts';
 
 import type { BffConfig } from '../config.js';
@@ -130,6 +132,22 @@ export function replyToLogExported(reply: WireReply): WireLogExportEffect {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a log-export command');
+}
+
+/** Map an engine `WireReply` to `WireVtzTree` (VTZ_TREE), throwing a typed error on a refusal. */
+export function replyToVtzTree(reply: WireReply): WireVtzTree {
+  if (typeof reply === 'object' && 'VtzTree' in reply) return reply.VtzTree;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a vtz-tree read');
+}
+
+/** Map an engine `WireReply` to `WireVtzDetail` (VTZ_DETAIL), throwing a typed error on a refusal. */
+export function replyToVtzDetail(reply: WireReply): WireVtzDetail {
+  if (typeof reply === 'object' && 'VtzDetail' in reply) return reply.VtzDetail;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a vtz-detail read');
 }
 
 /** Reject `op` if it does not settle within `ms` (a per-call bound; every engine call is bounded). */
@@ -375,6 +393,26 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireLogExportEffect> {
     return this.call(
       async (transport) => replyToLogExported(await dispatch(transport, { LogExport: request })),
+      opts,
+    );
+  }
+
+  async vtzTree(
+    request: Parameters<CrucibleClient['vtzTree']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzTree> {
+    return this.call(
+      async (transport) => replyToVtzTree(await dispatch(transport, { VtzTree: request })),
+      opts,
+    );
+  }
+
+  async vtzDetail(
+    request: Parameters<CrucibleClient['vtzDetail']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireVtzDetail> {
+    return this.call(
+      async (transport) => replyToVtzDetail(await dispatch(transport, { VtzDetail: request })),
       opts,
     );
   }
