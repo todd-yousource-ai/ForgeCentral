@@ -42,7 +42,18 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'LogExport' in request ||
       // Contain is a data-plane write; like SubmitMemoryWrite it rides the QuerySubmit opcode and the
       // engine discriminates it by its CBOR enum tag, then routes it to the write path + Data-plane gate.
-      'Contain' in request)
+      'Contain' in request ||
+      // The VTZ reads (VTZ_TREE / VTZ_DETAIL, crdb IP-CONSOLE-VTZ-SUBSTRATE VZ.3b) ride the QuerySubmit
+      // opcode too; the engine discriminates them by their CBOR enum tag (handler.rs routes them in the
+      // same read allowlist as ConnectivityGraph).
+      'VtzTree' in request ||
+      'VtzDetail' in request ||
+      // The four audited VTZ writes ride it as well; like Contain the engine routes them to the write
+      // path + Data-plane gate after discriminating the tag.
+      'VtzCreate' in request ||
+      'VtzEdit' in request ||
+      'VtzRescope' in request ||
+      'VtzDelete' in request)
   ) {
     return FrameType.QuerySubmit;
   }

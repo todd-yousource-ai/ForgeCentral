@@ -20,6 +20,14 @@ import type {
   WireReply,
   WireRequest,
   WireValue,
+  WireContain,
+  WireVtzCreate,
+  WireVtzDelete,
+  WireVtzDetailQuery,
+  WireVtzEdit,
+  WireVtzRescope,
+  WireVtzSpec,
+  WireVtzTreeQuery,
 } from '@forge/contracts';
 
 import { CborFloat, decode, encode } from './cbor.js';
@@ -171,6 +179,84 @@ function logExportToCbor(request: WireLogExport): unknown {
 }
 
 /**
+ * The operator containment disposition (CONTAIN, crdb IP-CONTAIN-COMMAND). Rust struct order
+ * (operator?, request); `operator` carries skip-if-none so an absent one is OMITTED.
+ */
+function containToCbor(request: WireContain): unknown {
+  const out: Record<string, unknown> = {};
+  applyOperator(out, request.operator);
+  out['request'] = request.request;
+  return out;
+}
+
+/**
+ * A zone definition (`WireVtzSpec`). Fields in the Rust struct order (name, description, zone_type,
+ * own_postures, micro_segmentation, telemetry, reauth_interval_hours, lifecycle) so the CBOR map is
+ * byte-identical to a native client's. Every field is required -- there is no skip-if-none here.
+ */
+function vtzSpecToCbor(spec: WireVtzSpec): unknown {
+  return {
+    name: spec.name,
+    description: spec.description,
+    zone_type: spec.zone_type,
+    own_postures: spec.own_postures.map((p) => ({
+      domain: p.domain,
+      posture: p.posture,
+      floor: p.floor,
+    })),
+    micro_segmentation: spec.micro_segmentation,
+    telemetry: spec.telemetry,
+    reauth_interval_hours: spec.reauth_interval_hours,
+    lifecycle: spec.lifecycle,
+  };
+}
+
+/** `VTZ_TREE` (VZ.3). Rust struct order: request_id, limit, operator?. */
+function vtzTreeToCbor(request: WireVtzTreeQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id, limit: request.limit };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `VTZ_DETAIL` (VZ.3). Rust struct order: request_id, vtz_id, operator?. */
+function vtzDetailToCbor(request: WireVtzDetailQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id, vtz_id: request.vtz_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `VTZ_CREATE` / `VTZ_EDIT` (VZ.4). Rust struct order: request_id, spec, operator?. */
+function vtzSpecRequestToCbor(request: WireVtzCreate | WireVtzEdit): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    spec: vtzSpecToCbor(request.spec),
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `VTZ_RESCOPE` (VZ.4). Rust struct order: request_id, vtz_id, new_name, operator?. */
+function vtzRescopeToCbor(request: WireVtzRescope): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    vtz_id: request.vtz_id,
+    new_name: request.new_name,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `VTZ_DELETE` (VZ.4). Rust struct order: request_id, vtz_id, operator?. */
+function vtzDeleteToCbor(request: WireVtzDelete): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    vtz_id: request.vtz_id,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
  * Encode a WireRequest to its CBOR frame payload. The read + cursor variants (what the Console's reads
  * need) are supported; the write-path variants throw a clear error rather than emit a wrong shape.
  */
@@ -198,6 +284,17 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
     return encode({ LogExplain: logExplainToCbor(request.LogExplain) });
   }
   if ('LogExport' in request) return encode({ LogExport: logExportToCbor(request.LogExport) });
+  if ('Contain' in request) return encode({ Contain: containToCbor(request.Contain) });
+  if ('VtzTree' in request) return encode({ VtzTree: vtzTreeToCbor(request.VtzTree) });
+  if ('VtzDetail' in request) return encode({ VtzDetail: vtzDetailToCbor(request.VtzDetail) });
+  if ('VtzCreate' in request) {
+    return encode({ VtzCreate: vtzSpecRequestToCbor(request.VtzCreate) });
+  }
+  if ('VtzEdit' in request) return encode({ VtzEdit: vtzSpecRequestToCbor(request.VtzEdit) });
+  if ('VtzRescope' in request) {
+    return encode({ VtzRescope: vtzRescopeToCbor(request.VtzRescope) });
+  }
+  if ('VtzDelete' in request) return encode({ VtzDelete: vtzDeleteToCbor(request.VtzDelete) });
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });
   if ('CursorClose' in request)
