@@ -4,14 +4,13 @@ The per-PR landing record for `IP-CONSOLE-02-VTZ` -- the ForgeCentral Virtual Tr
 live crdb VTZ system of record (`IP-CONSOLE-VTZ-SUBSTRATE`, `:7878`). One row per roster step; each lands
 on its own branch through the full `scripts/ci.sh`, no-ff merged, then recorded here with its commit.
 
-**Status: PLANNED -- no roster step landed. Plan authored on `docs/ip-console-02-vtz`, pending review. The
-engine half (crdb `IP-CONSOLE-VTZ-SUBSTRATE`) is COMPLETE + LIVE over :7878 and deployed to the node
-2026-07-19, so every read/command binding here is LIVE-backed except the named PENDINGs (member/policy
-counts, `vtz.setMembership`).**
+**Status: IN PROGRESS -- V2.1 landed. The engine half (crdb `IP-CONSOLE-VTZ-SUBSTRATE`) is COMPLETE + LIVE
+over :7878 and deployed to the node 2026-07-19, so every read/command binding here is LIVE-backed except
+the named PENDINGs (member/policy counts, `vtz.setMembership`). NEXT = V2.2 (the BFF read path).**
 
 | Step | Invariant | Status | Commit | Proof |
 |---|---|---|---|---|
-| V2.1 | INV-CONSOLE-VTZ-CONTRACT | OPEN | -- | `@forge/contracts` regenerated from the crdb VTZ schema; VTZ view models + fail-closed projections; `vtz.*` bindings registered. |
+| V2.1 | INV-CONSOLE-VTZ-CONTRACT | LANDED | `a12ae5e` | `@forge/contracts` regenerated from the crdb VTZ schema (13 `Vtz*` defs, 6 request + 3 reply variants, additive; pinned contract version unchanged so the codegen drift gate holds). `src/vtz.ts` view models + fail-closed projections (`toVtzTree`/`toVtzDetail`/`toVtzZone`/`toVtzMutation`), every enum narrowed CLOSED, the catastrophic floor carried from the engine's own flag, no trust score in the model. `vtz.*` bindings registered: tree/detail/riskBand + the four audited mutations LIVE; memberCounts/policyCount/setMembership PENDING with gating tasks. 19 tier-1 projection tests + the binding assertions; full `scripts/ci.sh` green. |
 | V2.2 | INV-CONSOLE-VTZ-BROKERED | OPEN | -- | BFF read path (`operator-engine` + `wire-client` + resolvers + `/api/vtz/tree` + `/api/vtz/detail`). |
 | V2.3 | INV-CONSOLE-VTZ-MGMT-BROKERED | OPEN | -- | BFF write path (create/edit/rescope/delete + refusal mapping). |
 | V2.4 | INV-CONSOLE-VTZ-GRID | OPEN | -- | Active VTZs grid: KPI row (no Avg Trust), zone cards (posture badge + risk band, sub-zone count). |
