@@ -176,6 +176,12 @@ export interface WireDecisionRow {
   technique: string;
 }
 
+export interface WireDomainPosture {
+  domain: string;
+  floor: boolean;
+  posture: string;
+}
+
 export type WireDriftTrigger = 'Schema' | 'Policy' | 'Statistics' | 'Model' | 'AsOf' | 'Workspace';
 
 export interface WireEntityConnections {
@@ -287,7 +293,10 @@ export type WireReply =
   | { LogExported: WireLogExportEffect; }
   | { ConnectivityGraph: WireConnectivityGraph; }
   | { MemberList: WireMemberList; }
-  | { UsageOverview: WireUsageOverviewResult; };
+  | { UsageOverview: WireUsageOverviewResult; }
+  | { VtzTree: WireVtzTree; }
+  | { VtzDetail: WireVtzDetail; }
+  | { VtzMutated: WireVtzMutation; };
 
 export type WireRequest =
   | { QuerySubmit: WireQuerySubmit; }
@@ -309,7 +318,13 @@ export type WireRequest =
   | { LogExport: WireLogExport; }
   | { ConnectivityGraph: WireConnectivityQuery; }
   | { ConnectivityMembers: WireConnectivityMembers; }
-  | { UsageOverview: WireUsageOverview; };
+  | { UsageOverview: WireUsageOverview; }
+  | { VtzTree: WireVtzTreeQuery; }
+  | { VtzDetail: WireVtzDetailQuery; }
+  | { VtzCreate: WireVtzCreate; }
+  | { VtzEdit: WireVtzEdit; }
+  | { VtzRescope: WireVtzRescope; }
+  | { VtzDelete: WireVtzDelete; };
 
 export interface WireRiskBand {
   candidate: number;
@@ -367,10 +382,49 @@ export type WireValue =
   | { Timestamp: number; }
   | { Vector: Array<number>; };
 
+export interface WireVtzAncestor {
+  id: string;
+  name: string;
+}
+
+export interface WireVtzCreate {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  spec: WireVtzSpec;
+}
+
+export interface WireVtzDelete {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  vtz_id: string;
+}
+
 export interface WireVtzDestEdge {
   dest_class: string;
   vtz_id: string;
   weight: number;
+}
+
+export interface WireVtzDetail {
+  ancestors: Array<WireVtzAncestor>;
+  zone?: WireVtzTreeNode | null;
+}
+
+export interface WireVtzDetailQuery {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  vtz_id: string;
+}
+
+export interface WireVtzEdit {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  spec: WireVtzSpec;
+}
+
+export interface WireVtzMutation {
+  id: string;
+  lifecycle: string;
 }
 
 export interface WireVtzNode {
@@ -378,4 +432,47 @@ export interface WireVtzNode {
   name: string;
   profile: string;
   risk: WireRiskBand;
+}
+
+export interface WireVtzRescope {
+  new_name: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  vtz_id: string;
+}
+
+export interface WireVtzSpec {
+  description: string;
+  lifecycle: string;
+  micro_segmentation: boolean;
+  name: string;
+  own_postures: Array<WireDomainPosture>;
+  reauth_interval_hours: number;
+  telemetry: string;
+  zone_type: string;
+}
+
+export interface WireVtzTree {
+  nodes: Array<WireVtzTreeNode>;
+  truncated: boolean;
+}
+
+export interface WireVtzTreeNode {
+  effective_postures: Array<WireDomainPosture>;
+  id: string;
+  lifecycle: string;
+  micro_segmentation: boolean;
+  name: string;
+  own_postures: Array<WireDomainPosture>;
+  parent?: string | null;
+  reauth_interval_hours: number;
+  sub_zone_count: number;
+  telemetry: string;
+  zone_type: string;
+}
+
+export interface WireVtzTreeQuery {
+  limit: number;
+  operator?: OperatorDelegation | null;
+  request_id: number;
 }

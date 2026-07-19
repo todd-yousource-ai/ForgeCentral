@@ -254,6 +254,142 @@ const overviewReads: readonly ReadBinding[] = [
   },
 ];
 
+// -- IP-CONSOLE-02 (Virtual Trust Zones, Phase 3) the `vtz.*` governance bindings ---------------------
+//
+// The first governance surface. The engine half is the crdb VTZ system of record
+// (`IP-CONSOLE-VTZ-SUBSTRATE` VZ.1-VZ.N, live over :7878, deployed 2026-07-19), so both reads and all
+// four audited mutations are LIVE-backed: `VtzTree` / `VtzDetail` reads and `VtzCreate` / `VtzEdit` /
+// `VtzRescope` / `VtzDelete` writes, each re-validating the catastrophic floor + tighten-only inheritance
+// engine-side and committing through the audit chain. `vtz.riskBand` is a JOIN over the already-live
+// `overview.graph` per-VTZ risk band -- no new engine op, and the reason there is NO trust score on this
+// surface (the wire carries none). The three PENDING entries are honest cross-repo deferrals: zone
+// MEMBERSHIP has no substrate (crdb `VtzSetMembership` was deferred as it would have been a stub), and a
+// per-zone policy count needs the Policies surface's store. Their cards render the honest absence.
+
+const vtzReads: readonly ReadBinding[] = [
+  {
+    // The tenant's zone tree: every zone with its own + effective (tighten-only composed) per-domain
+    // postures, archetype, lifecycle, and real direct-child count (crdb VtzTree, VZ.3a/VZ.3b).
+    id: bindingId('vtz.tree'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'vtz_tree_v1',
+    viewModel: 'VtzTree',
+    status: { kind: 'live' },
+  },
+  {
+    // One zone plus the ancestor chain contributing to its effective posture, so the editor can name
+    // WHICH ancestor tightened a domain (crdb VtzDetail, VZ.3a/VZ.3b).
+    id: bindingId('vtz.detail'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'vtz_detail_v1',
+    viewModel: 'VtzDetailView',
+    status: { kind: 'live' },
+  },
+  {
+    // The zone card's health signal, replacing the removed trust score: a JOIN of the live
+    // `overview.graph` per-VTZ WireRiskBand by zone id (crdb CONNECTIVITY_GRAPH). No new engine op.
+    id: bindingId('vtz.riskBand'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'connectivity_graph_v1',
+    viewModel: 'OverviewRiskBand',
+    status: { kind: 'live' },
+  },
+  {
+    // Users/objects assigned to a zone. crdb has no zone-membership store: VZ.4a deliberately DEFERRED
+    // the VtzSetMembership verb rather than ship a stub, so the card omits the count entirely.
+    id: bindingId('vtz.memberCounts'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'vtz_member_counts_v1',
+    viewModel: 'VtzMemberCounts',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask:
+        'IP-CONSOLE-VTZ-SUBSTRATE VtzSetMembership (zone-membership substrate, TRD-CONSOLE-12)',
+    },
+  },
+  {
+    // Policies scoped to a zone. Needs the crdb policy store the Policies surface produces.
+    id: bindingId('vtz.policyCount'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'vtz_policy_count_v1',
+    viewModel: 'VtzPolicyCount',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'IP-CONSOLE-05 Policies surface (crdb policy store)',
+    },
+  },
+];
+
+const vtzCommands: readonly CommandBinding[] = [
+  {
+    // Author a new zone (crdb VtzCreate, VZ.4a/VZ.4b): audited through the Committer, with the
+    // catastrophic floor + tighten-only inheritance re-validated engine-side. Confirm-gated in the SPA.
+    id: bindingId('vtz.create'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'vtz_create_v1',
+    authz: 'operator:vtz.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Edit a zone's own postures + settings, incl. the draft -> published transition (crdb VtzEdit).
+    id: bindingId('vtz.edit'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'vtz_edit_v1',
+    authz: 'operator:vtz.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Re-scope a zone: a RENAME (the dotted name is the hierarchy; parent is its lexical prefix, not a
+    // stored pointer), audited (crdb VtzRescope).
+    id: bindingId('vtz.rescope'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'vtz_rescope_v1',
+    authz: 'operator:vtz.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Delete a zone, audited; the engine refuses a zone that still has children (a typed Conflict the
+    // surface reports honestly rather than swallowing) (crdb VtzDelete).
+    id: bindingId('vtz.delete'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'vtz_delete_v1',
+    authz: 'operator:vtz.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // "Modify VTZ assignment" -- move an entity into/out of a zone. Same deferral as `vtz.memberCounts`:
+    // no membership substrate exists, so the control is a labelled non-live affordance, never a button
+    // that silently does nothing.
+    id: bindingId('vtz.setMembership'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'vtz_set_membership_v1',
+    authz: 'operator:vtz.reassign',
+    audited: true,
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask:
+        'IP-CONSOLE-VTZ-SUBSTRATE VtzSetMembership (zone-membership substrate, TRD-CONSOLE-12)',
+    },
+  },
+];
+
 function register(target: Record<string, Binding>, entries: readonly Binding[]): void {
   for (const entry of entries) {
     target[entry.id] = entry;
@@ -265,6 +401,8 @@ register(registry, entityReads);
 register(registry, entityCommands);
 register(registry, logReads);
 register(registry, overviewReads);
+register(registry, vtzReads);
+register(registry, vtzCommands);
 
 /** The Console binding registry. Keyed by `BindingId`; populated by the surface IPs. */
 export const bindings: BindingManifest = registry;

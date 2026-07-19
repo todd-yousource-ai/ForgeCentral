@@ -12,5 +12,6 @@ export * from './binding.js';
 export * from './entity.js';
 export * from './logs.js';
 export * from './overview.js';
+export * from './vtz.js';
 export * from './openapi.js';
 export * from './schema.js';
