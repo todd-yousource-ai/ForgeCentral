@@ -11,3 +11,4 @@ export * from './EntityDrawer.js';
 export * from './ContainerMembersView.js';
 export * from './DataTable.js';
 export * from './OverviewSankeyFlow.js';
+export * from './VtzZoneCard.js';

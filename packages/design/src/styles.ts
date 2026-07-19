@@ -49,6 +49,37 @@ export function componentStyles(): string {
 .fc-kpi__label { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-sm); color: var(--fc-color-text-muted); }
 .fc-kpi__value { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-2xl); font-weight: var(--fc-font-weight-bold); color: var(--fc-color-text-primary); }
 
+/* Virtual Trust Zones grid (IP-CONSOLE-02 V2.4): one card per zone, archetype + risk focal, no gauge. */
+.fc-vtz-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-md);
+  padding: var(--fc-space-lg);
+  border-radius: var(--fc-radius-lg);
+  border: 1px solid var(--fc-color-surface-border);
+  background: var(--fc-color-surface-card);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.fc-vtz-card:hover { border-color: var(--fc-color-brand-primary); }
+.fc-vtz-card:focus-visible { outline: 2px solid var(--fc-color-status-info); outline-offset: 2px; }
+.fc-vtz-card--selected {
+  border-color: var(--fc-color-brand-primary);
+  background: color-mix(in srgb, var(--fc-color-brand-primary) 8%, var(--fc-color-surface-card));
+}
+.fc-vtz-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--fc-space-md); }
+.fc-vtz-card__name { display: flex; flex-direction: column; gap: var(--fc-space-xs); }
+.fc-vtz-card__leaf { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-lg); font-weight: var(--fc-font-weight-bold); color: var(--fc-color-text-primary); }
+.fc-vtz-card__path { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-xs); color: var(--fc-color-text-muted); }
+.fc-vtz-card__badges { display: flex; flex-wrap: wrap; gap: var(--fc-space-xs); justify-content: flex-end; }
+.fc-vtz-card__stats { display: flex; gap: var(--fc-space-lg); margin: 0; }
+.fc-vtz-card__stat { display: flex; flex-direction: column; gap: var(--fc-space-xs); }
+.fc-vtz-card__stat-label { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-xs); color: var(--fc-color-text-muted); }
+.fc-vtz-card__stat-value { margin: 0; font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-lg); font-weight: var(--fc-font-weight-semibold); color: var(--fc-color-text-primary); }
+.fc-vtz-card__stat-value--absent { font-size: var(--fc-font-size-sm); font-weight: var(--fc-font-weight-regular); color: var(--fc-color-text-muted); }
+.fc-vtz-card__foot { font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-xs); color: var(--fc-color-text-muted); }
+
 .fc-tabs { display: inline-flex; gap: var(--fc-space-xs); border-bottom: 1px solid var(--fc-color-surface-border); }
 .fc-tab {
   appearance: none;
