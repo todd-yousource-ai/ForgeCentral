@@ -21,6 +21,7 @@ import {
   replyToDecisionList,
   replyToQueryRows,
   replyToVtzDetail,
+  replyToVtzMutation,
   replyToVtzTree,
 } from '../src/engine/wire-client.js';
 
@@ -153,6 +154,20 @@ describe('the entity-read reply helpers (DR.3c)', () => {
     expect(() => replyToVtzDetail(refused)).toThrow(EngineRefusedError);
     // A reply of the wrong variant is a hard error, never coerced into an empty tree.
     expect(() => replyToVtzTree({ VtzDetail: { zone: null, ancestors: [] } })).toThrow(
+      'unexpected reply',
+    );
+  });
+
+  it('replyToVtzMutation returns the committed mutation, or throws on a refusal (V2.3)', () => {
+    expect(
+      replyToVtzMutation({ VtzMutated: { id: 'YouSource.Corp', lifecycle: 'draft' } }),
+    ).toEqual({
+      id: 'YouSource.Corp',
+      lifecycle: 'draft',
+    });
+    // A refused write committed nothing; it must surface as a typed error, never as a success.
+    expect(() => replyToVtzMutation(refused)).toThrow(EngineRefusedError);
+    expect(() => replyToVtzMutation({ VtzTree: { nodes: [], truncated: false } })).toThrow(
       'unexpected reply',
     );
   });

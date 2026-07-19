@@ -6,8 +6,14 @@
 // CLOSED when the engine emits an enum tag the Console does not know -- never a defaulted posture.
 
 import type {
+  VtzSpecInput,
+  WireVtzCreate,
+  WireVtzDelete,
   WireVtzDetail,
   WireVtzDetailQuery,
+  WireVtzEdit,
+  WireVtzMutation,
+  WireVtzRescope,
   WireVtzTree,
   WireVtzTreeQuery,
 } from '@forge/contracts';
@@ -15,10 +21,17 @@ import { describe, expect, it } from 'vitest';
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
+import { EngineRefusedError } from '../src/engine/wire-client.js';
 import {
   MAX_VTZ_TREE_LIMIT,
+  VtzMutationRefusedError,
   VtzUnavailableError,
+  classifyVtzRefusal,
+  resolveVtzCreate,
+  resolveVtzDelete,
   resolveVtzDetail,
+  resolveVtzEdit,
+  resolveVtzRescope,
   resolveVtzTree,
 } from '../src/engine/vtz.js';
 
@@ -89,6 +102,10 @@ function engineWith(replies: { tree?: WireVtzTree; detail?: WireVtzDetail }): {
       details.push(request);
       return replies.detail ? Promise.resolve(replies.detail) : unused();
     },
+    vtzCreate: unused,
+    vtzEdit: unused,
+    vtzRescope: unused,
+    vtzDelete: unused,
   };
   return { engine, trees, details };
 }
@@ -188,6 +205,165 @@ describe('resolveVtzDetail (V2.2)', () => {
       detail: { zone: zone({ lifecycle: 'archived' }), ancestors: [] },
     });
     await expect(resolveVtzDetail(engine, principal, 'YouSource.Corp')).rejects.toBeInstanceOf(
+      VtzUnavailableError,
+    );
+  });
+});
+
+// --- the audited write path (V2.3) ---------------------------------------------------------------------
+
+const spec: VtzSpecInput = {
+  name: 'YouSource.Corp.Finance',
+  description: 'Finance systems',
+  zoneType: 'standard',
+  ownPostures: [
+    { domain: 'governed-egress', posture: 'deny', floor: true },
+    { domain: 'execution', posture: 'deny', floor: true },
+    { domain: 'ordinary-network', posture: 'permit-deny-risky', floor: false },
+  ],
+  microSegmentation: true,
+  telemetry: 'full',
+  reauthIntervalHours: 8,
+  lifecycle: 'draft',
+};
+
+/** An engine refusal of the given class (what crdb's `vtz_store_refusal` emits; no message, no oracle). */
+function refusal(cls: 'Conflict' | 'Denied' | 'Internal'): EngineRefusedError {
+  return new EngineRefusedError({ class: cls, code: 0, retry: 'Never', correlation_id: 0 });
+}
+
+/** A mock OperatorEngine whose four mutations are scripted and which captures the wire requests. */
+function mutatingEngine(reply: WireVtzMutation | Error): {
+  engine: OperatorEngine;
+  creates: WireVtzCreate[];
+  edits: WireVtzEdit[];
+  rescopes: WireVtzRescope[];
+  deletes: WireVtzDelete[];
+} {
+  const unused = () => Promise.reject(new Error('unused'));
+  const creates: WireVtzCreate[] = [];
+  const edits: WireVtzEdit[] = [];
+  const rescopes: WireVtzRescope[] = [];
+  const deletes: WireVtzDelete[] = [];
+  const settle = () => (reply instanceof Error ? Promise.reject(reply) : Promise.resolve(reply));
+  const engine: OperatorEngine = {
+    querySubmit: unused,
+    cursorFetch: unused,
+    cursorClose: unused,
+    listAgents: unused,
+    entityDecisions: unused,
+    entityConnections: unused,
+    connectivityGraph: unused,
+    connectivityMembers: unused,
+    contain: unused,
+    logQuery: unused,
+    logExplain: unused,
+    logExport: unused,
+    vtzTree: unused,
+    vtzDetail: unused,
+    vtzCreate: (_p, request) => {
+      creates.push(request);
+      return settle();
+    },
+    vtzEdit: (_p, request) => {
+      edits.push(request);
+      return settle();
+    },
+    vtzRescope: (_p, request) => {
+      rescopes.push(request);
+      return settle();
+    },
+    vtzDelete: (_p, request) => {
+      deletes.push(request);
+      return settle();
+    },
+  };
+  return { engine, creates, edits, rescopes, deletes };
+}
+
+describe('classifyVtzRefusal (the engine refusal taxonomy)', () => {
+  it('maps the two classes crdb emits and nothing else', () => {
+    // crdb's vtz_store_refusal: exists / not-found / has-children -> Conflict; floor, inheritance
+    // contradiction, or a cross-tenant write -> Denied. Anything else is NOT a refusal we can explain.
+    expect(classifyVtzRefusal(refusal('Conflict'))).toBe('conflict');
+    expect(classifyVtzRefusal(refusal('Denied'))).toBe('denied');
+    expect(classifyVtzRefusal(refusal('Internal'))).toBeNull();
+    expect(classifyVtzRefusal(new Error('a transport failure'))).toBeNull();
+  });
+});
+
+describe('the audited zone mutations (V2.3)', () => {
+  it('compiles the authored spec to the wire and returns the committed lifecycle', async () => {
+    const { engine, creates } = mutatingEngine({
+      id: 'YouSource.Corp.Finance',
+      lifecycle: 'draft',
+    });
+    const result = await resolveVtzCreate(engine, principal, spec);
+    expect(result).toEqual({ id: 'YouSource.Corp.Finance', lifecycle: 'draft' });
+    expect(creates[0]?.spec.name).toBe('YouSource.Corp.Finance');
+    expect(creates[0]?.spec.zone_type).toBe('standard');
+    expect(creates[0]?.spec.reauth_interval_hours).toBe(8);
+    // The floor rows go back verbatim; the engine re-derives and re-enforces them regardless.
+    expect(creates[0]?.spec.own_postures.filter((p) => p.floor)).toHaveLength(2);
+    // The OperatorEngine injects the delegation, so the resolver leaves it null.
+    expect(creates[0]?.operator).toBeNull();
+  });
+
+  it('edits, re-scopes, and deletes through their own audited verbs', async () => {
+    const edited = mutatingEngine({ id: 'YouSource.Corp.Finance', lifecycle: 'published' });
+    expect((await resolveVtzEdit(edited.engine, principal, spec)).lifecycle).toBe('published');
+    expect(edited.edits[0]?.spec.name).toBe('YouSource.Corp.Finance');
+
+    const moved = mutatingEngine({ id: 'YouSource.Ops.Finance', lifecycle: '' });
+    const rescoped = await resolveVtzRescope(
+      moved.engine,
+      principal,
+      'YouSource.Corp.Finance',
+      'YouSource.Ops.Finance',
+    );
+    expect(moved.rescopes[0]).toMatchObject({
+      vtz_id: 'YouSource.Corp.Finance',
+      new_name: 'YouSource.Ops.Finance',
+    });
+    // Rescope returns no lifecycle by design; the Console re-reads rather than guessing a state.
+    expect(rescoped).toEqual({ id: 'YouSource.Ops.Finance', lifecycle: null });
+
+    const removed = mutatingEngine({ id: 'YouSource.Corp.Finance', lifecycle: '' });
+    await resolveVtzDelete(removed.engine, principal, 'YouSource.Corp.Finance');
+    expect(removed.deletes[0]?.vtz_id).toBe('YouSource.Corp.Finance');
+  });
+
+  it('reports a floor or inheritance refusal as denied, never as a success', async () => {
+    // The engine refuses to relax the read-only catastrophic floor. Nothing was committed, and the
+    // resolver must surface that rather than swallowing it or reporting an optimistic result.
+    const { engine } = mutatingEngine(refusal('Denied'));
+    await expect(resolveVtzCreate(engine, principal, spec)).rejects.toMatchObject({
+      name: 'VtzMutationRefusedError',
+      kind: 'denied',
+    });
+  });
+
+  it('reports a state clash (exists / not-found / has children) as a conflict', async () => {
+    const { engine } = mutatingEngine(refusal('Conflict'));
+    await expect(resolveVtzDelete(engine, principal, 'YouSource.Corp')).rejects.toBeInstanceOf(
+      VtzMutationRefusedError,
+    );
+    await expect(resolveVtzDelete(engine, principal, 'YouSource.Corp')).rejects.toMatchObject({
+      kind: 'conflict',
+    });
+  });
+
+  it('passes a refusal it cannot classify through as an engine error, never as a known refusal', async () => {
+    const { engine } = mutatingEngine(refusal('Internal'));
+    await expect(resolveVtzCreate(engine, principal, spec)).rejects.not.toBeInstanceOf(
+      VtzMutationRefusedError,
+    );
+  });
+
+  it('fails closed when the commit lands but names a lifecycle the Console does not know', async () => {
+    // The write DID land. Reporting a guessed state would be worse than reporting unavailability.
+    const { engine } = mutatingEngine({ id: 'YouSource.Corp', lifecycle: 'archived' });
+    await expect(resolveVtzEdit(engine, principal, spec)).rejects.toBeInstanceOf(
       VtzUnavailableError,
     );
   });

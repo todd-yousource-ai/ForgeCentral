@@ -22,6 +22,18 @@ const admin: OperatorPrincipal = {
   tenant: 'tenant-op',
 };
 
+/** A minimal well-formed engine spec for the audited VTZ writes. */
+const wireSpec = {
+  name: 'YouSource.Corp',
+  description: 'Corporate systems',
+  zone_type: 'standard',
+  own_postures: [{ domain: 'governed-egress', posture: 'deny', floor: true }],
+  micro_segmentation: true,
+  telemetry: 'full',
+  reauth_interval_hours: 8,
+  lifecycle: 'draft',
+};
+
 /** A CrucibleClient that records its calls (and the querySubmit requests) and returns scripted results. */
 function recordingClient(overrides: Partial<CrucibleClient> = {}): {
   client: CrucibleClient;
@@ -115,6 +127,26 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       calls.push('vtzDetail');
       reads.push(req);
       return Promise.resolve({ zone: null, ancestors: [] });
+    },
+    vtzCreate: (req) => {
+      calls.push('vtzCreate');
+      reads.push(req);
+      return Promise.resolve({ id: 'YouSource.New', lifecycle: 'draft' });
+    },
+    vtzEdit: (req) => {
+      calls.push('vtzEdit');
+      reads.push(req);
+      return Promise.resolve({ id: 'YouSource.New', lifecycle: 'published' });
+    },
+    vtzRescope: (req) => {
+      calls.push('vtzRescope');
+      reads.push(req);
+      return Promise.resolve({ id: 'YouSource.Moved', lifecycle: '' });
+    },
+    vtzDelete: (req) => {
+      calls.push('vtzDelete');
+      reads.push(req);
+      return Promise.resolve({ id: 'YouSource.Gone', lifecycle: '' });
     },
     logExplain: (req) => {
       calls.push('logExplain');
@@ -389,6 +421,35 @@ describe('createOperatorEngine', () => {
       expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
     }
     expect(recorded.map((d) => d.action)).toEqual(['vtzTree', 'vtzDetail']);
+  });
+
+  it('records the delegation + injects the operator on every audited VTZ write (V2.3)', async () => {
+    // The audit entry the engine writes is attributed to THIS operator in THIS tenant, so the delegation
+    // is injected server-side on every mutation and is never client-asserted.
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    await engine.vtzCreate(admin, { request_id: 9, operator: null, spec: wireSpec });
+    await engine.vtzEdit(admin, { request_id: 10, operator: null, spec: wireSpec });
+    await engine.vtzRescope(admin, {
+      request_id: 11,
+      operator: null,
+      vtz_id: 'YouSource.Corp',
+      new_name: 'YouSource.Ops',
+    });
+    await engine.vtzDelete(admin, { request_id: 12, operator: null, vtz_id: 'YouSource.Ops' });
+
+    expect(calls).toEqual(['vtzCreate', 'vtzEdit', 'vtzRescope', 'vtzDelete']);
+    for (const read of reads) {
+      expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
+    }
+    expect(recorded.map((d) => d.action)).toEqual([
+      'vtzCreate',
+      'vtzEdit',
+      'vtzRescope',
+      'vtzDelete',
+    ]);
   });
 
   it('records cursorFetch + cursorClose delegations and delegates', async () => {

@@ -53,6 +53,10 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     logExport: unused,
     vtzTree: unused,
     vtzDetail: unused,
+    vtzCreate: unused,
+    vtzEdit: unused,
+    vtzRescope: unused,
+    vtzDelete: unused,
     cursorFetch: unused,
     cursorClose: unused,
     close: () => Promise.resolve(),
@@ -181,6 +185,10 @@ function operatorEngineWith(): OperatorEngine {
       }),
     vtzTree: () => Promise.resolve({ nodes: [wireZone()], truncated: false }),
     vtzDetail: () => Promise.resolve({ zone: wireZone(), ancestors: [] }),
+    vtzCreate: () => Promise.resolve({ id: 'YouSource.New', lifecycle: 'draft' }),
+    vtzEdit: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: 'published' }),
+    vtzRescope: () => Promise.resolve({ id: 'YouSource.Moved', lifecycle: '' }),
+    vtzDelete: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: '' }),
   };
 }
 
@@ -212,6 +220,24 @@ function wireZone(overrides: Partial<WireVtzTreeNode> = {}): WireVtzTreeNode {
     effective_postures: postures,
     sub_zone_count: 1,
     ...overrides,
+  };
+}
+
+/** A well-formed authoring payload as the SPA would POST it. */
+function authoredSpec(): Record<string, unknown> {
+  return {
+    name: 'YouSource.Corp',
+    description: 'Corporate systems',
+    zoneType: 'standard',
+    ownPostures: [
+      { domain: 'governed-egress', posture: 'deny', floor: true },
+      { domain: 'execution', posture: 'deny', floor: true },
+      { domain: 'ordinary-network', posture: 'permit-deny-risky', floor: false },
+    ],
+    microSegmentation: true,
+    telemetry: 'full',
+    reauthIntervalHours: 8,
+    lifecycle: 'draft',
   };
 }
 
@@ -623,6 +649,190 @@ describe('BFF HTTP surface', () => {
     expect(await names(other)).toEqual(['ten-b']);
     // The second ten-a read was served warm; ten-b never saw ten-a's projection.
     expect(seen).toEqual(['ten-a', 'ten-b']);
+  });
+
+  it('POST /api/vtz commits an authored zone through the audited path', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    const res = await fetch(`${base}/api/vtz`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(authoredSpec()),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: 'YouSource.New', lifecycle: 'draft' });
+  });
+
+  it('edits, re-scopes, and deletes a zone on their own audited routes', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    const edit = await fetch(`${base}/api/vtz/YouSource.Corp`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(authoredSpec()),
+    });
+    expect(edit.status).toBe(200);
+    expect(await edit.json()).toEqual({ id: 'YouSource.Corp', lifecycle: 'published' });
+
+    const rescope = await fetch(`${base}/api/vtz/YouSource.Corp/rescope`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ newName: 'YouSource.Moved' }),
+    });
+    expect(rescope.status).toBe(200);
+    // Rescope commits with no lifecycle by design; the Console re-reads the moved zone.
+    expect(await rescope.json()).toEqual({ id: 'YouSource.Moved', lifecycle: null });
+
+    const removed = await fetch(`${base}/api/vtz/YouSource.Corp`, { method: 'DELETE' });
+    expect(removed.status).toBe(200);
+  });
+
+  it('rejects a malformed or rule-breaking spec at the boundary, before the engine (400)', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      // A malformed spec must never reach the engine at all.
+      vtzCreate: () => Promise.reject(new Error('the engine must not be called')),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const post = (body: unknown) =>
+      fetch(`${base}/api/vtz`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    expect((await post({})).status).toBe(400);
+    expect((await post({ ...authoredSpec(), zoneType: 'restricted' })).status).toBe(400);
+    expect((await post({ ...authoredSpec(), telemetry: 'verbose' })).status).toBe(400);
+    expect((await post({ ...authoredSpec(), lifecycle: 'archived' })).status).toBe(400);
+    // The re-auth interval is bounded 1-24; the engine re-validates, but a bad one fails fast here.
+    expect((await post({ ...authoredSpec(), reauthIntervalHours: 0 })).status).toBe(400);
+    expect((await post({ ...authoredSpec(), reauthIntervalHours: 99 })).status).toBe(400);
+    // An unknown object domain or posture tag cannot be half-understood into a spec.
+    expect(
+      (
+        await post({
+          ...authoredSpec(),
+          ownPostures: [{ domain: 'wormhole', posture: 'deny', floor: false }],
+        })
+      ).status,
+    ).toBe(400);
+    // A re-scope with no new name never reaches the engine either.
+    expect(
+      (
+        await fetch(`${base}/api/vtz/YouSource.Corp/rescope`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ newName: '  ' }),
+        })
+      ).status,
+    ).toBe(400);
+  });
+
+  it('reports a floor or inheritance refusal as a 403 that names the rule class, not the cause', async () => {
+    // The engine refuses to relax the read-only catastrophic floor and returns NO message (no oracle),
+    // so the response names the CLASS of rule and never invents which zone or domain was at fault.
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      vtzCreate: () =>
+        Promise.reject(
+          new EngineRefusedError({ class: 'Denied', code: 0, retry: 'Never', correlation_id: 0 }),
+        ),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/vtz`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(authoredSpec()),
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'refused', reason: 'denied' });
+  });
+
+  it('reports a state conflict (a zone that still has children) as a 409', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      vtzDelete: () =>
+        Promise.reject(
+          new EngineRefusedError({ class: 'Conflict', code: 0, retry: 'Never', correlation_id: 0 }),
+        ),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/vtz/YouSource.Corp`, { method: 'DELETE' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'refused', reason: 'conflict' });
+  });
+
+  it('drops the tenant cached zone tree after a write so the operator never sees a pre-write view', async () => {
+    // INV-CONSOLE-NO-2ND-DB: the cache is a projection. If a write did not evict it, the operator's own
+    // edit would appear not to have taken until the TTL elapsed.
+    let zoneName = 'YouSource.Corp';
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      vtzTree: () =>
+        Promise.resolve({ nodes: [wireZone({ id: zoneName, name: zoneName })], truncated: false }),
+      vtzEdit: () => {
+        zoneName = 'YouSource.Corp.Renamed';
+        return Promise.resolve({ id: zoneName, lifecycle: 'published' });
+      },
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const names = async () =>
+      (
+        (await (await fetch(`${base}/api/vtz/tree`)).json()) as { zones: { name: string }[] }
+      ).zones.map((z) => z.name);
+
+    expect(await names()).toEqual(['YouSource.Corp']);
+    expect(await names()).toEqual(['YouSource.Corp']); // served warm
+    await fetch(`${base}/api/vtz/YouSource.Corp`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(authoredSpec()),
+    });
+    // The write evicted this tenant's projections, so the next read reflects it.
+    expect(await names()).toEqual(['YouSource.Corp.Renamed']);
+  });
+
+  it('the zone mutations are 401 without a session, 503 without an engine, 405 on a bad method', async () => {
+    const noSession = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+    expect((await fetch(`${noSession}/api/vtz`, { method: 'POST' })).status).toBe(401);
+    expect((await fetch(`${noSession}/api/vtz/YouSource.Corp`, { method: 'DELETE' })).status).toBe(
+      401,
+    );
+
+    const noEngine = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+      },
+    );
+    expect((await fetch(`${noEngine}/api/vtz`, { method: 'POST' })).status).toBe(503);
+
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    // PUT on the collection and POST on a zone are not mutations this surface defines.
+    expect((await fetch(`${base}/api/vtz`, { method: 'PUT' })).status).toBe(405);
+    expect((await fetch(`${base}/api/vtz/YouSource.Corp`, { method: 'POST' })).status).toBe(405);
   });
 
   it('GET /api/overview/sankey is 401 without an operator session (fail-closed)', async () => {

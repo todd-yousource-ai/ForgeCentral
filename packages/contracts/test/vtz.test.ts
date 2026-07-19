@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   VTZ_OBJECT_DOMAINS,
+  toVtzSpecInput,
+  toWireVtzSpec,
   toDomainPosture,
   toVtzArchetype,
   toVtzDetail,
@@ -240,5 +242,83 @@ describe('toVtzMutation (the audited create/edit/rescope/delete reply)', () => {
 
   it('fails closed on an unknown lifecycle tag', () => {
     expect(toVtzMutation({ id: 'YouSource.Corp', lifecycle: 'archived' })).toBeNull();
+  });
+});
+
+describe('the authoring spec (V2.3 write side)', () => {
+  const body = {
+    name: '  YouSource.Corp.Finance  ',
+    description: 'Finance systems',
+    zoneType: 'standard',
+    ownPostures: [
+      { domain: 'governed-egress', posture: 'deny', floor: true },
+      { domain: 'ordinary-network', posture: 'permit-deny-risky', floor: false },
+    ],
+    microSegmentation: true,
+    telemetry: 'full',
+    reauthIntervalHours: 8,
+    lifecycle: 'draft',
+  };
+
+  it('narrows a well-formed payload and trims the dotted name', () => {
+    const spec = toVtzSpecInput(body);
+    expect(spec?.name).toBe('YouSource.Corp.Finance');
+    expect(spec?.zoneType).toBe('standard');
+    expect(spec?.telemetry).toBe('full');
+    expect(spec?.lifecycle).toBe('draft');
+    expect(spec?.ownPostures).toHaveLength(2);
+  });
+
+  it('compiles the authored spec to the wire, carrying the floor rows back verbatim', () => {
+    const spec = toVtzSpecInput(body);
+    if (spec === null) throw new Error('the well-formed payload must narrow');
+    const wire = toWireVtzSpec(spec);
+    expect(wire.name).toBe('YouSource.Corp.Finance');
+    expect(wire.zone_type).toBe('standard');
+    expect(wire.micro_segmentation).toBe(true);
+    expect(wire.reauth_interval_hours).toBe(8);
+    // The Console never asserts what is a floor; it echoes the flag and the engine re-derives it.
+    expect(wire.own_postures[0]).toEqual({
+      domain: 'governed-egress',
+      posture: 'deny',
+      floor: true,
+    });
+  });
+
+  it('refuses a payload with ANY unknown tag rather than half-understanding it', () => {
+    expect(toVtzSpecInput({ ...body, zoneType: 'restricted' })).toBeNull();
+    expect(toVtzSpecInput({ ...body, telemetry: 'verbose' })).toBeNull();
+    expect(toVtzSpecInput({ ...body, lifecycle: 'archived' })).toBeNull();
+    expect(
+      toVtzSpecInput({
+        ...body,
+        ownPostures: [{ domain: 'wormhole', posture: 'deny', floor: false }],
+      }),
+    ).toBeNull();
+    expect(
+      toVtzSpecInput({
+        ...body,
+        ownPostures: [{ domain: 'ipc', posture: 'permit', floor: false }],
+      }),
+    ).toBeNull();
+  });
+
+  it('refuses a missing, mistyped, or out-of-range field (no defaulting, no partial accept)', () => {
+    expect(toVtzSpecInput(null)).toBeNull();
+    expect(toVtzSpecInput('a string')).toBeNull();
+    expect(toVtzSpecInput({})).toBeNull();
+    expect(toVtzSpecInput({ ...body, name: '   ' })).toBeNull();
+    expect(toVtzSpecInput({ ...body, description: 42 })).toBeNull();
+    expect(toVtzSpecInput({ ...body, microSegmentation: 'yes' })).toBeNull();
+    expect(toVtzSpecInput({ ...body, ownPostures: [] })).toBeNull();
+    expect(toVtzSpecInput({ ...body, ownPostures: 'all' })).toBeNull();
+    // The re-auth interval is bounded 1-24 and must be a whole number of hours.
+    expect(toVtzSpecInput({ ...body, reauthIntervalHours: 0 })).toBeNull();
+    expect(toVtzSpecInput({ ...body, reauthIntervalHours: 25 })).toBeNull();
+    expect(toVtzSpecInput({ ...body, reauthIntervalHours: 8.5 })).toBeNull();
+    // A posture row missing the floor flag is not silently defaulted to false.
+    expect(
+      toVtzSpecInput({ ...body, ownPostures: [{ domain: 'ipc', posture: 'deny' }] }),
+    ).toBeNull();
   });
 });

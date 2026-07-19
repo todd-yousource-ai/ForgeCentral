@@ -14,13 +14,14 @@ import {
   type ServerResponse,
 } from 'node:http';
 
-import { objectId, principalId, vtzId } from '@forge/contracts';
+import { objectId, principalId, toVtzSpecInput, vtzId } from '@forge/contracts';
 import type {
   EntityRef,
   IsolateRequest,
   LogExportRequest,
   LogQueryFilter,
   OverviewQuery,
+  VtzSpecInput,
 } from '@forge/contracts';
 
 import type { AuthRouter } from './auth/router.js';
@@ -40,8 +41,13 @@ import type { OperatorEngine } from './engine/operator-engine.js';
 import {
   DEFAULT_VTZ_TREE_LIMIT,
   MAX_VTZ_TREE_LIMIT,
+  VtzMutationRefusedError,
   VtzUnavailableError,
+  resolveVtzCreate,
+  resolveVtzDelete,
   resolveVtzDetail,
+  resolveVtzEdit,
+  resolveVtzRescope,
   resolveVtzTree,
 } from './engine/vtz.js';
 import type { ReverseDnsResolver } from './engine/reverse-dns.js';
@@ -710,8 +716,8 @@ async function handleVtz(
   // Tenant-scoped key: a warm projection is never served across tenants (INV-CONSOLE-ENGINE-AUTHZ).
   const cacheKey =
     path === '/api/vtz/tree'
-      ? `vtz:tree:${principal.tenant}:${String(limit)}`
-      : `vtz:detail:${principal.tenant}:${zoneId ?? ''}`;
+      ? `${vtzCachePrefix(principal.tenant)}tree:${String(limit)}`
+      : `${vtzCachePrefix(principal.tenant)}detail:${zoneId ?? ''}`;
   const cached = deps.cache.get(cacheKey, VTZ_CACHE_VERSION);
   if (cached !== undefined) {
     sendJson(res, 200, cached);
@@ -740,6 +746,15 @@ async function handleVtz(
   return true;
 }
 
+/**
+ * The cache-key prefix for every VTZ projection of one tenant, so an audited write can drop exactly that
+ * tenant's stale zone views and nothing else (a write must never evict another tenant's cache, and the
+ * operator must never be shown a pre-write tree that makes their own edit look lost).
+ */
+function vtzCachePrefix(tenant: string | undefined): string {
+  return `vtz:${tenant ?? ''}:`;
+}
+
 /** Parse the `limit` query param into a bounded zone-tree limit (absent/malformed -> the default). */
 function parseVtzLimit(params: URLSearchParams): number {
   const raw = params.get('limit');
@@ -747,6 +762,137 @@ function parseVtzLimit(params: URLSearchParams): number {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_VTZ_TREE_LIMIT;
   return Math.min(parsed, MAX_VTZ_TREE_LIMIT);
+}
+
+/** `/api/vtz/<id>` -- the edit + delete routes (the dotted zone id is percent-encoded). */
+const VTZ_ZONE_RE = /^\/api\/vtz\/(?!tree$|detail$)([^/]+)$/;
+
+/** `/api/vtz/<id>/rescope` -- the re-scope (rename) route. */
+const VTZ_RESCOPE_RE = /^\/api\/vtz\/([^/]+)\/rescope$/;
+
+/** The audited zone mutation a request resolved to, once the path + method + body all validated. */
+type VtzCommand =
+  | { readonly kind: 'create'; readonly spec: VtzSpecInput }
+  | { readonly kind: 'edit'; readonly spec: VtzSpecInput }
+  | { readonly kind: 'rescope'; readonly id: string; readonly newName: string }
+  | { readonly kind: 'delete'; readonly id: string };
+
+/** Parse a re-scope body into its new dotted name, or null when it is missing/blank. */
+function parseRescopeName(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const newName = (body as Record<string, unknown>)['newName'];
+  if (typeof newName !== 'string' || newName.trim() === '') return null;
+  return newName.trim();
+}
+
+/**
+ * Resolve the request to a {@link VtzCommand}, or `null` if the path+method pair is not a zone mutation,
+ * or `'bad'` if it is one but the body did not validate. Every spec is narrowed fail-closed by
+ * `toVtzSpecInput` (no partial accept, no defaulting) before it can reach the engine.
+ */
+async function parseVtzCommand(
+  req: IncomingMessage,
+  method: string,
+  path: string,
+): Promise<VtzCommand | 'bad' | null> {
+  const rescope = VTZ_RESCOPE_RE.exec(path);
+  if (rescope && method === 'POST') {
+    const name = parseRescopeName(await readJsonBody(req, MAX_COMMAND_BODY_BYTES));
+    if (name === null) return 'bad';
+    return { kind: 'rescope', id: decodeURIComponent(rescope[1] ?? ''), newName: name };
+  }
+  if (path === '/api/vtz' && method === 'POST') {
+    const spec = toVtzSpecInput(await readJsonBody(req, MAX_COMMAND_BODY_BYTES));
+    return spec === null ? 'bad' : { kind: 'create', spec };
+  }
+  const zone = VTZ_ZONE_RE.exec(path);
+  if (zone && method === 'PUT') {
+    const spec = toVtzSpecInput(await readJsonBody(req, MAX_COMMAND_BODY_BYTES));
+    return spec === null ? 'bad' : { kind: 'edit', spec };
+  }
+  if (zone && method === 'DELETE') {
+    return { kind: 'delete', id: decodeURIComponent(zone[1] ?? '') };
+  }
+  return null;
+}
+
+/**
+ * Serve the audited zone mutations: `POST /api/vtz` (create), `PUT /api/vtz/<id>` (edit),
+ * `POST /api/vtz/<id>/rescope`, `DELETE /api/vtz/<id>`. Session-gated (401), engine-gated (503), body
+ * validated fail-closed (400). Each commits through the crdb Committer with the operator delegation
+ * injected server-side, so a success has already landed on the audit chain attributed to this operator.
+ *
+ * A REFUSAL IS REPORTED, NEVER SWALLOWED: the engine refuses a catastrophic-floor relaxation or an
+ * inheritance contradiction (403) and a state conflict such as a zone that still has children (409). The
+ * engine returns no message (it is not an oracle), so the response names the class of rule and nothing
+ * more specific. On success the tenant's cached zone projections are dropped, so the operator's next read
+ * cannot serve a pre-write tree that would make their own change look lost. Returns true iff it claimed
+ * the request.
+ */
+async function handleVtzCommand(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (!path.startsWith('/api/vtz')) return false;
+  if (path === '/api/vtz/tree' || path === '/api/vtz/detail') return false;
+  if (method === 'GET') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let command: VtzCommand | 'bad' | null;
+  try {
+    command = await parseVtzCommand(req, method, path);
+  } catch {
+    command = 'bad';
+  }
+  if (command === null) {
+    sendJson(res, 405, { error: 'method_not_allowed' });
+    return true;
+  }
+  if (command === 'bad') {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const engine = deps.operatorEngine;
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    let result;
+    if (command.kind === 'create') {
+      result = await resolveVtzCreate(engine, principal, command.spec, opts);
+    } else if (command.kind === 'edit') {
+      result = await resolveVtzEdit(engine, principal, command.spec, opts);
+    } else if (command.kind === 'rescope') {
+      result = await resolveVtzRescope(engine, principal, command.id, command.newName, opts);
+    } else {
+      result = await resolveVtzDelete(engine, principal, command.id, opts);
+    }
+    // The write landed; every cached projection of this tenant's zones is now stale.
+    deps.cache.deletePrefix(vtzCachePrefix(principal.tenant));
+    sendJson(res, 200, result);
+  } catch (err) {
+    if (err instanceof VtzMutationRefusedError) {
+      // Nothing was committed. `conflict` is a state clash, `denied` a floor/inheritance/tenant rule.
+      sendJson(res, err.kind === 'conflict' ? 409 : 403, { error: 'refused', reason: err.kind });
+    } else if (err instanceof VtzUnavailableError) {
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'vtz mutation failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -770,6 +916,9 @@ async function route(
     return;
   }
   if (await handleLogExport(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleVtzCommand(deps, req, method, path, res)) {
     return;
   }
   if (method !== 'GET') {
