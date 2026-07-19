@@ -954,6 +954,9 @@
         "limit": {
           "type": "integer"
         },
+        "offset": {
+          "type": "integer"
+        },
         "operator": {
           "oneOf": [
             {
