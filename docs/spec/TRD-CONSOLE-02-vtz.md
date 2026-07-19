@@ -1,15 +1,26 @@
 # TRD-CONSOLE-02 -- Virtual Trust Zones (VTZ)
 
-**Status:** DRAFT (authored 2026-07-07). Inherits `TRD-CONSOLE-00`. The VTZ surface is the operator view
-of the Forge Virtual Trust Zone model (TRD-32 v2). VTZs are the middle column of the Overview graph (the
-score-ringed zones traffic flows through) and the grouping axis of Policies. This surface manages them.
+**Status:** DRAFT (authored 2026-07-07). **AMENDED 2026-07-19 (`IP-CONSOLE-02` V2.6): Trust Score is
+struck from this TRD.** Inherits `TRD-CONSOLE-00`. The VTZ surface is the operator view of the Forge
+Virtual Trust Zone model (TRD-32 v2). VTZs are the middle column of the Overview graph (the zones traffic
+flows through, colored by their risk band) and the grouping axis of Policies. This surface manages them.
+
+> **AMENDMENT (2026-07-19) -- Trust Score is removed from this surface.** This TRD was authored before the
+> engine had a VTZ system of record. The one we built (crdb `IP-CONSOLE-VTZ-SUBSTRATE`, VZ.1-VZ.N) carries
+> **no score**: `WireVtzTreeNode` has no score field, and there is no computed per-zone trust value
+> anywhere in the engine. A zone's health is therefore its **posture** (own + effective, per domain) plus
+> the **decision-LOG risk band** (green / yellow / red) joined from the Overview substrate by zone id --
+> absent by design when no decision drives it, never a defaulted value. This mirrors the same removal made
+> in the entity drawer (`IP-CONSOLE-12` DR.1) and the Overview redesign (`IP-CONSOLE-01`). Every clause
+> below that referenced a Trust Score has been struck or restated; the `docs/ui-examples/` VTZ mockups
+> (15-20) still show the old score rings and are superseded on this point.
 
 ---
 
 ## 1. Purpose
 
 Let the operator see and steer the platform's trust zones: their hierarchy, each zone's default posture
-and effective (inherited) posture, its members, its boundary, and its live Trust Score -- and create,
+and effective (inherited) posture, its members, its boundary, and its decision-driven risk band -- and create,
 re-scope, or adjust a zone safely. VTZs are the policy and containment boundary; this surface is where
 that boundary is defined.
 
@@ -26,12 +37,20 @@ that boundary is defined.
 - **Members + boundary.** A zone's members (the principals/objects it contains) and its boundary (what
   traffic it admits); membership is launch-independent (the cgroup/identity-derived membership Torch
   attributes, not a launch-path guess).
-- **Trust Score.** The zone's live score (the ring shown on Overview), a real computed value.
+- **Risk band (replaces Trust Score).** The zone's health signal is the decision-LOG risk band -- `red`
+  if any recent decision recommends `escalate`, else `yellow` if any recommends `candidate`, else `green`
+  -- joined from the Overview connectivity read by zone id. It is derived from real detections, not a
+  computed score, and a zone no decision has touched carries **no band at all** rather than a reassuring
+  default. There is no numeric trust value on this surface (see the amendment above).
 
 ## 3. Data source and bindings (INV-CONSOLE-NO-STUB, CRUCIBLEQL-FIRST)
 
-- **Read binding `vtz.tree`** -> the zone hierarchy with each zone's own + effective posture, member
-  count, and Trust Score, from the Forge VTZ model. Rendered as an explorable tree/list.
+- **Read binding `vtz.tree`** -> the zone hierarchy with each zone's own + effective per-domain posture,
+  archetype, lifecycle, and real sub-zone count, from the crdb VTZ system of record. Rendered as an
+  explorable grid/tree. The per-zone risk band is a JOIN over the already-live `overview.graph` read
+  (`vtz.riskBand`), not a field of this binding and not a new engine op. Member counts are `PENDING`:
+  crdb has no zone-membership substrate (`VtzSetMembership` deferred, `TRD-CONSOLE-12`), so the card
+  renders their honest absence rather than a number.
 - **Read binding `vtz.detail(id)`** -> a zone's full definition: posture (own + effective + the
   contributing ancestors), risk rules, boundary, members (paged), and its policies (link to
   `TRD-CONSOLE-05`) and recent decisions (the LOG filtered to the zone).
@@ -69,8 +88,11 @@ inheritance rule is blocked in-form and, if forced, refused by the engine with t
 ## 6. Acceptance and failure semantics
 
 **Acceptance:**
-- The zone tree, postures (own + effective), members, and Trust Scores derive from the real Forge VTZ
-  model; no fabricated zone (contract test + fixtureless render).
+- The zone tree, postures (own + effective), and sub-zone counts derive from the real crdb VTZ system of
+  record; no fabricated zone, posture, or count (contract test + a fixtureless render showing only the
+  seeded root zone).
+- **No trust score is shown anywhere.** The only zone-health signal is the posture badge plus the
+  decision-LOG risk band, absent by design when no decision drives it.
 - Most-restrictive-wins inheritance is shown correctly (a child never displays a laxer effective posture
   than an ancestor's floor); the catastrophic read-only floor cannot be edited away.
 - Create/edit/re-scope commit through the engine with audit; confirm-gated; the effective-posture diff is

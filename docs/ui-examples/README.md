@@ -14,7 +14,8 @@ hex codes alone cannot pin down. If you build a surface that does not look like 
 set, it is wrong.
 
 Captured 2026-07-05 from the design prototype (the `DEMO` environment badge is visible top-left;
-data shown is illustrative demo data, not a live tenant).
+data shown is illustrative demo data, not a live tenant). Screenshots 15-20 were added 2026-07-19 for
+the Virtual Trust Zones surface (`IP-CONSOLE-02` V2.6).
 
 ## The screenshots
 
@@ -34,6 +35,40 @@ data shown is illustrative demo data, not a live tenant).
 | 12 | **Settings -> HA & Topology** | Settings tab strip (HA & Topology, Failover & DR, RBAC, Federation, Security, TrustLock, Policy, Observability, FIPS Mode). Controller-cluster nodes with replication-lag bars + `Leader` badge; DR-target cards (RPO/RTO/Ready) + `Rotate Leadership` / `Test Quorum Loss`. |
 | 13 | **Trust Overview** (hover-focus) | The graph with one path emphasized and the rest dimmed, plus a hover tooltip (`Inventory-Bot - 1 connections - Trust: 78`). Shows the focus/dim interaction. |
 | 14 | **Trust Overview** (entity drawer) | The right **slide-over drawer** for a focused entity: score-ring header + sparkline, Entity Information (Trust State, Risk Score, Region, Last Seen, Tags), Connected VTZs, Capabilities, Effective Policies, Recent Events (Denied/Success/Pass chips), and **Quick Actions** (View Remediation, Isolate from network, Modify VTZ assignment, Open full report). This is how the `<= 3-click` rule is met: select in the graph -> act in the drawer. |
+
+### Virtual Trust Zones (15-20, captured 2026-07-19)
+
+The VTZ surface mockups. **Read the divergence note below before building against them:** the crdb VTZ
+system of record we shipped is meaningfully different from what these screens show, and the wire contract
+wins. They remain the layout guideline -- density, grid rhythm, the KPI row, the tab strip, the form
+order -- which is exactly what a mockup is for.
+
+| # | View | What it establishes |
+|---|------|---------------------|
+| 15 | **Active VTZs** (grid) | The landing view: a four-up KPI row (`Total VTZs`, `Avg Trust`, `High-Sens`, `Sessions`), an `Active VTZs` / `Configure VTZs` tab strip, a full-width search, and a responsive grid of zone cards. Each card: dotted zone name, a score ring, four counts (users / objects / policies / sub-zones), and an archetype chip (`Standard` / `Trusted` / `Isolation` / `Public`) whose color carries the archetype. Top-right primary `+ Create`. |
+| 16 | **Configure VTZs** (form, top) | The editor: a zone selector top-right of the card, then `VTZ Name`, `VTZ Type`, `Parent VTZ (Optional)`, `Description`, `Origin-ID`, `Encryption Mode` as a two-up segmented control. Info `(i)` affordances on the fields that need a definition. |
+| 17 | **Configure VTZs** (form, bottom) | The rest of the form -- `Trust Score Threshold (0-100)`, `Trust Session Duration (1-24 hours)`, `Micro-Segmentation` toggle with an Enabled/Disabled caption, `Telemetry Mode` -- above a sticky action bar: destructive `Delete` left, `Revert` + `Duplicate` beside it, primary `Save` right. |
+| 18 | **Create New Virtual Trust Zone** (modal) | The create path as a centered modal over a dimmed surface: title + one-line purpose, the same field order as the editor, and `Cancel` / `Create VTZ` in a pinned footer. Establishes that create and edit share one form. |
+| 19 | **Configure VTZs** (form, top, zone selected) | Near-duplicate of 16 with the name field in its focused/selected state. Kept for the focus treatment. |
+| 20 | **Configure VTZs** (form, bottom, action bar) | Near-duplicate of 17. **Carries a capture artifact:** a macOS screenshot preview thumbnail floats over the lower-right action bar. Ignore it; it is not a UI element. |
+
+**DIVERGENCE FROM THE SHIPPED SURFACE (`IP-CONSOLE-02`, built to the substrate).** These screens predate
+the crdb VTZ system of record. Where they disagree with the wire contract, the contract wins:
+
+- **No trust score, anywhere.** The per-card score rings (95/94/92/...), the `Avg Trust` KPI, and the
+  `Trust Score Threshold` field are **removed** -- the substrate carries no score (`WireVtzTreeNode` has
+  no score field). A zone's health is its **posture** plus the decision-LOG **risk band** joined from the
+  Overview, exactly as `TRD-CONSOLE-02` Section 2 was amended to say. Same removal as the entity drawer
+  (DR.1) and the Overview redesign.
+- **Posture is a per-domain matrix, not one dropdown.** The shipped editor renders the eleven TRD-32 v2
+  object domains with own vs effective posture, and the two catastrophic-floor rows are locked by the
+  engine's own flag.
+- **`Parent VTZ` is derived, not chosen.** The dotted name IS the hierarchy, so the parent is its lexical
+  prefix and a re-scope is a rename -- a separate audited verb, not a field on Save.
+- **Dropped:** `Origin-ID` and `Encryption Mode` are not in the substrate and are not built.
+  `Trust Session Duration` ships as the plain re-auth interval, labelled **Session Duration**.
+- **Counts:** `sub-zones` is real. The user / object / policy counts on the card are `PENDING` -- their
+  substrates do not exist yet -- so the shipped card renders an explicit "Not available", never a number.
 
 ## Design language (observed; normative source is `TRD-CONSOLE-00` Section 6)
 
