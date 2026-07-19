@@ -95,6 +95,7 @@ function filterToWire(filter: LogQueryFilter): WireLogQuery {
     action: filter.action ?? null,
     search: filter.search ?? null,
     limit: filter.limit,
+    ...(filter.offset !== undefined && filter.offset > 0 ? { offset: filter.offset } : {}),
   };
 }
 

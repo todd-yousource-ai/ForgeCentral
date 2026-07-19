@@ -119,6 +119,8 @@ export interface LogQueryFilter {
   readonly search?: string;
   /** The maximum number of most-recent matching rows to return (bounded further by the engine ceiling). */
   readonly limit: number;
+  /** Rows to skip before the page (SQ.8b background paging); absent = the first page. */
+  readonly offset?: number;
 }
 
 /**

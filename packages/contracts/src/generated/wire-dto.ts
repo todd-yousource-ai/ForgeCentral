@@ -232,6 +232,8 @@ export interface WireLogQuery {
   action?: string | null;
   confidence?: string | null;
   limit: number;
+  /** Rows to skip before the page (SQ.8a background paging); zero/absent = the first page. */
+  offset?: number;
   operator?: OperatorDelegation | null;
   request_id: number;
   rule_id?: string | null;
