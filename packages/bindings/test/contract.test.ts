@@ -177,6 +177,71 @@ describe('IP-CONSOLE-01 O1.1: the Overview (overview.*) connectivity bindings', 
   });
 });
 
+describe('IP-CONSOLE-02 V2.1: the Virtual Trust Zones (vtz.*) governance bindings', () => {
+  const vtzBindings = Object.values(bindings).filter((b) => b.id.startsWith('vtz.'));
+
+  it('registers every VTZ read + audited mutation binding', () => {
+    const ids = vtzBindings.map((b) => b.id).sort();
+    expect(ids).toEqual([
+      'vtz.create',
+      'vtz.delete',
+      'vtz.detail',
+      'vtz.edit',
+      'vtz.memberCounts',
+      'vtz.policyCount',
+      'vtz.rescope',
+      'vtz.riskBand',
+      'vtz.setMembership',
+      'vtz.tree',
+    ]);
+  });
+
+  it('binds the tree + detail reads LIVE to the crdb VTZ system of record', () => {
+    // Backed by crdb IP-CONSOLE-VTZ-SUBSTRATE (VZ.1-VZ.N), live over :7878 and deployed 2026-07-19.
+    const tree = bindings['vtz.tree'];
+    expect(tree?.kind).toBe('read');
+    expect(tree?.surface).toBe('cruciblql');
+    expect(tree?.op).toBe('vtz_tree_v1');
+    expect(tree?.status.kind).toBe('live');
+    const detail = bindings['vtz.detail'];
+    expect(detail?.op).toBe('vtz_detail_v1');
+    expect(detail?.status.kind).toBe('live');
+  });
+
+  it('sources zone health from the live Overview risk band, never a trust score', () => {
+    // The wire carries no score, so the card's focal signal is posture + this JOIN over the already-live
+    // connectivity graph. It deliberately reuses that op rather than inventing a new engine read.
+    const riskBand = bindings['vtz.riskBand'];
+    expect(riskBand?.op).toBe('connectivity_graph_v1');
+    expect(riskBand?.status.kind).toBe('live');
+    expect(vtzBindings.map((b) => b.id)).not.toContain('vtz.trustScore');
+  });
+
+  it('exposes all four authoring mutations as real audited commands', () => {
+    for (const id of ['vtz.create', 'vtz.edit', 'vtz.rescope', 'vtz.delete']) {
+      const command = bindings[id];
+      expect(command?.kind).toBe('command');
+      expect(command?.status.kind).toBe('live');
+      if (command?.kind === 'command') {
+        expect(command.audited).toBe(true);
+        expect(command.authz).toBe('operator:vtz.author');
+      }
+    }
+  });
+
+  it('defers only membership + policy counts, each naming its gating engine task', () => {
+    const pending = vtzBindings.filter((b) => b.status.kind === 'pending').map((b) => b.id);
+    expect(pending.sort()).toEqual(['vtz.memberCounts', 'vtz.policyCount', 'vtz.setMembership']);
+    for (const id of pending) {
+      const binding = bindings[id];
+      if (binding?.status.kind === 'pending') {
+        expect(binding.status.owningRepo).toBe('crdb');
+        expect(binding.status.gatingTask).not.toBe('');
+      }
+    }
+  });
+});
+
 describe('INV-CONSOLE-NO-STUB: the enforcement rules', () => {
   it('accepts a well-formed live read binding', () => {
     const manifest: BindingManifest = { [liveRead.id]: liveRead };

@@ -705,6 +705,26 @@
       ],
       "type": "object"
     },
+    "WireDomainPosture": {
+      "additionalProperties": false,
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "floor": {
+          "type": "boolean"
+        },
+        "posture": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain",
+        "posture",
+        "floor"
+      ],
+      "type": "object"
+    },
     "WireDriftTrigger": {
       "enum": [
         "Schema",
@@ -1530,6 +1550,42 @@
             "UsageOverview"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzTree": {
+              "$ref": "#/$defs/WireVtzTree"
+            }
+          },
+          "required": [
+            "VtzTree"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzDetail": {
+              "$ref": "#/$defs/WireVtzDetail"
+            }
+          },
+          "required": [
+            "VtzDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzMutated": {
+              "$ref": "#/$defs/WireVtzMutation"
+            }
+          },
+          "required": [
+            "VtzMutated"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -1929,6 +1985,78 @@
             "UsageOverview"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzTree": {
+              "$ref": "#/$defs/WireVtzTreeQuery"
+            }
+          },
+          "required": [
+            "VtzTree"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzDetail": {
+              "$ref": "#/$defs/WireVtzDetailQuery"
+            }
+          },
+          "required": [
+            "VtzDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzCreate": {
+              "$ref": "#/$defs/WireVtzCreate"
+            }
+          },
+          "required": [
+            "VtzCreate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzEdit": {
+              "$ref": "#/$defs/WireVtzEdit"
+            }
+          },
+          "required": [
+            "VtzEdit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzRescope": {
+              "$ref": "#/$defs/WireVtzRescope"
+            }
+          },
+          "required": [
+            "VtzRescope"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "VtzDelete": {
+              "$ref": "#/$defs/WireVtzDelete"
+            }
+          },
+          "required": [
+            "VtzDelete"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -2234,6 +2362,74 @@
         }
       ]
     },
+    "WireVtzAncestor": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "WireVtzCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "spec": {
+          "$ref": "#/$defs/WireVtzSpec"
+        }
+      },
+      "required": [
+        "request_id",
+        "spec"
+      ],
+      "type": "object"
+    },
+    "WireVtzDelete": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "vtz_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz_id"
+      ],
+      "type": "object"
+    },
     "WireVtzDestEdge": {
       "additionalProperties": false,
       "properties": {
@@ -2251,6 +2447,99 @@
         "vtz_id",
         "dest_class",
         "weight"
+      ],
+      "type": "object"
+    },
+    "WireVtzDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "ancestors": {
+          "items": {
+            "$ref": "#/$defs/WireVtzAncestor"
+          },
+          "type": "array"
+        },
+        "zone": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/WireVtzTreeNode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ancestors"
+      ],
+      "type": "object"
+    },
+    "WireVtzDetailQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "vtz_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz_id"
+      ],
+      "type": "object"
+    },
+    "WireVtzEdit": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "spec": {
+          "$ref": "#/$defs/WireVtzSpec"
+        }
+      },
+      "required": [
+        "request_id",
+        "spec"
+      ],
+      "type": "object"
+    },
+    "WireVtzMutation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "lifecycle"
       ],
       "type": "object"
     },
@@ -2275,6 +2564,188 @@
         "name",
         "profile",
         "risk"
+      ],
+      "type": "object"
+    },
+    "WireVtzRescope": {
+      "additionalProperties": false,
+      "properties": {
+        "new_name": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "vtz_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz_id",
+        "new_name"
+      ],
+      "type": "object"
+    },
+    "WireVtzSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "micro_segmentation": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "own_postures": {
+          "items": {
+            "$ref": "#/$defs/WireDomainPosture"
+          },
+          "type": "array"
+        },
+        "reauth_interval_hours": {
+          "type": "integer"
+        },
+        "telemetry": {
+          "type": "string"
+        },
+        "zone_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "zone_type",
+        "own_postures",
+        "micro_segmentation",
+        "telemetry",
+        "reauth_interval_hours",
+        "lifecycle"
+      ],
+      "type": "object"
+    },
+    "WireVtzTree": {
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/WireVtzTreeNode"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "nodes",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "WireVtzTreeNode": {
+      "additionalProperties": false,
+      "properties": {
+        "effective_postures": {
+          "items": {
+            "$ref": "#/$defs/WireDomainPosture"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "micro_segmentation": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "own_postures": {
+          "items": {
+            "$ref": "#/$defs/WireDomainPosture"
+          },
+          "type": "array"
+        },
+        "parent": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reauth_interval_hours": {
+          "type": "integer"
+        },
+        "sub_zone_count": {
+          "type": "integer"
+        },
+        "telemetry": {
+          "type": "string"
+        },
+        "zone_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "zone_type",
+        "lifecycle",
+        "micro_segmentation",
+        "telemetry",
+        "reauth_interval_hours",
+        "own_postures",
+        "effective_postures",
+        "sub_zone_count"
+      ],
+      "type": "object"
+    },
+    "WireVtzTreeQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "type": "integer"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "limit"
       ],
       "type": "object"
     }
