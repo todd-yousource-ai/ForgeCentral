@@ -184,7 +184,7 @@ function operatorEngineWith(): OperatorEngine {
         ],
       }),
     vtzTree: () => Promise.resolve({ nodes: [wireZone()], truncated: false }),
-    vtzDetail: () => Promise.resolve({ zone: wireZone(), ancestors: [] }),
+    vtzDetail: () => Promise.resolve({ zone: wireZone(), ancestors: [], commit_version: 7 }),
     vtzCreate: () => Promise.resolve({ id: 'YouSource.New', lifecycle: 'draft' }),
     vtzEdit: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: 'published' }),
     vtzRescope: () => Promise.resolve({ id: 'YouSource.Moved', lifecycle: '' }),
@@ -554,7 +554,7 @@ describe('BFF HTTP surface', () => {
   it('GET /api/vtz/detail reports an unknown zone as an honest not-found, never an empty zone', async () => {
     const engine: OperatorEngine = {
       ...operatorEngineWith(),
-      vtzDetail: () => Promise.resolve({ zone: null, ancestors: [] }),
+      vtzDetail: () => Promise.resolve({ zone: null, ancestors: [], commit_version: 7 }),
     };
     const base = await start(
       mockClient(() => Promise.resolve()),
@@ -562,7 +562,7 @@ describe('BFF HTTP surface', () => {
     );
     const res = await fetch(`${base}/api/vtz/detail?id=No.Such.Zone`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ zone: null, ancestors: [] });
+    expect(await res.json()).toEqual({ zone: null, ancestors: [], commitVersion: 7 });
   });
 
   it('the VTZ reads are 401 without a session and 503 without an engine (fail-closed)', async () => {

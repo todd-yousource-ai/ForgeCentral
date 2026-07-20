@@ -55,6 +55,27 @@ export interface WireAuditEntry {
   timestamp: number;
 }
 
+export interface WireBundleCommit {
+  bundle: Array<number>;
+  operator?: OperatorDelegation | null;
+  request_id: string;
+}
+
+export interface WireBundleCommitted {
+  commit_version: number;
+  version: number;
+}
+
+export interface WireBundleDelivered {
+  bundle?: Array<number> | null;
+  version: number;
+}
+
+export interface WireBundleFetch {
+  have?: number | null;
+  request_id: string;
+}
+
 export interface WireClassUsage {
   class: string;
   octets: number;
@@ -293,6 +314,8 @@ export type WireReply =
   | { LogExported: WireLogExportEffect; }
   | { ConnectivityGraph: WireConnectivityGraph; }
   | { MemberList: WireMemberList; }
+  | { BundleCommitted: WireBundleCommitted; }
+  | { BundleDelivered: WireBundleDelivered; }
   | { UsageOverview: WireUsageOverviewResult; }
   | { VtzTree: WireVtzTree; }
   | { VtzDetail: WireVtzDetail; }
@@ -324,7 +347,9 @@ export type WireRequest =
   | { VtzCreate: WireVtzCreate; }
   | { VtzEdit: WireVtzEdit; }
   | { VtzRescope: WireVtzRescope; }
-  | { VtzDelete: WireVtzDelete; };
+  | { VtzDelete: WireVtzDelete; }
+  | { BundleCommit: WireBundleCommit; }
+  | { BundleFetch: WireBundleFetch; };
 
 export interface WireRiskBand {
   candidate: number;
@@ -407,6 +432,7 @@ export interface WireVtzDestEdge {
 
 export interface WireVtzDetail {
   ancestors: Array<WireVtzAncestor>;
+  commit_version: number;
   zone?: WireVtzTreeNode | null;
 }
 

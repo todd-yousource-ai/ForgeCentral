@@ -208,6 +208,7 @@ describe('toVtzDetail (zone + effective-posture contributors)', () => {
         { id: 'YouSource', name: 'YouSource' },
         { id: 'YouSource.Corp', name: 'YouSource.Corp' },
       ],
+      commit_version: 42,
     };
     const detail = toVtzDetail(reply);
     expect(detail?.zone?.name).toBe('YouSource.Corp.Finance');
@@ -215,12 +216,14 @@ describe('toVtzDetail (zone + effective-posture contributors)', () => {
   });
 
   it('treats an absent zone as the honest not-found state, not a failure or an empty zone', () => {
-    const detail = toVtzDetail({ ancestors: [] });
-    expect(detail).toEqual({ zone: null, ancestors: [] });
+    const detail = toVtzDetail({ ancestors: [], commit_version: 7 });
+    expect(detail).toEqual({ zone: null, ancestors: [], commitVersion: 7 });
   });
 
   it('fails closed when a PRESENT zone cannot narrow', () => {
-    expect(toVtzDetail({ zone: wireZone({ lifecycle: 'archived' }), ancestors: [] })).toBeNull();
+    expect(
+      toVtzDetail({ zone: wireZone({ lifecycle: 'archived' }), ancestors: [], commit_version: 7 }),
+    ).toBeNull();
   });
 });
 
