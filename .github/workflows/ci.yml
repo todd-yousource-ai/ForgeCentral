@@ -7,6 +7,11 @@
 # + the BFF OpenAPI). If contract generation needs read access to a private engine repo, add a
 # CRUCIBLE_TOKEN repository secret; the workspace-install step maps it. Absent the secret the gate still
 # runs everything that does not need it.
+#
+# The sidecar's Rust gate git-depends on TWO private repos: Crucible and torch (torch-forge supplies the
+# Forge bundle preimage, FD.2). The credential step below rewrites all of github.com, so one token covers
+# both -- but CRUCIBLE_TOKEN must be scoped to read BOTH repos. A Crucible-only token fails the sidecar
+# gate rather than skipping it, which is deliberate: a green gate means the crates actually built.
 name: console-quality-gate
 
 on:
