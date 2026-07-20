@@ -112,14 +112,17 @@ elif ! command -v cargo >/dev/null 2>&1; then
 else
     offline=""
     [ "$skip_net" = "true" ] && offline="--offline"
-    # The Rust crates git-depend on TWO private repos: Crucible (cdb-mtls / cdb-artifact / cdb-types /
-    # cdb-wire / cdb-device-identity) and torch (torch-forge, for the Forge bundle preimage, FD.2).
-    # That fetch needs a credential.
+    # The Rust crates git-depend on the PRIVATE Crucible repo (cdb-mtls / cdb-types / cdb-wire /
+    # cdb-device-identity). That fetch needs a credential: in CI the CRUCIBLE_TOKEN secret, which the
+    # workflow rewrites over github.com.
     #
-    # In CI the CRUCIBLE_TOKEN secret is rewritten over all of github.com, so it covers both repos --
-    # but the token must be scoped to read BOTH; a Crucible-only token now fails the sidecar gate.
+    # FD.2 additionally needs the PRIVATE torch repo (torch-forge, for the Forge bundle preimage). That
+    # edge is currently backed out: CRUCIBLE_TOKEN 403s on torch, which turned this gate red on main.
+    # Before it returns, provision either a TORCH_TOKEN secret (the workflow already prefers it) or read
+    # access to torch on CRUCIBLE_TOKEN.
     #
-    # Locally each repo has its own SSH alias + deploy key, so a single generic insteadOf is not enough:
+    # Locally each repo has its own SSH alias + deploy key, so a single generic insteadOf will not be
+    # enough once the torch edge returns:
     # a rule mapping all of https://github.com/todd-yousource-ai/ to github-crucible would send the torch
     # fetch to the Crucible deploy key, which cannot read it. Git resolves insteadOf by LONGEST matching
     # prefix, so add a more specific rule for torch alongside the generic one (see CONTRIBUTING.md):
