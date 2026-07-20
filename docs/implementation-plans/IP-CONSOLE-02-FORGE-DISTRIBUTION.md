@@ -1,0 +1,156 @@
+# IP-CONSOLE-02-FORGE-DISTRIBUTION -- ForgeCentral as the Forge policy-distribution plane
+
+Makes the authored Virtual Trust Zones *enforceable*: ForgeCentral composes the zone definitions it
+already reads into a flat `EndpointPolicy`, signs it into a `SignedPolicyBundle`, and serves it to Torch
+endpoints over a mutually-authenticated seam. Torch's receiving half is already built and gated
+(`IP-TORCH-FORGE-CORE` FG1.1b-FG1.11, LANDED): it verifies the signature on-device, rejects downgrades and
+stale leases, applies atomically with last-known-good rollback, and reports the outcome back. What has
+never existed is a producer. This IP is that producer.
+
+**The boundary this IP fixes (operator decision, 2026-07-20):** policy always comes from ForgeCentral.
+CrucibleDB is the system of record for zone *definitions* and never composes, signs, or serves policy;
+ForgeCentral is 1Source, and it is the only holder of the bundle signing key. An endpoint that verifies a
+bundle is verifying ForgeCentral's signature, and nothing else can produce one.
+
+**Read with:** `TRD-32 v1` (the endpoint requirement set the bundle contract comes from: R-FRG-21/40/70
+identity-authenticated distribution, R-FRG-22/23/24 verify/atomic/fail-closed-stale, R-FRG-42
+SignatureEnvelope, R-FRG-60..63 monotonic version and may-only-tighten), `TRD-32 v2` Section 12 (the
+distribution contract shapes) and Section 15 (the identifier registry), the torch
+`IP-TORCH-FORGE-CORE-LEDGER` (what the endpoint already enforces, so this IP builds only its counterpart),
+`TRD-CONSOLE-00` (BFF, sidecar, no-2nd-DB, audited), and `IP-CONSOLE-02-VTZ` (the zone reads reused here).
+
+**Named invariant:** **INV-CONSOLE-FORGE-SIGNED-AT-SOURCE** -- every bundle an endpoint accepts was
+composed from the live crdb zone store and signed by the ForgeCentral signing key held in the crypto
+sidecar. The signing key never enters the TypeScript tier, no bundle is ever produced from a source other
+than the zone system of record, and a carrier that relays a bundle cannot forge one.
+
+---
+
+## SPEC GAP (cite at every PR review)
+
+The Console TRD suite does not assign ForgeCentral the Forge distribution role. `TRD-32` Section 1.3 fixes
+the split as "1Source AUTHORS policy per VTZ, Forge ingests/composes/distributes/enforces, Torch's per-OS
+VTZ realizes", and the platform boundary records 1Source == ForgeCentral -- but no `TRD-CONSOLE-NN` states
+that the Console *is* Forge's composition and distribution plane. `TRD-CONSOLE-05` covers the Policies
+surface over the TRD-04 policy engine, which is a different thing: an operator authoring view, not a
+bundle producer.
+
+This IP is therefore filed under `TRD-CONSOLE-02` (Virtual Trust Zones), whose zones are what it
+distributes, and it carries a standing amendment obligation: **`TRD-CONSOLE-00` gains a section naming
+ForgeCentral as the Forge composition/distribution plane, with this IP's invariant, before FD.N closes.**
+That amendment is FD.6 and is docs-only. Recording the conflict here rather than quietly implementing an
+unspecified role is the `CLAUDE.md` source-hierarchy rule ("cite any conflict so the resolution is
+auditable"). Precedent: `IP-CONSOLE-02-VTZ` V2.6 amended `TRD-CONSOLE-02` at all five Trust-Score sites
+the same way.
+
+---
+
+## Prerequisites
+
+- **torch `IP-TORCH-FORGE-CORE` FG1.1b-FG1.11 -- LANDED.** `EndpointPolicyApplier::verify_and_apply` (the
+  ordered fail-closed chain), `ForgeDistribution` trait + `ForgeDistributionClient`
+  (`refresh`/`receive_pushed`), atomic apply with rollback, monotonic version, freshness/partition
+  fail-closed, apply audit. **The concrete transport is deferred-live and unbound** -- only an in-process
+  fixture transport exists, so this IP is free to choose the seam.
+- **crdb `IP-CONSOLE-VTZ-SUBSTRATE` -- LIVE over `:7878`**, and the `cdb-types` contract already carries
+  `SignedPolicyBundle`, `EndpointPolicy`, `BundleVersion`, `IdentityScope`, `FreshnessLease`,
+  `ApplyOutcome`. **No crdb change is required by this IP** (min-change rule); if one proves necessary it
+  is flagged and justified, not assumed.
+- **`IP-CONSOLE-02-VTZ` -- COMPLETE.** `vtz.tree` / `vtz.detail` are live and are the only zone source.
+- **The ForgeCentral crypto sidecar** (`console-crypto-sidecar`, Rust + AWS-LC, already a gate step
+  `[11]`) -- the home for the signing key and the ML-DSA-87 operation.
+
+---
+
+## The three findings that shape this IP
+
+**1. The v1 bundle cannot express 8 of the 11 v2 domains.** `EndpointPolicy` is the TRD-32 *v1*
+disposition: `brokered`, `restricted`, `allow_ordinary_internet`, `exec`, `resource_bound`,
+`max_classification`. A v2 zone carries eleven `ObjectDomain` postures. Only three map cleanly
+(`GovernedEgress` -> brokered, `OrdinaryNetwork` -> allow_ordinary_internet, `Execution` -> exec). The
+other eight (`PrivilegeEscalation`, `KernelModule`, `CredentialStore`, `Persistence`, `FileAndConfig`,
+`Memory`, `Ipc`, `Device`) have no v1 field. They must not be silently dropped: FD.1 composes only the
+expressible three, and the bundle's contributor list records that the zone carried domains this bundle
+shape cannot express, so an operator can see the gap. Carrying v2 postures end to end is a **named
+deferral** (`FD-DEFER-V2-POSTURE-BUNDLE`) gated on extending `SignedPolicyBundle` in `cdb-types` -- a crdb
+change, deliberately out of this IP.
+
+**2. `BundleVersion` monotonicity vs `INV-CONSOLE-NO-2ND-DB`.** The endpoint rejects any bundle whose
+version is not strictly newer, so the producer needs a monotonic counter -- but the Console persists no
+durable domain data. Resolution: **derive the version from the crdb commit version of the zone read**, not
+from Console state. It is monotonic by construction, it is the system of record's own clock, two Console
+replicas composing the same zones agree without coordination, and a zone edit is exactly what should
+produce a new bundle. FD.2 proves a re-composition with no zone change yields the *same* version (so the
+endpoint idempotently no-ops) and a zone edit yields a strictly greater one.
+
+**3. mTLS is not the bundle signature.** Three CAs exist on the node today: `CrucibleDB Wire CA` (torch's
+seam anchor), `CrucibleDB ZTP CA Intermediate` (torch's device identity), and `CrucibleDB Console CA`
+(FC-to-engine on `:7879`). The distribution listener takes a **Wire-CA-issued server cert** so torch's
+trust store needs no change, and FC adds the ZTP intermediate to authenticate endpoint clients. This is a
+new destination, not a new trust domain. Independently of all of it, the endpoint still verifies the
+bundle's own ML-DSA-87 signature against the `DistributionAnchor`; `torch-forge/src/distribution.rs:5-7`
+is explicit that transport auth never substitutes for it. The anchor is therefore a provisioning
+deliverable (FD.5), not a side effect of the TLS choice.
+
+---
+
+## INV-CROSS -- what is real, and what is not
+
+| Piece | Real today? | Note |
+|---|---|---|
+| Zone definitions (`vtz.tree`) | **LIVE** | crdb `:7878`, the only composition input |
+| `SignedPolicyBundle` / `EndpointPolicy` types | **LIVE** | `cdb-types/src/forge.rs`; shared contract, frozen |
+| Endpoint verify + atomic apply | **LIVE (torch)** | FG1.2-FG1.6, gated, fixture-proven |
+| Endpoint distribution client | **LIVE (torch, trait only)** | FG1.7; concrete transport deferred-live -- FD.4 supplies it |
+| Bundle composition | **THIS IP** | FD.1 |
+| Bundle signing | **THIS IP** | FD.2, sidecar-held key |
+| Distribution listener + Section 12 frames | **THIS IP** | FD.3 |
+| Membership (which principal is in which zone) | **DEFERRED** | crdb `VtzSetMembership` not built; scope is the enrolled device identity only. See "Out of scope" |
+| Enforcement | **OFF** | AG.7-OFF throughout; an applied bundle realizes nothing until enforcement is turned on separately |
+
+---
+
+## Roster
+
+| Step | Invariant | Deliverable |
+|---|---|---|
+| FD.1 | `INV-CONSOLE-FORGE-COMPOSED-FROM-RECORD` | Compose an `EndpointPolicy` from the live zone tree: a pure, deterministic function in `@forge/contracts` mapping the zone's effective (not own) postures through the three expressible domains, with the catastrophic floor preserved and every unexpressible domain recorded rather than dropped. Fail-closed at every gap: an absent posture, an unknown enum tag, or an unreadable zone yields the most restrictive value, never a permissive default. Tier 1: the three mappings + floor preservation + a zone with an unknown tag composing closed. Tier 4 vector: a fixture zone composes byte-for-byte to the expected `EndpointPolicy` under the canonical CBOR encoding torch's verifier expects. |
+| FD.2 | `INV-CONSOLE-FORGE-SIGNED-AT-SOURCE` | Signing in the crypto sidecar: ML-DSA-87 over SHA-512 of the canonical CBOR preimage, matching `torch-forge`'s `bundle_preimage_bytes` byte-for-byte; `SignedPolicyBundle` assembly (version derived from the crdb commit version per finding 2, `IdentityScope` from the target's enrolled identity, `FreshnessLease`, `signing_key_id` + `signature_algorithm` travelling for rotation). The key is generated in and never leaves the sidecar; the BFF sends a preimage and receives a signature. Tier 1: preimage equality against a torch fixture. Tier 2: a bundle this step produces passes torch's real `EndpointPolicyApplier` unmodified (the cross-repo proof that matters). Tier 3: version monotonicity -- unchanged zones re-compose to an equal version, an edited zone to a strictly greater one; a tampered byte fails verification. |
+| FD.3 | `INV-CONSOLE-FORGE-DISTRIBUTION-AUTHED` | The distribution listener: Section 12 `pull(have) -> Option<SignedPolicyBundle>` and `report_apply(ApplyOutcome)` over mTLS, Wire-CA server cert, ZTP-intermediate client trust, CBOR codec. Identity is the verified peer's, never a payload field. A `pull` returns only a bundle whose `IdentityScope` includes that peer; an unauthenticated, unscoped, or revoked peer gets nothing (not an empty bundle -- a typed refusal). `report_apply` is recorded and surfaced, so a rejected bundle is visible rather than silent. Tier 2: scope enforcement + refusal paths. Tier 3: a peer presenting a valid cert outside scope receives no bundle. |
+| FD.4 | `INV-TORCH-FORGE-TRANSPORT-REAL` (torch) | torch: the concrete `ForgeDistribution` impl over the FC listener, replacing the fixture transport, plus its config (endpoint address, anchor path). Closes FG1.7's deferred-live transport. Tier 2 against a local FC listener; the live leg folds into FD.N. **Torch's verify/apply path is untouched** -- this step supplies a transport, nothing else. |
+| FD.5 | `INV-CONSOLE-FORGE-ANCHOR-PROVISIONED` | Provisioning, in installer code and not by hand (the live-stitching rule): the sidecar's signing keypair generated at install, the `DistributionAnchor` (public half) delivered to endpoints at enrollment, the Wire-CA-issued listener cert issued, and the ZTP intermediate added to the listener's client-trust set. Must survive the daily ZTP rotation -- the endpoint's 24h leaf changes under the anchor, and the anchor does not rotate with it. Idempotent re-run; a missing anchor fails the install loudly rather than starting an unverifiable plane. |
+| FD.6 | (docs) | `TRD-CONSOLE-00` amendment naming ForgeCentral as the Forge composition/distribution plane, resolving the SPEC GAP above; `IP-CONSOLE-02-VTZ-LEDGER` cross-reference so the VTZ IP points at where its zones become enforceable. Docs-only, scoped separately from code. |
+| FD.N | `INV-CONSOLE-FORGE-LIVE` | Live capstone on the node: author a zone in the Console -> compose -> sign -> torchd pulls over the real seam -> verifies -> applies -> reports the outcome -> the Console shows it. Enforcement stays OFF, so the proof is that the *policy plane* is real end to end, not that anything is enforced. Requires a fresh ZTP enrollment (the leaf expires daily). |
+
+## Sequencing
+
+FD.1 -> FD.2 -> FD.3 gate each other (compose before sign before serve). FD.4 needs FD.3's listener.
+FD.5 can start after FD.2 fixes the key shape and must land before FD.N. FD.6 is independent and may land
+any time after FD.1. FD.N closes the set.
+
+The first three touch **only ForgeCentral**. Torch is not modified until FD.4, and crdb is not modified at
+all.
+
+## Acceptance
+
+1. A bundle ForgeCentral produces is accepted by torch's unmodified `EndpointPolicyApplier` (FD.2 Tier 2).
+2. A bundle whose bytes are altered after signing is refused on-device (FD.2 Tier 3).
+3. An endpoint outside a bundle's `IdentityScope` cannot obtain it (FD.3 Tier 3).
+4. Re-composing unchanged zones does not advance the version; a zone edit does (FD.2 Tier 3).
+5. A zone domain the v1 bundle cannot express is recorded, never silently dropped (FD.1).
+6. The signing key is absent from the TypeScript tier and from every log (FD.2, hygiene test).
+7. The full plane runs live on the node with enforcement OFF (FD.N).
+
+## Out of scope (named, with the gating dependency)
+
+- **Membership.** Which *principal* is in which zone -- the IdAM-group anchor, session-vs-device binding,
+  signed membership sets, `Selector::GroupRef` expansion (torch VM1.7, currently inert:
+  `taxonomy.rs:121` returns `false`) -- is gated on crdb's deferred `VtzSetMembership` substrate and is
+  its own IP. This IP scopes a bundle to the **enrolled device identity**, which already exists.
+- **v2 posture bundles.** `FD-DEFER-V2-POSTURE-BUNDLE`, gated on extending `SignedPolicyBundle` in
+  `cdb-types` (a crdb change).
+- **Enforcement.** AG.7-OFF. Realizing an applied bundle as OS controls is `IP-TORCH-VTZ-ENFORCE`.
+- **Policy authoring beyond zones.** The rules an operator writes *against* a zone are `TRD-CONSOLE-05`
+  (Policies). This IP distributes the zone disposition, not the rule set.
+- **Push.** Only `pull` is built (plus `receive_pushed`, which torch already has). Server-initiated push
+  is a later step once the endpoint inventory exists.
