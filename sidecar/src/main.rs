@@ -40,10 +40,59 @@ async fn shutdown_signal() -> Result<(), SidecarError> {
     }
 }
 
+/// The `DistributionAnchor` JSON for `signer`: the `{key_id: hex}` map an endpoint's anchor loader
+/// (`torch-edge` `policy::load_anchor`) consumes. The seed never leaves; only the derived key id and
+/// the public verifying key appear here.
+///
+/// A single-key anchor -- the one signing identity this sidecar holds. Hand-formed (both the key id
+/// and the value are hex, so no escaping is needed) rather than pulling `serde_json` in for one object.
+fn anchor_json(signer: &BundleSigner) -> String {
+    use std::fmt::Write as _;
+    let hex = signer
+        .verifying_key()
+        .iter()
+        .fold(String::new(), |mut acc, byte| {
+            let _ = write!(acc, "{byte:02x}");
+            acc
+        });
+    format!("{{\"{}\":\"{hex}\"}}", signer.key_id().0)
+}
+
+/// The provisioning subcommands (FD.5). `seed-init` generates the seed ONCE (refusing to overwrite an
+/// existing one), `seed-anchor` reads an existing seed; both print the anchor the installer publishes
+/// to endpoints. Generation lives here, in the sidecar, so the seed is never in installer memory.
+fn run_seed_subcommand(verb: &str, seed_path: &str) -> Result<(), SidecarError> {
+    let path = std::path::Path::new(seed_path);
+    let signer = match verb {
+        "seed-init" => BundleSigner::generate(path)
+            .map_err(|e| SidecarError::Config(format!("seed generate: {e}")))?,
+        "seed-anchor" => {
+            BundleSigner::load(path).map_err(|e| SidecarError::Config(format!("seed load: {e}")))?
+        }
+        other => {
+            return Err(SidecarError::Config(format!("unknown subcommand: {other}")));
+        }
+    };
+    // CLI stdout is the interface (the installer captures it); build tooling, not linted src.
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{}", anchor_json(&signer));
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), SidecarError> {
-    let path = env::args()
-        .nth(1)
+    let first = env::args().nth(1);
+    // Provisioning subcommands take a seed path and exit; they never bind a listener.
+    if let Some(verb @ ("seed-init" | "seed-anchor")) = first.as_deref() {
+        let seed_path = env::args().nth(2).ok_or_else(|| {
+            SidecarError::Config(format!("{verb} needs a seed path: {verb} <seed-path>"))
+        })?;
+        return run_seed_subcommand(verb, &seed_path);
+    }
+
+    let path = first
         .or_else(|| env::var("SIDECAR_CONFIG").ok())
         .ok_or_else(|| {
             SidecarError::Config(
@@ -105,5 +154,51 @@ async fn main() -> Result<(), SidecarError> {
             result = engine.run() => result,
             result = shutdown_signal() => result,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+    use super::anchor_json;
+    use console_crypto_sidecar::signing::BundleSigner;
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("fc-anchor-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn the_anchor_names_the_signer_and_carries_its_public_key() {
+        // FD.5: the provisioned anchor is exactly the {key_id: hex} map the endpoint loader consumes,
+        // and it names THIS signer -- the same key_id a bundle this sidecar signs will carry.
+        let signer = BundleSigner::generate(&scratch("names").join("seed")).unwrap();
+        let json = anchor_json(&signer);
+
+        let anchor: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(&json).expect("the anchor is valid JSON");
+        assert_eq!(anchor.len(), 1, "one signing identity");
+        let (key_id, hex) = anchor.iter().next().unwrap();
+        assert_eq!(key_id, &signer.key_id().0);
+        // The value is the hex of the exact verifying-key bytes -- what verify checks the signature against.
+        let expected: String = signer
+            .verifying_key()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(hex, &expected);
+        assert!(hex.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn a_reloaded_seed_produces_the_identical_anchor() {
+        // The provisioning idempotency guarantee at the unit level: re-reading a seed never changes the
+        // published key, so a re-run cannot orphan endpoints already holding the anchor.
+        let path = scratch("reload").join("seed");
+        let first = anchor_json(&BundleSigner::generate(&path).unwrap());
+        let second = anchor_json(&BundleSigner::load(&path).unwrap());
+        assert_eq!(first, second);
     }
 }

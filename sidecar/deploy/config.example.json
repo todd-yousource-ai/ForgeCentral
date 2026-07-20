@@ -9,5 +9,7 @@
   "engine_key": "/etc/cdb/control/client.key",
   "egress_addr": "127.0.0.1:8789",
   "admin_cert": "/etc/console-sidecar/admin-cert.pem",
-  "admin_key": "/etc/console-sidecar/admin-key.pem"
+  "admin_key": "/etc/console-sidecar/admin-key.pem",
+  "sign_addr": "127.0.0.1:8790",
+  "sign_seed": "/etc/console-sidecar/sign.seed"
 }
