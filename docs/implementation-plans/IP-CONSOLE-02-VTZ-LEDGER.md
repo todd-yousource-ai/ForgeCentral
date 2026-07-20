@@ -6,7 +6,7 @@ on its own branch through the full `scripts/ci.sh`, no-ff merged, then recorded 
 
 **Status: COMPLETE -- every roster step landed (V2.1/V2.2/V2.4/V2.3/V2.5/V2.6/V2.N). The VTZ surface reads, authors, and audits against the crdb system of record end to end. The engine half (crdb `IP-CONSOLE-VTZ-SUBSTRATE`) is COMPLETE + LIVE
 over :7878 and deployed to the node 2026-07-19, so every read/command binding here is LIVE-backed except
-the named PENDINGs (member/policy counts, `vtz.setMembership`). IP EXIT. Named cross-repo gaps carried forward: crdb `WireVtzTreeNode` has no `description` (the edit form says saving replaces it), and the four VTZ verbs carry no command_id (mutations are not idempotent on retry; the SPA sets `retry: false`).**
+the named PENDINGs (member/policy counts, `vtz.setMembership`). IP EXIT. **Operator review after exit corrected the model the surface expressed (the zone is the policy EDGE, not the policy) -- see "Post-exit corrections" at the foot of this ledger for what it supersedes in the rows below.** Named cross-repo gaps carried forward: crdb `WireVtzTreeNode` has no `description` (the edit form says saving replaces it), and the four VTZ verbs carry no command_id (mutations are not idempotent on retry; the SPA sets `retry: false`).**
 
 | Step | Invariant | Status | Commit | Proof |
 |---|---|---|---|---|
@@ -30,3 +30,22 @@ seed, live over `:7878`, deployed. The `vtz.riskBand` join reuses the live `over
   AG.7-OFF.
 
 **Sequence:** V2.1 -> V2.2 -> V2.4 -> V2.3 -> V2.5 -> V2.6 (independent) -> V2.N.
+
+## Post-exit corrections (operator model, 2026-07-19/20)
+
+The IP exited against the substrate as built. Operator review then corrected the MODEL the surface
+expressed, which changed code the rows above cite as proof. These landed after IP exit; the rows are left
+as the historical record of what each step proved at the time, and this section states what since changed.
+
+| Change | Status | Commit | What it supersedes |
+|---|---|---|---|
+| The zone is the policy EDGE, not the policy | LANDED | `1fd7904` | **V2.5's `PostureMatrixEditor` is DELETED**, and with it the composition preview and the bootstrap matrix. A VTZ is a virtual construct that policies TARGET; it grants and denies nothing. Specs commit `ownPostures: []`, which the engine resolves fail-closed to all-Deny (proven over the live wire). The governing rules are authored against the zone on the Policies surface (`CONSOLE-05`). The authoring form is the seven operator-named fields: VTZ name, VTZ type, Parent VTZ (optional), Description, Session duration, Micro-segmentation, Telemetry mode. |
+| `trusted` -> `quarantine`, plus `observability` | LANDED | `1fd7904` (engine-first: crdb `c86fe4b4` + `815c58a2`) | The archetype names WHICH KIND of policy a zone is meant to receive. There is no "trusted" policy; there is a quarantine one. `observability` is an agent fully onboarded and wrapped under a permissive (any/any) policy authored on the Policies surface. The Console narrows CLOSED, so the retired `trusted` tag no longer projects. |
+| Nesting is a field; no zone is a root by privilege | LANDED | `1fd7904` | Supersedes the Console-only root-immutability constraint (the engine never had one: no special case in `commit_edit_zone` / `commit_delete_zone`). `Parent VTZ (optional)` composes the dotted name -- pick `Demo.sales`, name the zone `reps`, commit `Demo.sales.reps`. Every zone stands alone and can be edited and deleted like any other. |
+| The card focal is the risk-coloured VTZ disc | LANDED | `1fd7904` | Replaces the mockup's trust-score ring. It reuses the Overview's own `.fc-ov__vtz--*` at card scale so the two surfaces read as one system, carrying the zone's REAL risk band instead of a number the substrate does not have. **A zone with no band renders the NEUTRAL disc, never a green one** (operator-confirmed 2026-07-20): an unmonitored zone must not read as a clean one. |
+| The move is part of Save | LANDED | `57386a7` | **Supersedes V2.5's and V2.N's "re-scope is a separate confirmed act".** Re-parenting is an ordinary field edit: change `Parent VTZ`, press Save. The `save` command runs `vtz.edit` then, when the composed name lands somewhere new, `vtz.rescope` -- edit FIRST, because re-scope carries the stored record forward. The confirm still NAMES the move and states it is a separate audited write (folding the act in must not hide it on an audited surface). A refused move after a committed edit reports `settingsCommitted` rather than the false "nothing was committed". The parent control disables for a zone with descendants, which the engine refuses to move (`VtzStoreError::HasChildren`). |
+
+**Test roster after the corrections:** 27 surface tests + 16 Playwright journeys, full `scripts/ci.sh` green
+(the e2e count moved 15 -> 16: the re-scope journey became a move-within-Save journey plus a new
+has-sub-zones refusal). The named cross-repo gaps are unchanged: `WireVtzTreeNode` still carries no
+`description`, and the four VTZ verbs still carry no `command_id`.
