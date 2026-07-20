@@ -19,13 +19,12 @@
 //! renamed on either side fails here. It deliberately does NOT re-verify what the other two gates already
 //! prove; it only closes the seam between them.
 //!
-//! DEFERRED (gating dependency: a CI credential with torch read access). Two further tests belong here
-//! and are held back with the `torch-forge` / `cdb-artifact` edges: that the endpoint's own
-//! `bundle_preimage_bytes` is reachable from this process, is deterministic, and excludes its own
-//! signature; and that a bundle signed with `cdb-artifact`'s ML-DSA-87 signer verifies against torch's
-//! real `DistributionAnchor` while a tampered one does not. Both passed locally before the edges were
-//! backed out (CRUCIBLE_TOKEN 403s on the torch repo, so the gate went red on main). They return with
-//! FD.2, which is the step that needs those crates anyway.
+//! It also proves this tier can compute the signed preimage. That function used to live in the ENDPOINT
+//! (`torch-forge`), which forced this producer to build the endpoint's repository just to agree on what
+//! bytes a signature covers. It now lives in `cdb-artifact`, so the producer and the verifier run one
+//! implementation and this tier depends on a single private repo. The authoritative byte-for-byte
+//! conformance vector lives with the function in crdb; duplicating it here would only invite the two
+//! copies to drift, so this asserts the properties FD.2 depends on locally instead.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -192,4 +191,67 @@ fn the_vendored_field_order_matches_what_the_signing_tier_serializes() {
             "{def}: x-fieldOrder and properties name different fields"
         );
     }
+}
+
+#[test]
+fn the_preimage_is_reachable_and_deterministic_from_this_process() {
+    // FD.2 signs sha512(preimage). The same bundle must always yield the same bytes, or a detached
+    // signature could not be verified by anyone else.
+    let bundle = sample_bundle();
+    let first = cdb_artifact::bundle_preimage_bytes(&bundle).expect("the preimage encodes");
+    assert!(!first.is_empty(), "a preimage is never empty");
+    assert_eq!(
+        first,
+        cdb_artifact::bundle_preimage_bytes(&bundle).expect("the preimage encodes"),
+        "the preimage is deterministic for one bundle"
+    );
+}
+
+#[test]
+fn the_preimage_excludes_the_signature_but_covers_the_policy() {
+    // Excluding the signature is what lets this tier compute the preimage BEFORE it has a signature to
+    // insert -- the ordering the whole signing step depends on. Covering the policy is what makes the
+    // signature worth anything: flipping the one bit a zone authors must move the signed bytes.
+    let mut bundle = sample_bundle();
+    let base = cdb_artifact::bundle_preimage_bytes(&bundle).expect("the preimage encodes");
+
+    bundle.signature = vec![9, 9, 9];
+    assert_eq!(
+        base,
+        cdb_artifact::bundle_preimage_bytes(&bundle).expect("the preimage encodes"),
+        "the signature is excluded from its own preimage"
+    );
+
+    let mut tampered = sample_bundle();
+    tampered.policy.allow_ordinary_internet = true;
+    assert_ne!(
+        base,
+        cdb_artifact::bundle_preimage_bytes(&tampered).expect("the preimage encodes"),
+        "flipping the one authored bit must change the signed bytes"
+    );
+}
+
+#[test]
+fn this_tier_can_sign_a_bundle_that_verifies() {
+    // The producer's half end to end, with the provider the endpoint verifies with. The endpoint's
+    // DistributionAnchor wraps this same MlDsa87Verifier and calls this same preimage function, so
+    // agreement here is agreement there -- structurally, not by fixture.
+    use cdb_artifact::{sha512, MlDsa87Signer, MlDsa87Verifier, Signer, Verifier};
+
+    let key_id = KeyId("forge-signing-1".to_owned());
+    let signer = MlDsa87Signer::from_seed(key_id.clone(), &[7u8; 32]).expect("the seed is valid");
+    let bundle = sample_bundle();
+    let digest = sha512(&cdb_artifact::bundle_preimage_bytes(&bundle).expect("encodes"));
+    let signature = signer.sign(digest.as_bytes()).expect("signing succeeds");
+
+    let verifier =
+        MlDsa87Verifier::default().with_key(key_id.clone(), signer.verifying_key_bytes());
+    verifier
+        .verify(
+            digest.as_bytes(),
+            &signature,
+            &key_id,
+            SignatureAlgorithm::MlDsa87,
+        )
+        .expect("a bundle this tier signed verifies with the endpoint's provider");
 }

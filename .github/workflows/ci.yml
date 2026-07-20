@@ -7,11 +7,7 @@
 # + the BFF OpenAPI). If contract generation needs read access to a private engine repo, add a
 # CRUCIBLE_TOKEN repository secret; the workspace-install step maps it. Absent the secret the gate still
 # runs everything that does not need it.
-#
-# The sidecar's Rust gate git-depends on TWO private repos: Crucible and torch (torch-forge supplies the
-# Forge bundle preimage, FD.2). The credential step below rewrites all of github.com, so one token covers
-# both -- but CRUCIBLE_TOKEN must be scoped to read BOTH repos. A Crucible-only token fails the sidecar
-# gate rather than skipping it, which is deliberate: a green gate means the crates actually built.
+
 name: console-quality-gate
 
 on:
@@ -26,7 +22,6 @@ jobs:
     # but `env` is. Absent the secret this is an empty string and the mapping step below is skipped.
     env:
       CRUCIBLE_TOKEN: ${{ secrets.CRUCIBLE_TOKEN }}
-      TORCH_TOKEN: ${{ secrets.TORCH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,23 +33,13 @@ jobs:
       - name: Enable corepack (pnpm, pinned in package.json)
         run: corepack enable
 
-      - name: Map the private git deps to their tokens (if configured)
+      - name: Map the engine contract dep to the token (if configured)
         if: ${{ env.CRUCIBLE_TOKEN != '' }}
-        # The sidecar git-depends on TWO private repos, Crucible and torch. Git resolves insteadOf by
-        # LONGEST matching prefix, so a dedicated torch rule wins over the general one and each repo can
-        # carry its own narrowly-scoped token -- neither needs read access to the other.
-        #
-        # TORCH_TOKEN is optional so both remedies work: set it to keep the tokens least-privilege, or
-        # leave it unset and grant CRUCIBLE_TOKEN read access to torch as well. If neither is true the
-        # torch fetch 403s and the sidecar gate fails RED, which is deliberate -- it is not soft-skipped,
-        # because a green gate has to mean the crates actually built.
-        run: |
-          git config --global url."https://x-access-token:${CRUCIBLE_TOKEN}@github.com/".insteadOf "https://github.com/"
-          if [ -n "${TORCH_TOKEN}" ]; then
-            git config --global \
-              url."https://x-access-token:${TORCH_TOKEN}@github.com/todd-yousource-ai/torch".insteadOf \
-              "https://github.com/todd-yousource-ai/torch"
-          fi
+        # One private repo, one credential. The sidecar briefly also git-depended on the torch repo, for
+        # the Forge bundle preimage, which needed a second token and turned this gate red when none
+        # existed. The preimage moved into cdb-artifact, where the producer and the endpoint already
+        # meet, so that coupling and its credential are both gone.
+        run: git config --global url."https://x-access-token:${CRUCIBLE_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Provision Playwright (browser + OS libraries) for the e2e stage
         # The runner has no browser or its shared libraries; --with-deps apt-installs them (needs the
