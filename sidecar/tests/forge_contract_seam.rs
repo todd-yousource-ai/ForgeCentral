@@ -18,6 +18,14 @@
 //! contains and asserts the field set matches the vendored schema's `$def`, so a field added, removed, or
 //! renamed on either side fails here. It deliberately does NOT re-verify what the other two gates already
 //! prove; it only closes the seam between them.
+//!
+//! DEFERRED (gating dependency: a CI credential with torch read access). Two further tests belong here
+//! and are held back with the `torch-forge` / `cdb-artifact` edges: that the endpoint's own
+//! `bundle_preimage_bytes` is reachable from this process, is deterministic, and excludes its own
+//! signature; and that a bundle signed with `cdb-artifact`'s ML-DSA-87 signer verifies against torch's
+//! real `DistributionAnchor` while a tampered one does not. Both passed locally before the edges were
+//! backed out (CRUCIBLE_TOKEN 403s on the torch repo, so the gate went red on main). They return with
+//! FD.2, which is the step that needs those crates anyway.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -184,69 +192,4 @@ fn the_vendored_field_order_matches_what_the_signing_tier_serializes() {
             "{def}: x-fieldOrder and properties name different fields"
         );
     }
-}
-
-#[test]
-fn the_preimage_is_reachable_and_deterministic_from_this_process() {
-    // De-risks FD.2: the signing tier can compute the endpoint's own preimage, and the same bundle
-    // always yields the same bytes, which is what makes a detached signature verifiable at all. The
-    // signature field is excluded from the preimage, so changing it must not change the bytes -- that
-    // is what lets the signer compute the preimage BEFORE it has a signature to put in the bundle.
-    let mut bundle = sample_bundle();
-    let first = torch_forge::bundle_preimage_bytes(&bundle).expect("the preimage encodes");
-    assert!(!first.is_empty(), "a preimage is never empty");
-    assert_eq!(
-        first,
-        torch_forge::bundle_preimage_bytes(&bundle).expect("the preimage encodes"),
-        "the preimage is deterministic for one bundle"
-    );
-
-    bundle.signature = vec![9, 9, 9];
-    assert_eq!(
-        first,
-        torch_forge::bundle_preimage_bytes(&bundle).expect("the preimage encodes"),
-        "the signature is excluded from its own preimage"
-    );
-
-    // A change to any SIGNED field must change the bytes, or tampering would go undetected.
-    let mut tampered = sample_bundle();
-    tampered.policy.allow_ordinary_internet = true;
-    assert_ne!(
-        first,
-        torch_forge::bundle_preimage_bytes(&tampered).expect("the preimage encodes"),
-        "flipping the one authored bit must change the signed bytes"
-    );
-}
-
-#[test]
-fn the_signing_provider_round_trips_against_the_endpoint_verifier() {
-    // The cross-repo proof in miniature: sign with cdb-artifact's ML-DSA-87 signer, verify with torch's
-    // DistributionAnchor -- the same code path the endpoint runs. FD.2 builds the service around this.
-    use cdb_artifact::{sha512, MlDsa87Signer, Signer};
-
-    let key_id = KeyId("forge-signing-1".to_owned());
-    let signer = MlDsa87Signer::from_seed(key_id.clone(), &[7u8; 32]).expect("the seed is valid");
-
-    let mut bundle = sample_bundle();
-    bundle.signing_key_id = key_id.clone();
-    bundle.signature_algorithm = SignatureAlgorithm::MlDsa87;
-    let preimage = torch_forge::bundle_preimage_bytes(&bundle).expect("the preimage encodes");
-    bundle.signature = signer
-        .sign(sha512(&preimage).as_bytes())
-        .expect("signing succeeds")
-        .0;
-
-    let anchor =
-        torch_forge::DistributionAnchor::new().with_key(key_id, signer.verifying_key_bytes());
-    anchor
-        .verify_bundle(&bundle)
-        .expect("a bundle this tier signed verifies at the endpoint");
-
-    // And a tampered bundle does not.
-    let mut tampered = bundle.clone();
-    tampered.policy.allow_ordinary_internet = true;
-    assert!(
-        anchor.verify_bundle(&tampered).is_err(),
-        "a bundle altered after signing must fail verification"
-    );
 }

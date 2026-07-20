@@ -40,18 +40,18 @@ cdb-mtls = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d
 rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
 # The Forge contract seam (INV-CONSOLE-FORGE-CONTRACT-SEAM-GATED). The bundle this sidecar will sign in
 # FD.2 is typed by cdb-types, but the TypeScript half is generated from the vendored forge-dto schema,
-# and the two arrive from DIFFERENT crdb revs: these edges pin d1d4d137 (what torch-forge pins), while
+# and the two arrive from DIFFERENT crdb revs: this edge pins d1d4d137 (what torch-forge pins), while
 # packages/contracts/schema is copied from crdb main. Nothing else compares them, so a forge.rs change
 # between those revs would diverge the producer's Rust from its own TypeScript silently. The seam test
-# closes that.
+# closes that, and needs cdb-types alone.
 #
-# torch-forge owns `bundle_preimage_bytes`, the exact CBOR encoding the endpoint verifies against, and
-# its doc names this caller: "exposed so a Forge signing service can compute the identical preimage when
-# the service half lands". FD.2 calls it, which makes byte-exactness STRUCTURAL rather than fixture
-# asserted. These move to [dependencies] when the signing module lands.
+# DEFERRED (gating dependency: a CI credential with torch read access). FD.2 additionally needs
+# torch-forge, for `bundle_preimage_bytes`, and cdb-artifact, for the ML-DSA-87 signer. Those edges were
+# landed and then backed out: CRUCIBLE_TOKEN reads Crucible but 403s on torch, so the sidecar gate went
+# red on main. The mechanism is already wired (.github/workflows/ci.yml prefers an optional TORCH_TOKEN);
+# only the secret is missing. Both edges, and the two tests that proved the preimage is reachable and
+# that a bundle signed here verifies against torch's real DistributionAnchor, return with FD.2.
 cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d1d4d137df0f77964fd23287e0026d2f46fd3e15" }
-cdb-artifact = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d1d4d137df0f77964fd23287e0026d2f46fd3e15" }
-torch-forge = { git = "https://github.com/todd-yousource-ai/torch.git", rev = "31982b1b2cb3dd622fec980ee577dd82c012b616" }
 # The seam test builds a PolicyVersionRef, whose PolicyId wraps a Uuid. Already resolved transitively
 # via cdb-types, so naming it here does not add a package to the graph.
 uuid = "1"

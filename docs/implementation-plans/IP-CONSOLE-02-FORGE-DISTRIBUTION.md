@@ -72,6 +72,12 @@ the same way.
   array survives it. FC projects those arrays into `FORGE_FIELD_ORDER`, so a reorder upstream fails a
   gated assertion instead of invalidating signatures in the field.
 - **`IP-CONSOLE-02-VTZ` -- COMPLETE.** `vtz.tree` / `vtz.detail` are live and are the only zone source.
+- **A CI credential with torch read access -- MISSING, and it blocks FD.2.** FD.2 signs by calling
+  torch's own `bundle_preimage_bytes`, so the sidecar git-depends on the private torch repo. Both edges
+  landed and were then backed out: `CRUCIBLE_TOKEN` reads Crucible but 403s on torch, so the sidecar gate
+  went red on main. The mechanism is wired (`.github/workflows/ci.yml` prefers an optional `TORCH_TOKEN`
+  by longest-prefix matching, keeping each token scoped to one repo); only the secret is missing. The
+  seam gate that needs `cdb-types` alone stayed. Provision the credential before FD.2 restores the edge.
 - **The ForgeCentral crypto sidecar** (`console-crypto-sidecar`, Rust + AWS-LC, already a gate step
   `[11]`) -- the home for the signing key and the ML-DSA-87 operation.
 
