@@ -99,6 +99,10 @@ interface BffState {
   mutation: { status: number; body: unknown };
   /** Every authoring request the surface actually sent. */
   sent: { url: string; method: string; body: unknown }[];
+  /** The scripted convergence a zone's distribution panel reads. */
+  convergence: unknown;
+  /** Every distribute (re-push) the surface actually sent. */
+  distributed: { url: string; body: unknown }[];
 }
 
 /** Mock the whole BFF for the VTZ journey. `state` is mutable so a test can script a refusal. */
@@ -107,6 +111,16 @@ async function mockBff(page: Page): Promise<BffState> {
     tree: TREE,
     mutation: { status: 200, body: { id: 'YouSource.Corp.Finance', lifecycle: 'published' } },
     sent: [],
+    convergence: {
+      hasBundle: true,
+      version: 7,
+      members: [
+        { endpointCn: 'a.box', state: 'applied', reason: null },
+        { endpointCn: 'b.box', state: 'rejected', reason: 'SignatureInvalid' },
+        { endpointCn: 'c.box', state: 'silent', reason: null },
+      ],
+    },
+    distributed: [],
   };
   await page.route('**/auth/me', (route) => json(route, { operator: OPERATOR }));
   await page.route(/\/api\/overview\/sankey/, (route) => json(route, GRAPH));
@@ -132,6 +146,20 @@ async function mockBff(page: Page): Promise<BffState> {
           : undefined,
     });
     return json(route, state.mutation.body, state.mutation.status);
+  });
+  // FD.7c: the distribution ledger read and the re-distribute post. Registered last so they win.
+  await page.route(/\/api\/vtz\/convergence/, (route) => json(route, state.convergence));
+  await page.route(/\/api\/vtz\/[^/]+\/distribute$/, (route) => {
+    state.distributed.push({
+      url: new URL(route.request().url()).pathname,
+      body: JSON.parse(route.request().postData() ?? '{}'),
+    });
+    return json(route, {
+      version: 8,
+      commitVersion: 42,
+      unexpressedDomains: [],
+      unexpressedFields: [],
+    });
   });
   return state;
 }
@@ -331,4 +359,28 @@ test('a new zone nests under the chosen parent and commits on confirm', async ({
   expect(state.sent[0]?.method).toBe('POST');
   expect(state.sent[0]?.url).toBe('/api/vtz');
   expect((state.sent[0]?.body as { name: string }).name).toBe('YouSource.Corp.New');
+});
+
+test('the distribution ledger shows who has a zone policy and re-distributes to them (<= 3 clicks)', async ({
+  page,
+}) => {
+  const state = await mockBff(page);
+  await page.goto('/vtz');
+
+  // 1 click: open the zone. Its authoring view carries the distribution ledger.
+  await page.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }).click();
+
+  const panel = page.getByRole('region', { name: 'Policy distribution' });
+  await expect(panel).toBeVisible();
+  // The three states an operator must tell apart, the rejection carrying its reason.
+  await expect(panel.getByText('a.box')).toBeVisible();
+  await expect(panel.getByText('Applied')).toBeVisible();
+  await expect(panel.getByText(/Rejected: SignatureInvalid/)).toBeVisible();
+  await expect(panel.getByText('No confirmation')).toBeVisible();
+
+  // 2 clicks: re-distribute the freshly composed policy to exactly the current scope.
+  await panel.getByRole('button', { name: /Commit & re-distribute to 3 endpoints/ }).click();
+
+  await expect.poll(() => state.distributed.length).toBe(1);
+  expect(state.distributed[0]?.body).toEqual({ members: ['a.box', 'b.box', 'c.box'] });
 });
