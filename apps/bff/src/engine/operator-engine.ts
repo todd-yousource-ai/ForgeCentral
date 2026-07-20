@@ -32,6 +32,8 @@ import type {
   WireMemberList,
   WireQueryRows,
   WireQuerySubmit,
+  WireBundleCommit,
+  WireBundleCommitted,
   WireVtzCreate,
   WireVtzDelete,
   WireVtzDetail,
@@ -62,6 +64,7 @@ export type EngineAction =
   | 'vtzTree'
   | 'vtzDetail'
   | 'vtzCreate'
+  | 'bundleCommit'
   | 'vtzEdit'
   | 'vtzRescope'
   | 'vtzDelete'
@@ -174,6 +177,12 @@ export interface OperatorEngine {
     request: WireVtzDetailQuery,
     opts?: EngineCallOptions,
   ): Promise<WireVtzDetail>;
+  /** Commit a signed policy bundle for carriage (BUNDLE_COMMIT, FD.2) on behalf of `principal`. */
+  bundleCommit(
+    principal: OperatorPrincipal,
+    request: WireBundleCommit,
+    opts?: EngineCallOptions,
+  ): Promise<WireBundleCommitted>;
   /** Author a new zone (VTZ_CREATE) on behalf of `principal`. Audited engine-side. */
   vtzCreate(
     principal: OperatorPrincipal,
@@ -304,6 +313,11 @@ export function createOperatorEngine(
     // The four audited zone mutations. The operator delegation is injected from the authenticated
     // principal, never client-asserted: the engine attributes the audit entry to THIS operator, in THIS
     // tenant, under the peer's Delegation grant.
+    bundleCommit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'bundleCommit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.bundleCommit({ ...request, operator }, opts);
+    },
     vtzCreate: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'vtzCreate', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };

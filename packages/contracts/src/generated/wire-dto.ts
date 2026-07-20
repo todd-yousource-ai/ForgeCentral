@@ -58,7 +58,7 @@ export interface WireAuditEntry {
 export interface WireBundleCommit {
   bundle: Array<number>;
   operator?: OperatorDelegation | null;
-  request_id: string;
+  request_id: number;
 }
 
 export interface WireBundleCommitted {
@@ -73,7 +73,7 @@ export interface WireBundleDelivered {
 
 export interface WireBundleFetch {
   have?: number | null;
-  request_id: string;
+  request_id: number;
 }
 
 export interface WireClassUsage {
