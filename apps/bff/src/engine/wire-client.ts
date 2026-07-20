@@ -34,6 +34,7 @@ import type {
   WireQueryRows,
   WireReply,
   WireVtzDetail,
+  WireBundleCommitted,
   WireVtzMutation,
   WireVtzTree,
 } from '@forge/contracts';
@@ -156,6 +157,13 @@ export function replyToVtzDetail(reply: WireReply): WireVtzDetail {
  * refusal. A refusal here is meaningful, not noise: the engine refuses a floor relaxation, an inheritance
  * contradiction, or a state conflict, and the resolver classifies it for the operator.
  */
+export function replyToBundleCommitted(reply: WireReply): WireBundleCommitted {
+  if (typeof reply === 'object' && 'BundleCommitted' in reply) return reply.BundleCommitted;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a bundle commit');
+}
+
 export function replyToVtzMutation(reply: WireReply): WireVtzMutation {
   if (typeof reply === 'object' && 'VtzMutated' in reply) return reply.VtzMutated;
   if (typeof reply === 'object' && 'Refused' in reply)
@@ -426,6 +434,17 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireVtzDetail> {
     return this.call(
       async (transport) => replyToVtzDetail(await dispatch(transport, { VtzDetail: request })),
+      opts,
+    );
+  }
+
+  async bundleCommit(
+    request: Parameters<CrucibleClient['bundleCommit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireBundleCommitted> {
+    return this.call(
+      async (transport) =>
+        replyToBundleCommitted(await dispatch(transport, { BundleCommit: request })),
       opts,
     );
   }

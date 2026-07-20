@@ -54,6 +54,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     vtzTree: unused,
     vtzDetail: unused,
     vtzCreate: unused,
+    bundleCommit: unused,
     vtzEdit: unused,
     vtzRescope: unused,
     vtzDelete: unused,
@@ -186,6 +187,7 @@ function operatorEngineWith(): OperatorEngine {
     vtzTree: () => Promise.resolve({ nodes: [wireZone()], truncated: false }),
     vtzDetail: () => Promise.resolve({ zone: wireZone(), ancestors: [], commit_version: 7 }),
     vtzCreate: () => Promise.resolve({ id: 'YouSource.New', lifecycle: 'draft' }),
+    bundleCommit: () => Promise.resolve({ version: 1, commit_version: 1 }),
     vtzEdit: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: 'published' }),
     vtzRescope: () => Promise.resolve({ id: 'YouSource.Moved', lifecycle: '' }),
     vtzDelete: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: '' }),
@@ -696,6 +698,7 @@ describe('BFF HTTP surface', () => {
       ...operatorEngineWith(),
       // A malformed spec must never reach the engine at all.
       vtzCreate: () => Promise.reject(new Error('the engine must not be called')),
+      bundleCommit: () => Promise.reject(new Error('unused')),
     };
     const base = await start(
       mockClient(() => Promise.resolve()),
@@ -744,6 +747,7 @@ describe('BFF HTTP surface', () => {
         Promise.reject(
           new EngineRefusedError({ class: 'Denied', code: 0, retry: 'Never', correlation_id: 0 }),
         ),
+      bundleCommit: () => Promise.reject(new Error('unused')),
     };
     const base = await start(
       mockClient(() => Promise.resolve()),

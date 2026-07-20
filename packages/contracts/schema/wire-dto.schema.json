@@ -216,7 +216,7 @@
           ]
         },
         "request_id": {
-          "type": "string"
+          "type": "integer"
         }
       },
       "required": [
@@ -282,7 +282,7 @@
           ]
         },
         "request_id": {
-          "type": "string"
+          "type": "integer"
         }
       },
       "required": [

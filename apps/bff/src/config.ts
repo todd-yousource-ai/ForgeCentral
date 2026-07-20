@@ -45,6 +45,9 @@ const ConfigSchema = z.object({
   cacheMaxEntries: z.coerce.number().int().positive().default(1000),
   /** Default per-call engine timeout in ms (every engine call is bounded). */
   requestTimeoutMs: z.coerce.number().int().positive().default(5000),
+  // The sidecar bundle-signing service port (FD.2), loopback-only; absent = the distribute
+  // surface answers 503 (the signing plane is provisioned by FD.5, not assumed).
+  signerPort: z.coerce.number().int().positive().optional(),
   /** Engine heartbeat interval in ms. The wire client sends a PING within this cadence to refresh the
    * engine session lease (TRD-04a 3.1: a client must heartbeat within the lease window or the engine
    * closes the connection; the crdb default lease is 60s). Keep it well under the lease so a missed beat
@@ -100,6 +103,8 @@ export interface BffConfig {
   readonly cacheTtlMs: number;
   readonly cacheMaxEntries: number;
   readonly requestTimeoutMs: number;
+  /** The loopback port of the sidecar's FD.2 signing service, or undefined when unprovisioned. */
+  readonly signerPort?: number;
   /** Engine heartbeat cadence in ms (PING keeps the engine session lease alive; see the schema note). */
   readonly heartbeatIntervalMs: number;
   /** Path to the built Console SPA served behind the admin plane; absent -> the BFF is API-only. */
@@ -184,6 +189,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     cacheTtlMs: env['FC_CACHE_TTL_MS'],
     cacheMaxEntries: env['FC_CACHE_MAX_ENTRIES'],
     requestTimeoutMs: env['FC_REQUEST_TIMEOUT_MS'],
+    signerPort: env['FC_SIGNER_PORT'],
     engineHeartbeatMs: env['FC_ENGINE_HEARTBEAT_MS'],
     spaDir: env['FC_SPA_DIST'],
     sessionTtlMs: env['FC_SESSION_TTL_MS'],

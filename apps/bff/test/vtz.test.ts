@@ -103,6 +103,7 @@ function engineWith(replies: { tree?: WireVtzTree; detail?: WireVtzDetail }): {
       return replies.detail ? Promise.resolve(replies.detail) : unused();
     },
     vtzCreate: unused,
+    bundleCommit: unused,
     vtzEdit: unused,
     vtzRescope: unused,
     vtzDelete: unused,
@@ -262,6 +263,7 @@ function mutatingEngine(reply: WireVtzMutation | Error): {
     logExport: unused,
     vtzTree: unused,
     vtzDetail: unused,
+    bundleCommit: unused,
     vtzCreate: (_p, request) => {
       creates.push(request);
       return settle();

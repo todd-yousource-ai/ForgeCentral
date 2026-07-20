@@ -44,6 +44,17 @@ pub struct SidecarConfig {
     pub admin_cert: PathBuf,
     /// Path to the admin-plane server private key.
     pub admin_key: PathBuf,
+    /// The loopback `ip:port` the Forge bundle-signing service listens on (FD.2), or absent.
+    ///
+    /// OPTIONAL BY DESIGN, unlike every field above: the signing plane is a provisioned capability --
+    /// FD.5's installer generates the seed and writes both fields together -- and a sidecar deployed
+    /// before that provisioning must keep terminating TLS rather than refuse startup. Setting one of
+    /// the pair without the other IS a refused misconfiguration (see `validate`).
+    #[serde(default)]
+    pub sign_addr: Option<String>,
+    /// Path to the ML-DSA-87 signing seed the sidecar owns (FD.2), or absent. See `sign_addr`.
+    #[serde(default)]
+    pub sign_seed: Option<PathBuf>,
 }
 
 impl SidecarConfig {
@@ -79,6 +90,17 @@ impl SidecarConfig {
         assert_node_ip_bind(&self.admin_bind_ip)?;
         assert_loopback_addr(&self.admin_upstream)?;
         assert_loopback_addr(&self.egress_addr)?;
+        // The signing pair travels together: half a signing plane is a misconfiguration, not a mode.
+        match (&self.sign_addr, &self.sign_seed) {
+            (Some(addr), Some(_)) => assert_loopback_addr(addr)?,
+            (None, None) => {}
+            _ => {
+                return Err(SidecarError::Config(
+                    "sign_addr and sign_seed must be set together (FD.5 provisions both)"
+                        .to_owned(),
+                ))
+            }
+        }
         Ok(())
     }
 }
@@ -125,6 +147,24 @@ mod tests {
         // fail-closed startup error (no silent fallback).
         let json = valid_json().replace("\"engine_key\": \"/etc/cdb/control/client.key\",", "");
         assert!(SidecarConfig::from_json_str(&json).is_err());
+    }
+
+    #[test]
+    fn a_half_configured_signing_plane_is_refused() {
+        // FD.2: the pair travels together. Half a signing plane is a misconfiguration, not a mode.
+        let with_addr_only = valid_json().replace(
+            "\"egress_addr\"",
+            "\"sign_addr\": \"127.0.0.1:8790\", \"egress_addr\"",
+        );
+        assert!(SidecarConfig::from_json_str(&with_addr_only).is_err());
+        // Both set parses, and a routable sign_addr is refused like every internal hop.
+        let both = valid_json().replace(
+            "\"egress_addr\"",
+            "\"sign_addr\": \"127.0.0.1:8790\", \"sign_seed\": \"/var/lib/console/sign.seed\", \"egress_addr\"",
+        );
+        assert!(SidecarConfig::from_json_str(&both).is_ok());
+        let routable = both.replace("127.0.0.1:8790", "10.0.0.5:8790");
+        assert!(SidecarConfig::from_json_str(&routable).is_err());
     }
 
     #[test]

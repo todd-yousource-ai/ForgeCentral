@@ -53,6 +53,7 @@ const unusedClient: CrucibleClient = {
   vtzTree: () => Promise.reject(new Error('unused')),
   vtzDetail: () => Promise.reject(new Error('unused')),
   vtzCreate: () => Promise.reject(new Error('unused')),
+  bundleCommit: () => Promise.reject(new Error('unused')),
   vtzEdit: () => Promise.reject(new Error('unused')),
   vtzRescope: () => Promise.reject(new Error('unused')),
   vtzDelete: () => Promise.reject(new Error('unused')),

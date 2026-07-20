@@ -26,6 +26,8 @@ import type {
   WireMemberList,
   WireQueryRows,
   WireQuerySubmit,
+  WireBundleCommit,
+  WireBundleCommitted,
   WireVtzCreate,
   WireVtzDelete,
   WireVtzDetail,
@@ -103,6 +105,8 @@ export interface CrucibleClient {
   /** Author a new trust zone (VTZ_CREATE, crdb VZ.4b). An audited write: the engine re-validates the
    * name, the catastrophic floor, and tighten-only inheritance, commits through the Committer, and
    * refuses rather than silently correcting. */
+  /** Commit a signed policy bundle for carriage (BUNDLE_COMMIT, FD.2). Audited engine-side. */
+  bundleCommit(request: WireBundleCommit, opts?: EngineCallOptions): Promise<WireBundleCommitted>;
   vtzCreate(request: WireVtzCreate, opts?: EngineCallOptions): Promise<WireVtzMutation>;
   /** Edit a zone's own postures + settings, incl. the draft -> published transition (VTZ_EDIT). Audited. */
   vtzEdit(request: WireVtzEdit, opts?: EngineCallOptions): Promise<WireVtzMutation>;

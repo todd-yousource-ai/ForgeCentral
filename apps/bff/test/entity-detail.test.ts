@@ -57,6 +57,7 @@ function engineWith(parts: {
     vtzTree: unused,
     vtzDetail: unused,
     vtzCreate: unused,
+    bundleCommit: unused,
     vtzEdit: unused,
     vtzRescope: unused,
     vtzDelete: unused,

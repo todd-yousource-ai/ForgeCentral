@@ -50,6 +50,8 @@ import {
   resolveVtzRescope,
   resolveVtzTree,
 } from './engine/vtz.js';
+import { DistributeZoneUnknownError, resolveDistribute } from './engine/distribute.js';
+import { SigningRefusedError, SigningUnavailableError } from './engine/sign-client.js';
 import type { ReverseDnsResolver } from './engine/reverse-dns.js';
 import { principalFromSession } from './engine/principal.js';
 import { EngineRefusedError } from './engine/wire-client.js';
@@ -829,6 +831,88 @@ async function parseVtzCommand(
  * cannot serve a pre-write tree that would make their own change look lost. Returns true iff it claimed
  * the request.
  */
+/**
+ * Serve `POST /api/vtz/<id>/distribute` (FD.2): compose the zone's bundle, sign it in the sidecar,
+ * commit it to the crdb carrier under the operator's delegation, and return the version plus the
+ * composition record (the unexpressed domains/fields -- visible, never dropped). 503 when the signing
+ * plane is unprovisioned (FD.5 provisions it); the operator names the target endpoints, non-empty,
+ * because FC is 1Source and an implicit all-devices scope would be a fabricated authoring decision.
+ */
+async function handleVtzDistribute(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const match = /^\/api\/vtz\/([^/]+)\/distribute$/.exec(path);
+  if (!match || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  if (deps.config.signerPort === undefined) {
+    sendJson(res, 503, { error: 'signer_unavailable' });
+    return true;
+  }
+  let members: string[];
+  try {
+    const body: unknown = await readJsonBody(req, 64 * 1024);
+    const raw = (body as { members?: unknown }).members;
+    if (
+      !Array.isArray(raw) ||
+      raw.length === 0 ||
+      !raw.every((m) => typeof m === 'string' && m.length > 0)
+    ) {
+      throw new Error('members');
+    }
+    members = raw as string[];
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const signer = {
+    host: '127.0.0.1',
+    port: deps.config.signerPort,
+    timeoutMs: deps.config.requestTimeoutMs,
+  };
+  try {
+    const result = await resolveDistribute(
+      deps.operatorEngine,
+      signer,
+      principal,
+      { zoneId: decodeURIComponent(match[1] ?? ''), members },
+      { timeoutMs: deps.config.requestTimeoutMs },
+    );
+    sendJson(res, 200, result);
+  } catch (err) {
+    if (err instanceof DistributeZoneUnknownError) {
+      sendJson(res, 404, { error: 'unknown_zone' });
+    } else if (err instanceof SigningRefusedError) {
+      sendJson(res, 422, { error: 'signing_refused' });
+    } else if (err instanceof SigningUnavailableError) {
+      sendJson(res, 503, { error: 'signer_unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      // Includes the carrier's monotonicity refusal: a non-advancing version is the caller's state
+      // problem (409-shaped), everything else a denial.
+      sendJson(res, err.wireError.class === 'Framing' ? 409 : 403, {
+        error: 'refused',
+        class: err.wireError.class,
+      });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'distribute failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleVtzCommand(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -916,6 +1000,9 @@ async function route(
     return;
   }
   if (await handleLogExport(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleVtzDistribute(deps, req, method, path, res)) {
     return;
   }
   if (await handleVtzCommand(deps, req, method, path, res)) {

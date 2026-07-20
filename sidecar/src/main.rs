@@ -12,6 +12,8 @@ use console_crypto_sidecar::admin::AdminTerminator;
 use console_crypto_sidecar::bind::SidecarError;
 use console_crypto_sidecar::config::SidecarConfig;
 use console_crypto_sidecar::engine::EngineOriginator;
+use console_crypto_sidecar::sign_service::SignService;
+use console_crypto_sidecar::signing::BundleSigner;
 use console_crypto_sidecar::tls::admin_server_config;
 
 fn read_pem(path: &std::path::Path) -> Result<Vec<u8>, SidecarError> {
@@ -78,10 +80,30 @@ async fn main() -> Result<(), SidecarError> {
     )
     .await?;
 
-    // Serve both legs; the first listener error, or a shutdown signal, ends the process.
-    tokio::select! {
-        result = admin.run() => result,
-        result = engine.run() => result,
-        result = shutdown_signal() => result,
+    // The Forge bundle-signing service (FD.2), only when FD.5 has provisioned the pair. A missing
+    // seed at a configured path refuses startup (never silently re-minted: a re-minted key orphans
+    // every provisioned anchor); an unprovisioned sidecar simply runs without the signing plane.
+    let sign = match (&config.sign_addr, &config.sign_seed) {
+        (Some(addr), Some(seed_path)) => {
+            let signer = BundleSigner::load(seed_path)
+                .map_err(|e| SidecarError::Config(format!("bundle signer: {e}")))?;
+            Some(SignService::bind(addr, std::sync::Arc::new(signer)).await?)
+        }
+        _ => None,
+    };
+
+    // Serve every configured leg; the first listener error, or a shutdown signal, ends the process.
+    match sign {
+        Some(sign) => tokio::select! {
+            result = admin.run() => result,
+            result = engine.run() => result,
+            result = sign.run() => result,
+            result = shutdown_signal() => result,
+        },
+        None => tokio::select! {
+            result = admin.run() => result,
+            result = engine.run() => result,
+            result = shutdown_signal() => result,
+        },
     }
 }
