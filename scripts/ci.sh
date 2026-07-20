@@ -112,27 +112,15 @@ elif ! command -v cargo >/dev/null 2>&1; then
 else
     offline=""
     [ "$skip_net" = "true" ] && offline="--offline"
-    # The Rust crates git-depend on the PRIVATE Crucible repo (cdb-mtls / cdb-types / cdb-wire /
-    # cdb-device-identity). That fetch needs a credential: in CI the CRUCIBLE_TOKEN secret, which the
-    # workflow rewrites over github.com.
+    # The Rust crates git-depend on the PRIVATE Crucible repo (cdb-mtls / cdb-types / cdb-artifact /
+    # cdb-wire / cdb-device-identity). That fetch needs a credential: locally the `github-crucible` SSH
+    # insteadOf + a deploy key; in CI the `CRUCIBLE_TOKEN` secret the workflow maps to a git credential.
     #
-    # FD.2 additionally needs the PRIVATE torch repo (torch-forge, for the Forge bundle preimage). That
-    # edge is currently backed out: CRUCIBLE_TOKEN 403s on torch, which turned this gate red on main.
-    # Before it returns, provision either a TORCH_TOKEN secret (the workflow already prefers it) or read
-    # access to torch on CRUCIBLE_TOKEN.
+    # ONE private repo, deliberately. The Forge bundle preimage briefly pulled in the torch repo too,
+    # which needed a second credential and turned this gate red; it moved to cdb-artifact, where the
+    # producer and the endpoint already meet.
     #
-    # Locally each repo has its own SSH alias + deploy key, so a single generic insteadOf will not be
-    # enough once the torch edge returns:
-    # a rule mapping all of https://github.com/todd-yousource-ai/ to github-crucible would send the torch
-    # fetch to the Crucible deploy key, which cannot read it. Git resolves insteadOf by LONGEST matching
-    # prefix, so add a more specific rule for torch alongside the generic one (see CONTRIBUTING.md):
-    #
-    #   git config --global url."ssh://git@github-torch/todd-yousource-ai/torch.git".insteadOf \
-    #       "https://github.com/todd-yousource-ai/torch.git"
-    #
-    # Committed Cargo.toml URLs stay portable https:// so CI needs no alias.
-    #
-    # If a repo is not reachable the fetch below fails the gate (RED) -- no soft-skip, so a green gate
+    # If it is not reachable the fetch below fails the gate (RED) -- no soft-skip, so a green gate
     # genuinely means the crates built. To intentionally skip the Rust gate, pass --skip-sidecar.
     for rust_project in sidecar; do
         echo "    -- ${rust_project} --"
