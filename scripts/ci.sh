@@ -112,11 +112,25 @@ elif ! command -v cargo >/dev/null 2>&1; then
 else
     offline=""
     [ "$skip_net" = "true" ] && offline="--offline"
-    # The Rust crates git-depend on the PRIVATE Crucible repo (cdb-mtls / cdb-wire / cdb-types /
-    # cdb-device-identity). That fetch needs a credential: locally the `github-crucible` SSH insteadOf + a
-    # deploy key; in CI the `CRUCIBLE_TOKEN` secret the workflow maps to a git credential. If it is not
-    # reachable the fetch below fails the gate (RED) -- no soft-skip, so a green gate genuinely means the
-    # crates built. To intentionally skip the Rust gate (e.g. a TS-only change), pass --skip-sidecar.
+    # The Rust crates git-depend on TWO private repos: Crucible (cdb-mtls / cdb-artifact / cdb-types /
+    # cdb-wire / cdb-device-identity) and torch (torch-forge, for the Forge bundle preimage, FD.2).
+    # That fetch needs a credential.
+    #
+    # In CI the CRUCIBLE_TOKEN secret is rewritten over all of github.com, so it covers both repos --
+    # but the token must be scoped to read BOTH; a Crucible-only token now fails the sidecar gate.
+    #
+    # Locally each repo has its own SSH alias + deploy key, so a single generic insteadOf is not enough:
+    # a rule mapping all of https://github.com/todd-yousource-ai/ to github-crucible would send the torch
+    # fetch to the Crucible deploy key, which cannot read it. Git resolves insteadOf by LONGEST matching
+    # prefix, so add a more specific rule for torch alongside the generic one (see CONTRIBUTING.md):
+    #
+    #   git config --global url."ssh://git@github-torch/todd-yousource-ai/torch.git".insteadOf \
+    #       "https://github.com/todd-yousource-ai/torch.git"
+    #
+    # Committed Cargo.toml URLs stay portable https:// so CI needs no alias.
+    #
+    # If a repo is not reachable the fetch below fails the gate (RED) -- no soft-skip, so a green gate
+    # genuinely means the crates built. To intentionally skip the Rust gate, pass --skip-sidecar.
     for rust_project in sidecar; do
         echo "    -- ${rust_project} --"
         (
