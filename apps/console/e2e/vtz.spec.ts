@@ -7,8 +7,8 @@ import type { Page, Route } from '@playwright/test';
 //   * the tree, postures and sub-zone counts come from the store; nothing is fabricated, and a fixtureless
 //     tenant renders only its seeded root zone;
 //   * tighten-only inheritance is shown correctly and the read-only catastrophic floor cannot be edited;
-//   * create / edit / re-scope / delete commit through the audited path, confirm-gated, and a refusal is
-//     surfaced honestly rather than silently accepted;
+//   * create / save (settings, and the move when the parent changes) / delete commit through the audited
+//     path, confirm-gated, and a refusal is surfaced honestly rather than silently accepted;
 //   * a VTZ ring on the Overview graph lands on that zone inside the 3-click budget;
 //   * NO trust score is shown anywhere.
 
@@ -59,6 +59,14 @@ const ROOT = zone({
 });
 
 const TREE = { zones: [ROOT, zone()], truncated: false };
+
+/** A LEAF zone: the engine only moves a zone with no descendants, so re-parenting needs one. */
+const LEAF = zone({
+  id: 'YouSource.Corp.Sales',
+  name: 'YouSource.Corp.Sales',
+  parent: 'YouSource.Corp',
+  subZoneCount: 0,
+});
 
 /** The connectivity graph, which the grid joins per-VTZ risk bands from (`vtz.riskBand`). */
 const GRAPH = {
@@ -256,32 +264,50 @@ test('an engine refusal is surfaced honestly, never silently accepted', async ({
   await expect(alert).toContainText('Nothing was committed.');
 });
 
-test('a re-scope and a delete are separate audited acts, each separately confirmed', async ({
+test('changing the parent moves the zone as part of Save, and delete stays its own act', async ({
   page,
 }) => {
   const state = await mockBff(page);
+  state.tree = { zones: [ROOT, zone(), LEAF], truncated: false };
   await page.goto('/vtz');
-  await page.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }).click();
-  await expect(page.getByLabel('Re-scope (move) to')).toBeVisible();
+  await page.getByRole('button', { name: 'Trust zone YouSource.Corp.Sales' }).click();
+  await expect(page.getByLabel('Parent VTZ (optional)')).toBeVisible();
+  // Re-parenting is a field on the form, not a separate workflow.
+  await expect(page.getByRole('button', { name: 'Re-scope' })).toHaveCount(0);
 
-  // A rename is the engine's RESCOPE verb, not an edit of the name field.
-  await page.getByLabel('Re-scope (move) to').fill('YouSource.Ops.Finance');
-  await page.getByRole('button', { name: 'Re-scope' }).click();
+  await page.getByLabel('Parent VTZ (optional)').selectOption('YouSource.Corp.Finance');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  // One act for the operator, but the confirm still NAMES the move: it is a second audited write and it
+  // changes the posture the zone inherits.
   await expect(page.getByRole('alertdialog')).toContainText(
-    'Move YouSource.Corp.Finance to YouSource.Ops.Finance?',
+    'Save YouSource.Corp.Sales and move it to YouSource.Corp.Finance.Sales?',
   );
+  await expect(page.getByRole('alertdialog')).toContainText('separate audited write');
   await page.getByRole('alertdialog').getByRole('button', { name: 'Commit' }).click();
-  await expect.poll(() => state.sent.length).toBe(1);
-  expect(state.sent[0]?.url).toBe('/api/vtz/YouSource.Corp.Finance/rescope');
-  expect(state.sent[0]?.body).toEqual({ newName: 'YouSource.Ops.Finance' });
 
-  // Delete is its own confirm, marked destructive, and names the rule the engine will apply.
+  // Settings first, then the move, so the moved record carries the new settings forward.
+  await expect.poll(() => state.sent.length).toBe(2);
+  expect(state.sent[0]?.method).toBe('PUT');
+  expect(state.sent[0]?.url).toBe('/api/vtz/YouSource.Corp.Sales');
+  expect(state.sent[1]?.url).toBe('/api/vtz/YouSource.Corp.Sales/rescope');
+  expect(state.sent[1]?.body).toEqual({ newName: 'YouSource.Corp.Finance.Sales' });
+
+  // Delete remains its own confirm, marked destructive, naming the rule the engine will apply.
   await page.getByRole('button', { name: 'Delete zone' }).click();
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toContainText('refuses to delete a zone that still has sub-zones');
   await confirm.getByRole('button', { name: 'Delete' }).click();
-  await expect.poll(() => state.sent.length).toBe(2);
-  expect(state.sent[1]?.method).toBe('DELETE');
+  await expect.poll(() => state.sent.length).toBe(3);
+  expect(state.sent[2]?.method).toBe('DELETE');
+});
+
+test('a zone with sub-zones is not offered a move the engine would refuse', async ({ page }) => {
+  await mockBff(page);
+  await page.goto('/vtz');
+  await page.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }).click();
+  // Finance has descendants, which a move would orphan; the control states that and disables.
+  await expect(page.getByLabel('Parent VTZ (optional)')).toBeDisabled();
+  await expect(page.getByText(/has sub-zones, so the engine refuses to move it/)).toBeVisible();
 });
 
 test('a new zone nests under the chosen parent and commits on confirm', async ({ page }) => {

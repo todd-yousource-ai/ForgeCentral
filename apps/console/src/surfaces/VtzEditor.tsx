@@ -14,9 +14,11 @@
 // pick `Demo.sales`, name the zone `reps`, and it commits as `Demo.sales.reps`. Nothing is a root by
 // privilege: a zone with no parent is simply top-level, and it can be edited and deleted like any other.
 //
-// THREE SEPARATE VERBS, THREE SEPARATE ACTIONS. The engine models a rename as a RE-SCOPE, not an edit,
-// so Save never silently becomes two audited writes: Save commits the settings (`vtz.edit`), Re-scope
-// commits the move (`vtz.rescope`), Delete removes the zone (`vtz.delete`). Each is separately confirmed.
+// PARENT IS A FIELD, SO MOVING IS PART OF SAVING. Changing the parent is an ordinary edit to the operator:
+// they pick a new parent and press Save. The engine decomposes that into two audited verbs (`vtz.edit` for
+// the settings, `vtz.rescope` for the move, because the dotted name is the hierarchy), but that is the
+// engine's shape, not a workflow to impose on the operator. The confirm dialog NAMES the move when there
+// is one -- folding the act into Save must not make it invisible on an audited surface.
 //
 // The form initializes from its props once; the surface remounts it with a `key` when the selected zone
 // changes, so there is no state-sync effect to get wrong.
@@ -55,18 +57,36 @@ const ARCHETYPE_HINT: Readonly<Record<VtzArchetype, string>> = {
     'Visibility first: an agent is fully onboarded and wrapped here, under a permissive (any/any) policy authored on the Policies surface.',
 };
 
-/** The operator-facing explanation of a failed command. Names the rule class, never a fabricated cause. */
-export function failureMessage(failure: VtzCommandFailure): string {
+/**
+ * The operator-facing explanation of a failed command. Names the rule class, never a fabricated cause.
+ *
+ * `settingsCommitted` reports the one partial outcome a Save can produce: the settings reached the store
+ * and the move did not. Saying "nothing was committed" there would be false.
+ */
+export function failureMessage(failure: VtzCommandFailure, settingsCommitted = false): string {
+  const outcome = settingsCommitted
+    ? 'The settings were committed; the zone was NOT moved and stays where it was.'
+    : 'Nothing was committed.';
   if (failure === 'denied') {
-    return 'The engine refused this change: it contradicts a rule the platform enforces on every zone. Nothing was committed.';
+    return `The engine refused this change: it contradicts a rule the platform enforces on every zone. ${outcome}`;
   }
   if (failure === 'conflict') {
-    return 'The engine refused this change: the zone already exists, no longer exists, or still has sub-zones. Nothing was committed. Re-read the tree and try again.';
+    return `The engine refused this change: the zone already exists, no longer exists, or still has sub-zones. ${outcome} Re-read the tree and try again.`;
   }
   if (failure === 'malformed') {
-    return 'That zone definition was rejected before it reached the engine. Nothing was committed.';
+    return `That zone definition was rejected before it reached the engine. ${outcome}`;
   }
-  return 'The zone could not be reached. Nothing was committed.';
+  return `The zone could not be reached. ${outcome}`;
+}
+
+/**
+ * Split a dotted zone name into its parent prefix and its own leaf segment: `Demo.sales.reps` is the leaf
+ * `reps` under the parent `Demo.sales`. A name with no dot is a top-level zone (empty parent).
+ */
+export function splitZoneName(name: string): { parent: string; leaf: string } {
+  const cut = name.lastIndexOf('.');
+  if (cut === -1) return { parent: '', leaf: name };
+  return { parent: name.slice(0, cut), leaf: name.slice(cut + 1) };
 }
 
 /**
@@ -91,21 +111,28 @@ interface FormState {
   readonly reauthIntervalHours: number;
 }
 
+/** Why the last command did not commit, and whether the settings half of a Save reached the store. */
+export interface EditorFailure {
+  readonly kind: VtzCommandFailure;
+  readonly settingsCommitted: boolean;
+}
+
 export interface VtzEditorProps {
   /** `create` authors a new zone; `edit` configures `zone`. */
   readonly mode: 'create' | 'edit';
   /** The zone being configured. Null in create mode. */
   readonly zone: VtzZone | null;
-  /** Every zone that may be chosen as a parent (create mode). */
+  /** Every zone that may be chosen as a parent. */
   readonly parents: readonly VtzZone[];
   /** True while a command is in flight (every control disables, so nothing is double-submitted). */
   readonly busy: boolean;
   /** Why the last command did not commit, or null. */
-  readonly failure: VtzCommandFailure | null;
-  /** Commit the zone (`vtz.create` in create mode, `vtz.edit` in edit mode). */
-  readonly onSubmit: (spec: VtzSpecInput) => void;
-  /** Move the zone to a new dotted name (`vtz.rescope`). Edit mode only. */
-  readonly onRescope?: (newName: string) => void;
+  readonly failure: EditorFailure | null;
+  /**
+   * Commit the zone: `vtz.create` in create mode, otherwise the settings plus, when `moveTo` is non-null,
+   * the move to that dotted name.
+   */
+  readonly onSubmit: (spec: VtzSpecInput, moveTo: string | null) => void;
   /** Delete the zone (`vtz.delete`). Edit mode only. */
   readonly onDelete?: () => void;
   /** Abandon a create. */
@@ -113,8 +140,7 @@ export interface VtzEditorProps {
 }
 
 /** The pending confirm, if any: which audited act the operator is being asked to authorize. */
-type Pending =
-  null | { readonly kind: 'submit' } | { readonly kind: 'rescope' } | { readonly kind: 'delete' };
+type Pending = null | { readonly kind: 'submit' } | { readonly kind: 'delete' };
 
 export function VtzEditor({
   mode,
@@ -123,15 +149,14 @@ export function VtzEditor({
   busy,
   failure,
   onSubmit,
-  onRescope,
   onDelete,
   onCancel,
 }: VtzEditorProps): ReactElement {
-  // In create mode `leaf` is the zone's own segment and the parent select supplies the prefix. In edit
-  // mode the name is the zone's identity, and only a re-scope may change it.
-  const [leaf, setLeaf] = useState('');
-  const [parentName, setParentName] = useState('');
-  const [rescopeName, setRescopeName] = useState(zone?.name ?? '');
+  // `leaf` is the zone's own segment and the parent select supplies the dotted prefix, in BOTH modes: an
+  // existing zone opens on its current place in the tree, so re-parenting it is picking a different one.
+  const initial = zone !== null ? splitZoneName(zone.name) : { parent: '', leaf: '' };
+  const [leaf, setLeaf] = useState(initial.leaf);
+  const [parentName, setParentName] = useState(initial.parent);
   const [form, setForm] = useState<FormState>({
     description: '',
     zoneType: zone?.zoneType ?? 'standard',
@@ -142,10 +167,19 @@ export function VtzEditor({
   });
   const [pending, setPending] = useState<Pending>(null);
 
-  const composed = mode === 'create' ? composeZoneName(parentName, leaf) : (zone?.name ?? '');
+  // The engine refuses to move a zone that still has descendants (it would orphan them), so the Console
+  // says so up front instead of offering a control that can only end in a refusal.
+  const moveBlocked = mode === 'edit' && (zone?.subZoneCount ?? 0) > 0;
+  // A zone can be neither its own parent nor its own descendant's child.
+  const selectableParents =
+    zone === null
+      ? parents
+      : parents.filter((p) => p.name !== zone.name && !p.name.startsWith(`${zone.name}.`));
+
+  const composed = composeZoneName(parentName, leaf);
   const canSubmit = !busy && composed !== '';
-  const canRescope =
-    !busy && rescopeName.trim() !== '' && zone !== null && rescopeName.trim() !== zone.name;
+  // A move is simply the composed name landing somewhere other than where the zone already is.
+  const moveTo = mode === 'edit' && zone !== null && composed !== zone.name ? composed : null;
 
   function specFromForm(): VtzSpecInput {
     return {
@@ -166,8 +200,7 @@ export function VtzEditor({
     const act = pending;
     setPending(null);
     if (act === null) return;
-    if (act.kind === 'submit') onSubmit(specFromForm());
-    else if (act.kind === 'rescope') onRescope?.(rescopeName.trim());
+    if (act.kind === 'submit') onSubmit(specFromForm(), moveTo);
     else onDelete?.();
   }
 
@@ -175,7 +208,7 @@ export function VtzEditor({
     <div className="fcx-vtz-editor">
       {failure !== null ? (
         <p className="fcx-vtz-editor__failure" role="alert">
-          {failureMessage(failure)}
+          {failureMessage(failure.kind, failure.settingsCommitted)}
         </p>
       ) : null}
 
@@ -186,12 +219,12 @@ export function VtzEditor({
             type="text"
             className="fcx-input"
             aria-label="VTZ name"
-            value={mode === 'create' ? leaf : (zone?.name ?? '')}
-            disabled={busy || mode === 'edit'}
+            value={leaf}
+            disabled={busy}
             placeholder="reps"
             onChange={(e) => setLeaf(e.target.value)}
           />
-          {mode === 'create' && composed !== '' ? (
+          {composed !== '' ? (
             <span className="fcx-field__note">
               Commits as <code>{composed}</code>
             </span>
@@ -222,19 +255,19 @@ export function VtzEditor({
             className="fcx-input"
             aria-label="Parent VTZ (optional)"
             value={parentName}
-            disabled={busy || mode === 'edit'}
+            disabled={busy || moveBlocked}
             onChange={(e) => setParentName(e.target.value)}
           >
             <option value="">None (top-level zone)</option>
-            {parents.map((p) => (
+            {selectableParents.map((p) => (
               <option key={p.id} value={p.name}>
                 {p.name}
               </option>
             ))}
           </select>
           <span className="fcx-field__note">
-            {mode === 'edit'
-              ? 'Moving a zone is a separate audited act -- use Re-scope below.'
+            {moveBlocked
+              ? 'This zone has sub-zones, so the engine refuses to move it -- moving it would orphan them. Re-parent or remove them first.'
               : 'Nests this zone under the chosen parent. Leave as None for a stand-alone zone.'}
           </span>
         </label>
@@ -350,49 +383,25 @@ export function VtzEditor({
         ) : null}
       </div>
 
-      {mode === 'edit' && onRescope ? (
-        <div className="fcx-vtz-editor__rescope">
-          <label className="fcx-field">
-            <span className="fcx-field__label">Re-scope (move) to</span>
-            <input
-              type="text"
-              className="fcx-input"
-              aria-label="Re-scope (move) to"
-              value={rescopeName}
-              disabled={busy}
-              onChange={(e) => setRescopeName(e.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            className="fcx-btn"
-            disabled={!canRescope}
-            onClick={() => setPending({ kind: 'rescope' })}
-          >
-            Re-scope
-          </button>
-          <p className="fcx-vtz-editor__note">
-            The dotted name is the hierarchy, so moving a zone under a different parent is a rename.
-            It is a separate audited act from saving this zone settings.
-          </p>
-        </div>
-      ) : null}
-
       <ConfirmDialog
         open={pending !== null}
         title={
           pending?.kind === 'delete'
             ? `Delete ${zone?.name ?? 'this zone'}?`
-            : pending?.kind === 'rescope'
-              ? `Move ${zone?.name ?? 'this zone'} to ${rescopeName.trim()}?`
-              : mode === 'create'
-                ? `Create ${composed}?`
+            : mode === 'create'
+              ? `Create ${composed}?`
+              : moveTo !== null
+                ? `Save ${zone?.name ?? 'this zone'} and move it to ${moveTo}?`
                 : `Save changes to ${zone?.name ?? 'this zone'}?`
         }
         description={
           pending?.kind === 'delete'
             ? 'This is an audited change to the trust-zone system of record. The engine refuses to delete a zone that still has sub-zones.'
-            : 'This is an audited change to the trust-zone system of record, attributed to you.'
+            : moveTo !== null
+              ? // Folding the move into Save must not hide it: the move is a second audited write, and a
+                // zone's place in the tree is what its inherited posture depends on.
+                'This is an audited change to the trust-zone system of record, attributed to you. Moving the zone changes its full name and the posture it inherits; it is recorded as a separate audited write from the settings.'
+              : 'This is an audited change to the trust-zone system of record, attributed to you.'
         }
         confirmLabel={pending?.kind === 'delete' ? 'Delete' : 'Commit'}
         tone={pending?.kind === 'delete' ? 'critical' : 'default'}

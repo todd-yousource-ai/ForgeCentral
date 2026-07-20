@@ -146,6 +146,27 @@ function stubFetch(opts: {
   return sent;
 }
 
+/** A LEAF zone: no sub-zones, so the engine will move it (a zone with descendants cannot be re-scoped). */
+const leafZone = zone({
+  id: vtzId('YouSource.Public'),
+  name: 'YouSource.Public',
+  parent: 'YouSource',
+  zoneType: 'public',
+  lifecycle: 'draft',
+  subZoneCount: 0,
+});
+
+/** Open the editor for the leaf Public zone and wait for the form to render. */
+async function openPublicEditor(): Promise<void> {
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Trust zone YouSource.Public' })).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Trust zone YouSource.Public' }));
+  await waitFor(() => {
+    expect(screen.getByLabelText('VTZ type')).toBeInTheDocument();
+  });
+}
+
 /** Open the editor for the Finance zone and wait for the form to render. */
 async function openFinanceEditor(): Promise<void> {
   await waitFor(() => {
@@ -373,35 +394,97 @@ describe('the VTZ authoring editor (V2.5)', () => {
     expect(sent).toHaveLength(0);
   });
 
-  it('re-scopes through its own verb, separately confirmed from a save', async () => {
-    const sent = stubFetch({ mutationBody: { id: 'YouSource.Ops.Finance', lifecycle: '' } });
-    renderWithProviders(<VtzSurface />, { route: '/vtz' });
-    await openFinanceEditor();
-
-    fireEvent.change(screen.getByLabelText('Re-scope (move) to'), {
-      target: { value: 'YouSource.Ops.Finance' },
+  it('moves the zone as part of Save when the parent changes, naming the move in the confirm', async () => {
+    const sent = stubFetch({
+      detailBody: { zone: leafZone, ancestors: [] },
+      mutationBody: { id: 'YouSource.Corp.Public', lifecycle: 'draft' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Re-scope' }));
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openPublicEditor();
+
+    // Re-parenting is an ordinary field edit: pick a parent, press Save. No separate re-scope act.
+    fireEvent.change(screen.getByLabelText('Parent VTZ (optional)'), {
+      target: { value: 'YouSource.Corp.Finance' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    // Folding the move into Save must not hide it: the confirm names where the zone lands.
     expect(await screen.findByRole('alertdialog')).toHaveTextContent(
-      'Move YouSource.Corp.Finance to YouSource.Ops.Finance?',
+      'Save YouSource.Public and move it to YouSource.Corp.Finance.Public?',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
 
+    // One operator act, but the engine has no combined verb: settings first, then the move, so the
+    // moved record carries the new settings forward.
+    await waitFor(() => {
+      expect(sent).toHaveLength(2);
+    });
+    expect(sent[0]?.method).toBe('PUT');
+    expect(sent[0]?.url).toBe('/api/vtz/YouSource.Public');
+    expect(sent[1]?.method).toBe('POST');
+    expect(sent[1]?.url).toBe('/api/vtz/YouSource.Public/rescope');
+    expect(sent[1]?.body).toEqual({ newName: 'YouSource.Corp.Finance.Public' });
+  });
+
+  it('commits only the settings when the parent is left alone', async () => {
+    const sent = stubFetch({ detailBody: { zone: leafZone, ancestors: [] } });
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openPublicEditor();
+
+    fireEvent.change(screen.getByLabelText('Telemetry mode'), { target: { value: 'sampled' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      'Save changes to YouSource.Public?',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    // No move means exactly one audited write; the Console never sends a no-op re-scope.
     await waitFor(() => {
       expect(sent).toHaveLength(1);
     });
-    // A rename is the engine RESCOPE verb, not an edit of the name field.
-    expect(sent[0]?.method).toBe('POST');
-    expect(sent[0]?.url).toBe('/api/vtz/YouSource.Corp.Finance/rescope');
-    expect(sent[0]?.body).toEqual({ newName: 'YouSource.Ops.Finance' });
+    expect(sent[0]?.method).toBe('PUT');
   });
 
-  it('does not offer a re-scope that would be a no-op', async () => {
+  it('says the settings committed when only the move was refused', async () => {
+    // The edit succeeds and the re-scope is refused, so "nothing was committed" would be a lie.
+    let call = 0;
+    const fetchMock = vi.fn((input: string) => {
+      if (input.startsWith('/api/vtz/tree')) return Promise.resolve(jsonResponse(200, tree));
+      if (input.startsWith('/api/vtz/detail')) {
+        return Promise.resolve(jsonResponse(200, { zone: leafZone, ancestors: [] }));
+      }
+      if (input.startsWith('/api/overview/sankey')) {
+        return Promise.resolve(jsonResponse(200, sankey));
+      }
+      call += 1;
+      return Promise.resolve(
+        call === 1
+          ? jsonResponse(200, { id: 'YouSource.Public', lifecycle: 'draft' })
+          : jsonResponse(409, {}),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await openPublicEditor();
+    fireEvent.change(screen.getByLabelText('Parent VTZ (optional)'), {
+      target: { value: 'YouSource.Corp.Finance' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The settings were committed; the zone was NOT moved and stays where it was.',
+    );
+  });
+
+  it('refuses to offer a move for a zone that still has sub-zones', async () => {
     stubFetch({});
     renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    // Finance carries three sub-zones, which the engine would orphan; the control says so and disables
+    // rather than offering an act that can only end in a refusal.
     await openFinanceEditor();
-    // The field starts at the zone current name, so there is nothing to move.
-    expect(screen.getByRole('button', { name: 'Re-scope' })).toBeDisabled();
+    expect(screen.getByLabelText('Parent VTZ (optional)')).toBeDisabled();
+    expect(screen.getByText(/has sub-zones, so the engine refuses to move it/)).toBeInTheDocument();
   });
 
   it('deletes behind a critical confirm through the delete verb', async () => {
