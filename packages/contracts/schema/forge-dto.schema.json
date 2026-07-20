@@ -1,0 +1,397 @@
+{
+  "$defs": {
+    "AgentGci": {
+      "type": "string"
+    },
+    "ApplyError": {
+      "enum": [
+        "SignatureInvalid",
+        "StaleLease",
+        "DowngradeRejected",
+        "ScopeMismatch",
+        "UnknownRuleKind",
+        "VtzCannotRealize",
+        "AppendFailed"
+      ]
+    },
+    "ApplyOutcome": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Applied": {
+              "$ref": "#/$defs/BundleVersion"
+            }
+          },
+          "required": [
+            "Applied"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Rejected": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "$ref": "#/$defs/BundleVersion"
+                },
+                {
+                  "$ref": "#/$defs/ApplyError"
+                }
+              ],
+              "type": "array"
+            }
+          },
+          "required": [
+            "Rejected"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BundleVersion": {
+      "type": "integer"
+    },
+    "CertIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "cn": {
+          "type": "string"
+        },
+        "sans": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "cn",
+        "sans"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "cn",
+        "sans"
+      ]
+    },
+    "Classification": {
+      "enum": [
+        "Unclassified",
+        "Internal",
+        "Confidential",
+        "Restricted",
+        "Secret"
+      ]
+    },
+    "EndpointPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_ordinary_internet": {
+          "type": "boolean"
+        },
+        "brokered": {
+          "$ref": "#/$defs/ModelMcpDestSet"
+        },
+        "exec": {
+          "$ref": "#/$defs/ExecDisposition"
+        },
+        "max_classification": {
+          "$ref": "#/$defs/Classification"
+        },
+        "resource_bound": {
+          "$ref": "#/$defs/ResourceBound"
+        },
+        "restricted": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "max_classification",
+        "brokered",
+        "restricted",
+        "allow_ordinary_internet",
+        "exec",
+        "resource_bound"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "max_classification",
+        "brokered",
+        "restricted",
+        "allow_ordinary_internet",
+        "exec",
+        "resource_bound"
+      ]
+    },
+    "ExecDisposition": {
+      "enum": [
+        "DenyUnwrappedExec"
+      ]
+    },
+    "FreshnessLease": {
+      "additionalProperties": false,
+      "properties": {
+        "issued_at": {
+          "$ref": "#/$defs/Hlc"
+        },
+        "not_after": {
+          "$ref": "#/$defs/Hlc"
+        }
+      },
+      "required": [
+        "issued_at",
+        "not_after"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "issued_at",
+        "not_after"
+      ]
+    },
+    "Hlc": {
+      "type": "integer"
+    },
+    "IdentityScope": {
+      "additionalProperties": false,
+      "properties": {
+        "members": {
+          "items": {
+            "$ref": "#/$defs/ScopeMember"
+          },
+          "type": "array"
+        },
+        "vtz": {
+          "$ref": "#/$defs/VtzId"
+        }
+      },
+      "required": [
+        "vtz",
+        "members"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "vtz",
+        "members"
+      ]
+    },
+    "KeyId": {
+      "type": "string"
+    },
+    "ModelMcpDest": {
+      "type": "string"
+    },
+    "ModelMcpDestSet": {
+      "additionalProperties": false,
+      "properties": {
+        "destinations": {
+          "items": {
+            "$ref": "#/$defs/ModelMcpDest"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "destinations"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "destinations"
+      ]
+    },
+    "PolicyId": {
+      "type": "string"
+    },
+    "PolicyVersionRef": {
+      "additionalProperties": false,
+      "properties": {
+        "policy": {
+          "$ref": "#/$defs/PolicyId"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        }
+      },
+      "required": [
+        "policy",
+        "version"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "policy",
+        "version"
+      ]
+    },
+    "ResourceBound": {
+      "additionalProperties": false,
+      "properties": {
+        "cost_micros": {
+          "type": "integer"
+        },
+        "cpu_millicores": {
+          "type": "integer"
+        },
+        "io_bytes_per_sec": {
+          "type": "integer"
+        },
+        "memory_bytes": {
+          "type": "integer"
+        },
+        "pids": {
+          "type": "integer"
+        },
+        "rate_per_sec": {
+          "type": "integer"
+        },
+        "storage_bytes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cpu_millicores",
+        "memory_bytes",
+        "pids",
+        "io_bytes_per_sec",
+        "cost_micros",
+        "storage_bytes",
+        "rate_per_sec"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "cpu_millicores",
+        "memory_bytes",
+        "pids",
+        "io_bytes_per_sec",
+        "cost_micros",
+        "storage_bytes",
+        "rate_per_sec"
+      ]
+    },
+    "ScopeMember": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AgentGci"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endpoint": {
+          "$ref": "#/$defs/CertIdentity"
+        }
+      },
+      "required": [
+        "endpoint",
+        "agent"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "endpoint",
+        "agent"
+      ]
+    },
+    "SignatureAlgorithm": {
+      "enum": [
+        "MlDsa87",
+        "BatchAnchoredSha512"
+      ]
+    },
+    "SignedPolicyBundle": {
+      "additionalProperties": false,
+      "properties": {
+        "contributors": {
+          "items": {
+            "$ref": "#/$defs/PolicyVersionRef"
+          },
+          "type": "array"
+        },
+        "lease": {
+          "$ref": "#/$defs/FreshnessLease"
+        },
+        "policy": {
+          "$ref": "#/$defs/EndpointPolicy"
+        },
+        "scope": {
+          "$ref": "#/$defs/IdentityScope"
+        },
+        "signature": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "signature_algorithm": {
+          "$ref": "#/$defs/SignatureAlgorithm"
+        },
+        "signing_key_id": {
+          "$ref": "#/$defs/KeyId"
+        },
+        "version": {
+          "$ref": "#/$defs/BundleVersion"
+        }
+      },
+      "required": [
+        "version",
+        "policy",
+        "contributors",
+        "scope",
+        "lease",
+        "signing_key_id",
+        "signature_algorithm",
+        "signature"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "version",
+        "policy",
+        "contributors",
+        "scope",
+        "lease",
+        "signing_key_id",
+        "signature_algorithm",
+        "signature"
+      ]
+    },
+    "Version": {
+      "additionalProperties": false,
+      "properties": {
+        "major": {
+          "type": "integer"
+        },
+        "minor": {
+          "type": "integer"
+        },
+        "patch": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "major",
+        "minor",
+        "patch"
+      ]
+    },
+    "VtzId": {
+      "type": "string"
+    }
+  },
+  "$id": "https://schema.yousource.ai/crucible/forge/dto/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CrucibleDB Forge policy-bundle contract (TRD-32 Section 12)"
+}

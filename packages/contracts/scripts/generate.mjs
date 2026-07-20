@@ -110,14 +110,23 @@ function renderDef(name, def) {
     const body = lines.map((line) => `  ${line}`).join('\n');
     return `export interface ${name} {\n${body}\n}`;
   }
+  // A serde newtype struct serializes as its inner value, so the contract carries it as a top-level
+  // scalar or array def. Emit it as an alias; tsType still throws on a genuinely unsupported node.
+  if (def.type) {
+    return `export type ${name} = ${tsType(def)};`;
+  }
   throw new Error(`unsupported top-level def ${name}: ${JSON.stringify(def)}`);
+}
+
+/** Render the sorted `$defs` body shared by every emitted contract module. */
+function renderDefsBody(schema) {
+  const defs = schema.$defs ?? {};
+  const names = Object.keys(defs).sort();
+  return names.map((name) => renderDef(name, defs[name])).join('\n\n');
 }
 
 /** Render the whole generated module from a parsed wire DTO schema object. */
 export function renderWireDtoTypes(schema) {
-  const defs = schema.$defs ?? {};
-  const names = Object.keys(defs).sort();
-  const body = names.map((name) => renderDef(name, defs[name])).join('\n\n');
   const header = [
     '// GENERATED FILE -- DO NOT EDIT BY HAND.',
     '//',
@@ -130,16 +139,67 @@ export function renderWireDtoTypes(schema) {
     '',
     '',
   ].join('\n');
-  return `${header}${body}\n`;
+  return `${header}${renderDefsBody(schema)}\n`;
+}
+
+/**
+ * Render the Forge policy-bundle module: the type projection, plus `FORGE_FIELD_ORDER`.
+ *
+ * A bundle signature is over a CBOR preimage whose maps carry their keys in struct
+ * field-declaration order, which the JSON Schema `properties` object cannot express (crdb's emitter
+ * alphabetizes it). crdb therefore emits `x-fieldOrder` per struct, and this projects those arrays
+ * into TypeScript so a preimage builder asserts its layout against the contract rather than against
+ * a hand-written constant. A reorder upstream fails the assertion instead of silently invalidating
+ * every signature.
+ */
+export function renderForgeDtoTypes(schema) {
+  const defs = schema.$defs ?? {};
+  const entries = Object.keys(defs)
+    .sort()
+    .filter((name) => defs[name]['x-fieldOrder'])
+    .map((name) => `  ${name}: [${defs[name]['x-fieldOrder'].map(lit).join(', ')}],`);
+  if (entries.length === 0) {
+    throw new Error('forge schema carries no x-fieldOrder: the signed layout would be unstated');
+  }
+  const header = [
+    '// GENERATED FILE -- DO NOT EDIT BY HAND.',
+    '//',
+    '// The TypeScript projection of the Crucible Forge policy-bundle contract, emitted from the',
+    `// vendored schema schema/forge-dto.schema.json (${schema.$id}) by scripts/generate.mjs.`,
+    '// The engine is the single source of truth (INV-CONSOLE-CONTRACTS-SINGLE-SOURCE); regenerate with',
+    '//   node scripts/generate.mjs',
+    '// Edit the schema (upstream, in crdb), not this file.',
+    '',
+    '',
+  ].join('\n');
+  const orderBlock = [
+    '/**',
+    ' * The struct field-declaration order a bundle signature binds, per crdb `x-fieldOrder`.',
+    ' *',
+    ' * The CBOR preimage encodes struct maps in this order (serde + ciborium emit declaration order;',
+    ' * they do NOT sort, so it is deterministic but not RFC 8949 canonical form). A preimage built in',
+    ' * any other order produces a signature the endpoint refuses.',
+    ' */',
+    'export const FORGE_FIELD_ORDER = {',
+    ...entries,
+    '} as const;',
+  ].join('\n');
+  return `${header}${renderDefsBody(schema)}\n\n${orderBlock}\n`;
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const here = dirname(fileURLToPath(import.meta.url));
-  const schemaPath = join(here, '..', 'schema', 'wire-dto.schema.json');
-  const outPath = join(here, '..', 'src', 'generated', 'wire-dto.ts');
-  const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
-  writeFileSync(outPath, renderWireDtoTypes(schema));
-  // eslint-disable-next-line no-console -- CLI progress line; this file is build tooling, not linted src.
-  console.log(`generated ${outPath} from ${schema.$id}`);
+  const targets = [
+    { schema: 'wire-dto.schema.json', out: 'wire-dto.ts', render: renderWireDtoTypes },
+    { schema: 'forge-dto.schema.json', out: 'forge-dto.ts', render: renderForgeDtoTypes },
+  ];
+  for (const target of targets) {
+    const schemaPath = join(here, '..', 'schema', target.schema);
+    const outPath = join(here, '..', 'src', 'generated', target.out);
+    const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
+    writeFileSync(outPath, target.render(schema));
+    // eslint-disable-next-line no-console -- CLI progress line; build tooling, not linted src.
+    console.log(`generated ${outPath} from ${schema.$id}`);
+  }
 }
