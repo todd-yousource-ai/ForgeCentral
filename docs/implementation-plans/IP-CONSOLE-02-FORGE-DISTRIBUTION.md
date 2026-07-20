@@ -64,16 +64,34 @@ the same way.
 
 ## The three findings that shape this IP
 
-**1. The v1 bundle cannot express 8 of the 11 v2 domains.** `EndpointPolicy` is the TRD-32 *v1*
-disposition: `brokered`, `restricted`, `allow_ordinary_internet`, `exec`, `resource_bound`,
-`max_classification`. A v2 zone carries eleven `ObjectDomain` postures. Only three map cleanly
-(`GovernedEgress` -> brokered, `OrdinaryNetwork` -> allow_ordinary_internet, `Execution` -> exec). The
-other eight (`PrivilegeEscalation`, `KernelModule`, `CredentialStore`, `Persistence`, `FileAndConfig`,
-`Memory`, `Ipc`, `Device`) have no v1 field. They must not be silently dropped: FD.1 composes only the
-expressible three, and the bundle's contributor list records that the zone carried domains this bundle
-shape cannot express, so an operator can see the gap. Carrying v2 postures end to end is a **named
-deferral** (`FD-DEFER-V2-POSTURE-BUNDLE`) gated on extending `SignedPolicyBundle` in `cdb-types` -- a crdb
-change, deliberately out of this IP.
+**1. A zone-only bundle carries exactly ONE authored bit, and that is a property of the model, not a
+defect.** `EndpointPolicy` is the TRD-32 *v1* disposition; a v2 `TrustZoneRecord` carries eleven
+`ObjectDomain` postures plus metadata. Verified field by field against `cdb-types`, the real mapping is:
+
+| `EndpointPolicy` field | Zone source | Result |
+|---|---|---|
+| `allow_ordinary_internet` | `OrdinaryNetwork` effective posture | **the one real mapping** |
+| `exec` | `Execution` (a catastrophic-floor domain, always `Deny`) | constant `DenyUnwrappedExec` |
+| `brokered` | none | **empty** -- a destination SET, not a posture |
+| `restricted` | none | **empty** -- likewise |
+| `resource_bound` | none | grant-derived (R-FRG-4), not zone-derived |
+| `max_classification` | none | not a field on `TrustZoneRecord` |
+
+`GovernedEgress` does NOT map to `brokered`: a posture is a disposition, a `ModelMcpDestSet` is a list of
+destinations, and a zone holds no destinations. Destinations and resource ceilings arrive from policy
+rules (`TRD-CONSOLE-05`) and capability grants, neither of which is built.
+
+The result is still enforceable and still fail-closed. With `brokered` and `restricted` empty,
+`EndpointPolicy::egress_class` classifies **every** destination as restricted unless
+`allow_ordinary_internet` is true -- so a zone denying `OrdinaryNetwork` produces a bundle that denies all
+egress, and a zone permitting it produces one that allows direct ordinary egress. That is a real,
+verifiable disposition reaching a real endpoint.
+
+The eight domains with no v1 field (`PrivilegeEscalation`, `KernelModule`, `CredentialStore`,
+`Persistence`, `FileAndConfig`, `Memory`, `Ipc`, `Device`) must not be silently dropped: FD.1 records
+them on the bundle's contributor list so the gap is visible to an operator. Carrying them for real is a
+**named deferral** (`FD-DEFER-V2-POSTURE-BUNDLE`) gated on extending `SignedPolicyBundle` in `cdb-types`
+-- a crdb change, deliberately out of this IP.
 
 **2. `BundleVersion` monotonicity vs `INV-CONSOLE-NO-2ND-DB`.** The endpoint rejects any bundle whose
 version is not strictly newer, so the producer needs a monotonic counter -- but the Console persists no
@@ -114,7 +132,7 @@ deliverable (FD.5), not a side effect of the TLS choice.
 
 | Step | Invariant | Deliverable |
 |---|---|---|
-| FD.1 | `INV-CONSOLE-FORGE-COMPOSED-FROM-RECORD` | Compose an `EndpointPolicy` from the live zone tree: a pure, deterministic function in `@forge/contracts` mapping the zone's effective (not own) postures through the three expressible domains, with the catastrophic floor preserved and every unexpressible domain recorded rather than dropped. Fail-closed at every gap: an absent posture, an unknown enum tag, or an unreadable zone yields the most restrictive value, never a permissive default. Tier 1: the three mappings + floor preservation + a zone with an unknown tag composing closed. Tier 4 vector: a fixture zone composes byte-for-byte to the expected `EndpointPolicy` under the canonical CBOR encoding torch's verifier expects. |
+| FD.1 | `INV-CONSOLE-FORGE-COMPOSED-FROM-RECORD` | Compose an `EndpointPolicy` from the live zone tree: a pure, deterministic function in `@forge/contracts` over the zone's **effective** (not own) postures, per the verified mapping in finding 1 -- `OrdinaryNetwork` drives `allow_ordinary_internet`, `exec` is the floor constant, `brokered`/`restricted` are empty, and `resource_bound`/`max_classification` take their most-restrictive fail-closed values because no zone field supplies them. Every unexpressible domain is recorded on the contributor list rather than dropped. Fail-closed at every gap: an absent posture, an unknown enum tag, or an unreadable zone yields the most restrictive value, never a permissive default. Tier 1: the egress mapping both ways, floor preservation, a zone with an unknown tag composing closed, and a test asserting the fail-closed defaults are the restrictive ones. Tier 4 vector: a fixture zone composes byte-for-byte to the expected `EndpointPolicy` under the canonical CBOR encoding torch's verifier expects. |
 | FD.2 | `INV-CONSOLE-FORGE-SIGNED-AT-SOURCE` | Signing in the crypto sidecar: ML-DSA-87 over SHA-512 of the canonical CBOR preimage, matching `torch-forge`'s `bundle_preimage_bytes` byte-for-byte; `SignedPolicyBundle` assembly (version derived from the crdb commit version per finding 2, `IdentityScope` from the target's enrolled identity, `FreshnessLease`, `signing_key_id` + `signature_algorithm` travelling for rotation). The key is generated in and never leaves the sidecar; the BFF sends a preimage and receives a signature. Tier 1: preimage equality against a torch fixture. Tier 2: a bundle this step produces passes torch's real `EndpointPolicyApplier` unmodified (the cross-repo proof that matters). Tier 3: version monotonicity -- unchanged zones re-compose to an equal version, an edited zone to a strictly greater one; a tampered byte fails verification. |
 | FD.3 | `INV-CONSOLE-FORGE-DISTRIBUTION-AUTHED` | The distribution listener: Section 12 `pull(have) -> Option<SignedPolicyBundle>` and `report_apply(ApplyOutcome)` over mTLS, Wire-CA server cert, ZTP-intermediate client trust, CBOR codec. Identity is the verified peer's, never a payload field. A `pull` returns only a bundle whose `IdentityScope` includes that peer; an unauthenticated, unscoped, or revoked peer gets nothing (not an empty bundle -- a typed refusal). `report_apply` is recorded and surfaced, so a rejected bundle is visible rather than silent. Tier 2: scope enforcement + refusal paths. Tier 3: a peer presenting a valid cert outside scope receives no bundle. |
 | FD.4 | `INV-TORCH-FORGE-TRANSPORT-REAL` (torch) | torch: the concrete `ForgeDistribution` impl over the FC listener, replacing the fixture transport, plus its config (endpoint address, anchor path). Closes FG1.7's deferred-live transport. Tier 2 against a local FC listener; the live leg folds into FD.N. **Torch's verify/apply path is untouched** -- this step supplies a transport, nothing else. |
