@@ -45,6 +45,7 @@ import {
   VtzUnavailableError,
   resolveVtzCreate,
   resolveVtzDelete,
+  resolveBundleConvergence,
   resolveVtzDetail,
   resolveVtzEdit,
   resolveVtzRescope,
@@ -685,7 +686,8 @@ const VTZ_CACHE_VERSION = 'vtz-v1';
 
 /**
  * Serve the VTZ reads (`GET /api/vtz/tree` -> the tenant zone tree; `GET /api/vtz/detail?id=<zone>` -> one
- * zone + its effective-posture ancestors). Session-gated (401) and engine-gated (503). Fails CLOSED: an
+ * zone + its effective-posture ancestors; `GET /api/vtz/convergence?id=<zone>` -> which endpoints have
+ * the zone's distributed bundle, FD.7c). Session-gated (401) and engine-gated (503). Fails CLOSED: an
  * enum tag the Console does not know is a 503 (never a defaulted posture on a governance surface), a
  * query-gate refusal a sanitized 403, any other engine error a 502. Returns true iff it claimed the
  * request.
@@ -696,7 +698,8 @@ async function handleVtz(
   path: string,
   res: ServerResponse,
 ): Promise<boolean> {
-  if (path !== '/api/vtz/tree' && path !== '/api/vtz/detail') return false;
+  if (path !== '/api/vtz/tree' && path !== '/api/vtz/detail' && path !== '/api/vtz/convergence')
+    return false;
   const session = deps.authRouter?.resolveSession(req);
   if (!session) {
     sendJson(res, 401, { error: 'unauthorized' });
@@ -710,24 +713,37 @@ async function handleVtz(
   const principal = principalFromSession(session, activeTenantOverride(req));
   // The detail read needs its zone id up front, so a malformed request never reaches the engine.
   const zoneId = params.get('id')?.trim();
-  if (path === '/api/vtz/detail' && !zoneId) {
+  if ((path === '/api/vtz/detail' || path === '/api/vtz/convergence') && !zoneId) {
     sendJson(res, 400, { error: 'bad_request' });
     return true;
   }
   const limit = parseVtzLimit(params);
   // Tenant-scoped key: a warm projection is never served across tenants (INV-CONSOLE-ENGINE-AUTHZ).
-  const cacheKey =
-    path === '/api/vtz/tree'
-      ? `${vtzCachePrefix(principal.tenant)}tree:${String(limit)}`
-      : `${vtzCachePrefix(principal.tenant)}detail:${zoneId ?? ''}`;
-  const cached = deps.cache.get(cacheKey, VTZ_CACHE_VERSION);
-  if (cached !== undefined) {
-    sendJson(res, 200, cached);
-    return true;
+  // Convergence is live -- endpoints report continuously -- so it is never cached: a stale reading
+  // could tell an operator a box holds a policy it has since lost. Tree/detail keep their warm cache.
+  if (path !== '/api/vtz/convergence') {
+    const cacheKey =
+      path === '/api/vtz/tree'
+        ? `${vtzCachePrefix(principal.tenant)}tree:${String(limit)}`
+        : `${vtzCachePrefix(principal.tenant)}detail:${zoneId ?? ''}`;
+    const cached = deps.cache.get(cacheKey, VTZ_CACHE_VERSION);
+    if (cached !== undefined) {
+      sendJson(res, 200, cached);
+      return true;
+    }
   }
   const engine = deps.operatorEngine;
   const opts = { timeoutMs: deps.config.requestTimeoutMs };
   try {
+    if (path === '/api/vtz/convergence') {
+      const view = await resolveBundleConvergence(engine, principal, zoneId ?? '', opts);
+      sendJson(res, 200, view);
+      return true;
+    }
+    const cacheKey =
+      path === '/api/vtz/tree'
+        ? `${vtzCachePrefix(principal.tenant)}tree:${String(limit)}`
+        : `${vtzCachePrefix(principal.tenant)}detail:${zoneId ?? ''}`;
     const view =
       path === '/api/vtz/tree'
         ? await resolveVtzTree(engine, principal, limit, opts)
@@ -921,7 +937,8 @@ async function handleVtzCommand(
   res: ServerResponse,
 ): Promise<boolean> {
   if (!path.startsWith('/api/vtz')) return false;
-  if (path === '/api/vtz/tree' || path === '/api/vtz/detail') return false;
+  if (path === '/api/vtz/tree' || path === '/api/vtz/detail' || path === '/api/vtz/convergence')
+    return false;
   if (method === 'GET') return false;
   const session = deps.authRouter?.resolveSession(req);
   if (!session) {

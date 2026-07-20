@@ -22,6 +22,7 @@ import {
   UNEXPRESSIBLE_ZONE_FIELDS,
   VTZ_OBJECT_DOMAINS,
   composeEndpointPolicy,
+  toBundleConvergence,
   unexpressibleDomains,
   type DomainPosture,
   type VtzObjectDomain,
@@ -163,5 +164,54 @@ describe('Forge DTO codegen (drift gate)', () => {
   it('the vendored schema carries exactly the pinned contract version', () => {
     const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as { $id?: string };
     expect(schema.$id).toBe(FORGE_DTO_SCHEMA_ID);
+  });
+});
+
+describe('FD.7c toBundleConvergence', () => {
+  const member = (endpoint_cn: string, state: string, reason?: string | null) => ({
+    endpoint_cn,
+    state,
+    ...(reason === undefined ? {} : { reason }),
+  });
+
+  it('projects the three states, carrying the rejected reason', () => {
+    const view = toBundleConvergence({
+      has_bundle: true,
+      version: 7,
+      members: [
+        member('a.box', 'applied'),
+        member('b.box', 'rejected', 'SignatureInvalid'),
+        member('c.box', 'silent'),
+      ],
+    });
+    expect(view).not.toBeNull();
+    expect(view?.hasBundle).toBe(true);
+    expect(view?.version).toBe(7);
+    expect(view?.members).toEqual([
+      { endpointCn: 'a.box', state: 'applied', reason: null },
+      { endpointCn: 'b.box', state: 'rejected', reason: 'SignatureInvalid' },
+      { endpointCn: 'c.box', state: 'silent', reason: null },
+    ]);
+  });
+
+  it('is the honest empty state when no bundle is distributed', () => {
+    const view = toBundleConvergence({ has_bundle: false, version: 0, members: [] });
+    expect(view).toEqual({ hasBundle: false, version: 0, members: [] });
+  });
+
+  it('fails closed on an unknown state, or a mislabelled reason', () => {
+    expect(
+      toBundleConvergence({ has_bundle: true, version: 1, members: [member('x', 'pending')] }),
+    ).toBeNull();
+    expect(
+      toBundleConvergence({ has_bundle: true, version: 1, members: [member('x', 'rejected')] }),
+    ).toBeNull();
+    expect(
+      toBundleConvergence({
+        has_bundle: true,
+        version: 1,
+        members: [member('x', 'applied', 'oops')],
+      }),
+    ).toBeNull();
   });
 });

@@ -35,6 +35,7 @@ import type {
   WireReply,
   WireVtzDetail,
   WireBundleCommitted,
+  WireBundleConvergence,
   WireVtzMutation,
   WireVtzTree,
 } from '@forge/contracts';
@@ -157,6 +158,13 @@ export function replyToVtzDetail(reply: WireReply): WireVtzDetail {
  * refusal. A refusal here is meaningful, not noise: the engine refuses a floor relaxation, an inheritance
  * contradiction, or a state conflict, and the resolver classifies it for the operator.
  */
+export function replyToBundleConvergence(reply: WireReply): WireBundleConvergence {
+  if (typeof reply === 'object' && 'BundleConvergence' in reply) return reply.BundleConvergence;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a bundle convergence read');
+}
+
 export function replyToBundleCommitted(reply: WireReply): WireBundleCommitted {
   if (typeof reply === 'object' && 'BundleCommitted' in reply) return reply.BundleCommitted;
   if (typeof reply === 'object' && 'Refused' in reply)
@@ -424,6 +432,17 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireVtzTree> {
     return this.call(
       async (transport) => replyToVtzTree(await dispatch(transport, { VtzTree: request })),
+      opts,
+    );
+  }
+
+  async bundleConvergence(
+    request: Parameters<CrucibleClient['bundleConvergence']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireBundleConvergence> {
+    return this.call(
+      async (transport) =>
+        replyToBundleConvergence(await dispatch(transport, { BundleConvergence: request })),
       opts,
     );
   }

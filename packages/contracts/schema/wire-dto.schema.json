@@ -241,6 +241,45 @@
       ],
       "type": "object"
     },
+    "WireBundleConvergence": {
+      "additionalProperties": false,
+      "properties": {
+        "has_bundle": {
+          "type": "boolean"
+        },
+        "members": {
+          "items": {
+            "$ref": "#/$defs/WireConvergenceMember"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "has_bundle",
+        "version",
+        "members"
+      ],
+      "type": "object"
+    },
+    "WireBundleConvergenceQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "type": "integer"
+        },
+        "vtz_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz_id"
+      ],
+      "type": "object"
+    },
     "WireBundleDelivered": {
       "additionalProperties": false,
       "properties": {
@@ -287,6 +326,48 @@
       },
       "required": [
         "request_id"
+      ],
+      "type": "object"
+    },
+    "WireBundleReport": {
+      "additionalProperties": false,
+      "properties": {
+        "rejected_reason": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "integer"
+        },
+        "vtz_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz_id",
+        "version"
+      ],
+      "type": "object"
+    },
+    "WireBundleReported": {
+      "additionalProperties": false,
+      "properties": {
+        "commit_version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "commit_version"
       ],
       "type": "object"
     },
@@ -581,6 +662,32 @@
         "action",
         "enforcement_active",
         "summary"
+      ],
+      "type": "object"
+    },
+    "WireConvergenceMember": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint_cn": {
+          "type": "string"
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint_cn",
+        "state"
       ],
       "type": "object"
     },
@@ -1662,6 +1769,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "BundleReported": {
+              "$ref": "#/$defs/WireBundleReported"
+            }
+          },
+          "required": [
+            "BundleReported"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "BundleConvergence": {
+              "$ref": "#/$defs/WireBundleConvergence"
+            }
+          },
+          "required": [
+            "BundleConvergence"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "UsageOverview": {
               "$ref": "#/$defs/WireUsageOverviewResult"
             }
@@ -2199,6 +2330,30 @@
           },
           "required": [
             "BundleFetch"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "BundleReport": {
+              "$ref": "#/$defs/WireBundleReport"
+            }
+          },
+          "required": [
+            "BundleReport"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "BundleConvergence": {
+              "$ref": "#/$defs/WireBundleConvergenceQuery"
+            }
+          },
+          "required": [
+            "BundleConvergence"
           ],
           "type": "object"
         }

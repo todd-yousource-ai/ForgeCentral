@@ -34,6 +34,8 @@ import type {
   WireQuerySubmit,
   WireBundleCommit,
   WireBundleCommitted,
+  WireBundleConvergence,
+  WireBundleConvergenceQuery,
   WireVtzCreate,
   WireVtzDelete,
   WireVtzDetail,
@@ -65,6 +67,7 @@ export type EngineAction =
   | 'vtzDetail'
   | 'vtzCreate'
   | 'bundleCommit'
+  | 'bundleConvergence'
   | 'vtzEdit'
   | 'vtzRescope'
   | 'vtzDelete'
@@ -183,6 +186,12 @@ export interface OperatorEngine {
     request: WireBundleCommit,
     opts?: EngineCallOptions,
   ): Promise<WireBundleCommitted>;
+  /** Read a zone bundle's endpoint convergence (BUNDLE_CONVERGENCE, FD.7c) on behalf of `principal`. */
+  bundleConvergence(
+    principal: OperatorPrincipal,
+    request: WireBundleConvergenceQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireBundleConvergence>;
   /** Author a new zone (VTZ_CREATE) on behalf of `principal`. Audited engine-side. */
   vtzCreate(
     principal: OperatorPrincipal,
@@ -317,6 +326,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'bundleCommit', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.bundleCommit({ ...request, operator }, opts);
+    },
+    // A tenant-scoped read: the operator delegation is injected server-side like every other read.
+    bundleConvergence: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'bundleConvergence', request.request_id));
+      return client.bundleConvergence(request, opts);
     },
     vtzCreate: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'vtzCreate', request.request_id));

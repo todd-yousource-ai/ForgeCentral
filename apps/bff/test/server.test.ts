@@ -55,6 +55,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     vtzDetail: unused,
     vtzCreate: unused,
     bundleCommit: unused,
+    bundleConvergence: unused,
     vtzEdit: unused,
     vtzRescope: unused,
     vtzDelete: unused,
@@ -188,6 +189,7 @@ function operatorEngineWith(): OperatorEngine {
     vtzDetail: () => Promise.resolve({ zone: wireZone(), ancestors: [], commit_version: 7 }),
     vtzCreate: () => Promise.resolve({ id: 'YouSource.New', lifecycle: 'draft' }),
     bundleCommit: () => Promise.resolve({ version: 1, commit_version: 1 }),
+    bundleConvergence: () => Promise.resolve({ has_bundle: false, version: 0, members: [] }),
     vtzEdit: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: 'published' }),
     vtzRescope: () => Promise.resolve({ id: 'YouSource.Moved', lifecycle: '' }),
     vtzDelete: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: '' }),
@@ -567,6 +569,40 @@ describe('BFF HTTP surface', () => {
     expect(await res.json()).toEqual({ zone: null, ancestors: [], commitVersion: 7 });
   });
 
+  it('GET /api/vtz/convergence projects the three endpoint states, and 400 without an id', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      bundleConvergence: () =>
+        Promise.resolve({
+          has_bundle: true,
+          version: 7,
+          members: [
+            { endpoint_cn: 'a.box', state: 'applied' },
+            { endpoint_cn: 'b.box', state: 'rejected', reason: 'SignatureInvalid' },
+            { endpoint_cn: 'c.box', state: 'silent' },
+          ],
+        }),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const res = await fetch(`${base}/api/vtz/convergence?id=YouSource.Corp`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      hasBundle: boolean;
+      members: { endpointCn: string; state: string; reason: string | null }[];
+    };
+    expect(body.hasBundle).toBe(true);
+    expect(body.members).toEqual([
+      { endpointCn: 'a.box', state: 'applied', reason: null },
+      { endpointCn: 'b.box', state: 'rejected', reason: 'SignatureInvalid' },
+      { endpointCn: 'c.box', state: 'silent', reason: null },
+    ]);
+    // No zone id never reaches the engine.
+    expect((await fetch(`${base}/api/vtz/convergence`)).status).toBe(400);
+  });
+
   it('the VTZ reads are 401 without a session and 503 without an engine (fail-closed)', async () => {
     const noSession = await start(
       mockClient(() => Promise.resolve()),
@@ -699,6 +735,7 @@ describe('BFF HTTP surface', () => {
       // A malformed spec must never reach the engine at all.
       vtzCreate: () => Promise.reject(new Error('the engine must not be called')),
       bundleCommit: () => Promise.reject(new Error('unused')),
+      bundleConvergence: () => Promise.reject(new Error('unused')),
     };
     const base = await start(
       mockClient(() => Promise.resolve()),
@@ -748,6 +785,7 @@ describe('BFF HTTP surface', () => {
           new EngineRefusedError({ class: 'Denied', code: 0, retry: 'Never', correlation_id: 0 }),
         ),
       bundleCommit: () => Promise.reject(new Error('unused')),
+      bundleConvergence: () => Promise.reject(new Error('unused')),
     };
     const base = await start(
       mockClient(() => Promise.resolve()),
