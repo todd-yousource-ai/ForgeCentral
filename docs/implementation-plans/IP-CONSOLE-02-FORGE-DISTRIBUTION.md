@@ -7,10 +7,18 @@ endpoints over a mutually-authenticated seam. Torch's receiving half is already 
 stale leases, applies atomically with last-known-good rollback, and reports the outcome back. What has
 never existed is a producer. This IP is that producer.
 
-**The boundary this IP fixes (operator decision, 2026-07-20):** policy always comes from ForgeCentral.
-CrucibleDB is the system of record for zone *definitions* and never composes, signs, or serves policy;
-ForgeCentral is 1Source, and it is the only holder of the bundle signing key. An endpoint that verifies a
-bundle is verifying ForgeCentral's signature, and nothing else can produce one.
+**The boundary this IP fixes (operator decision, 2026-07-20; carrier amended 2026-07-20):** policy
+always comes from ForgeCentral. CrucibleDB is the system of record for zone *definitions* and never
+composes or signs policy; ForgeCentral is 1Source, and it is the only holder of the bundle signing key.
+An endpoint that verifies a bundle is verifying ForgeCentral's signature, and nothing else can produce
+one.
+
+CrucibleDB IS the distribution **carrier** (operator decision, 2026-07-20): a signed bundle travels
+FC -> crdb over the Console control plane (`:7879`) and is fetched by the endpoint over its existing
+`:7878` seam, as **opaque signed bytes** crdb stores and serves but can neither author nor alter --
+the named invariant already binds this ("a carrier that relays a bundle cannot forge one"), and the
+endpoint's verify chain is carrier-independent by construction (`INV-FRG-DISTRIBUTION-IDENTITY-AUTH`:
+transport auth never substitutes for the bundle's own signature).
 
 **Read with:** `TRD-32 v1` (the endpoint requirement set the bundle contract comes from: R-FRG-21/40/70
 identity-authenticated distribution, R-FRG-22/23/24 verify/atomic/fail-closed-stale, R-FRG-42
@@ -140,14 +148,26 @@ replicas composing the same zones agree without coordination, and a zone edit is
 produce a new bundle. FD.2 proves a re-composition with no zone change yields the *same* version (so the
 endpoint idempotently no-ops) and a zone edit yields a strictly greater one.
 
-**3. mTLS is not the bundle signature.** Three CAs exist on the node today: `CrucibleDB Wire CA` (torch's
-seam anchor), `CrucibleDB ZTP CA Intermediate` (torch's device identity), and `CrucibleDB Console CA`
-(FC-to-engine on `:7879`). The distribution listener takes a **Wire-CA-issued server cert** so torch's
-trust store needs no change, and FC adds the ZTP intermediate to authenticate endpoint clients. This is a
-new destination, not a new trust domain. Independently of all of it, the endpoint still verifies the
-bundle's own ML-DSA-87 signature against the `DistributionAnchor`; `torch-forge/src/distribution.rs:5-7`
-is explicit that transport auth never substitutes for it. The anchor is therefore a provisioning
-deliverable (FD.5), not a side effect of the TLS choice.
+**3. The distribution channel is the endpoint's EXISTING `:7878` seam (operator decision,
+2026-07-20).** The original plan had ForgeCentral host a new mTLS listener (Wire-CA server cert, ZTP
+client trust) that every endpoint would connect to -- a SECOND seam on every torch node. That was
+fighting the endpoint's own design: `torch-forge/src/distribution.rs` states "the endpoint pulls its
+bundle over the one mutually-authenticated torch-core seam" and that the real transport "rides
+`torch_core::SeamClient`". Torch was built expecting bundles on `:7878`.
+
+So the channel is: FC commits the signed bundle to crdb over `:7879` (the Console's existing control
+plane), crdb stores it as opaque signed bytes, and the endpoint fetches it over `:7878` with its
+enrolled identity -- the fetch is scope-gated to the verified peer, exactly as the old FD.3 required.
+No new listener, no new cert plumbing, no second trust decision on any endpoint, and store-and-forward
+falls out for free: a bundle waits in crdb for an endpoint that is offline, which -- together with the
+freshness lease failing closed -- is the durable-delivery story (see FD.7 and Out of scope).
+
+"Push" over this channel is honest pull: torchd's `refresh` loop fetches on its own cadence, so the
+refresh interval is the delivery latency and the lease bounds staleness. Server-initiated push waits on
+a wire push-stream, already deferred platform-wide. Independently of all of it, the endpoint still
+verifies the bundle's own ML-DSA-87 signature against the `DistributionAnchor`;
+`torch-forge/src/distribution.rs:5-7` is explicit that transport auth never substitutes for it. The
+anchor remains a provisioning deliverable (FD.5), not a side effect of the channel choice.
 
 ---
 
@@ -173,9 +193,9 @@ deliverable (FD.5), not a side effect of the TLS choice.
 |---|---|---|
 | FD.1 | `INV-CONSOLE-FORGE-COMPOSED-FROM-RECORD` | Compose an `EndpointPolicy` from the live zone tree: a pure, deterministic function in `@forge/contracts` over the zone's **effective** (not own) postures, per the verified mapping in finding 1 -- `OrdinaryNetwork` drives `allow_ordinary_internet`, `exec` is the floor constant, `brokered`/`restricted` are empty, and `resource_bound`/`max_classification` take their most-restrictive fail-closed values because no zone field supplies them. Every unexpressible domain AND field is recorded in the audited composition record and the bundle detail view (not on the contributor list, which is typed `Vec<PolicyVersionRef>` and cannot hold it -- see finding 1). Fail-closed at every gap: an absent posture, an unknown enum tag, or an unreadable zone yields the most restrictive value, never a permissive default. Tier 1: the egress mapping both ways, floor preservation, a zone with an unknown tag composing closed, and a test asserting the fail-closed defaults are the restrictive ones. Tier 4 vector: a fixture zone composes byte-for-byte to the expected `EndpointPolicy` under **ciborium's serde encoding** -- definite-length maps, text keys, in struct **field-declaration order**. This is deterministic but NOT RFC 8949 canonical form: keys are NOT sorted. `packages/wire/src/cbor.ts` already encodes this way (`Object.keys` insertion order); do not add sorting. The corollary is a real constraint: the TS preimage object literal's property order must mirror `BundlePreimage` exactly (`domain, version, policy, contributors, scope, lease, signing_key_id, signature_algorithm`), so FD.1 pins that order with its own test -- an innocuous reordering silently invalidates every signature, and would surface only in FD.2 Tier 2. |
 | FD.2 | `INV-CONSOLE-FORGE-SIGNED-AT-SOURCE` | Signing in the crypto sidecar: ML-DSA-87 over SHA-512 of the canonical CBOR preimage, computed by `cdb_artifact::bundle_preimage_bytes`, the one implementation the endpoint also verifies with; `SignedPolicyBundle` assembly (version derived from the crdb commit version per finding 2, `IdentityScope` from the target's enrolled identity, `FreshnessLease`, `signing_key_id` + `signature_algorithm` travelling for rotation). **Key lifecycle (operator decision, 2026-07-20).** FD.2 owns the SEED, FD.5 owns the ANCHOR: the sidecar generates the 32-byte FIPS 204 seed on first install and persists it `0600` under its own user, the installer never mints it, and only the public verifying key leaves. That is what makes "never leaves the sidecar" true -- an installer-generated seed would exist in installer memory, shell history, and possibly logs. Generation is a ONE-TIME EXPLICIT ACT, never an implicit repair: a missing seed on a running system refuses startup rather than minting a replacement, because a silently re-minted key orphans every deployed anchor and stops every bundle verifying in a way that reads as a crypto fault. `key_id` is DERIVED from the verifying key (a hash prefix), not hand-picked, because `signing_key_id` is inside the signed preimage and a key id that can drift from the key it names is a hazard. The BFF sends the bundle's unsigned parts and receives the assembled signed bundle; the seed never enters the TypeScript tier. Tier 1: preimage equality against a torch fixture. Tier 2: a bundle this step produces passes torch's real `EndpointPolicyApplier` unmodified (the cross-repo proof that matters). Tier 3: version monotonicity -- unchanged zones re-compose to an equal version, an edited zone to a strictly greater one; a tampered byte fails verification. |
-| FD.3 | `INV-CONSOLE-FORGE-DISTRIBUTION-AUTHED` | The distribution listener: Section 12 `pull(have) -> Option<SignedPolicyBundle>` and `report_apply(ApplyOutcome)` over mTLS, Wire-CA server cert, ZTP-intermediate client trust, CBOR codec. Identity is the verified peer's, never a payload field. A `pull` returns only a bundle whose `IdentityScope` includes that peer; an unauthenticated, unscoped, or revoked peer gets nothing (not an empty bundle -- a typed refusal). `report_apply` is recorded and surfaced, so a rejected bundle is visible rather than silent. Tier 2: scope enforcement + refusal paths. Tier 3: a peer presenting a valid cert outside scope receives no bundle. |
-| FD.4 | `INV-TORCH-FORGE-TRANSPORT-REAL` (torch) | torch: the concrete `ForgeDistribution` impl over the FC listener, replacing the fixture transport, plus its config (endpoint address, anchor path). Closes FG1.7's deferred-live transport. Tier 2 against a local FC listener; the live leg folds into FD.N. **Torch's verify/apply path is untouched** -- this step supplies a transport, nothing else. |
-| FD.5 | `INV-CONSOLE-FORGE-ANCHOR-PROVISIONED` | Provisioning, in installer code and not by hand (the live-stitching rule): the sidecar's signing seed GENERATED BY THE SIDECAR on first start and the public verifying key read back and published as the `DistributionAnchor` (provisioned at install, not generated at install -- see FD.2), the `DistributionAnchor` (public half) delivered to endpoints at enrollment, the Wire-CA-issued listener cert issued, and the ZTP intermediate added to the listener's client-trust set. Must survive the daily ZTP rotation -- the endpoint's 24h leaf changes under the anchor, and the anchor does not rotate with it. Idempotent re-run; a missing anchor fails the install loudly rather than starting an unverifiable plane. |
+| FD.3 | `INV-CONSOLE-FORGE-DISTRIBUTION-AUTHED` | The crdb bundle carrier (a crdb PR, flagged per the min-change rule; the second and last crdb change of this IP). A committed, audited store for opaque `SignedPolicyBundle` bytes plus two verbs: FC commits a bundle over `:7879` (Console-plane identity required), and an endpoint fetches the latest bundle whose `IdentityScope` includes the VERIFIED peer identity over `:7878` -- never a payload-asserted name. An unauthenticated, unscoped, or revoked peer gets a typed refusal, not an empty bundle. crdb serves bytes it cannot author: it holds no signing key, and a stored bundle is returned exactly as committed (byte-identical, or the endpoint's signature check fails -- which is the tamper evidence). `report_apply` stays torch FG1.10's advisory facts, which already land in crdb; no new report path. Tier 2: scope enforcement + refusal paths. Tier 3: a valid-cert peer outside scope receives nothing; a bundle round-trips byte-identical. |
+| FD.4| FD.4 | `INV-TORCH-FORGE-TRANSPORT-REAL` (torch) | torch: the concrete `ForgeDistribution` impl over `torch_core::SeamClient` and the FD.3 wire verbs on `:7878` -- the transport FG1.7's own docs anticipated ("rides torch_core::SeamClient"; deferred-live, gated on the service half, which FD.3 is). Plus its config: the fetch cadence knob and the anchor path. Closes FG1.7's deferred-live transport. Tier 2 against an in-process verb fixture; the live leg folds into FD.N. **Torch's verify/apply path is untouched** -- this step supplies a transport, nothing else. |
+| FD.5| FD.5 | `INV-CONSOLE-FORGE-ANCHOR-PROVISIONED` | Provisioning, in installer code and not by hand (the live-stitching rule): the sidecar's signing seed GENERATED BY THE SIDECAR on first start and the public verifying key read back and published as the `DistributionAnchor` (provisioned at install, not generated at install -- see FD.2), the `DistributionAnchor` (public half) delivered to endpoints at enrollment, the Wire-CA-issued listener cert issued, and the ZTP intermediate added to the listener's client-trust set. Must survive the daily ZTP rotation -- the endpoint's 24h leaf changes under the anchor, and the anchor does not rotate with it. Idempotent re-run; a missing anchor fails the install loudly rather than starting an unverifiable plane. |
 | FD.6 | (docs) | `TRD-CONSOLE-00` amendment naming ForgeCentral as the Forge composition/distribution plane, resolving the SPEC GAP above; `IP-CONSOLE-02-VTZ-LEDGER` cross-reference so the VTZ IP points at where its zones become enforceable. Docs-only, scoped separately from code. |
 | FD.7 | `INV-CONSOLE-FORGE-CONVERGENCE-VISIBLE` | The distribution convergence ledger: for any bundle, which endpoints have acknowledged it and which have not, as a **projection** and never a Console-held table (`INV-CONSOLE-NO-2ND-DB`). The numerator already exists as durable fact: torch FG1.10 (LANDED) emits a typed, payload-free, GCI-attributed `ForgeAudit::Apply` fact for every apply AND every rejection onto the TRD-21 advisory path, so no outcome is silent (R-FRG-25/52). The denominator is the bundle's own `IdentityScope` members, which FD.2 authored -- so this needs no endpoint inventory, unlike push. The ledger is the delta, per bundle version, with the typed `ApplyError` carried through for a rejection rather than collapsed to "failed". Surfaces the three states an operator must tell apart: acknowledged-applied, acknowledged-rejected (with the reason), and silent. Tier 2: an endpoint that reports `Applied` leaves the not-converged set and one that reports `Rejected` does not. Tier 3: an endpoint that reports nothing is rendered as silent, never as converged -- the fail-closed reading, since absence of evidence is not delivery. |
 | FD.N | `INV-CONSOLE-FORGE-LIVE` | Live capstone on the node: author a zone in the Console -> compose -> sign -> torchd pulls over the real seam -> verifies -> applies -> reports the outcome -> the Console shows it. Enforcement stays OFF, so the proof is that the *policy plane* is real end to end, not that anything is enforced. Requires a fresh ZTP enrollment (the leaf expires daily). |
@@ -187,9 +207,10 @@ FD.5 can start after FD.2 fixes the key shape and must land before FD.N. FD.6 is
 any time after FD.1. FD.7 needs FD.3 (the `report_apply` path) and FD.2 (the `IdentityScope` it counts
 against). FD.N closes the set.
 
-The first three touch **only ForgeCentral**, and torch is not modified until FD.4. crdb's single
-contribution is the FD.0 contract export recorded under Prerequisites, which landed before FD.1 and is
-export-only; no further crdb change is in scope.
+FD.1 and FD.2 touch **only ForgeCentral**, and torch is not modified until FD.4. crdb contributes
+exactly twice, both flagged per the min-change rule: FD.0 (the contract export, landed) and FD.3 (the
+bundle carrier -- store plus two verbs, no policy semantics; crdb can neither author nor alter what it
+carries).
 
 ## Acceptance
 
