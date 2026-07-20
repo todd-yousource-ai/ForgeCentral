@@ -54,8 +54,23 @@ the same way.
   fixture transport exists, so this IP is free to choose the seam.
 - **crdb `IP-CONSOLE-VTZ-SUBSTRATE` -- LIVE over `:7878`**, and the `cdb-types` contract already carries
   `SignedPolicyBundle`, `EndpointPolicy`, `BundleVersion`, `IdentityScope`, `FreshnessLease`,
-  `ApplyOutcome`. **No crdb change is required by this IP** (min-change rule); if one proves necessary it
-  is flagged and justified, not assumed.
+  `ApplyOutcome`.
+- **crdb FD.0 `INV-FORGE-DTO-SCHEMA-EXPORTED` -- LANDED (crdb `8ac09d0e`).** Those types existed only in
+  the Rust crate: the vendored `wire-dto.schema.json` is the TRD-04a `QUERY_SUBMIT` contract and carries
+  none of them, so ForgeCentral had no TypeScript representation of the bundle it must compose and sign.
+  crdb now emits a separate `forge-dto.schema.json`, which FC vendors and generates from.
+
+  **This IP therefore DOES require one crdb change, contrary to the original scoping.** It was taken
+  deliberately rather than hand-authoring the types: a hand-copy of a cryptographically load-bearing
+  struct would sit outside the codegen drift gate, and combined with the field-order dependency below, a
+  future `cdb-types` reorder or field addition would break every signature silently with no gate in
+  either repo catching it. The change is export-only (no new fields, no engine logic, no wire byte, lock
+  count unchanged), which is what the min-change rule asks for: minimal and flagged, not avoided.
+
+  It also carries `x-fieldOrder` per struct. JSON Schema `properties` is an object that crdb's emitter
+  alphabetizes, so struct declaration order -- which the CBOR preimage binds -- would be lost; a JSON
+  array survives it. FC projects those arrays into `FORGE_FIELD_ORDER`, so a reorder upstream fails a
+  gated assertion instead of invalidating signatures in the field.
 - **`IP-CONSOLE-02-VTZ` -- COMPLETE.** `vtz.tree` / `vtz.detail` are live and are the only zone source.
 - **The ForgeCentral crypto sidecar** (`console-crypto-sidecar`, Rust + AWS-LC, already a gate step
   `[11]`) -- the home for the signing key and the ML-DSA-87 operation.
@@ -87,8 +102,12 @@ The result is still enforceable and still fail-closed. With `brokered` and `rest
 egress, and a zone permitting it produces one that allows direct ordinary egress. That is a real,
 verifiable disposition reaching a real endpoint.
 
-The eight domains with no v1 field (`PrivilegeEscalation`, `KernelModule`, `CredentialStore`,
-`Persistence`, `FileAndConfig`, `Memory`, `Ipc`, `Device`) must not be silently dropped -- and neither
+The NINE domains with no v1 field must not be silently dropped -- `GovernedEgress`,
+`PrivilegeEscalation`, `KernelModule`, `CredentialStore`, `Persistence`, `FileAndConfig`, `Memory`,
+`Ipc`, and `Device`. `GovernedEgress` belongs on that list for exactly the reason the mapping table
+gives: it reads as though it maps to `brokered` and does not. Only `OrdinaryNetwork` and `Execution`
+are expressible, so FD.1 derives the list as "every domain that is not one of those two" rather than
+hardcoding it, and the record cannot drift as the bundle learns new fields -- and neither
 must the four authored zone FIELDS with no v1 carrier (`micro_segmentation`, `telemetry`,
 `reauth_interval_hours`, `zone_type`), which are equally operator-visible in the VTZ surface.
 
@@ -158,8 +177,9 @@ FD.1 -> FD.2 -> FD.3 gate each other (compose before sign before serve). FD.4 ne
 FD.5 can start after FD.2 fixes the key shape and must land before FD.N. FD.6 is independent and may land
 any time after FD.1. FD.N closes the set.
 
-The first three touch **only ForgeCentral**. Torch is not modified until FD.4, and crdb is not modified at
-all.
+The first three touch **only ForgeCentral**, and torch is not modified until FD.4. crdb's single
+contribution is the FD.0 contract export recorded under Prerequisites, which landed before FD.1 and is
+export-only; no further crdb change is in scope.
 
 ## Acceptance
 
