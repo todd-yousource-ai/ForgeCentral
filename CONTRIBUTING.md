@@ -22,31 +22,24 @@ Read the standards in `docs/standards/` and the Console TRD suite in `docs/spec/
 The GitHub remote is `github-forgecentral` (`git@github-forgecentral:todd-yousource-ai/ForgeCentral.git`,
 a dedicated deploy key). Push local `main` and GitHub `main` together.
 
-### Private git dependencies (required for the sidecar Rust gate)
+### Private git dependency (required for the sidecar Rust gate)
 
-The sidecar git-depends on **Crucible** (`cdb-mtls`, `cdb-types`), and from FD.2 will also depend on
-**torch** (`torch-forge`, which owns the Forge bundle preimage). Each repo has its own SSH alias and
-deploy key. Committed `Cargo.toml` URLs are portable `https://`, so the mapping to the right key is local
-git config. Git resolves `insteadOf` by longest matching prefix, so the torch rule must be MORE SPECIFIC
-than the generic one or the torch fetch is sent to the Crucible key and fails:
+The sidecar git-depends on one private repo, **Crucible** (`cdb-mtls`, `cdb-types`, `cdb-artifact`).
+Committed `Cargo.toml` URLs are portable `https://`, so the mapping to the deploy key is local git config:
 
 ```bash
 git config --global url."ssh://git@github-crucible/todd-yousource-ai/".insteadOf \
     "https://github.com/todd-yousource-ai/"
-git config --global url."ssh://git@github-torch/todd-yousource-ai/torch.git".insteadOf \
-    "https://github.com/todd-yousource-ai/torch.git"
 ```
 
-Verify with `git ls-remote https://github.com/todd-yousource-ai/torch.git HEAD`, which must resolve.
+Every crdb edge in `sidecar/Cargo.toml` must name the SAME rev. Two revs of one repo are two distinct
+cargo sources, so a mismatch builds two copies of `cdb-types` into one process.
 
-Both crdb edges and torch's own crdb pin must name the SAME rev. Two revs of one repo are two distinct
-cargo sources, so a mismatch builds two copies of `cdb-types` into one process. When bumping either,
-bump both.
+In CI no alias is needed: the workflow rewrites github.com through `CRUCIBLE_TOKEN`.
 
-In CI no alias is needed: the workflow rewrites github.com through `CRUCIBLE_TOKEN`, and prefers an
-optional `TORCH_TOKEN` for the torch repo when one is set. The torch edge is currently backed out because
-neither credential could read torch, which turned the sidecar gate red on main; provision one before
-FD.2 restores the dependency.
+Note the sidecar does NOT depend on the torch repo. The Forge bundle preimage briefly lived there, which
+made this producer build the endpoint's repository to agree on what bytes a signature covers; it moved to
+`cdb-artifact`, where both sides already meet.
 
 ## Conventions
 

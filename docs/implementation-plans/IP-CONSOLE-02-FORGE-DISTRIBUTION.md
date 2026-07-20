@@ -72,12 +72,14 @@ the same way.
   array survives it. FC projects those arrays into `FORGE_FIELD_ORDER`, so a reorder upstream fails a
   gated assertion instead of invalidating signatures in the field.
 - **`IP-CONSOLE-02-VTZ` -- COMPLETE.** `vtz.tree` / `vtz.detail` are live and are the only zone source.
-- **A CI credential with torch read access -- MISSING, and it blocks FD.2.** FD.2 signs by calling
-  torch's own `bundle_preimage_bytes`, so the sidecar git-depends on the private torch repo. Both edges
-  landed and were then backed out: `CRUCIBLE_TOKEN` reads Crucible but 403s on torch, so the sidecar gate
-  went red on main. The mechanism is wired (`.github/workflows/ci.yml` prefers an optional `TORCH_TOKEN`
-  by longest-prefix matching, keeping each token scoped to one repo); only the secret is missing. The
-  seam gate that needs `cdb-types` alone stayed. Provision the credential before FD.2 restores the edge.
+- **crdb `INV-FORGE-PREIMAGE-SINGLE-DEFINITION` -- LANDED (crdb `d7c110b5`), and torch consumes it
+  (torch `95d6243`).** FD.2 signs `sha512(preimage)`, so the producer must compute the exact bytes the
+  endpoint verifies. That function was defined inside `torch-forge`, which meant the only way to agree
+  with the endpoint was to take a source dependency on the endpoint's repository -- and CI could not
+  fetch it, so the sidecar gate went red. It now lives in `cdb-artifact`, alongside the `sha512` and
+  ML-DSA-87 provider both sides already share, pinned to a conformance vector captured from torch's
+  implementation before the move. torch re-exports it. The producer therefore depends on ONE private
+  repo, needs no torch credential, and agrees with the endpoint structurally rather than by fixture.
 - **The ForgeCentral crypto sidecar** (`console-crypto-sidecar`, Rust + AWS-LC, already a gate step
   `[11]`) -- the home for the signing key and the ML-DSA-87 operation.
 
