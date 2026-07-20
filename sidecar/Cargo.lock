@@ -148,6 +148,7 @@ dependencies = [
 name = "console-crypto-sidecar"
 version = "0.0.0"
 dependencies = [
+ "aws-lc-rs",
  "cdb-artifact",
  "cdb-mtls",
  "cdb-types",
