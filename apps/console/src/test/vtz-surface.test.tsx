@@ -127,6 +127,11 @@ function stubFetch(opts: {
     if (input.startsWith('/api/overview/sankey')) {
       return Promise.resolve(jsonResponse(200, sankey));
     }
+    // The authoring view embeds the distribution panel (FD.7c); its convergence read is handled here
+    // so it never lands in the authoring-command `sent` log the assertions count.
+    if (input.startsWith('/api/vtz/convergence')) {
+      return Promise.resolve(jsonResponse(200, { hasBundle: false, version: 0, members: [] }));
+    }
     if (input.startsWith('/api/vtz')) {
       sent.push({
         url: input,
@@ -454,6 +459,9 @@ describe('the VTZ authoring editor (V2.5)', () => {
       }
       if (input.startsWith('/api/overview/sankey')) {
         return Promise.resolve(jsonResponse(200, sankey));
+      }
+      if (input.startsWith('/api/vtz/convergence')) {
+        return Promise.resolve(jsonResponse(200, { hasBundle: false, version: 0, members: [] }));
       }
       call += 1;
       return Promise.resolve(

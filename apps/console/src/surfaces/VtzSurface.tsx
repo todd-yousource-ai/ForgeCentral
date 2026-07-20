@@ -29,6 +29,7 @@ import { Badge, KpiCard, TabStrip, VtzZoneCard, type BadgeVariant } from '@forge
 import type { RiskLevel, VtzArchetype, VtzSpecInput, VtzZone } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { DistributionPanel } from './DistributionPanel.js';
 import { VtzEditor, type EditorFailure } from './VtzEditor.js';
 import { useVtzMutation, VtzCommandError } from './useVtzMutation.js';
 import { useVtzDetail, useVtzRiskBands, useVtzTree } from './useVtzTree.js';
@@ -134,24 +135,28 @@ function ZoneAuthoring({
     );
   }
   return (
-    <VtzEditor
-      // Remount on a zone change so the form initializes from the new zone with no state-sync effect.
-      key={zone.id}
-      mode="edit"
-      zone={zone}
-      parents={parents}
-      busy={mutation.isPending}
-      failure={failureOf(mutation.error)}
-      onSubmit={(spec: VtzSpecInput, moveTo: string | null) =>
-        mutation.mutate(
-          { kind: 'save', id: zone.id, spec, moveTo },
-          // A move lands the zone on a new id, so the surface follows it rather than holding a
-          // selection the store no longer has.
-          { onSuccess: (result) => onMoved(result.id) },
-        )
-      }
-      onDelete={() => mutation.mutate({ kind: 'delete', id: zone.id }, { onSuccess: onDeleted })}
-    />
+    <>
+      <VtzEditor
+        // Remount on a zone change so the form initializes from the new zone with no state-sync effect.
+        key={zone.id}
+        mode="edit"
+        zone={zone}
+        parents={parents}
+        busy={mutation.isPending}
+        failure={failureOf(mutation.error)}
+        onSubmit={(spec: VtzSpecInput, moveTo: string | null) =>
+          mutation.mutate(
+            { kind: 'save', id: zone.id, spec, moveTo },
+            // A move lands the zone on a new id, so the surface follows it rather than holding a
+            // selection the store no longer has.
+            { onSuccess: (result) => onMoved(result.id) },
+          )
+        }
+        onDelete={() => mutation.mutate({ kind: 'delete', id: zone.id }, { onSuccess: onDeleted })}
+      />
+      {/* The distribution ledger: where this zone's policy becomes enforceable on endpoints (FD.7c). */}
+      <DistributionPanel zoneId={zone.id} />
+    </>
   );
 }
 
