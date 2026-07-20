@@ -29,8 +29,8 @@ import { Badge, KpiCard, TabStrip, VtzZoneCard, type BadgeVariant } from '@forge
 import type { RiskLevel, VtzArchetype, VtzSpecInput, VtzZone } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { VtzEditor } from './VtzEditor.js';
-import { useVtzMutation, VtzCommandError, type VtzCommandFailure } from './useVtzMutation.js';
+import { VtzEditor, type EditorFailure } from './VtzEditor.js';
+import { useVtzMutation, VtzCommandError } from './useVtzMutation.js';
 import { useVtzDetail, useVtzRiskBands, useVtzTree } from './useVtzTree.js';
 
 /**
@@ -86,9 +86,12 @@ export function matchZones(zones: readonly VtzZone[], search: string): readonly 
 }
 
 /** The typed failure of the last command, or null when it was not one the Console classified. */
-function failureOf(error: Error | null): VtzCommandFailure | null {
+function failureOf(error: Error | null): EditorFailure | null {
   if (error === null) return null;
-  return error instanceof VtzCommandError ? error.failure : 'unavailable';
+  if (error instanceof VtzCommandError) {
+    return { kind: error.failure, settingsCommitted: error.settingsCommitted };
+  }
+  return { kind: 'unavailable', settingsCommitted: false };
 }
 
 /**
@@ -139,10 +142,11 @@ function ZoneAuthoring({
       parents={parents}
       busy={mutation.isPending}
       failure={failureOf(mutation.error)}
-      onSubmit={(spec: VtzSpecInput) => mutation.mutate({ kind: 'edit', id: zone.id, spec })}
-      onRescope={(newName) =>
+      onSubmit={(spec: VtzSpecInput, moveTo: string | null) =>
         mutation.mutate(
-          { kind: 'rescope', id: zone.id, newName },
+          { kind: 'save', id: zone.id, spec, moveTo },
+          // A move lands the zone on a new id, so the surface follows it rather than holding a
+          // selection the store no longer has.
           { onSuccess: (result) => onMoved(result.id) },
         )
       }

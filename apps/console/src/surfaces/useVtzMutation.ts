@@ -32,9 +32,19 @@ export type VtzCommandFailure =
   /** Anything else (transport, timeout, an engine error the Console cannot classify). */
   | 'unavailable';
 
-/** An authoring command that did not commit. Nothing was written. */
+/**
+ * An authoring command that did not commit.
+ *
+ * `settingsCommitted` is the one case where something DID reach the store: a Save that both changed the
+ * zone settings and moved the zone runs two audited engine verbs (there is no combined one), so an edit
+ * that commits followed by a refused move leaves the settings written and the zone where it was. The
+ * operator is told exactly that rather than "nothing was committed", which would be a lie.
+ */
 export class VtzCommandError extends Error {
-  constructor(readonly failure: VtzCommandFailure) {
+  constructor(
+    readonly failure: VtzCommandFailure,
+    readonly settingsCommitted = false,
+  ) {
     super(`the zone command did not commit (${failure})`);
     this.name = 'VtzCommandError';
   }
@@ -70,26 +80,54 @@ async function send(
   return (await res.json()) as VtzMutationResult;
 }
 
-/** The authoring command to run. Each maps to one audited engine verb. */
+/**
+ * The authoring command to run.
+ *
+ * `save` is the operator's single act of configuring a zone, and it is the only one that may run more than
+ * one engine verb: the zone's dotted name IS its place in the hierarchy, so changing the parent moves the
+ * zone (`vtz.rescope`) while changing anything else edits it (`vtz.edit`). The operator authors one form
+ * and confirms once; the Console does not make them perform the engine's decomposition by hand.
+ */
 export type VtzCommand =
   | { readonly kind: 'create'; readonly spec: VtzSpecInput }
-  | { readonly kind: 'edit'; readonly id: string; readonly spec: VtzSpecInput }
-  | { readonly kind: 'rescope'; readonly id: string; readonly newName: string }
+  | {
+      readonly kind: 'save';
+      readonly id: string;
+      readonly spec: VtzSpecInput;
+      /** The dotted name to move to, or null to leave the zone where it is. */
+      readonly moveTo: string | null;
+    }
   | { readonly kind: 'delete'; readonly id: string };
 
-/** Run one authoring command against its route. */
-export function runVtzCommand(command: VtzCommand): Promise<VtzMutationResult> {
+/**
+ * Run one authoring command against its route.
+ *
+ * A `save` that also moves commits the settings FIRST and then the move: `vtz.rescope` carries the stored
+ * record forward to the new name, so editing first means the moved zone arrives with the operator's new
+ * settings. The reverse order would edit a zone id that no longer exists.
+ */
+export async function runVtzCommand(command: VtzCommand): Promise<VtzMutationResult> {
   if (command.kind === 'create') {
     return send('/api/vtz', 'POST', command.spec);
   }
   const id = encodeURIComponent(command.id);
-  if (command.kind === 'edit') {
-    return send(`/api/vtz/${id}`, 'PUT', command.spec);
+  if (command.kind === 'delete') {
+    return send(`/api/vtz/${id}`, 'DELETE');
   }
-  if (command.kind === 'rescope') {
-    return send(`/api/vtz/${id}/rescope`, 'POST', { newName: command.newName });
+  const edited = await send(`/api/vtz/${id}`, 'PUT', command.spec);
+  if (command.moveTo === null) {
+    return edited;
   }
-  return send(`/api/vtz/${id}`, 'DELETE');
+  try {
+    return await send(`/api/vtz/${id}/rescope`, 'POST', { newName: command.moveTo });
+  } catch (error) {
+    // The settings are already on the audit chain; only the move was refused. Re-throw carrying that
+    // fact so the operator is not told nothing happened.
+    if (error instanceof VtzCommandError) {
+      throw new VtzCommandError(error.failure, true);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -107,7 +145,7 @@ export function useVtzMutation(): UseMutationResult<VtzMutationResult, Error, Vt
       void queryClient.invalidateQueries({ queryKey: ['vtzTree'] });
       void queryClient.invalidateQueries({ queryKey: vtzDetailQueryKey(result.id) });
       if (command.kind !== 'create') {
-        // A re-scope moves the zone to a new id, so the OLD detail entry is stale too.
+        // A save that moved the zone lands it on a new id, so the OLD detail entry is stale too.
         void queryClient.invalidateQueries({ queryKey: vtzDetailQueryKey(command.id) });
       }
     },
