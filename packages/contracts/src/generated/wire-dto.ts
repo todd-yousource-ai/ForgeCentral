@@ -66,6 +66,17 @@ export interface WireBundleCommitted {
   version: number;
 }
 
+export interface WireBundleConvergence {
+  has_bundle: boolean;
+  members: Array<WireConvergenceMember>;
+  version: number;
+}
+
+export interface WireBundleConvergenceQuery {
+  request_id: number;
+  vtz_id: string;
+}
+
 export interface WireBundleDelivered {
   bundle?: Array<number> | null;
   version: number;
@@ -74,6 +85,17 @@ export interface WireBundleDelivered {
 export interface WireBundleFetch {
   have?: number | null;
   request_id: number;
+}
+
+export interface WireBundleReport {
+  rejected_reason?: string | null;
+  request_id: number;
+  version: number;
+  vtz_id: string;
+}
+
+export interface WireBundleReported {
+  commit_version: number;
 }
 
 export interface WireClassUsage {
@@ -145,6 +167,12 @@ export interface WireContainEffect {
   action: Action;
   enforcement_active: boolean;
   summary: string;
+}
+
+export interface WireConvergenceMember {
+  endpoint_cn: string;
+  reason?: string | null;
+  state: string;
 }
 
 export interface WireDecision {
@@ -316,6 +344,8 @@ export type WireReply =
   | { MemberList: WireMemberList; }
   | { BundleCommitted: WireBundleCommitted; }
   | { BundleDelivered: WireBundleDelivered; }
+  | { BundleReported: WireBundleReported; }
+  | { BundleConvergence: WireBundleConvergence; }
   | { UsageOverview: WireUsageOverviewResult; }
   | { VtzTree: WireVtzTree; }
   | { VtzDetail: WireVtzDetail; }
@@ -349,7 +379,9 @@ export type WireRequest =
   | { VtzRescope: WireVtzRescope; }
   | { VtzDelete: WireVtzDelete; }
   | { BundleCommit: WireBundleCommit; }
-  | { BundleFetch: WireBundleFetch; };
+  | { BundleFetch: WireBundleFetch; }
+  | { BundleReport: WireBundleReport; }
+  | { BundleConvergence: WireBundleConvergenceQuery; };
 
 export interface WireRiskBand {
   candidate: number;

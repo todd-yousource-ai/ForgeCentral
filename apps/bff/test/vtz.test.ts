@@ -14,6 +14,7 @@ import type {
   WireVtzEdit,
   WireVtzMutation,
   WireVtzRescope,
+  WireBundleConvergence,
   WireVtzTree,
   WireVtzTreeQuery,
 } from '@forge/contracts';
@@ -29,6 +30,7 @@ import {
   classifyVtzRefusal,
   resolveVtzCreate,
   resolveVtzDelete,
+  resolveBundleConvergence,
   resolveVtzDetail,
   resolveVtzEdit,
   resolveVtzRescope,
@@ -73,7 +75,11 @@ const zone = (overrides: Record<string, unknown> = {}) => ({
 });
 
 /** A mock OperatorEngine whose VTZ reads are scripted and which captures the wire requests it saw. */
-function engineWith(replies: { tree?: WireVtzTree; detail?: WireVtzDetail }): {
+function engineWith(replies: {
+  tree?: WireVtzTree;
+  detail?: WireVtzDetail;
+  convergence?: WireBundleConvergence;
+}): {
   engine: OperatorEngine;
   trees: WireVtzTreeQuery[];
   details: WireVtzDetailQuery[];
@@ -104,6 +110,8 @@ function engineWith(replies: { tree?: WireVtzTree; detail?: WireVtzDetail }): {
     },
     vtzCreate: unused,
     bundleCommit: unused,
+    bundleConvergence: () =>
+      replies.convergence ? Promise.resolve(replies.convergence) : unused(),
     vtzEdit: unused,
     vtzRescope: unused,
     vtzDelete: unused,
@@ -264,6 +272,7 @@ function mutatingEngine(reply: WireVtzMutation | Error): {
     vtzTree: unused,
     vtzDetail: unused,
     bundleCommit: unused,
+    bundleConvergence: unused,
     vtzCreate: (_p, request) => {
       creates.push(request);
       return settle();
@@ -283,6 +292,40 @@ function mutatingEngine(reply: WireVtzMutation | Error): {
   };
   return { engine, creates, edits, rescopes, deletes };
 }
+
+describe('resolveBundleConvergence (FD.7c)', () => {
+  it('projects the convergence, carrying the rejected reason', async () => {
+    const { engine } = engineWith({
+      convergence: {
+        has_bundle: true,
+        version: 7,
+        members: [
+          { endpoint_cn: 'a.box', state: 'applied' },
+          { endpoint_cn: 'b.box', state: 'rejected', reason: 'StaleLease' },
+        ],
+      },
+    });
+    const view = await resolveBundleConvergence(engine, principal, 'YouSource.Corp');
+    expect(view.hasBundle).toBe(true);
+    expect(view.members).toEqual([
+      { endpointCn: 'a.box', state: 'applied', reason: null },
+      { endpointCn: 'b.box', state: 'rejected', reason: 'StaleLease' },
+    ]);
+  });
+
+  it('surfaces unavailable when the engine returns a state the Console cannot render', async () => {
+    const { engine } = engineWith({
+      convergence: {
+        has_bundle: true,
+        version: 1,
+        members: [{ endpoint_cn: 'x', state: 'pending' }],
+      },
+    });
+    await expect(resolveBundleConvergence(engine, principal, 'Z')).rejects.toBeInstanceOf(
+      VtzUnavailableError,
+    );
+  });
+});
 
 describe('classifyVtzRefusal (the engine refusal taxonomy)', () => {
   it('maps the two classes crdb emits and nothing else', () => {

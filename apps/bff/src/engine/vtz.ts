@@ -14,12 +14,20 @@
 // {@link VtzUnavailableError} rather than rendering a zone whose posture it had to guess. On a governance
 // surface a mis-rendered posture is a security-relevant lie, so the route reports unavailability instead.
 
-import { toVtzDetail, toVtzMutation, toVtzTree, toWireVtzSpec } from '@forge/contracts';
+import {
+  toBundleConvergence,
+  toVtzDetail,
+  toVtzMutation,
+  toVtzTree,
+  toWireVtzSpec,
+} from '@forge/contracts';
 import type {
   VtzDetailView,
   VtzMutationResult,
   VtzSpecInput,
   VtzTree,
+  BundleConvergenceView,
+  WireBundleConvergenceQuery,
   WireVtzDetailQuery,
   WireVtzTreeQuery,
 } from '@forge/contracts';
@@ -92,6 +100,26 @@ export async function resolveVtzDetail(
     vtz_id: id,
   };
   const view = toVtzDetail(await engine.vtzDetail(principal, request, opts));
+  if (view === null) {
+    throw new VtzUnavailableError();
+  }
+  return view;
+}
+
+/**
+ * Read a zone bundle's endpoint convergence (BUNDLE_CONVERGENCE, FD.7c): which endpoints have the
+ * zone's newest bundle and which do not. A tenant-scoped read; the engine projects the delta over the
+ * stored bundle's scope. A shape the Console cannot render honestly (an unknown state) surfaces as
+ * unavailable rather than a guessed convergence.
+ */
+export async function resolveBundleConvergence(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  id: string,
+  opts?: EngineCallOptions,
+): Promise<BundleConvergenceView> {
+  const request: WireBundleConvergenceQuery = { request_id: 0, vtz_id: id };
+  const view = toBundleConvergence(await engine.bundleConvergence(principal, request, opts));
   if (view === null) {
     throw new VtzUnavailableError();
   }

@@ -178,3 +178,61 @@ export function composeEndpointPolicy(zone: VtzZone): ComposedEndpointPolicy {
     unexpressedFields: UNEXPRESSIBLE_ZONE_FIELDS,
   };
 }
+
+// -- FD.7c: the distribution convergence ledger (a projection over BUNDLE_CONVERGENCE) ----------------
+
+import type { WireBundleConvergence } from './generated/wire-dto.js';
+
+/**
+ * One endpoint's convergence state for a zone's newest bundle. The three states an operator must tell
+ * apart -- applied, rejected (with a typed reason), or silent (no confirmation). `silent` is never
+ * read as converged: absence of evidence is not delivery.
+ */
+export type EndpointConvergenceState = 'applied' | 'rejected' | 'silent';
+
+/** The wire state tags this projection accepts; an unknown tag fails the projection closed. */
+const CONVERGENCE_STATES: readonly EndpointConvergenceState[] = ['applied', 'rejected', 'silent'];
+
+/** One scope member with its convergence state, projected from a `WireConvergenceMember`. */
+export interface ConvergenceMemberView {
+  readonly endpointCn: string;
+  readonly state: EndpointConvergenceState;
+  /** The `ApplyError` variant name for a `rejected` state; `null` otherwise. Never a generic "failed". */
+  readonly reason: string | null;
+}
+
+/**
+ * A zone bundle's convergence, projected from `BUNDLE_CONVERGENCE`. `hasBundle` is false when no bundle
+ * has been distributed for the zone (then `members` is empty) -- the honest "nothing to converge on"
+ * state, distinct from a bundle every endpoint is silent about.
+ */
+export interface BundleConvergenceView {
+  readonly hasBundle: boolean;
+  readonly version: number;
+  readonly members: readonly ConvergenceMemberView[];
+}
+
+/**
+ * Project a `WireBundleConvergence` to the view model. Fail-closed: an unknown member state, or a
+ * `rejected` member with no reason, collapses the whole projection to `null` (the resolver then
+ * surfaces unavailability rather than rendering a mislabelled convergence state on a governance
+ * surface). A `rejected` state MUST carry its reason; `applied`/`silent` MUST NOT.
+ */
+export function toBundleConvergence(reply: WireBundleConvergence): BundleConvergenceView | null {
+  const members: ConvergenceMemberView[] = [];
+  for (const member of reply.members) {
+    const state = CONVERGENCE_STATES.find((s) => s === member.state);
+    if (state === undefined) {
+      return null;
+    }
+    const reason = member.reason ?? null;
+    if (state === 'rejected' && reason === null) {
+      return null;
+    }
+    if (state !== 'rejected' && reason !== null) {
+      return null;
+    }
+    members.push({ endpointCn: member.endpoint_cn, state, reason });
+  }
+  return { hasBundle: reply.has_bundle, version: reply.version, members };
+}

@@ -28,6 +28,8 @@ import type {
   WireQuerySubmit,
   WireBundleCommit,
   WireBundleCommitted,
+  WireBundleConvergence,
+  WireBundleConvergenceQuery,
   WireVtzCreate,
   WireVtzDelete,
   WireVtzDetail,
@@ -107,6 +109,11 @@ export interface CrucibleClient {
    * refuses rather than silently correcting. */
   /** Commit a signed policy bundle for carriage (BUNDLE_COMMIT, FD.2). Audited engine-side. */
   bundleCommit(request: WireBundleCommit, opts?: EngineCallOptions): Promise<WireBundleCommitted>;
+  /** Read a zone bundle's endpoint convergence (BUNDLE_CONVERGENCE, FD.7c). Tenant-scoped read. */
+  bundleConvergence(
+    request: WireBundleConvergenceQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireBundleConvergence>;
   vtzCreate(request: WireVtzCreate, opts?: EngineCallOptions): Promise<WireVtzMutation>;
   /** Edit a zone's own postures + settings, incl. the draft -> published transition (VTZ_EDIT). Audited. */
   vtzEdit(request: WireVtzEdit, opts?: EngineCallOptions): Promise<WireVtzMutation>;
