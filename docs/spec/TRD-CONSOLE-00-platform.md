@@ -125,6 +125,35 @@ introduced (`TypeScript_Dev_Rules.md` Section 7.1).
   operational (session store if not stateless-JWT, rate-limit counters, the ephemeral cache) -- never
   domain data.
 
+### 2.5 The Console is the Forge composition and distribution plane (INV-CONSOLE-FORGE-SIGNED-AT-SOURCE)
+
+The Console **is** 1Source: the Forge composition and distribution plane. Forge's TRD-32 Section 1.3
+split is "1Source AUTHORS policy per VTZ, Forge composes and distributes it, Torch's per-OS VTZ
+realizes it", and the platform boundary records 1Source == the Console -- so the Console composes an
+operator's authored trust zone into a flat `EndpointPolicy`, signs it into a `SignedPolicyBundle`, and
+distributes it to Torch endpoints. This is the ONE exception to "the Console originates nothing": it
+originates no durable domain *state* (that is still Crucible's, Section 2.1), but it does originate the
+**policy bundle signature**, and it is the sole holder of the Forge signing key.
+
+The role is realized so that it changes none of the invariants above:
+
+- **The signing key lives in the crypto sidecar (Section 8.5), never the TypeScript tier.** The BFF
+  composes the bundle's unsigned parts and receives the assembled signed bundle; the seed is generated
+  by the sidecar on first install and only its public half (the `DistributionAnchor`) ever leaves the
+  box. An endpoint that verifies a bundle is verifying the Console's signature, and nothing else can
+  produce one.
+- **Crucible remains the system of record and the carrier.** Zone *definitions* live in Crucible
+  (`TRD-CONSOLE-02`); a signed bundle is committed to Crucible as opaque signed bytes and fetched by
+  the endpoint over its existing `:7878` seam. Crucible stores and serves the bundle but can neither
+  author nor alter it -- a mutation in carriage breaks the bundle's own signature at the endpoint. The
+  Console adds no distribution listener of its own.
+- **The composition is deterministic and audited.** The bundle version derives from the Crucible commit
+  version of the zone read (so replicas agree and an unchanged zone re-composes to an equal version),
+  and what the v1 bundle cannot express is recorded, never dropped.
+
+Enforcement stays OFF (`IP-TORCH-VTZ-ENFORCE`): an applied bundle realizes nothing on a device until
+enforcement is separately engaged.
+
 ---
 
 ## 3. Terminology map (trust-era mock -> AI-native platform)
@@ -432,6 +461,11 @@ the platform's CNSA 2.0 / FIPS posture.
   freshness and an explicit staleness indicator on lag; they are not silent polled snapshots.
 - **INV-CONSOLE-AUDITED.** Every Console-originated mutation commits through the engine's atomic batch +
   hash-chained audit; the operator identity is on the audit entry.
+- **INV-CONSOLE-FORGE-SIGNED-AT-SOURCE.** The Console is the Forge composition/distribution plane
+  (Section 2.5) and the sole holder of the Forge signing key, held in the crypto sidecar and never in
+  the TypeScript tier. Every policy bundle an endpoint accepts was composed from the live Crucible zone
+  store and signed by that key; Crucible carries the signed bytes but can neither author nor alter
+  them, and a carrier that relays a bundle cannot forge one.
 
 ---
 

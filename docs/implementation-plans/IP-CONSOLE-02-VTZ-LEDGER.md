@@ -49,3 +49,11 @@ as the historical record of what each step proved at the time, and this section 
 (the e2e count moved 15 -> 16: the re-scope journey became a move-within-Save journey plus a new
 has-sub-zones refusal). The named cross-repo gaps are unchanged: `WireVtzTreeNode` still carries no
 `description`, and the four VTZ verbs still carry no `command_id`.
+
+## Where these zones become enforceable
+
+A published VTZ is the policy EDGE; it is composed, signed, and distributed to endpoints by
+`IP-CONSOLE-02-FORGE-DISTRIBUTION` (the Forge composition/distribution plane, `TRD-CONSOLE-00`
+Section 2.5). The read verbs this IP landed (`vtz.tree` / `vtz.detail`) are that producer's only
+composition input, and `VtzDetail`'s `commit_version` is the bundle's monotonic version clock. Enforcement
+of a distributed bundle stays OFF until `IP-TORCH-VTZ-ENFORCE` is engaged.
