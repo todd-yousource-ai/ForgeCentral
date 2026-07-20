@@ -33,23 +33,27 @@ cdb-mtls = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d
 # NOTE: keep this rev aligned with the [dev-dependencies] crdb edges below. Two revs of one repo are two
 # distinct cargo sources, so a mismatch builds two copies of cdb-types into one process.
 
+# The Forge bundle signer (FD.2). cdb-artifact carries `bundle_preimage_bytes` -- the one implementation
+# the endpoint also verifies with, so producer and verifier agree structurally rather than by fixture --
+# plus sha512 and the ML-DSA-87 signer. It used to live in torch-forge, which forced this producer to
+# build the endpoint's repository just to agree on what bytes a signature covers, and CI could not fetch
+# it; moving it to cdb-artifact left this tier depending on ONE private repo.
+#
+# The seam test also pins these cdb-types shapes against the vendored forge-dto schema
+# (INV-CONSOLE-FORGE-CONTRACT-SEAM-GATED): the TypeScript half is generated from a schema copied off
+# crdb main, and nothing else compares the two.
+#
+# Keep every crdb rev here identical: two revs of one repo are two distinct cargo sources, so a mismatch
+# builds two copies of cdb-types into one process.
+cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d7c110b56f8859fd84c876877c1e12db6102c08c" }
+cdb-artifact = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d7c110b56f8859fd84c876877c1e12db6102c08c" }
+# The CSPRNG for seed generation, and the same FIPS-track provider cdb-artifact signs with. Already
+# resolved transitively via cdb-artifact, so naming it direct does not add a package to the graph.
+aws-lc-rs = "1.17"
 [dev-dependencies]
 # Test-only: mint a throwaway P-384 leaf so the terminator's floor + the engine leg can be proven against
 # real rustls clients. The runtime crate never mints certs (the installer provisions the leaves).
 rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
-# The Forge contract seam (INV-CONSOLE-FORGE-CONTRACT-SEAM-GATED). The bundle this sidecar signs in FD.2
-# is typed by cdb-types, but the TypeScript half is generated from the vendored forge-dto schema, and the
-# two can arrive from different crdb revs: this edge pins one, while packages/contracts/schema is copied
-# from crdb main. Nothing else compares them, so a forge.rs change between revs would diverge the
-# producer's Rust from its own TypeScript silently. The seam test closes that.
-#
-# cdb-artifact carries the signed bundle preimage and the ML-DSA-87 provider. It used to live in
-# torch-forge, which forced this producer to build the endpoint's repository just to agree on what bytes
-# a signature covers -- and CI could not fetch it. It moved to cdb-artifact (crdb d7c110b5), where both
-# sides already meet, so this tier now depends on ONE private repo and the endpoint imports the same
-# implementation. These move to [dependencies] when the signing module lands.
-cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d7c110b56f8859fd84c876877c1e12db6102c08c" }
-cdb-artifact = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d7c110b56f8859fd84c876877c1e12db6102c08c" }
 # The seam test builds a PolicyVersionRef, whose PolicyId wraps a Uuid. Already resolved transitively
 # via cdb-types, so naming it here does not add a package to the graph.
 uuid = "1"
