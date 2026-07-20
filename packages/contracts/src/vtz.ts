@@ -156,6 +156,12 @@ export interface VtzAncestorRef {
 export interface VtzDetailView {
   readonly zone: VtzZone | null;
   readonly ancestors: readonly VtzAncestorRef[];
+  /**
+   * The committed store version this read observed (FD.2 finding 2): the system of record's own
+   * commit counter, from which the policy-bundle producer derives `BundleVersion`. Unchanged zones
+   * re-read to an equal value; a zone edit strictly advances it.
+   */
+  readonly commitVersion: number;
 }
 
 /**
@@ -306,6 +312,7 @@ export function toVtzDetail(reply: WireVtzDetail): VtzDetailView | null {
       id: vtzId(ancestor.id),
       name: ancestor.name,
     })),
+    commitVersion: reply.commit_version,
   };
 }
 

@@ -194,6 +194,102 @@
       ],
       "type": "object"
     },
+    "WireBundleCommit": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "bundle"
+      ],
+      "type": "object"
+    },
+    "WireBundleCommitted": {
+      "additionalProperties": false,
+      "properties": {
+        "commit_version": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "commit_version"
+      ],
+      "type": "object"
+    },
+    "WireBundleDelivered": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle": {
+          "oneOf": [
+            {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
+    },
+    "WireBundleFetch": {
+      "additionalProperties": false,
+      "properties": {
+        "have": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
     "WireClassUsage": {
       "additionalProperties": false,
       "properties": {
@@ -1542,6 +1638,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "BundleCommitted": {
+              "$ref": "#/$defs/WireBundleCommitted"
+            }
+          },
+          "required": [
+            "BundleCommitted"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "BundleDelivered": {
+              "$ref": "#/$defs/WireBundleDelivered"
+            }
+          },
+          "required": [
+            "BundleDelivered"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "UsageOverview": {
               "$ref": "#/$defs/WireUsageOverviewResult"
             }
@@ -2057,6 +2177,30 @@
             "VtzDelete"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "BundleCommit": {
+              "$ref": "#/$defs/WireBundleCommit"
+            }
+          },
+          "required": [
+            "BundleCommit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "BundleFetch": {
+              "$ref": "#/$defs/WireBundleFetch"
+            }
+          },
+          "required": [
+            "BundleFetch"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -2459,6 +2603,9 @@
           },
           "type": "array"
         },
+        "commit_version": {
+          "type": "integer"
+        },
         "zone": {
           "oneOf": [
             {
@@ -2471,7 +2618,8 @@
         }
       },
       "required": [
-        "ancestors"
+        "ancestors",
+        "commit_version"
       ],
       "type": "object"
     },

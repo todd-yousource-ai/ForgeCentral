@@ -126,7 +126,7 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
     vtzDetail: (req) => {
       calls.push('vtzDetail');
       reads.push(req);
-      return Promise.resolve({ zone: null, ancestors: [] });
+      return Promise.resolve({ zone: null, ancestors: [], commit_version: 7 });
     },
     vtzCreate: (req) => {
       calls.push('vtzCreate');

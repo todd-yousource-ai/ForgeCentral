@@ -185,6 +185,7 @@ describe('resolveVtzDetail (V2.2)', () => {
           { id: 'YouSource', name: 'YouSource' },
           { id: 'YouSource.Corp', name: 'YouSource.Corp' },
         ],
+        commit_version: 42,
       },
     });
     const view = await resolveVtzDetail(engine, principal, 'YouSource.Corp.Finance');
@@ -195,14 +196,14 @@ describe('resolveVtzDetail (V2.2)', () => {
   });
 
   it('treats an unknown zone id as the honest not-found state, not an error', async () => {
-    const { engine } = engineWith({ detail: { zone: null, ancestors: [] } });
+    const { engine } = engineWith({ detail: { zone: null, ancestors: [], commit_version: 7 } });
     const view = await resolveVtzDetail(engine, principal, 'No.Such.Zone');
-    expect(view).toEqual({ zone: null, ancestors: [] });
+    expect(view).toEqual({ zone: null, ancestors: [], commitVersion: 7 });
   });
 
   it('fails CLOSED when a PRESENT zone carries an unknown enum tag', async () => {
     const { engine } = engineWith({
-      detail: { zone: zone({ lifecycle: 'archived' }), ancestors: [] },
+      detail: { zone: zone({ lifecycle: 'archived' }), ancestors: [], commit_version: 7 },
     });
     await expect(resolveVtzDetail(engine, principal, 'YouSource.Corp')).rejects.toBeInstanceOf(
       VtzUnavailableError,
