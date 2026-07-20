@@ -169,13 +169,15 @@ deliverable (FD.5), not a side effect of the TLS choice.
 | FD.4 | `INV-TORCH-FORGE-TRANSPORT-REAL` (torch) | torch: the concrete `ForgeDistribution` impl over the FC listener, replacing the fixture transport, plus its config (endpoint address, anchor path). Closes FG1.7's deferred-live transport. Tier 2 against a local FC listener; the live leg folds into FD.N. **Torch's verify/apply path is untouched** -- this step supplies a transport, nothing else. |
 | FD.5 | `INV-CONSOLE-FORGE-ANCHOR-PROVISIONED` | Provisioning, in installer code and not by hand (the live-stitching rule): the sidecar's signing keypair generated at install, the `DistributionAnchor` (public half) delivered to endpoints at enrollment, the Wire-CA-issued listener cert issued, and the ZTP intermediate added to the listener's client-trust set. Must survive the daily ZTP rotation -- the endpoint's 24h leaf changes under the anchor, and the anchor does not rotate with it. Idempotent re-run; a missing anchor fails the install loudly rather than starting an unverifiable plane. |
 | FD.6 | (docs) | `TRD-CONSOLE-00` amendment naming ForgeCentral as the Forge composition/distribution plane, resolving the SPEC GAP above; `IP-CONSOLE-02-VTZ-LEDGER` cross-reference so the VTZ IP points at where its zones become enforceable. Docs-only, scoped separately from code. |
+| FD.7 | `INV-CONSOLE-FORGE-CONVERGENCE-VISIBLE` | The distribution convergence ledger: for any bundle, which endpoints have acknowledged it and which have not, as a **projection** and never a Console-held table (`INV-CONSOLE-NO-2ND-DB`). The numerator already exists as durable fact: torch FG1.10 (LANDED) emits a typed, payload-free, GCI-attributed `ForgeAudit::Apply` fact for every apply AND every rejection onto the TRD-21 advisory path, so no outcome is silent (R-FRG-25/52). The denominator is the bundle's own `IdentityScope` members, which FD.2 authored -- so this needs no endpoint inventory, unlike push. The ledger is the delta, per bundle version, with the typed `ApplyError` carried through for a rejection rather than collapsed to "failed". Surfaces the three states an operator must tell apart: acknowledged-applied, acknowledged-rejected (with the reason), and silent. Tier 2: an endpoint that reports `Applied` leaves the not-converged set and one that reports `Rejected` does not. Tier 3: an endpoint that reports nothing is rendered as silent, never as converged -- the fail-closed reading, since absence of evidence is not delivery. |
 | FD.N | `INV-CONSOLE-FORGE-LIVE` | Live capstone on the node: author a zone in the Console -> compose -> sign -> torchd pulls over the real seam -> verifies -> applies -> reports the outcome -> the Console shows it. Enforcement stays OFF, so the proof is that the *policy plane* is real end to end, not that anything is enforced. Requires a fresh ZTP enrollment (the leaf expires daily). |
 
 ## Sequencing
 
 FD.1 -> FD.2 -> FD.3 gate each other (compose before sign before serve). FD.4 needs FD.3's listener.
 FD.5 can start after FD.2 fixes the key shape and must land before FD.N. FD.6 is independent and may land
-any time after FD.1. FD.N closes the set.
+any time after FD.1. FD.7 needs FD.3 (the `report_apply` path) and FD.2 (the `IdentityScope` it counts
+against). FD.N closes the set.
 
 The first three touch **only ForgeCentral**, and torch is not modified until FD.4. crdb's single
 contribution is the FD.0 contract export recorded under Prerequisites, which landed before FD.1 and is
@@ -205,5 +207,17 @@ export-only; no further crdb change is in scope.
 - **Enforcement.** AG.7-OFF. Realizing an applied bundle as OS controls is `IP-TORCH-VTZ-ENFORCE`.
 - **Policy authoring beyond zones.** The rules an operator writes *against* a zone are `TRD-CONSOLE-05`
   (Policies). This IP distributes the zone disposition, not the rule set.
-- **Push.** Only `pull` is built (plus `receive_pushed`, which torch already has). Server-initiated push
-  is a later step once the endpoint inventory exists.
+- **Push, and with it server-driven retry.** Only `pull` is built (plus `receive_pushed`, which torch
+  already has). Server-initiated push is a later step once the endpoint inventory exists.
+
+  This is also the honest answer to "retry until the policy update goes through". In a pull model the
+  producer sends nothing, so it has nothing to retry: convergence is driven by the endpoint's own
+  `ForgeDistributionClient::refresh` loop, and an endpoint that never receives an update does not drift
+  on stale policy -- its freshness lease expires and it **fails closed** (R-FRG-24). That is a stronger
+  property than a delivery queue, and it is already built. FD.7 therefore makes non-convergence VISIBLE
+  rather than driving delivery.
+
+  A true server-initiated push with a durable retry queue is a separate step with two hard gates: the
+  endpoint inventory (the set of endpoints expected to hold a bundle, absent today), and a durable home
+  for the queue. That home cannot be ForgeCentral -- retry state is durable domain data and
+  `INV-CONSOLE-NO-2ND-DB` forbids it -- so it needs a crdb substrate, which is not built.
