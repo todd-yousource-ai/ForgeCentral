@@ -43,6 +43,8 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     ping,
     querySubmit: unused,
     listAgents: unused,
+    listPrincipals: unused,
+    listGroups: unused,
     entityDecisions: unused,
     entityConnections: unused,
     connectivityGraph: unused,
@@ -84,6 +86,8 @@ function authRouterWith(session: OperatorSession | undefined): AuthRouter {
 function operatorEngineWith(): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   return {
+    listPrincipals: unused,
+    listGroups: unused,
     querySubmit: () =>
       Promise.resolve({
         rows: [

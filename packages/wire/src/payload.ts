@@ -10,6 +10,8 @@ import type {
   OperatorDelegation,
   WireBundleCommit,
   WireBundleConvergenceQuery,
+  WireListGroups,
+  WireListPrincipals,
   WireConnectivityMembers,
   WireConnectivityQuery,
   WireEntityConnections,
@@ -69,6 +71,17 @@ function submitToCbor(submit: WireQuerySubmit): unknown {
 
 /** The agent-directory read (LIST_AGENTS, crdb ER.1). Fields in Rust struct order: request_id, operator. */
 function listAgentsToCbor(request: WireListAgents): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * The LUG principal/group directory reads (LIST_PRINCIPALS / LIST_GROUPS, crdb ER.6). Rust struct
+ * order: request_id, then the optional operator (omitted when absent, byte-identical to a
+ * non-delegating client).
+ */
+function directoryReadToCbor(request: WireListPrincipals | WireListGroups): unknown {
   const out: Record<string, unknown> = { request_id: request.request_id };
   applyOperator(out, request.operator);
   return out;
@@ -292,6 +305,11 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
     return encode({ SubmitMemoryWrite: submitToCbor(request.SubmitMemoryWrite) });
   }
   if ('ListAgents' in request) return encode({ ListAgents: listAgentsToCbor(request.ListAgents) });
+  if ('ListPrincipals' in request) {
+    return encode({ ListPrincipals: directoryReadToCbor(request.ListPrincipals) });
+  }
+  if ('ListGroups' in request)
+    return encode({ ListGroups: directoryReadToCbor(request.ListGroups) });
   if ('EntityDecisions' in request) {
     return encode({ EntityDecisions: entityDecisionsToCbor(request.EntityDecisions) });
   }

@@ -7,6 +7,7 @@ import { LogsSurface } from '../surfaces/LogsSurface.js';
 import { OverviewSurface } from '../surfaces/OverviewSurface.js';
 import { SurfacePlaceholder } from '../surfaces/SurfacePlaceholder.js';
 import { VtzSurface } from '../surfaces/VtzSurface.js';
+import { UsersSurface } from '../surfaces/UsersSurface.js';
 
 // One route per destination, generated from the IA (single source). A real surface renders its own
 // element; the rest render the honest empty placeholder until their phase lands. An unknown path is an
@@ -14,12 +15,13 @@ import { VtzSurface } from '../surfaces/VtzSurface.js';
 
 /**
  * The real surfaces that have replaced their placeholder, keyed by destination id (Overview O1.5; Logs
- * LG.3; Virtual Trust Zones V2.4).
+ * LG.3; Virtual Trust Zones V2.4; Users UY.2).
  */
 const SURFACES: Readonly<Record<string, ReactElement>> = {
   overview: <OverviewSurface />,
   logs: <LogsSurface />,
   vtz: <VtzSurface />,
+  users: <UsersSurface />,
 };
 
 function NotFound(): ReactElement {

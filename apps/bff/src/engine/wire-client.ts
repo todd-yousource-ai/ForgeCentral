@@ -23,6 +23,8 @@ import {
 } from '@forge/wire';
 import type {
   WireAgentList,
+  WireGroupList,
+  WirePrincipalList,
   WireConnectionList,
   WireConnectivityGraph,
   WireContainEffect,
@@ -79,6 +81,22 @@ export function replyToAgentList(reply: WireReply): WireAgentList {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a list-agents read');
+}
+
+/** Map an engine `WireReply` to `WirePrincipalList` (LIST_PRINCIPALS, crdb ER.6). */
+export function replyToPrincipalList(reply: WireReply): WirePrincipalList {
+  if (typeof reply === 'object' && 'PrincipalList' in reply) return reply.PrincipalList;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a list-principals read');
+}
+
+/** Map an engine `WireReply` to `WireGroupList` (LIST_GROUPS, crdb ER.6). */
+export function replyToGroupList(reply: WireReply): WireGroupList {
+  if (typeof reply === 'object' && 'GroupList' in reply) return reply.GroupList;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a list-groups read');
 }
 
 /** Map an engine `WireReply` to `WireDecisionList` (ENTITY_DECISIONS), throwing a typed error on a refusal. */
@@ -337,6 +355,27 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireAgentList> {
     return this.call(
       async (transport) => replyToAgentList(await dispatch(transport, { ListAgents: request })),
+      opts,
+    );
+  }
+
+  async listPrincipals(
+    request: Parameters<CrucibleClient['listPrincipals']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WirePrincipalList> {
+    return this.call(
+      async (transport) =>
+        replyToPrincipalList(await dispatch(transport, { ListPrincipals: request })),
+      opts,
+    );
+  }
+
+  async listGroups(
+    request: Parameters<CrucibleClient['listGroups']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireGroupList> {
+    return this.call(
+      async (transport) => replyToGroupList(await dispatch(transport, { ListGroups: request })),
       opts,
     );
   }

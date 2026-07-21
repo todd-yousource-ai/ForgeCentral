@@ -39,6 +39,8 @@ function engineWith(graph: WireConnectivityGraph): {
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: unused,
+    listPrincipals: unused,
+    listGroups: unused,
     entityDecisions: unused,
     entityConnections: unused,
     connectivityGraph: (_principal, request) => {
@@ -197,6 +199,8 @@ describe('resolveEntityConnections (O1.6a)', () => {
       cursorFetch: unused,
       cursorClose: unused,
       listAgents: unused,
+      listPrincipals: unused,
+      listGroups: unused,
       entityDecisions: unused,
       entityConnections: (_p, request) => {
         seen.push(request);
@@ -264,6 +268,8 @@ describe('resolveClassMembers (O1.6b)', () => {
       cursorFetch: unused,
       cursorClose: unused,
       listAgents: unused,
+      listPrincipals: unused,
+      listGroups: unused,
       entityDecisions: unused,
       entityConnections: unused,
       connectivityGraph: unused,

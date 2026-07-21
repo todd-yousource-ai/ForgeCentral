@@ -46,6 +46,16 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
   const reads: Array<{ operator?: unknown }> = [];
   const client: CrucibleClient = {
     ping: () => Promise.resolve(),
+    listPrincipals: (req) => {
+      calls.push(`listPrincipals:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ principals: [] });
+    },
+    listGroups: (req) => {
+      calls.push(`listGroups:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ groups: [] });
+    },
     querySubmit: (req) => {
       calls.push(`querySubmit:${String(req.request_id)}`);
       requests.push(req);

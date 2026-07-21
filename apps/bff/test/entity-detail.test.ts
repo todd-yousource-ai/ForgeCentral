@@ -42,6 +42,8 @@ function engineWith(parts: {
           : Promise.resolve(parts.capabilities ?? noRows),
     cursorFetch: unused,
     cursorClose: unused,
+    listPrincipals: unused,
+    listGroups: unused,
     listAgents: () =>
       parts.failDirectory
         ? Promise.reject(new Error('engine down'))

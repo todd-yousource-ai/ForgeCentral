@@ -59,7 +59,11 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // them by their CBOR enum tag, routing the commit to the write path + Data-plane gate (like
       // Contain) and the convergence read to the read allowlist (like VtzDetail).
       'BundleCommit' in request ||
-      'BundleConvergence' in request)
+      'BundleConvergence' in request ||
+      // The Users-surface directory reads (LIST_PRINCIPALS / LIST_GROUPS, crdb ER.6) ride the
+      // QuerySubmit opcode too; the engine discriminates them by their CBOR enum tag.
+      'ListPrincipals' in request ||
+      'ListGroups' in request)
   ) {
     return FrameType.QuerySubmit;
   }
