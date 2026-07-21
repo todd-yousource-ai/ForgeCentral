@@ -19,16 +19,19 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   Objects first). Cross-repo engine-first order: **E1 (LUG directory read)** first (unblocks UY.2/3/5),
   **E2 (human session bridge)** in parallel (unblocks UY.7, the homepage ask), **E3 (command backends)**
   before UY.6.
-- **Next action:** confirm/scope **E1** in crdb -- a `WireListPrincipals`/`WireListGroups` read pair
-  mirroring the landed `WireListAgents` (`IP-CONSOLE-ENTITY-READ` ER.1), projecting the `lug_store`.
-  Then FC **UY.1** (the trust-free contract), which has no engine dependency and can land first on the
-  Console side.
+- **E1 LANDED (2026-07-21, crdb `2d74bc20`, ER.6 in `IP-CONSOLE-ENTITY-READ`):** `LIST_PRINCIPALS`/
+  `LIST_GROUPS` wire verbs + `cdb_cyber::lug_directory` projection (current accounts w/ direct group
+  chips + confirmed subject + direct privileges; current groups w/ direct member counts; NO trust
+  field), operator-delegated, exposure-gated, ceiling-bounded; DTO schema export regenerated so
+  `@forge/contracts` can codegen. Full 8-step crdb gate green.
+- **Next action:** **E2** (the human session bridge feeding the Overview `users` lane) and/or FC
+  **UY.1** (the trust-free contract; its wire types now exist in the regenerated schema).
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
 | Id | Deliverable | Status | Commit |
 |----|-------------|--------|--------|
-| E1 | LUG directory read (`WireListPrincipals`/`WireListGroups`, projects `lug_store`, no trust field) | PLANNED | -- |
+| E1 | LUG directory read (`WireListPrincipals`/`WireListGroups`, projects `lug_store`, no trust field) | LANDED | crdb `2d74bc20` (code `7bd21def`, ER.6) |
 | E2 | Human session bridge (`UserSession` -> `LegNodeKind::User` `ConnectsTo`, feeds Overview `users` lane; growth-linear; humans only) | PLANNED | -- |
 | E3 | Local-principal + group command backends (create/edit/status/setMembers, audited, atomic) | PLANNED | -- |
 
