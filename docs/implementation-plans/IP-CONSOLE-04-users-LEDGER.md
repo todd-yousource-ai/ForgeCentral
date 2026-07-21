@@ -75,10 +75,16 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 - **Also landed on this branch:** the parked FD.7c panel revert + BundleCommit/BundleConvergence
   wire codecs (committed per the 2026-07-21 surface-placement ruling to unblock shared-file edits;
   see `IP-CONSOLE-02-FORGE-DISTRIBUTION.md`).
-- **Next action:** **UY.3** (the Groups tab cards over `groups.list`) then **UY.4** (the honest
-  IDAM shell) -- both small now that the substrate is wired; then UY.5 (drawer), UY.6 (commands),
-  UY.7 (homepage lane proof), UY.N (Playwright capstone + the box rebuild so the live node serves
-  E1-E3).
+- **UY.3 LANDED (2026-07-21):** the Groups tab renders the real group directory as cards (name,
+  member count, description, built-in badge; honest empty/error states) and ships the FIRST E3
+  command end to end: `GroupCreate` wire codec (QuerySubmit opcode + CBOR encoder) -> `groupCreate`
+  delegated `OperatorEngine` action -> POST `/api/users/groups` (session/engine-gated, typed
+  refusal mapping: Conflict->409 duplicate, Framing->400, else 403) -> the Create Group form with
+  typed failure messages; success refetches the directory so the new card is the ENGINE's record,
+  never a client-side insertion. This is the exact pattern UY.6's five remaining commands reuse.
+- **Next action:** **UY.4** (the honest IDAM shell tab) then UY.5 (drawer wiring), UY.6 (the
+  remaining commands + the Add User modal), UY.7 (homepage lane proof), UY.N (Playwright capstone +
+  the box rebuild so the live node serves E1-E3).
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -94,7 +100,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 |------|-----------|--------|--------|------|
 | UY.1 | `INV-CONSOLE-USERS-CONTRACT` | LANDED | `c8372db` | trust-free contract: schema revendored (E1-E3 DTOs codegen'd), `users.ts` view models + fail-closed projections, 13 live + 3 PENDING bindings registered, 10 tier-1 tests incl. the structural no-trust-key assertion |
 | UY.2 | `INV-CONSOLE-USERS-DIRECTORY` | LANDED | `410c226` | the All Users table over the real merge (LUG principals + AIG agent cross-bind); Origin replaces Override; whole-read fail-closed collapse; honest -- Remote/Compliance columns |
-| UY.3 | `INV-CONSOLE-GROUPS-REAL` | PLANNED | -- | needs E1; Groups cards |
+| UY.3 | `INV-CONSOLE-GROUPS-REAL` | LANDED | `c6d1277` | Groups cards over `groups.list` + the REAL `groups.create` command (the first E3 command through the FC stack: wire codec -> delegated engine action -> POST route w/ typed 409/400/403 -> form w/ typed failure) |
 | UY.4 | `INV-CONSOLE-IDAM-HONEST` | PLANNED | -- | honest "Not Connected" shell; Auth0 fast-follow named |
 | UY.5 | `INV-CONSOLE-3-CLICKS` | PLANNED | -- | reuse entity drawer (IP-CONSOLE-12) |
 | UY.6 | `INV-CONSOLE-USERS-COMMAND` | PLANNED | -- | needs E3; Add User modal minus trust field |
