@@ -258,7 +258,44 @@ export interface WireError {
 
 export type WireErrorClass = 'Unauthenticated' | 'Denied' | 'VersionUnsupported' | 'Conflict' | 'IdempotencyConflict' | 'AsOfUnavailable' | 'StorageUnavailable' | 'AuditFailure' | 'IntegrityFailure' | 'LimitExceeded' | 'Framing' | 'Internal';
 
+export interface WireGroupList {
+  groups: Array<WireGroupRecord>;
+}
+
+export interface WireGroupRecord {
+  built_in: boolean;
+  description: string;
+  group_id: string;
+  member_count: number;
+  name: string;
+  namespace: string;
+}
+
+export interface WireGroupSetMembers {
+  members: Array<string>;
+  name: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireGroupWrite {
+  description: string;
+  name: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
 export interface WireListAgents {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireListGroups {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireListPrincipals {
   operator?: OperatorDelegation | null;
   request_id: number;
 }
@@ -298,6 +335,71 @@ export interface WireLogQuery {
   until?: number | null;
 }
 
+export interface WireLugEdgeFact {
+  dst_id: string;
+  dst_kind: string;
+  membership_kind?: string | null;
+  relation: string;
+  src_id: string;
+  src_kind: string;
+}
+
+export interface WireLugEvents {
+  events: Array<WireLugIdentityEvent>;
+  namespace: string;
+  request_id: number;
+}
+
+export interface WireLugEventsApplied {
+  buckets_advanced: number;
+  counters_bumped: number;
+  deduped: number;
+  observations_written: number;
+  sessions_unchanged: number;
+  sessions_written: number;
+}
+
+export interface WireLugIdentityEvent {
+  account_source_id?: string | null;
+  attempted_username?: string | null;
+  detail: Array<[string, string]>;
+  kind: string;
+  occurred_at: number;
+  raw_event_hash: string;
+  session_source_id?: string | null;
+  session_state: Array<[string, string]>;
+}
+
+export interface WireLugNodeFact {
+  kind: string;
+  source_id: string;
+  state: Array<[string, string]>;
+}
+
+export interface WireLugProvisioned {
+  commit_version: number;
+}
+
+export interface WireLugSnapshot {
+  collector_version: string;
+  completeness: string;
+  edges: Array<WireLugEdgeFact>;
+  namespace: string;
+  nodes: Array<WireLugNodeFact>;
+  observed_at: number;
+  request_id: number;
+}
+
+export interface WireLugSnapshotApplied {
+  closed: number;
+  derived_closed?: number;
+  derived_written?: number;
+  edges_written: number;
+  nodes_written: number;
+  replay: boolean;
+  unchanged: number;
+}
+
 export interface WireMemberList {
   members: Array<WireConnectivityMember>;
 }
@@ -305,6 +407,53 @@ export interface WireMemberList {
 export interface WireNamedDest {
   address: string;
   count: number;
+}
+
+export interface WirePrincipalCreate {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  spec: WirePrincipalSpec;
+}
+
+export interface WirePrincipalEdit {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  spec: WirePrincipalSpec;
+}
+
+export interface WirePrincipalList {
+  principals: Array<WirePrincipalRecord>;
+}
+
+export interface WirePrincipalRecord {
+  account_type: string;
+  email: string;
+  enabled: boolean;
+  first_seen: number;
+  groups: Array<string>;
+  last_seen_bucket?: number | null;
+  namespace: string;
+  org: string;
+  origin: string;
+  principal_id: string;
+  privileges: Array<string>;
+  status: string;
+  subject_id?: string | null;
+  username: string;
+}
+
+export interface WirePrincipalSetStatus {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  status: string;
+  username: string;
+}
+
+export interface WirePrincipalSpec {
+  email?: string | null;
+  org?: string | null;
+  subject_type: string;
+  username: string;
 }
 
 export interface WireQueryRows {
@@ -323,6 +472,9 @@ export interface WireQuerySubmit {
 export type WireReply =
   | { QueryRows: WireQueryRows; }
   | { AgentList: WireAgentList; }
+  | { PrincipalList: WirePrincipalList; }
+  | { GroupList: WireGroupList; }
+  | { LugProvisioned: WireLugProvisioned; }
   | { DecisionList: WireDecisionList; }
   | { ConnectionList: WireConnectionList; }
   | 'CursorClosed'
@@ -346,6 +498,8 @@ export type WireReply =
   | { BundleDelivered: WireBundleDelivered; }
   | { BundleReported: WireBundleReported; }
   | { BundleConvergence: WireBundleConvergence; }
+  | { LugSnapshotApplied: WireLugSnapshotApplied; }
+  | { LugEventsApplied: WireLugEventsApplied; }
   | { UsageOverview: WireUsageOverviewResult; }
   | { VtzTree: WireVtzTree; }
   | { VtzDetail: WireVtzDetail; }
@@ -363,6 +517,14 @@ export type WireRequest =
   | { TxnAbort: { txn: Array<number>; }; }
   | { SubmitMemoryWrite: WireQuerySubmit; }
   | { ListAgents: WireListAgents; }
+  | { ListPrincipals: WireListPrincipals; }
+  | { ListGroups: WireListGroups; }
+  | { PrincipalCreate: WirePrincipalCreate; }
+  | { PrincipalEdit: WirePrincipalEdit; }
+  | { PrincipalSetStatus: WirePrincipalSetStatus; }
+  | { GroupCreate: WireGroupWrite; }
+  | { GroupEdit: WireGroupWrite; }
+  | { GroupSetMembers: WireGroupSetMembers; }
   | { EntityDecisions: WireEntityDecisions; }
   | { EntityConnections: WireEntityConnections; }
   | { Contain: WireContain; }
@@ -381,7 +543,9 @@ export type WireRequest =
   | { BundleCommit: WireBundleCommit; }
   | { BundleFetch: WireBundleFetch; }
   | { BundleReport: WireBundleReport; }
-  | { BundleConvergence: WireBundleConvergenceQuery; };
+  | { BundleConvergence: WireBundleConvergenceQuery; }
+  | { LugSnapshot: WireLugSnapshot; }
+  | { LugEvents: WireLugEvents; };
 
 export interface WireRiskBand {
   candidate: number;

@@ -1046,7 +1046,161 @@
         "Internal"
       ]
     },
+    "WireGroupList": {
+      "additionalProperties": false,
+      "properties": {
+        "groups": {
+          "items": {
+            "$ref": "#/$defs/WireGroupRecord"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "groups"
+      ],
+      "type": "object"
+    },
+    "WireGroupRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "built_in": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "group_id": {
+          "type": "string"
+        },
+        "member_count": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id",
+        "name",
+        "namespace",
+        "built_in",
+        "member_count",
+        "description"
+      ],
+      "type": "object"
+    },
+    "WireGroupSetMembers": {
+      "additionalProperties": false,
+      "properties": {
+        "members": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "name",
+        "members"
+      ],
+      "type": "object"
+    },
+    "WireGroupWrite": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "name",
+        "description"
+      ],
+      "type": "object"
+    },
     "WireListAgents": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WireListGroups": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WireListPrincipals": {
       "additionalProperties": false,
       "properties": {
         "operator": {
@@ -1260,6 +1414,304 @@
       ],
       "type": "object"
     },
+    "WireLugEdgeFact": {
+      "additionalProperties": false,
+      "properties": {
+        "dst_id": {
+          "type": "string"
+        },
+        "dst_kind": {
+          "type": "string"
+        },
+        "membership_kind": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "relation": {
+          "type": "string"
+        },
+        "src_id": {
+          "type": "string"
+        },
+        "src_kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "relation",
+        "src_kind",
+        "src_id",
+        "dst_kind",
+        "dst_id"
+      ],
+      "type": "object"
+    },
+    "WireLugEvents": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/$defs/WireLugIdentityEvent"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "namespace",
+        "events"
+      ],
+      "type": "object"
+    },
+    "WireLugEventsApplied": {
+      "additionalProperties": false,
+      "properties": {
+        "buckets_advanced": {
+          "type": "integer"
+        },
+        "counters_bumped": {
+          "type": "integer"
+        },
+        "deduped": {
+          "type": "integer"
+        },
+        "observations_written": {
+          "type": "integer"
+        },
+        "sessions_unchanged": {
+          "type": "integer"
+        },
+        "sessions_written": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "observations_written",
+        "deduped",
+        "sessions_written",
+        "sessions_unchanged",
+        "counters_bumped",
+        "buckets_advanced"
+      ],
+      "type": "object"
+    },
+    "WireLugIdentityEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "account_source_id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempted_username": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detail": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "occurred_at": {
+          "type": "integer"
+        },
+        "raw_event_hash": {
+          "type": "string"
+        },
+        "session_source_id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_state": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "occurred_at",
+        "raw_event_hash",
+        "session_state",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "WireLugNodeFact": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "source_id": {
+          "type": "string"
+        },
+        "state": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "source_id",
+        "state"
+      ],
+      "type": "object"
+    },
+    "WireLugProvisioned": {
+      "additionalProperties": false,
+      "properties": {
+        "commit_version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "commit_version"
+      ],
+      "type": "object"
+    },
+    "WireLugSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "collector_version": {
+          "type": "string"
+        },
+        "completeness": {
+          "type": "string"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/WireLugEdgeFact"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/WireLugNodeFact"
+          },
+          "type": "array"
+        },
+        "observed_at": {
+          "type": "integer"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "namespace",
+        "completeness",
+        "observed_at",
+        "collector_version",
+        "nodes",
+        "edges"
+      ],
+      "type": "object"
+    },
+    "WireLugSnapshotApplied": {
+      "additionalProperties": false,
+      "properties": {
+        "closed": {
+          "type": "integer"
+        },
+        "derived_closed": {
+          "type": "integer"
+        },
+        "derived_written": {
+          "type": "integer"
+        },
+        "edges_written": {
+          "type": "integer"
+        },
+        "nodes_written": {
+          "type": "integer"
+        },
+        "replay": {
+          "type": "boolean"
+        },
+        "unchanged": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "nodes_written",
+        "edges_written",
+        "closed",
+        "unchanged",
+        "replay"
+      ],
+      "type": "object"
+    },
     "WireMemberList": {
       "additionalProperties": false,
       "properties": {
@@ -1288,6 +1740,221 @@
       "required": [
         "address",
         "count"
+      ],
+      "type": "object"
+    },
+    "WirePrincipalCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "spec": {
+          "$ref": "#/$defs/WirePrincipalSpec"
+        }
+      },
+      "required": [
+        "request_id",
+        "spec"
+      ],
+      "type": "object"
+    },
+    "WirePrincipalEdit": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "spec": {
+          "$ref": "#/$defs/WirePrincipalSpec"
+        }
+      },
+      "required": [
+        "request_id",
+        "spec"
+      ],
+      "type": "object"
+    },
+    "WirePrincipalList": {
+      "additionalProperties": false,
+      "properties": {
+        "principals": {
+          "items": {
+            "$ref": "#/$defs/WirePrincipalRecord"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "principals"
+      ],
+      "type": "object"
+    },
+    "WirePrincipalRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "account_type": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "first_seen": {
+          "type": "integer"
+        },
+        "groups": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "last_seen_bucket": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "org": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "principal_id": {
+          "type": "string"
+        },
+        "privileges": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status": {
+          "type": "string"
+        },
+        "subject_id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "username": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "principal_id",
+        "username",
+        "namespace",
+        "account_type",
+        "enabled",
+        "status",
+        "origin",
+        "email",
+        "org",
+        "groups",
+        "privileges",
+        "first_seen"
+      ],
+      "type": "object"
+    },
+    "WirePrincipalSetStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "username",
+        "status"
+      ],
+      "type": "object"
+    },
+    "WirePrincipalSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "org": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subject_type": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "subject_type"
       ],
       "type": "object"
     },
@@ -1410,6 +2077,42 @@
           },
           "required": [
             "AgentList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PrincipalList": {
+              "$ref": "#/$defs/WirePrincipalList"
+            }
+          },
+          "required": [
+            "PrincipalList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "GroupList": {
+              "$ref": "#/$defs/WireGroupList"
+            }
+          },
+          "required": [
+            "GroupList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "LugProvisioned": {
+              "$ref": "#/$defs/WireLugProvisioned"
+            }
+          },
+          "required": [
+            "LugProvisioned"
           ],
           "type": "object"
         },
@@ -1793,6 +2496,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "LugSnapshotApplied": {
+              "$ref": "#/$defs/WireLugSnapshotApplied"
+            }
+          },
+          "required": [
+            "LugSnapshotApplied"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "LugEventsApplied": {
+              "$ref": "#/$defs/WireLugEventsApplied"
+            }
+          },
+          "required": [
+            "LugEventsApplied"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "UsageOverview": {
               "$ref": "#/$defs/WireUsageOverviewResult"
             }
@@ -2132,6 +2859,102 @@
         {
           "additionalProperties": false,
           "properties": {
+            "ListPrincipals": {
+              "$ref": "#/$defs/WireListPrincipals"
+            }
+          },
+          "required": [
+            "ListPrincipals"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ListGroups": {
+              "$ref": "#/$defs/WireListGroups"
+            }
+          },
+          "required": [
+            "ListGroups"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PrincipalCreate": {
+              "$ref": "#/$defs/WirePrincipalCreate"
+            }
+          },
+          "required": [
+            "PrincipalCreate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PrincipalEdit": {
+              "$ref": "#/$defs/WirePrincipalEdit"
+            }
+          },
+          "required": [
+            "PrincipalEdit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PrincipalSetStatus": {
+              "$ref": "#/$defs/WirePrincipalSetStatus"
+            }
+          },
+          "required": [
+            "PrincipalSetStatus"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "GroupCreate": {
+              "$ref": "#/$defs/WireGroupWrite"
+            }
+          },
+          "required": [
+            "GroupCreate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "GroupEdit": {
+              "$ref": "#/$defs/WireGroupWrite"
+            }
+          },
+          "required": [
+            "GroupEdit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "GroupSetMembers": {
+              "$ref": "#/$defs/WireGroupSetMembers"
+            }
+          },
+          "required": [
+            "GroupSetMembers"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "EntityDecisions": {
               "$ref": "#/$defs/WireEntityDecisions"
             }
@@ -2354,6 +3177,30 @@
           },
           "required": [
             "BundleConvergence"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "LugSnapshot": {
+              "$ref": "#/$defs/WireLugSnapshot"
+            }
+          },
+          "required": [
+            "LugSnapshot"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "LugEvents": {
+              "$ref": "#/$defs/WireLugEvents"
+            }
+          },
+          "required": [
+            "LugEvents"
           ],
           "type": "object"
         }

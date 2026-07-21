@@ -15,13 +15,14 @@ import { renderWithProviders, TEST_OPERATOR } from '../render.js';
 // placeholder, this test proves nothing fake ships from the shell.
 
 /** The binding prefixes registered by a landed surface contract. A new surface adds its prefix here. */
-const REGISTERED_PREFIXES = ['entity.', 'logs.', 'overview.', 'vtz.'];
+const REGISTERED_PREFIXES = ['entity.', 'logs.', 'overview.', 'vtz.', 'users.', 'groups.', 'idam.'];
 
 describe('no-stub contract (F0.8 shell)', () => {
   it('binds no surface data in the shell (the registry holds only registered surface contracts, unconsumed)', () => {
     // The registered contracts so far are the entity-drawer (entity.*), the Logs surface (logs.*), the
-    // Overview (overview.*), and the VTZ governance surface (vtz.*); the shell renders none of them yet
-    // (each surface consumes its bindings in its own PR -- the VTZ grid lands in V2.4, not V2.1).
+    // Overview (overview.*), the VTZ governance surface (vtz.*), and the Users surface (users.* /
+    // groups.* / idam.*, UY.1); the shell renders none of them yet (each surface consumes its bindings
+    // in its own PR -- the Users table lands in UY.2, not UY.1).
     const ids = Object.keys(bindings);
     expect(ids.length).toBeGreaterThan(0);
     expect(ids.every((id) => REGISTERED_PREFIXES.some((prefix) => id.startsWith(prefix)))).toBe(
