@@ -98,8 +98,25 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   to that group (the chips ARE the membership, engine-computed). <=3-click paths: row -> drawer
   (1); group -> members (1); filter to one org/type = one control. Full local Playwright suite run
   pre-push (16 passed; the new routine after the FD.7c e2e miss).
-- **Next action:** UY.6 (the remaining commands + the Add User modal), UY.7 (homepage lane proof),
-  UY.N (Playwright capstone + the box rebuild so the live node serves E1-E3).
+- **UY.6 LANDED (2026-07-21):** the command surface. **Wire:** the five remaining E3 codecs
+  (`PrincipalCreate`/`PrincipalEdit`/`PrincipalSetStatus`/`GroupEdit`/`GroupSetMembers`) --
+  byte-ordered CBOR (spec optionals OMITTED when absent), QuerySubmit opcode. **BFF:** five
+  delegated `OperatorEngine` actions + five resolvers + the one command route family (POST
+  `/api/users` create, `/edit`, `/status`, `/groups` create, `/groups/edit`, `/groups/members`),
+  typed refusal mapping (Conflict->409/Framing->400/else 403), body validation fail-closed.
+  **SPA:** the "+ Add" button -> the Add/Edit User form (username/type/email/org -- the mock form
+  MINUS the trust-override field; username read-only on edit); per-row lifecycle actions rendered
+  ONLY for `origin=local` rows (the engine refuses non-local subjects; observed accounts stay
+  honest `--`) -- Suspend/Activate + Revoke behind a ConfirmDialog (revoke = critical tone,
+  "history preserved, never deleted"); success invalidates the directory reads so every row is
+  the ENGINE's record. 3-click paths: Add (1) -> form (2) -> Create (3); suspend = row action (1)
+  -> confirm (2). Tests: 3 new resolver tests (create + duplicate refusal, setStatus, the
+  set-members no-change commit-0) + suites green; full local Playwright run pre-push (16 passed).
+  **Deferral recorded:** groups.edit / groups.setMembers have full engine+BFF backing but no
+  dedicated UI yet (member management UX); noted for UY.N polish, not a stub (no dead control
+  ships).
+- **Next action:** UY.7 (homepage lane proof) + UY.N (Playwright capstone + the box rebuild so
+  the live node serves E1-E3 and the surface renders real data end to end).
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -118,7 +135,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | UY.3 | `INV-CONSOLE-GROUPS-REAL` | LANDED | `c6d1277` | Groups cards over `groups.list` + the REAL `groups.create` command (the first E3 command through the FC stack: wire codec -> delegated engine action -> POST route w/ typed 409/400/403 -> form w/ typed failure) |
 | UY.4 | `INV-CONSOLE-IDAM-HONEST` | LANDED | `f233284` | the honest not-connected shell: three connector cards from `IDAM_CONNECTOR_SHELLS`, Configure + Sync Now = labelled disabled controls naming the Phase-2 gate, no fabricated sync anywhere |
 | UY.5 | `INV-CONSOLE-3-CLICKS` | LANDED | `3a612cc` | row -> the entity drawer (LUG identity branch joined the detail fan-out); hover prefetch; group card member-count -> All Users narrowed to that group (1 click) |
-| UY.6 | `INV-CONSOLE-USERS-COMMAND` | PLANNED | -- | needs E3; Add User modal minus trust field |
+| UY.6 | `INV-CONSOLE-USERS-COMMAND` | LANDED | `9633d03` | all five remaining E3 commands wired end to end; the Add/Edit User form (NO trust field); row lifecycle actions (local records only) w/ ConfirmDialog; groups.edit/setMembers BFF-complete (UI = a UY.N polish note) |
 | UY.7 | `INV-OVERVIEW-USER-CONTAINER-HUMAN` | PLANNED | -- | needs E2; homepage user container, humans only |
 | UY.N | `INV-CONSOLE-USERS-COMPLETE` | PLANNED | -- | Playwright capstone; proves no trust field anywhere |
 
