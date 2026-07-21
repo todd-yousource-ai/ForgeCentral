@@ -28,7 +28,10 @@ import {
   PRINCIPAL_STATUSES,
 } from '@forge/contracts';
 
+import { principalId } from '@forge/contracts';
+
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { useDrawer } from '../shell/DrawerHost.js';
 import { GroupCreateError, useCreateGroup, useGroups, useUsers } from './useUsers.js';
 
 /** The lifecycle badge color: active reads calm, suspended warns, revoked/compromised alarm. */
@@ -58,9 +61,10 @@ function kindLabel(kind: PrincipalKind): string {
 }
 
 /** The All Users tab: controls + the directory table. */
-function AllUsers(): ReactElement {
+function AllUsers({ initialSearch }: { readonly initialSearch: string }): ReactElement {
   const users = useUsers();
-  const [search, setSearch] = useState('');
+  const drawer = useDrawer();
+  const [search, setSearch] = useState(initialSearch);
   const [kind, setKind] = useState<'' | PrincipalKind>('');
   const [status, setStatus] = useState<'' | PrincipalStatus>('');
   const [origin, setOrigin] = useState<'' | PrincipalOrigin>('');
@@ -206,6 +210,13 @@ function AllUsers(): ReactElement {
           columns={columns}
           rows={rows}
           rowKey={(r) => r.principalId}
+          onRowActivate={(r) =>
+            drawer.openEntity({ kind: 'principal', id: principalId(r.principalId) })
+          }
+          rowLabel={(r) => `Open the entity drawer for ${r.username}`}
+          onRowHover={(r) =>
+            drawer.prefetchEntity({ kind: 'principal', id: principalId(r.principalId) })
+          }
           empty={
             <EmptyState
               title="No principals match"
@@ -223,7 +234,11 @@ function AllUsers(): ReactElement {
 }
 
 /** The Groups tab (UY.3): the real group directory as cards + the audited Create Group action. */
-function GroupsTab(): ReactElement {
+function GroupsTab({
+  onShowMembers,
+}: {
+  readonly onShowMembers: (group: string) => void;
+}): ReactElement {
   const groups = useGroups();
   const create = useCreateGroup();
   const [creating, setCreating] = useState(false);
@@ -327,9 +342,16 @@ function GroupsTab(): ReactElement {
                 <h4 className="fcx-users-group-card__name">{g.name}</h4>
                 {g.builtIn ? <Badge variant="neutral">built-in</Badge> : null}
               </div>
-              <p className="fcx-users-group-card__count">
+              {/* UY.5: a group's members are the principals wearing its chip -- one click lands on the
+                  All Users table narrowed to this group (the membership is engine-computed). */}
+              <button
+                type="button"
+                className="fcx-users-group-card__count fcx-btn--link"
+                onClick={() => onShowMembers(g.name)}
+                aria-label={`Show the ${String(g.memberCount)} members of ${g.name}`}
+              >
                 {g.memberCount} {g.memberCount === 1 ? 'member' : 'members'}
-              </p>
+              </button>
               <p className="fcx-users-group-card__description">
                 {g.description === '' ? '--' : g.description}
               </p>
@@ -394,6 +416,7 @@ function IdamTab(): ReactElement {
 /** The Users surface: the tab strip + the All Users table (Groups/IDAM land in UY.3/UY.4). */
 export function UsersSurface(): ReactElement {
   const [tab, setTab] = useState('all-users');
+  const [memberSearch, setMemberSearch] = useState('');
   return (
     <section className="fcx-surface" aria-labelledby="surface-users">
       <div className="fcx-surface__header">
@@ -411,7 +434,18 @@ export function UsersSurface(): ReactElement {
         onChange={setTab}
         ariaLabel="Users sections"
       />
-      {tab === 'all-users' ? <AllUsers /> : tab === 'groups' ? <GroupsTab /> : <IdamTab />}
+      {tab === 'all-users' ? (
+        <AllUsers key={memberSearch} initialSearch={memberSearch} />
+      ) : tab === 'groups' ? (
+        <GroupsTab
+          onShowMembers={(group) => {
+            setMemberSearch(group);
+            setTab('all-users');
+          }}
+        />
+      ) : (
+        <IdamTab />
+      )}
     </section>
   );
 }

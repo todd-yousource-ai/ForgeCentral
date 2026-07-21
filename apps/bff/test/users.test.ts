@@ -21,6 +21,7 @@ import {
   resolveUsersList,
   UsersUnavailableError,
 } from '../src/engine/users.js';
+import { resolveEntityDetail } from '../src/engine/entity-detail.js';
 
 const PRINCIPAL: OperatorPrincipal = {
   principalId: 'op-1',
@@ -50,7 +51,7 @@ function engineWith(parts: {
 }): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   return {
-    querySubmit: unused,
+    querySubmit: () => Promise.resolve({ rows: [], cursor: null, redacted_fields: [] }),
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: () => Promise.resolve(parts.agents ?? { agents: [] }),
@@ -60,7 +61,7 @@ function engineWith(parts: {
         : Promise.resolve({ commit_version: 7 }),
     listPrincipals: () => Promise.resolve(parts.principals ?? { principals: [] }),
     listGroups: () => Promise.resolve(parts.groups ?? { groups: [] }),
-    entityDecisions: unused,
+    entityDecisions: () => Promise.resolve({ decisions: [] }),
     entityConnections: unused,
     connectivityGraph: unused,
     connectivityMembers: unused,
@@ -122,6 +123,46 @@ describe('resolveUsersList (the All Users merge)', () => {
   it('an empty tenant resolves an honest empty directory', () => {
     return resolveUsersList(engineWith({}), PRINCIPAL).then((rows) => {
       expect(rows).toEqual([]);
+    });
+  });
+});
+
+describe('the drawer resolves a LUG principal (UY.5)', () => {
+  it('builds header + info from the principal directory when the ref is not an agent', () => {
+    const engine = engineWith({ principals: { principals: [human] } });
+    return resolveEntityDetail(engine, PRINCIPAL, {
+      kind: 'principal',
+      id: human.principal_id,
+    } as Parameters<typeof resolveEntityDetail>[2]).then((view) => {
+      expect(view.header.status).toBe('ok');
+      if (view.header.status === 'ok') {
+        expect(view.header.data.displayName).toBe('todd');
+        expect(view.header.data.kindLabel).toBe('Human');
+        expect(view.header.data.status).toBe('active');
+      }
+      expect(view.info.status).toBe('ok');
+      if (view.info.status === 'ok') {
+        expect(view.info.data.tags).toContain('origin=observed');
+        expect(view.info.data.tags).toContain('group=sudo');
+        expect(view.info.data.tags).toContain('privilege=sudo_all');
+        // No trust-era field sneaks in through the tags.
+        for (const tag of view.info.data.tags) {
+          expect(tag.toLowerCase()).not.toContain('trust');
+          expect(tag.toLowerCase()).not.toContain('score');
+        }
+      }
+      // Capabilities apply to agents only; a LUG principal is not-applicable, never fabricated.
+      expect(view.capabilities.status).toBe('not-applicable');
+    });
+  });
+
+  it('an id in neither directory renders honest empty sections', () => {
+    return resolveEntityDetail(engineWith({}), PRINCIPAL, {
+      kind: 'principal',
+      id: 'lug:local_account:ns:uid:9999',
+    } as Parameters<typeof resolveEntityDetail>[2]).then((view) => {
+      expect(view.header.status).toBe('empty');
+      expect(view.info.status).toBe('empty');
     });
   });
 });

@@ -18,6 +18,7 @@ import type {
   EntityRef,
   EntityStatus,
   HeaderView,
+  PrincipalRow,
   RecentDecisionRow,
   RecentDecisionsView,
   SectionState,
@@ -26,7 +27,7 @@ import type {
   WireQueryRows,
   WireValue,
 } from '@forge/contracts';
-import { decisionId } from '@forge/contracts';
+import { decisionId, toPrincipalRows } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -50,6 +51,38 @@ function toHeader(record: WireAgentRecord): HeaderView {
     kindLabel: 'Agent',
     status: toEntityStatus(record.status),
   };
+}
+
+/** The LUG principal's drawer header (UY.5): the engine tag as the kind label, the real lifecycle. */
+function principalHeader(row: PrincipalRow): HeaderView {
+  const kindLabel =
+    row.kind === 'human' ? 'Human' : row.kind === 'service' ? 'Service Account' : 'AI Agent';
+  const status: EntityStatus =
+    row.status === 'active' || row.status === 'suspended' || row.status === 'compromised'
+      ? row.status
+      : row.status === 'revoked' || row.status === 'disabled'
+        ? 'suspended'
+        : 'unknown';
+  return { displayName: row.username, kindLabel, status };
+}
+
+/**
+ * The LUG principal's info section (UY.5): the identity facts the directory row carries -- origin,
+ * namespace, groups, privileges, org/email where present -- as real key=value tags. `enrolledAt` is
+ * the fact's first-seen instant. No trust field exists (INV-CONSOLE-USERS-REAL).
+ */
+function principalInfo(row: PrincipalRow): EntityInfoView {
+  const tags = [
+    `origin=${row.origin}`,
+    `namespace=${row.namespace}`,
+    ...(row.status === 'revoked' || row.status === 'disabled' ? [`lifecycle=${row.status}`] : []),
+    ...(row.email === '' ? [] : [`email=${row.email}`]),
+    ...(row.org === '' ? [] : [`org=${row.org}`]),
+    ...row.groups.map((g) => `group=${g}`),
+    ...row.privileges.map((v) => `privilege=${v}`),
+    ...(row.subjectId === null ? [] : [`identity=${row.subjectId}`]),
+  ];
+  return { enrolledAt: row.firstSeen, tags };
 }
 
 function toInfo(record: WireAgentRecord): EntityInfoView {
@@ -176,8 +209,11 @@ export async function resolveEntityDetail(
   ref: EntityRef,
   opts?: EngineCallOptions,
 ): Promise<EntityDetailView> {
-  const [directory, decisions, capabilities, construction] = await Promise.allSettled([
+  const [directory, principals, decisions, capabilities, construction] = await Promise.allSettled([
     engine.listAgents(principal, { request_id: 0 }, opts),
+    // The LUG principal directory (LIST_PRINCIPALS, ER.6): a `principal` ref that is not an agent
+    // resolves its identity here (UY.5) -- observed accounts and provisioned records alike.
+    engine.listPrincipals(principal, { request_id: 0 }, opts),
     // ENTITY_DECISIONS is indexed by the engine EntityType (host/process/...); the entity kind is passed
     // opaquely, and the engine returns an honest empty result for a kind it does not index (e.g. an agent
     // principal, until ER.2b adds agent-scoped decisions) -- never a fabricated row.
@@ -217,15 +253,27 @@ export async function resolveEntityDetail(
     directory.status === 'fulfilled'
       ? directory.value.agents.find((agent) => agent.agent_id === ref.id)
       : undefined;
+  // The LUG identity, when the ref names a principal row (matched by id; the drawer trigger passes
+  // the row's engine id). Fail-closed: an un-narrowable directory collapses to null and the header
+  // degrades to error, never a guessed identity.
+  const principalRows =
+    principals.status === 'fulfilled' ? toPrincipalRows(principals.value) : null;
+  const principalRow = principalRows?.find((row) => row.principalId === ref.id);
 
   let header: SectionState<HeaderView>;
   let info: SectionState<EntityInfoView>;
-  if (directory.status === 'fulfilled') {
-    header = record ? { status: 'ok', data: toHeader(record) } : { status: 'empty' };
-    info = record ? { status: 'ok', data: toInfo(record) } : { status: 'empty' };
+  if (record) {
+    header = { status: 'ok', data: toHeader(record) };
+    info = { status: 'ok', data: toInfo(record) };
+  } else if (principalRow) {
+    header = { status: 'ok', data: principalHeader(principalRow) };
+    info = { status: 'ok', data: principalInfo(principalRow) };
+  } else if (directory.status === 'fulfilled' && principals.status === 'fulfilled') {
+    header = { status: 'empty' };
+    info = { status: 'empty' };
   } else {
-    header = { status: 'error', message: 'agent directory unavailable' };
-    info = { status: 'error', message: 'agent directory unavailable' };
+    header = { status: 'error', message: 'entity directory unavailable' };
+    info = { status: 'error', message: 'entity directory unavailable' };
   }
 
   // Capabilities apply only to an agent: a non-agent entity (not in the directory) is `not-applicable`;
