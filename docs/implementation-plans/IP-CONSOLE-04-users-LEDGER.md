@@ -34,10 +34,20 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   `account_ref`); the served overlay path stays scan-free (handler stamps `set_users_lane`); members
   drill-down of the users class lists the humans by username with live-session counts. The lane is
   a COUNT with no ribbon; real user->destination ribbons come later with DT.4 attribution.
-- **Next action:** **E3** (local-principal + group command backends) engine-side, or start the FC
-  side with **UY.1** (the trust-free contract; E1's wire types are in the regenerated schema). The
-  homepage user container (UY.7) is now provable end-to-end on the Console whenever the FC side
-  picks it up -- no FC code change expected (the `users` lane already anchors).
+- **E3 LANDED (2026-07-21, crdb `559b7aad`, LU.P in `IP-LUG-SUBSTRATE`):** two PRs. (1) TRD-35
+  amendment `ddb1b8c0`: `NamespaceKind::Enterprise` + `MEMBER_OF` widened to `IdentitySubject`
+  members (enterprise groups = the Groups-tab RBAC subject-sets). (2) Verbs `1e5fc976`:
+  `PRINCIPAL_CREATE/EDIT/SET_STATUS` + `GROUP_CREATE/EDIT/SET_MEMBERS` -> `LugProvisioned`, audited
+  atomic commits attributed to the delegated operator (VTZ pattern); membership set-diff tombstones
+  removals; duplicate -> Conflict, unknown status -> Framing; provisioned subjects project as
+  first-class directory rows (origin `local`) and `WirePrincipalRecord` gained
+  `status`/`origin`/`email`/`org` (+ `WireGroupRecord.description`) -- the FC table's Status and
+  Origin columns read straight off the DTO. Schema artifact regenerated for `@forge/contracts`.
+- **THE ENGINE PHASE IS COMPLETE: E1 + E2 + E3 all landed.** Every `users.*`/`groups.*` read and
+  command binding in the plan now has a real engine backend; only `idam.*` stays `PENDING` (TRD-35
+  Phase 2, Auth0 fast-follow).
+- **Next action:** the FC side -- **UY.1** (the trust-free contract; codegen from the regenerated
+  wire schema), then UY.2 (All Users table) onward per the roster.
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -45,7 +55,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 |----|-------------|--------|--------|
 | E1 | LUG directory read (`WireListPrincipals`/`WireListGroups`, projects `lug_store`, no trust field) | LANDED | crdb `2d74bc20` (code `7bd21def`, ER.6) |
 | E2 | Human session bridge feeding the Overview `users` lane (humans only, growth-free) | LANDED | crdb `1fa00951` (code `a0934e17`, CN.3) |
-| E3 | Local-principal + group command backends (create/edit/status/setMembers, audited, atomic) | PLANNED | -- |
+| E3 | Local-principal + group command backends (create/edit/status/setMembers, audited, atomic) | LANDED | crdb `559b7aad` (amendment `ddb1b8c0`, verbs `1e5fc976`, LU.P) |
 
 ## Roster (Console PRs)
 
