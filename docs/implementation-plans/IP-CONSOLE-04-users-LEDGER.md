@@ -55,9 +55,30 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   detail`, `groups.list/detail` + all six commands LIVE against the E1/E3 ops; `idam.connectors/
   configure/sync` PENDING naming TRD-35 Phase 2 (Auth0 first). The no-stub allowlist gained the
   three prefixes; `test:contract` green.
-- **Next action:** **UY.2** -- the All Users table: BFF resolver over `OperatorEngine` (new
-  `ListPrincipals`/`ListGroups` dispatch in wire-client + engine actions), the `/api/users` routes,
-  and the design-system data table with engine-side search/filter compilation.
+- **UY.2 LANDED (2026-07-21):** the All Users table end to end. **Wire:** `ListPrincipals`/
+  `ListGroups` ride the QuerySubmit opcode (`dispatch.ts`) with byte-faithful CBOR encoders
+  (`payload.ts`); reply parsers + client methods + `OperatorEngine` delegated actions. **Contract:**
+  `PrincipalKind` gained `agent` + `PrincipalStatus` gained `compromised` and
+  `toAgentPrincipalRow` cross-binds the AIG directory (LIST_AGENTS ER.1) so the ONE table lists
+  every actor the engine authorizes. **BFF:** `engine/users.ts` -- `resolveUsersList` (concurrent
+  LUG + AIG reads, merged + stably sorted; an un-narrowable record collapses the WHOLE read to
+  `UsersUnavailableError` -> 503, never a silently-shorter directory) + `resolveGroupsList`;
+  routes GET `/api/users` + `/api/users/groups` (session/engine/delegation-gated, VTZ error
+  semantics). **SPA:** `UsersSurface` registered for the `users` destination -- the mock's tab strip
+  (Groups/IDAM tabs honest placeholders until UY.3/UY.4), search + Type/Status/Origin filters, the
+  design-system DataTable with the mock columns MINUS trust (Origin replaces Override;
+  Remote/Compliance render `--`, no substrate yet). **Recorded deviation:** search/filters narrow
+  CLIENT-side -- the ER.6 read is bounded-and-complete (the engine REFUSES rather than truncates),
+  so the Console always holds the whole directory or an error; narrowing a complete dataset is not
+  the unbounded-LOG case where filters must compile to the engine query. Tests: 2 agent cross-bind
+  contract tests + 5 BFF resolver tests (merge, both collapse paths, empty tenant, groups).
+- **Also landed on this branch:** the parked FD.7c panel revert + BundleCommit/BundleConvergence
+  wire codecs (committed per the 2026-07-21 surface-placement ruling to unblock shared-file edits;
+  see `IP-CONSOLE-02-FORGE-DISTRIBUTION.md`).
+- **Next action:** **UY.3** (the Groups tab cards over `groups.list`) then **UY.4** (the honest
+  IDAM shell) -- both small now that the substrate is wired; then UY.5 (drawer), UY.6 (commands),
+  UY.7 (homepage lane proof), UY.N (Playwright capstone + the box rebuild so the live node serves
+  E1-E3).
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -72,7 +93,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | Step | Invariant | Status | Commit | Note |
 |------|-----------|--------|--------|------|
 | UY.1 | `INV-CONSOLE-USERS-CONTRACT` | LANDED | `c8372db` | trust-free contract: schema revendored (E1-E3 DTOs codegen'd), `users.ts` view models + fail-closed projections, 13 live + 3 PENDING bindings registered, 10 tier-1 tests incl. the structural no-trust-key assertion |
-| UY.2 | `INV-CONSOLE-USERS-DIRECTORY` | PLANNED | -- | needs E1; the All Users table (Origin replaces Override) |
+| UY.2 | `INV-CONSOLE-USERS-DIRECTORY` | LANDED | `410c226` | the All Users table over the real merge (LUG principals + AIG agent cross-bind); Origin replaces Override; whole-read fail-closed collapse; honest -- Remote/Compliance columns |
 | UY.3 | `INV-CONSOLE-GROUPS-REAL` | PLANNED | -- | needs E1; Groups cards |
 | UY.4 | `INV-CONSOLE-IDAM-HONEST` | PLANNED | -- | honest "Not Connected" shell; Auth0 fast-follow named |
 | UY.5 | `INV-CONSOLE-3-CLICKS` | PLANNED | -- | reuse entity drawer (IP-CONSOLE-12) |

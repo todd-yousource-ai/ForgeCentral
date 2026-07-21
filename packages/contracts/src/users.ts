@@ -31,6 +31,7 @@
 // is a security-relevant lie on a governance surface.
 
 import type {
+  WireAgentRecord,
   WireGroupList,
   WireGroupRecord,
   WireLugProvisioned,
@@ -39,8 +40,13 @@ import type {
   WirePrincipalSpec,
 } from './generated/wire-dto.js';
 
-/** The principal kinds the engine emits (`account_type` / `subject_type` tags), narrowed closed. */
-export const PRINCIPAL_KINDS = ['human', 'service'] as const;
+/**
+ * The principal kinds the engine emits, narrowed closed: `human`/`service` are the LUG
+ * `account_type`/`subject_type` tags; `agent` rows cross-bind from the AIG directory
+ * (LIST_AGENTS, ER.1) so the one table lists every actor the engine authorizes (TRD-CONSOLE-04:
+ * the mock's AI Agent rows).
+ */
+export const PRINCIPAL_KINDS = ['human', 'service', 'agent'] as const;
 export type PrincipalKind = (typeof PRINCIPAL_KINDS)[number];
 
 /**
@@ -48,7 +54,14 @@ export type PrincipalKind = (typeof PRINCIPAL_KINDS)[number];
  * (`active`/`suspended`/`revoked`, E3) plus the observed-account `disabled` (a collector fact --
  * shadowed/locked accounts -- an operator command cannot change a device's passwd file).
  */
-export const PRINCIPAL_STATUSES = ['active', 'suspended', 'revoked', 'disabled'] as const;
+export const PRINCIPAL_STATUSES = [
+  'active',
+  'suspended',
+  'revoked',
+  'disabled',
+  // The AIG lifecycle adds `compromised` (an agent flagged by the compromise assessor).
+  'compromised',
+] as const;
 export type PrincipalStatus = (typeof PRINCIPAL_STATUSES)[number];
 
 /** The row's authoritative source (TRD-35 Section 9); replaces the deleted Override column. */
@@ -203,6 +216,33 @@ export function toGroupCard(record: WireGroupRecord): GroupCard {
     builtIn: record.built_in,
     memberCount: record.member_count,
     description: record.description,
+  };
+}
+
+/**
+ * Project one AIG agent-directory record into a principal row (the AI-Agent cross-bind,
+ * LIST_AGENTS ER.1). FAIL-CLOSED on an unknown lifecycle status. The AIG record is machine
+ * identity: kind `agent`, origin `observed` (enrollment is an observed engine fact), namespace
+ * `aig`, enterprise fields honestly empty, first-seen = the enrollment instant.
+ */
+export function toAgentPrincipalRow(record: WireAgentRecord): PrincipalRow | null {
+  const status = toStatus(record.status);
+  if (status === null) {
+    return null;
+  }
+  return {
+    principalId: record.agent_id,
+    username: record.agent_id,
+    namespace: 'aig',
+    kind: 'agent',
+    status,
+    origin: 'observed',
+    email: '',
+    org: '',
+    groups: [],
+    subjectId: null,
+    privileges: [],
+    firstSeen: record.enrolled_at,
   };
 }
 

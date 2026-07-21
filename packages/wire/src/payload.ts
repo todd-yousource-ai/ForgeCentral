@@ -8,6 +8,10 @@
 
 import type {
   OperatorDelegation,
+  WireBundleCommit,
+  WireBundleConvergenceQuery,
+  WireListGroups,
+  WireListPrincipals,
   WireConnectivityMembers,
   WireConnectivityQuery,
   WireEntityConnections,
@@ -67,6 +71,17 @@ function submitToCbor(submit: WireQuerySubmit): unknown {
 
 /** The agent-directory read (LIST_AGENTS, crdb ER.1). Fields in Rust struct order: request_id, operator. */
 function listAgentsToCbor(request: WireListAgents): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * The LUG principal/group directory reads (LIST_PRINCIPALS / LIST_GROUPS, crdb ER.6). Rust struct
+ * order: request_id, then the optional operator (omitted when absent, byte-identical to a
+ * non-delegating client).
+ */
+function directoryReadToCbor(request: WireListPrincipals | WireListGroups): unknown {
   const out: Record<string, unknown> = { request_id: request.request_id };
   applyOperator(out, request.operator);
   return out;
@@ -225,6 +240,29 @@ function vtzDetailToCbor(request: WireVtzDetailQuery): unknown {
   return out;
 }
 
+/**
+ * `BUNDLE_CONVERGENCE` (FD.7c, crdb IP-CONSOLE-02-FORGE-DISTRIBUTION). Rust struct order:
+ * request_id, vtz_id. A tenant-scoped read: the operator delegation is injected server-side from the
+ * session, so there is no operator field on the wire (unlike the VTZ writes).
+ */
+function bundleConvergenceToCbor(request: WireBundleConvergenceQuery): unknown {
+  return { request_id: request.request_id, vtz_id: request.vtz_id };
+}
+
+/**
+ * `BUNDLE_COMMIT` (FD.2). Rust struct order: request_id, bundle, operator?. `bundle` is a plain
+ * `Vec<u8>` on the engine (NO serde_bytes, cf. `WireBundleCommit`), so it encodes as a CBOR array of
+ * integers -- exactly what a JS `Array<number>` produces; passing it through verbatim is byte-correct.
+ */
+function bundleCommitToCbor(request: WireBundleCommit): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    bundle: request.bundle,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `VTZ_CREATE` / `VTZ_EDIT` (VZ.4). Rust struct order: request_id, spec, operator?. */
 function vtzSpecRequestToCbor(request: WireVtzCreate | WireVtzEdit): unknown {
   const out: Record<string, unknown> = {
@@ -267,6 +305,11 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
     return encode({ SubmitMemoryWrite: submitToCbor(request.SubmitMemoryWrite) });
   }
   if ('ListAgents' in request) return encode({ ListAgents: listAgentsToCbor(request.ListAgents) });
+  if ('ListPrincipals' in request) {
+    return encode({ ListPrincipals: directoryReadToCbor(request.ListPrincipals) });
+  }
+  if ('ListGroups' in request)
+    return encode({ ListGroups: directoryReadToCbor(request.ListGroups) });
   if ('EntityDecisions' in request) {
     return encode({ EntityDecisions: entityDecisionsToCbor(request.EntityDecisions) });
   }
@@ -295,6 +338,12 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
     return encode({ VtzRescope: vtzRescopeToCbor(request.VtzRescope) });
   }
   if ('VtzDelete' in request) return encode({ VtzDelete: vtzDeleteToCbor(request.VtzDelete) });
+  if ('BundleConvergence' in request) {
+    return encode({ BundleConvergence: bundleConvergenceToCbor(request.BundleConvergence) });
+  }
+  if ('BundleCommit' in request) {
+    return encode({ BundleCommit: bundleCommitToCbor(request.BundleCommit) });
+  }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });
   if ('CursorClose' in request)

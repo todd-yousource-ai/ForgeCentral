@@ -53,7 +53,17 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'VtzCreate' in request ||
       'VtzEdit' in request ||
       'VtzRescope' in request ||
-      'VtzDelete' in request)
+      'VtzDelete' in request ||
+      // The Forge policy-distribution verbs (FD.2 BUNDLE_COMMIT, FD.7c BUNDLE_CONVERGENCE, crdb
+      // IP-CONSOLE-02-FORGE-DISTRIBUTION) ride the QuerySubmit opcode too: the engine discriminates
+      // them by their CBOR enum tag, routing the commit to the write path + Data-plane gate (like
+      // Contain) and the convergence read to the read allowlist (like VtzDetail).
+      'BundleCommit' in request ||
+      'BundleConvergence' in request ||
+      // The Users-surface directory reads (LIST_PRINCIPALS / LIST_GROUPS, crdb ER.6) ride the
+      // QuerySubmit opcode too; the engine discriminates them by their CBOR enum tag.
+      'ListPrincipals' in request ||
+      'ListGroups' in request)
   ) {
     return FrameType.QuerySubmit;
   }

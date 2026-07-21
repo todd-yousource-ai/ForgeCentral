@@ -24,7 +24,11 @@ import type {
   WireDecisionList,
   WireEntityConnections,
   WireEntityDecisions,
+  WireGroupList,
   WireListAgents,
+  WireListGroups,
+  WireListPrincipals,
+  WirePrincipalList,
   WireLogExplain,
   WireLogExport,
   WireLogExportEffect,
@@ -55,6 +59,8 @@ import type { OperatorPrincipal } from './principal.js';
 export type EngineAction =
   | 'querySubmit'
   | 'listAgents'
+  | 'listPrincipals'
+  | 'listGroups'
   | 'entityDecisions'
   | 'entityConnections'
   | 'connectivityGraph'
@@ -118,6 +124,18 @@ export interface OperatorEngine {
     request: WireListAgents,
     opts?: EngineCallOptions,
   ): Promise<WireAgentList>;
+  /** List the LUG principal directory (LIST_PRINCIPALS) on behalf of `principal`. */
+  listPrincipals(
+    principal: OperatorPrincipal,
+    request: WireListPrincipals,
+    opts?: EngineCallOptions,
+  ): Promise<WirePrincipalList>;
+  /** List the LUG group directory (LIST_GROUPS) on behalf of `principal`. */
+  listGroups(
+    principal: OperatorPrincipal,
+    request: WireListGroups,
+    opts?: EngineCallOptions,
+  ): Promise<WireGroupList>;
   /** List an entity's recent decisions (ENTITY_DECISIONS) on behalf of `principal`. */
   entityDecisions(
     principal: OperatorPrincipal,
@@ -265,6 +283,16 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'listAgents', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.listAgents({ ...request, operator }, opts);
+    },
+    listPrincipals: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'listPrincipals', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.listPrincipals({ ...request, operator }, opts);
+    },
+    listGroups: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'listGroups', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.listGroups({ ...request, operator }, opts);
     },
     entityDecisions: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'entityDecisions', request.request_id));

@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   IDAM_CONNECTOR_SHELLS,
+  toAgentPrincipalRow,
   toGroupCards,
   toPrincipalRow,
   toPrincipalRows,
@@ -147,6 +148,43 @@ describe('group cards + provisioning shapes', () => {
 
   it('a provisioning receipt carries the audited commit version', () => {
     expect(toProvisionReceipt({ commit_version: 9 })).toEqual({ commitVersion: 9 });
+  });
+});
+
+describe('the AI-Agent cross-bind (LIST_AGENTS, ER.1)', () => {
+  it('projects an agent record as an agent-kind row with honest empties', () => {
+    const row = toAgentPrincipalRow({
+      agent_id: 'aig:agent:demo-agent',
+      status: 'active',
+      enrolled_at: 300,
+      attributes: [['role', 'operator']],
+    });
+    expect(row?.kind).toBe('agent');
+    expect(row?.status).toBe('active');
+    expect(row?.origin).toBe('observed');
+    expect(row?.namespace).toBe('aig');
+    expect(row?.email).toBe('');
+    expect(row?.groups).toEqual([]);
+    expect(row?.firstSeen).toBe(300);
+  });
+
+  it('carries the AIG compromised lifecycle and refuses an unknown one', () => {
+    expect(
+      toAgentPrincipalRow({
+        agent_id: 'aig:agent:x',
+        status: 'compromised',
+        enrolled_at: 1,
+        attributes: [],
+      })?.status,
+    ).toBe('compromised');
+    expect(
+      toAgentPrincipalRow({
+        agent_id: 'aig:agent:x',
+        status: 'haunted',
+        enrolled_at: 1,
+        attributes: [],
+      }),
+    ).toBeNull();
   });
 });
 

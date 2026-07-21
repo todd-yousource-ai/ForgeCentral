@@ -51,6 +51,7 @@ import {
   resolveVtzRescope,
   resolveVtzTree,
 } from './engine/vtz.js';
+import { resolveGroupsList, resolveUsersList, UsersUnavailableError } from './engine/users.js';
 import { DistributeZoneUnknownError, resolveDistribute } from './engine/distribute.js';
 import { SigningRefusedError, SigningUnavailableError } from './engine/sign-client.js';
 import type { ReverseDnsResolver } from './engine/reverse-dns.js';
@@ -1005,6 +1006,51 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(payload);
 }
 
+/**
+ * The Users-surface reads (IP-CONSOLE-04 UY.2/UY.3): GET /api/users (the All Users table: the LUG
+ * principal directory + the AIG agent cross-bind) and GET /api/users/groups (the Groups tab).
+ * Session-gated, engine-gated, operator-delegated; the engine bounds and refuses rather than
+ * truncating, so the Console always holds the COMPLETE directory or an error -- client-side search
+ * over it narrows a complete dataset, never fabricates one.
+ */
+async function handleUsers(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/users' && path !== '/api/users/groups') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    const view =
+      path === '/api/users'
+        ? await resolveUsersList(deps.operatorEngine, principal, opts)
+        : await resolveGroupsList(deps.operatorEngine, principal, opts);
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof UsersUnavailableError) {
+      // The engine returned a record the Console cannot render honestly; surface unavailability.
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'users read failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function route(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1055,6 +1101,9 @@ async function route(
     return;
   }
   if (await handleOverview(deps, req, path, res)) {
+    return;
+  }
+  if (await handleUsers(deps, req, path, res)) {
     return;
   }
   if (await handleVtz(deps, req, path, res)) {
