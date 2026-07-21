@@ -1,8 +1,27 @@
 # TRD-CONSOLE-10 -- Objects (protected resources)
 
-**Status:** DRAFT (authored 2026-07-07). Inherits `TRD-CONSOLE-00`. The Objects surface manages the
-**resources** the platform protects -- the objects policies grant or deny access to, and the destination
-side of the Overview graph. Mock target: `shot-11`.
+**Status:** DRAFT (authored 2026-07-07; amended 2026-07-21). Inherits `TRD-CONSOLE-00`. The Objects
+surface manages the **resources** the platform protects -- the objects policies grant or deny access
+to, and the destination side of the Overview graph. Mock target: `shot-11`.
+
+**Amendment 2026-07-21 (operator rulings).**
+1. **Objects never apply policy.** An object is a NOUN -- a reusable source or destination a policy
+   references -- and this surface is the noun catalog only. Policy is composed, bound, and pushed
+   exclusively from the Policy surface (`TRD-CONSOLE-05`); no apply/enforce/posture control exists
+   here (the same surface-placement rule as the VTZ distribution ruling).
+2. **The taxonomy is the TRD-32 v2 object registry, not the mock's section headings.** Objects group
+   by the shared `ObjectKind` registry (`cdb-types::forge_v2`: User, Group, Agent, Service, Server,
+   Application, Uri, Network, RegistryKey, Certificate, Script, Kernel(...)); the Section 2 mock
+   table is layout guidance only. People groups are NOT catalog-owned: group membership arrives from
+   IdAM (and the Users surface's local records), and a policy references a group via the v2
+   `GroupRef` selector resolved and signed at 1Source (R-FRG-87) -- the endpoint never queries a
+   directory, and the Objects catalog never duplicates membership.
+3. **An object IS a named v2 `ObjectRef`.** The engine record is the TRD-32 v2 Section 18 grammar
+   `ObjectRef = { ObjectKind, Selector, [attributes] }` plus catalog identity (name, description,
+   classification tags). Members are resolved from the selector at read time, never stored.
+   **`Selector` gains a `Cidr` form** (TRD-32 v2 amendment, same date) so real IP-address/subnet
+   objects are expressible (`Network` + `Cidr(10.8.0.0/16)`); a glob over IP strings is not a
+   subnet match.
 
 ---
 
