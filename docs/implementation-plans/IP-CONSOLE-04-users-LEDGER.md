@@ -24,15 +24,27 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   chips + confirmed subject + direct privileges; current groups w/ direct member counts; NO trust
   field), operator-delegated, exposure-gated, ceiling-bounded; DTO schema export regenerated so
   `@forge/contracts` can codegen. Full 8-step crdb gate green.
-- **Next action:** **E2** (the human session bridge feeding the Overview `users` lane) and/or FC
-  **UY.1** (the trust-free contract; its wire types now exist in the regenerated schema).
+- **E2 LANDED (2026-07-21, crdb `1fa00951`, CN.3 in `IP-CONSOLE-CONNECTIVITY`):** implemented as a
+  READ-TIME projection, not a stored `ConnectsTo` edge (deviation from the plan sketch, recorded:
+  `LegNodeKind::User` is not an allowed `ConnectsTo` source and `Endpoint` never classifies as a
+  Sankey destination, and a stored edge would go stale on logout -- the read-time bridge delivers the
+  approved semantics EXACTLY: `users` lane count = session-present humans, service accounts excluded
+  by `account_type`, machine lanes structurally by node kind, zero growth, logout drops on next
+  read). `session_present_humans` honors BOTH producer legs (snapshot `OPENED_SESSION` edge + event
+  `account_ref`); the served overlay path stays scan-free (handler stamps `set_users_lane`); members
+  drill-down of the users class lists the humans by username with live-session counts. The lane is
+  a COUNT with no ribbon; real user->destination ribbons come later with DT.4 attribution.
+- **Next action:** **E3** (local-principal + group command backends) engine-side, or start the FC
+  side with **UY.1** (the trust-free contract; E1's wire types are in the regenerated schema). The
+  homepage user container (UY.7) is now provable end-to-end on the Console whenever the FC side
+  picks it up -- no FC code change expected (the `users` lane already anchors).
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
 | Id | Deliverable | Status | Commit |
 |----|-------------|--------|--------|
 | E1 | LUG directory read (`WireListPrincipals`/`WireListGroups`, projects `lug_store`, no trust field) | LANDED | crdb `2d74bc20` (code `7bd21def`, ER.6) |
-| E2 | Human session bridge (`UserSession` -> `LegNodeKind::User` `ConnectsTo`, feeds Overview `users` lane; growth-linear; humans only) | PLANNED | -- |
+| E2 | Human session bridge feeding the Overview `users` lane (humans only, growth-free) | LANDED | crdb `1fa00951` (code `a0934e17`, CN.3) |
 | E3 | Local-principal + group command backends (create/edit/status/setMembers, audited, atomic) | PLANNED | -- |
 
 ## Roster (Console PRs)
