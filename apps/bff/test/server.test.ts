@@ -44,6 +44,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     querySubmit: unused,
     listAgents: unused,
     listPrincipals: unused,
+    groupCreate: unused,
     listGroups: unused,
     entityDecisions: unused,
     entityConnections: unused,
@@ -87,6 +88,7 @@ function operatorEngineWith(): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   return {
     listPrincipals: unused,
+    groupCreate: unused,
     listGroups: unused,
     querySubmit: () =>
       Promise.resolve({

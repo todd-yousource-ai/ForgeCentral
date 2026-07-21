@@ -43,6 +43,7 @@ const unusedClient: CrucibleClient = {
   querySubmit: () => Promise.reject(new Error('unused')),
   listAgents: () => Promise.reject(new Error('unused')),
   listPrincipals: () => Promise.reject(new Error('unused')),
+  groupCreate: () => Promise.reject(new Error('unused')),
   listGroups: () => Promise.reject(new Error('unused')),
   entityDecisions: () => Promise.reject(new Error('unused')),
   entityConnections: () => Promise.reject(new Error('unused')),

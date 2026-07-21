@@ -15,11 +15,17 @@
 import type {
   GroupCard,
   PrincipalRow,
+  ProvisionReceipt,
   WireListAgents,
   WireListGroups,
   WireListPrincipals,
 } from '@forge/contracts';
-import { toAgentPrincipalRow, toGroupCards, toPrincipalRows } from '@forge/contracts';
+import {
+  toAgentPrincipalRow,
+  toGroupCards,
+  toPrincipalRows,
+  toProvisionReceipt,
+} from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -73,6 +79,36 @@ export async function resolveUsersList(
     (a, b) => a.username.localeCompare(b.username) || a.principalId.localeCompare(b.principalId),
   );
   return merged;
+}
+
+/**
+ * A provisioning command the engine refused, carried typed for the route (409 on a duplicate,
+ * 400 on malformed input, 403 on a denial) -- never collapsed to one opaque failure.
+ */
+export class UsersCommandError extends Error {
+  constructor(readonly wireClass: string) {
+    super(`users command refused: ${wireClass}`);
+    this.name = 'UsersCommandError';
+  }
+}
+
+/**
+ * Create an enterprise group (`groups.create`, crdb GROUP_CREATE): an audited atomic commit
+ * attributed to the delegated operator; a duplicate name is an engine Conflict, never an upsert.
+ */
+export async function resolveCreateGroup(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  name: string,
+  description: string,
+  opts?: EngineCallOptions,
+): Promise<ProvisionReceipt> {
+  const reply = await engine.groupCreate(
+    principal,
+    { request_id: requestId(), name, description },
+    opts,
+  );
+  return toProvisionReceipt(reply);
 }
 
 /** Resolve the Groups tab: the LUG group directory (enterprise + observed device groups). */

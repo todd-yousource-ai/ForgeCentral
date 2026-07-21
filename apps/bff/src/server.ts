@@ -51,7 +51,12 @@ import {
   resolveVtzRescope,
   resolveVtzTree,
 } from './engine/vtz.js';
-import { resolveGroupsList, resolveUsersList, UsersUnavailableError } from './engine/users.js';
+import {
+  resolveCreateGroup,
+  resolveGroupsList,
+  resolveUsersList,
+  UsersUnavailableError,
+} from './engine/users.js';
 import { DistributeZoneUnknownError, resolveDistribute } from './engine/distribute.js';
 import { SigningRefusedError, SigningUnavailableError } from './engine/sign-client.js';
 import type { ReverseDnsResolver } from './engine/reverse-dns.js';
@@ -1013,6 +1018,59 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
  * truncating, so the Console always holds the COMPLETE directory or an error -- client-side search
  * over it narrows a complete dataset, never fabricates one.
  */
+async function handleUsersCommand(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/users/groups' || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let body: { name?: unknown; description?: unknown };
+  try {
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as {
+      name?: unknown;
+      description?: unknown;
+    };
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  if (name === '') {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  try {
+    const receipt = await resolveCreateGroup(deps.operatorEngine, principal, name, description, {
+      timeoutMs: deps.config.requestTimeoutMs,
+    });
+    sendJson(res, 200, receipt);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      // Conflict = the name exists; Framing = malformed; anything else = a denial.
+      const cls = err.wireError.class;
+      const httpStatus = cls === 'Conflict' ? 409 : cls === 'Framing' ? 400 : 403;
+      sendJson(res, httpStatus, { error: 'refused', class: cls });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'group create failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleUsers(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1101,6 +1159,9 @@ async function route(
     return;
   }
   if (await handleOverview(deps, req, path, res)) {
+    return;
+  }
+  if (await handleUsersCommand(deps, req, method, path, res)) {
     return;
   }
   if (await handleUsers(deps, req, path, res)) {

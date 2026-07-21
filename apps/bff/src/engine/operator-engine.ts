@@ -25,9 +25,11 @@ import type {
   WireEntityConnections,
   WireEntityDecisions,
   WireGroupList,
+  WireGroupWrite,
   WireListAgents,
   WireListGroups,
   WireListPrincipals,
+  WireLugProvisioned,
   WirePrincipalList,
   WireLogExplain,
   WireLogExport,
@@ -61,6 +63,7 @@ export type EngineAction =
   | 'listAgents'
   | 'listPrincipals'
   | 'listGroups'
+  | 'groupCreate'
   | 'entityDecisions'
   | 'entityConnections'
   | 'connectivityGraph'
@@ -136,6 +139,12 @@ export interface OperatorEngine {
     request: WireListGroups,
     opts?: EngineCallOptions,
   ): Promise<WireGroupList>;
+  /** Create an enterprise group (GROUP_CREATE) on behalf of `principal`, audited. */
+  groupCreate(
+    principal: OperatorPrincipal,
+    request: WireGroupWrite,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
   /** List an entity's recent decisions (ENTITY_DECISIONS) on behalf of `principal`. */
   entityDecisions(
     principal: OperatorPrincipal,
@@ -293,6 +302,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'listGroups', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.listGroups({ ...request, operator }, opts);
+    },
+    groupCreate: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'groupCreate', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.groupCreate({ ...request, operator }, opts);
     },
     entityDecisions: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'entityDecisions', request.request_id));
