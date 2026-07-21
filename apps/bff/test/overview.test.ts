@@ -40,6 +40,7 @@ function engineWith(graph: WireConnectivityGraph): {
     cursorClose: unused,
     listAgents: unused,
     listPrincipals: unused,
+    groupCreate: unused,
     listGroups: unused,
     entityDecisions: unused,
     entityConnections: unused,
@@ -200,6 +201,7 @@ describe('resolveEntityConnections (O1.6a)', () => {
       cursorClose: unused,
       listAgents: unused,
       listPrincipals: unused,
+      groupCreate: unused,
       listGroups: unused,
       entityDecisions: unused,
       entityConnections: (_p, request) => {
@@ -269,6 +271,7 @@ describe('resolveClassMembers (O1.6b)', () => {
       cursorClose: unused,
       listAgents: unused,
       listPrincipals: unused,
+      groupCreate: unused,
       listGroups: unused,
       entityDecisions: unused,
       entityConnections: unused,

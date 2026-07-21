@@ -15,7 +15,12 @@ import type {
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
-import { resolveGroupsList, resolveUsersList, UsersUnavailableError } from '../src/engine/users.js';
+import {
+  resolveCreateGroup,
+  resolveGroupsList,
+  resolveUsersList,
+  UsersUnavailableError,
+} from '../src/engine/users.js';
 
 const PRINCIPAL: OperatorPrincipal = {
   principalId: 'op-1',
@@ -49,6 +54,10 @@ function engineWith(parts: {
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: () => Promise.resolve(parts.agents ?? { agents: [] }),
+    groupCreate: (_p: OperatorPrincipal, req: { name: string }) =>
+      req.name === 'Engineering'
+        ? Promise.reject(new Error('duplicate'))
+        : Promise.resolve({ commit_version: 7 }),
     listPrincipals: () => Promise.resolve(parts.principals ?? { principals: [] }),
     listGroups: () => Promise.resolve(parts.groups ?? { groups: [] }),
     entityDecisions: unused,
@@ -114,6 +123,22 @@ describe('resolveUsersList (the All Users merge)', () => {
     return resolveUsersList(engineWith({}), PRINCIPAL).then((rows) => {
       expect(rows).toEqual([]);
     });
+  });
+});
+
+describe('resolveCreateGroup (groups.create, audited)', () => {
+  it('returns the audited commit receipt on success', () => {
+    return resolveCreateGroup(engineWith({}), PRINCIPAL, 'Finance', 'Money team').then(
+      (receipt) => {
+        expect(receipt).toEqual({ commitVersion: 7 });
+      },
+    );
+  });
+
+  it('propagates an engine refusal untouched (the route maps Conflict to 409)', () => {
+    return expect(resolveCreateGroup(engineWith({}), PRINCIPAL, 'Engineering', '')).rejects.toThrow(
+      'duplicate',
+    );
   });
 });
 

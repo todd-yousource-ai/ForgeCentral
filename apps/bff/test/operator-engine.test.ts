@@ -56,6 +56,11 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ groups: [] });
     },
+    groupCreate: (req) => {
+      calls.push(`groupCreate:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ commit_version: 1 });
+    },
     querySubmit: (req) => {
       calls.push(`querySubmit:${String(req.request_id)}`);
       requests.push(req);

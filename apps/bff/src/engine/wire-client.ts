@@ -24,6 +24,7 @@ import {
 import type {
   WireAgentList,
   WireGroupList,
+  WireLugProvisioned,
   WirePrincipalList,
   WireConnectionList,
   WireConnectivityGraph,
@@ -97,6 +98,14 @@ export function replyToGroupList(reply: WireReply): WireGroupList {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a list-groups read');
+}
+
+/** Map an engine `WireReply` to `WireLugProvisioned` (the E3 provisioning ack). */
+export function replyToLugProvisioned(reply: WireReply): WireLugProvisioned {
+  if (typeof reply === 'object' && 'LugProvisioned' in reply) return reply.LugProvisioned;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a provisioning command');
 }
 
 /** Map an engine `WireReply` to `WireDecisionList` (ENTITY_DECISIONS), throwing a typed error on a refusal. */
@@ -376,6 +385,17 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireGroupList> {
     return this.call(
       async (transport) => replyToGroupList(await dispatch(transport, { ListGroups: request })),
+      opts,
+    );
+  }
+
+  async groupCreate(
+    request: Parameters<CrucibleClient['groupCreate']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned> {
+    return this.call(
+      async (transport) =>
+        replyToLugProvisioned(await dispatch(transport, { GroupCreate: request })),
       opts,
     );
   }

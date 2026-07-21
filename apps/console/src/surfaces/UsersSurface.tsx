@@ -24,7 +24,7 @@ import type {
 import { PRINCIPAL_KINDS, PRINCIPAL_ORIGINS, PRINCIPAL_STATUSES } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { useUsers } from './useUsers.js';
+import { GroupCreateError, useCreateGroup, useGroups, useUsers } from './useUsers.js';
 
 /** The lifecycle badge color: active reads calm, suspended warns, revoked/compromised alarm. */
 function statusVariant(status: PrincipalStatus): BadgeVariant {
@@ -217,6 +217,125 @@ function AllUsers(): ReactElement {
   );
 }
 
+/** The Groups tab (UY.3): the real group directory as cards + the audited Create Group action. */
+function GroupsTab(): ReactElement {
+  const groups = useGroups();
+  const create = useCreateGroup();
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+
+  const submit = (): void => {
+    create.mutate(
+      { name: name.trim(), description: description.trim() },
+      {
+        onSuccess: () => {
+          setCreating(false);
+          setName('');
+          setDescription('');
+        },
+      },
+    );
+  };
+  const createFailure =
+    create.error instanceof GroupCreateError
+      ? create.error.status === 409
+        ? 'A group with that name already exists.'
+        : create.error.status === 400
+          ? 'The group name is required.'
+          : 'The engine refused the command.'
+      : create.isError
+        ? 'The command could not reach the engine.'
+        : null;
+
+  return (
+    <>
+      <div className="fcx-surface__controls">
+        <h3 className="fcx-surface__subheading">User Groups</h3>
+        <button
+          type="button"
+          className="fcx-btn fcx-btn--primary"
+          onClick={() => setCreating((c) => !c)}
+        >
+          + Create Group
+        </button>
+      </div>
+
+      {creating ? (
+        <form
+          className="fcx-users-create"
+          aria-label="Create a group"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <label className="fcx-filter">
+            Name
+            <input
+              className="fcx-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </label>
+          <label className="fcx-filter">
+            Description
+            <input
+              className="fcx-input"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </label>
+          <button
+            type="submit"
+            className="fcx-btn fcx-btn--primary"
+            disabled={create.isPending || name.trim() === ''}
+          >
+            {create.isPending ? 'Creating...' : 'Create'}
+          </button>
+          <button type="button" className="fcx-btn" onClick={() => setCreating(false)}>
+            Cancel
+          </button>
+          {createFailure !== null ? (
+            <p role="alert" className="fcx-form-error">
+              {createFailure}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
+
+      {groups.isLoading ? (
+        <LoadingState label="Loading the group directory" />
+      ) : groups.isError ? (
+        <ErrorState
+          title="Could not load the group directory."
+          onRetry={() => void groups.refetch()}
+        />
+      ) : (groups.data ?? []).length === 0 ? (
+        <EmptyState title="No groups" hint="No groups have been observed or created yet." />
+      ) : (
+        <div className="fcx-users-groups-grid" role="list" aria-label="User groups">
+          {(groups.data ?? []).map((g) => (
+            <article key={g.groupId} role="listitem" className="fcx-users-group-card">
+              <div className="fcx-users-group-card__head">
+                <h4 className="fcx-users-group-card__name">{g.name}</h4>
+                {g.builtIn ? <Badge variant="neutral">built-in</Badge> : null}
+              </div>
+              <p className="fcx-users-group-card__count">
+                {g.memberCount} {g.memberCount === 1 ? 'member' : 'members'}
+              </p>
+              <p className="fcx-users-group-card__description">
+                {g.description === '' ? '--' : g.description}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 /** The Users surface: the tab strip + the All Users table (Groups/IDAM land in UY.3/UY.4). */
 export function UsersSurface(): ReactElement {
   const [tab, setTab] = useState('all-users');
@@ -240,8 +359,7 @@ export function UsersSurface(): ReactElement {
       {tab === 'all-users' ? (
         <AllUsers />
       ) : tab === 'groups' ? (
-        // UY.3 renders the group cards; until then the tab is an honest placeholder.
-        <EmptyState title="No Groups view yet" hint="The Groups tab lands with UY.3." />
+        <GroupsTab />
       ) : (
         // UY.4 renders the honest not-connected connector shells.
         <EmptyState

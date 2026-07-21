@@ -43,6 +43,7 @@ function engineWith(parts: {
     cursorFetch: unused,
     cursorClose: unused,
     listPrincipals: unused,
+    groupCreate: unused,
     listGroups: unused,
     listAgents: () =>
       parts.failDirectory

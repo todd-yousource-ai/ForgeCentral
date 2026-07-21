@@ -19,9 +19,11 @@ import type {
   WireEntityConnections,
   WireEntityDecisions,
   WireGroupList,
+  WireGroupWrite,
   WireListAgents,
   WireListGroups,
   WireListPrincipals,
+  WireLugProvisioned,
   WirePrincipalList,
   WireLogExplain,
   WireLogExport,
@@ -68,6 +70,8 @@ export interface CrucibleClient {
   listPrincipals(request: WireListPrincipals, opts?: EngineCallOptions): Promise<WirePrincipalList>;
   /** List the LUG group directory for the session tenant (LIST_GROUPS, crdb ER.6). */
   listGroups(request: WireListGroups, opts?: EngineCallOptions): Promise<WireGroupList>;
+  /** Create an enterprise group (GROUP_CREATE, crdb E3), audited. */
+  groupCreate(request: WireGroupWrite, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
   /** List an entity's recent governed decisions (ENTITY_DECISIONS, crdb ER.2c). */
   entityDecisions(
     request: WireEntityDecisions,

@@ -12,8 +12,14 @@
 // search/filters therefore narrow a complete dataset client-side -- unlike the unbounded LOG,
 // where narrowing must compile to the engine query.
 
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { GroupCard, PrincipalRow } from '@forge/contracts';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import type { GroupCard, PrincipalRow, ProvisionReceipt } from '@forge/contracts';
 
 /** Fetch the complete principal directory. Throws on a non-2xx so the surface shows a load error. */
 export async function fetchUsers(): Promise<readonly PrincipalRow[]> {
@@ -45,4 +51,44 @@ export function useUsers(): UseQueryResult<readonly PrincipalRow[]> {
 /** The group directory (UY.3 renders it; the hook lives with its sibling). */
 export function useGroups(): UseQueryResult<readonly GroupCard[]> {
   return useQuery({ queryKey: ['groups'], queryFn: fetchGroups });
+}
+
+/** A `groups.create` refusal, typed for the form (409 duplicate vs 400 malformed vs denial). */
+export class GroupCreateError extends Error {
+  constructor(readonly status: number) {
+    super(`group create failed: ${String(status)}`);
+    this.name = 'GroupCreateError';
+  }
+}
+
+/**
+ * Create an enterprise group (`groups.create` -> crdb GROUP_CREATE, audited, duplicate-refused).
+ * On success the group directory refetches, so the new card is the ENGINE's record, never a
+ * client-side insertion.
+ */
+export function useCreateGroup(): UseMutationResult<
+  ProvisionReceipt,
+  Error,
+  { name: string; description: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      const res = await fetch('/api/users/groups', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        throw new GroupCreateError(res.status);
+      }
+      return (await res.json()) as ProvisionReceipt;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      // Membership chips on the principal rows can change with group edits later; keep them fresh.
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
 }

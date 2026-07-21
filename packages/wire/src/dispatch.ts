@@ -63,7 +63,10 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // The Users-surface directory reads (LIST_PRINCIPALS / LIST_GROUPS, crdb ER.6) ride the
       // QuerySubmit opcode too; the engine discriminates them by their CBOR enum tag.
       'ListPrincipals' in request ||
-      'ListGroups' in request)
+      'ListGroups' in request ||
+      // The E3 provisioning command (GROUP_CREATE, crdb LU.P) rides the QuerySubmit opcode like the
+      // other data-plane writes; the engine routes it to the write path by its CBOR enum tag.
+      'GroupCreate' in request)
   ) {
     return FrameType.QuerySubmit;
   }

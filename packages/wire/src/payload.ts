@@ -10,6 +10,7 @@ import type {
   OperatorDelegation,
   WireBundleCommit,
   WireBundleConvergenceQuery,
+  WireGroupWrite,
   WireListGroups,
   WireListPrincipals,
   WireConnectivityMembers,
@@ -83,6 +84,20 @@ function listAgentsToCbor(request: WireListAgents): unknown {
  */
 function directoryReadToCbor(request: WireListPrincipals | WireListGroups): unknown {
   const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * The enterprise-group write (GROUP_CREATE / GROUP_EDIT, crdb E3 LU.P). Rust struct order:
+ * request_id, name, description, then the optional operator.
+ */
+function groupWriteToCbor(request: WireGroupWrite): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    name: request.name,
+    description: request.description,
+  };
   applyOperator(out, request.operator);
   return out;
 }
@@ -310,6 +325,8 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('ListGroups' in request)
     return encode({ ListGroups: directoryReadToCbor(request.ListGroups) });
+  if ('GroupCreate' in request)
+    return encode({ GroupCreate: groupWriteToCbor(request.GroupCreate) });
   if ('EntityDecisions' in request) {
     return encode({ EntityDecisions: entityDecisionsToCbor(request.EntityDecisions) });
   }
