@@ -46,8 +46,18 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 - **THE ENGINE PHASE IS COMPLETE: E1 + E2 + E3 all landed.** Every `users.*`/`groups.*` read and
   command binding in the plan now has a real engine backend; only `idam.*` stays `PENDING` (TRD-35
   Phase 2, Auth0 fast-follow).
-- **Next action:** the FC side -- **UY.1** (the trust-free contract; codegen from the regenerated
-  wire schema), then UY.2 (All Users table) onward per the roster.
+- **UY.1 LANDED (2026-07-21):** the wire schema revendored from crdb `559b7aad` and
+  `wire-dto.ts` regenerated (all E1-E3 DTOs now typed); `packages/contracts/src/users.ts` = the
+  `PrincipalRow`/`GroupCard`/`IdamConnector`/`PrincipalDraft`/`ProvisionReceipt` view models +
+  FAIL-CLOSED projections (an unknown kind/status/origin tag collapses the whole directory, never a
+  guessed identity; one malformed record kills the projection, not the row); NO trust field
+  (structurally tested: no key contains trust/override/score). Bindings registered: `users.list/
+  detail`, `groups.list/detail` + all six commands LIVE against the E1/E3 ops; `idam.connectors/
+  configure/sync` PENDING naming TRD-35 Phase 2 (Auth0 first). The no-stub allowlist gained the
+  three prefixes; `test:contract` green.
+- **Next action:** **UY.2** -- the All Users table: BFF resolver over `OperatorEngine` (new
+  `ListPrincipals`/`ListGroups` dispatch in wire-client + engine actions), the `/api/users` routes,
+  and the design-system data table with engine-side search/filter compilation.
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -61,7 +71,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 
 | Step | Invariant | Status | Commit | Note |
 |------|-----------|--------|--------|------|
-| UY.1 | `INV-CONSOLE-USERS-CONTRACT` | PLANNED | -- | trust-free contract; no engine dep; land first FC-side |
+| UY.1 | `INV-CONSOLE-USERS-CONTRACT` | LANDED | `c8372db` | trust-free contract: schema revendored (E1-E3 DTOs codegen'd), `users.ts` view models + fail-closed projections, 13 live + 3 PENDING bindings registered, 10 tier-1 tests incl. the structural no-trust-key assertion |
 | UY.2 | `INV-CONSOLE-USERS-DIRECTORY` | PLANNED | -- | needs E1; the All Users table (Origin replaces Override) |
 | UY.3 | `INV-CONSOLE-GROUPS-REAL` | PLANNED | -- | needs E1; Groups cards |
 | UY.4 | `INV-CONSOLE-IDAM-HONEST` | PLANNED | -- | honest "Not Connected" shell; Auth0 fast-follow named |

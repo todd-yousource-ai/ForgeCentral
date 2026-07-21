@@ -390,6 +390,160 @@ const vtzCommands: readonly CommandBinding[] = [
   },
 ];
 
+// -- IP-CONSOLE-04 (Users and Identity, UY.1) the `users.*` / `groups.*` / `idam.*` bindings --------
+//
+// Engine phase E1-E3 landed 2026-07-21 (crdb `559b7aad`): the ER.6 directory reads
+// (LIST_PRINCIPALS / LIST_GROUPS over the TRD-35 Local User Graph) and the LU.P provisioning
+// commands (PRINCIPAL_CREATE/EDIT/SET_STATUS + GROUP_CREATE/EDIT/SET_MEMBERS, audited atomic
+// batches attributed to the delegated operator) are all live engine ops, so every users/groups
+// binding registers LIVE. Only `idam.*` is PENDING: the External IDAM tab needs the TRD-35 Phase-2
+// IdAM adapters (Auth0 is the planned first live connector); UY.4 renders the honest not-connected
+// shell with non-live controls until then. NO trust binding exists (operator ruling 2026-07-21).
+
+const usersReads: readonly ReadBinding[] = [
+  {
+    // The All Users table: the LUG principal directory (observed accounts + provisioned local
+    // records, one row shape), tenant-private, clearance-filtered, bounded (crdb ER.6).
+    id: bindingId('users.list'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'list_principals_v1',
+    viewModel: 'PrincipalRow',
+    status: { kind: 'live' },
+  },
+  {
+    // A principal's full record for the drawer: the same directory read, keyed client-side by
+    // principal id (the bounded read carries the full row; no second engine op needed).
+    id: bindingId('users.detail'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'list_principals_v1',
+    viewModel: 'PrincipalRow',
+    status: { kind: 'live' },
+  },
+  {
+    // The Groups tab: enterprise groups + observed device groups with DIRECT member counts.
+    id: bindingId('groups.list'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'list_groups_v1',
+    viewModel: 'GroupCard',
+    status: { kind: 'live' },
+  },
+  {
+    // A group's card detail (same bounded read; members enumerate via the directory's chips).
+    id: bindingId('groups.detail'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'list_groups_v1',
+    viewModel: 'GroupCard',
+    status: { kind: 'live' },
+  },
+  {
+    // The External IDAM connector list: PENDING until the TRD-35 Phase-2 IdAM adapters land
+    // (Auth0 first). UY.4 renders the static honest shell (IDAM_CONNECTOR_SHELLS), never a
+    // fabricated sync state.
+    id: bindingId('idam.connectors'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'idam_connectors_v1',
+    viewModel: 'IdamConnector',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'TRD-35 Phase 2 IdAM adapters (ExternalAccount/federation sync; Auth0 first)',
+    },
+  },
+];
+
+const usersCommands: readonly CommandBinding[] = [
+  {
+    // Add User: provisions a local enterprise record (TRD-35 6.3), audited, duplicate-refused.
+    id: bindingId('users.create'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'principal_create_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Edit a local record's enterprise fields; an IdAM-owned field refusal arrives with Phase 2.
+    id: bindingId('users.edit'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'principal_edit_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Activate / suspend / revoke (never a delete; history preserved).
+    id: bindingId('users.setStatus'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'principal_set_status_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    id: bindingId('groups.create'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'group_create_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    id: bindingId('groups.edit'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'group_edit_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Membership set-diff: additions written, removals tombstoned engine-side.
+    id: bindingId('groups.setMembers'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'group_set_members_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Configure / sync a federation connector: PENDING with the Phase-2 adapters.
+    id: bindingId('idam.configure'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'idam_configure_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'TRD-35 Phase 2 IdAM adapters (connector config store + federation sync)',
+    },
+  },
+  {
+    id: bindingId('idam.sync'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'idam_sync_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'TRD-35 Phase 2 IdAM adapters (connector config store + federation sync)',
+    },
+  },
+];
+
 function register(target: Record<string, Binding>, entries: readonly Binding[]): void {
   for (const entry of entries) {
     target[entry.id] = entry;
@@ -403,6 +557,8 @@ register(registry, logReads);
 register(registry, overviewReads);
 register(registry, vtzReads);
 register(registry, vtzCommands);
+register(registry, usersReads);
+register(registry, usersCommands);
 
 /** The Console binding registry. Keyed by `BindingId`; populated by the surface IPs. */
 export const bindings: BindingManifest = registry;
