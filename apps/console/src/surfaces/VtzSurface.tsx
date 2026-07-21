@@ -29,7 +29,6 @@ import { Badge, KpiCard, TabStrip, VtzZoneCard, type BadgeVariant } from '@forge
 import type { RiskLevel, VtzArchetype, VtzSpecInput, VtzZone } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { DistributionPanel } from './DistributionPanel.js';
 import { VtzEditor, type EditorFailure } from './VtzEditor.js';
 import { useVtzMutation, VtzCommandError } from './useVtzMutation.js';
 import { useVtzDetail, useVtzRiskBands, useVtzTree } from './useVtzTree.js';
@@ -154,8 +153,6 @@ function ZoneAuthoring({
         }
         onDelete={() => mutation.mutate({ kind: 'delete', id: zone.id }, { onSuccess: onDeleted })}
       />
-      {/* The distribution ledger: where this zone's policy becomes enforceable on endpoints (FD.7c). */}
-      <DistributionPanel zoneId={zone.id} />
     </>
   );
 }
