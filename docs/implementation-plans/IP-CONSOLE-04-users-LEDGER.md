@@ -88,9 +88,18 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   labelled DISABLED controls whose tooltips name the gating work (TRD-35 Phase-2 IdAM adapters;
   Auth0 first). No fabricated last-sync timestamp exists anywhere (the shells' honesty is tier-1
   tested in the contract).
-- **Next action:** UY.5 (drawer wiring), UY.6 (the remaining commands + the Add User modal), UY.7
-  (homepage lane proof), UY.N (Playwright capstone + the box rebuild so the live node serves
-  E1-E3).
+- **UY.5 LANDED (2026-07-21):** the drawer resolves a LUG principal -- `resolveEntityDetail`'s
+  fan-out gained LIST_PRINCIPALS, so a `principal` ref not in the agent directory builds
+  header (username / engine-kind label / real lifecycle) + info (origin, namespace, lifecycle,
+  email/org, group + privilege + identity tags -- structurally no trust field) from the directory
+  row; both-directories-reachable-but-absent = honest `empty`, a failed directory = `error`;
+  capabilities stay agent-only (`not-applicable`). SPA: activating a table row opens the drawer
+  (hover prefetches); a group card's member count is now a button that lands on All Users narrowed
+  to that group (the chips ARE the membership, engine-computed). <=3-click paths: row -> drawer
+  (1); group -> members (1); filter to one org/type = one control. Full local Playwright suite run
+  pre-push (16 passed; the new routine after the FD.7c e2e miss).
+- **Next action:** UY.6 (the remaining commands + the Add User modal), UY.7 (homepage lane proof),
+  UY.N (Playwright capstone + the box rebuild so the live node serves E1-E3).
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -108,7 +117,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | UY.2 | `INV-CONSOLE-USERS-DIRECTORY` | LANDED | `410c226` | the All Users table over the real merge (LUG principals + AIG agent cross-bind); Origin replaces Override; whole-read fail-closed collapse; honest -- Remote/Compliance columns |
 | UY.3 | `INV-CONSOLE-GROUPS-REAL` | LANDED | `c6d1277` | Groups cards over `groups.list` + the REAL `groups.create` command (the first E3 command through the FC stack: wire codec -> delegated engine action -> POST route w/ typed 409/400/403 -> form w/ typed failure) |
 | UY.4 | `INV-CONSOLE-IDAM-HONEST` | LANDED | `f233284` | the honest not-connected shell: three connector cards from `IDAM_CONNECTOR_SHELLS`, Configure + Sync Now = labelled disabled controls naming the Phase-2 gate, no fabricated sync anywhere |
-| UY.5 | `INV-CONSOLE-3-CLICKS` | PLANNED | -- | reuse entity drawer (IP-CONSOLE-12) |
+| UY.5 | `INV-CONSOLE-3-CLICKS` | LANDED | `3a612cc` | row -> the entity drawer (LUG identity branch joined the detail fan-out); hover prefetch; group card member-count -> All Users narrowed to that group (1 click) |
 | UY.6 | `INV-CONSOLE-USERS-COMMAND` | PLANNED | -- | needs E3; Add User modal minus trust field |
 | UY.7 | `INV-OVERVIEW-USER-CONTAINER-HUMAN` | PLANNED | -- | needs E2; homepage user container, humans only |
 | UY.N | `INV-CONSOLE-USERS-COMPLETE` | PLANNED | -- | Playwright capstone; proves no trust field anywhere |
