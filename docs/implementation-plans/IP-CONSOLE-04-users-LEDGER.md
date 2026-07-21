@@ -136,8 +136,38 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | UY.4 | `INV-CONSOLE-IDAM-HONEST` | LANDED | `f233284` | the honest not-connected shell: three connector cards from `IDAM_CONNECTOR_SHELLS`, Configure + Sync Now = labelled disabled controls naming the Phase-2 gate, no fabricated sync anywhere |
 | UY.5 | `INV-CONSOLE-3-CLICKS` | LANDED | `3a612cc` | row -> the entity drawer (LUG identity branch joined the detail fan-out); hover prefetch; group card member-count -> All Users narrowed to that group (1 click) |
 | UY.6 | `INV-CONSOLE-USERS-COMMAND` | LANDED | `9633d03` | all five remaining E3 commands wired end to end; the Add/Edit User form (NO trust field); row lifecycle actions (local records only) w/ ConfirmDialog; groups.edit/setMembers BFF-complete (UI = a UY.N polish note) |
-| UY.7 | `INV-OVERVIEW-USER-CONTAINER-HUMAN` | PLANNED | -- | needs E2; homepage user container, humans only |
-| UY.N | `INV-CONSOLE-USERS-COMPLETE` | PLANNED | -- | Playwright capstone; proves no trust field anywhere |
+| UY.7 | `INV-OVERVIEW-USER-CONTAINER-HUMAN` | LANDED (live-proven) | crdb CN.3 + operator confirm | engine feed live on the box (CN.3 session bridge; operator-confirmed 2026-07-21 post-redeploy); FC lane rendering e2e-proven in overview.spec (users lane fixture); no FC code was needed (the lane anchors) |
+| UY.N | `INV-CONSOLE-USERS-COMPLETE` | LANDED | `a51cf91` | 4-test Playwright capstone (users.spec.ts) + the box redeploy (cdb `559b7aad` + console UY.1-UY.6) operator-confirmed live |
+
+
+## IP COMPLETE (2026-07-21)
+
+**Every roster row is LANDED; the surface is deployed and operator-confirmed on the live node.**
+Deployed stack: cdb from crdb main `559b7aad` (E1 directory reads + E2 session bridge + E3
+provisioning + CN.3), console-bff + SPA from FC main (UY.1-UY.6); LUG lanes verified post-redeploy
+(snapshot growth no-op, events applying); `/api/users` live behind the session gate.
+
+### Acceptance sweep (TRD-CONSOLE-04 Section 6)
+
+| Acceptance row | Proven by |
+|---|---|
+| Every principal/group/connector value derives from a real engine record; no fabricated user | contract fail-closed projections (whole-directory collapse) + BFF resolver tests + capstone empty-tenant test + fixtureless placeholder discipline |
+| Type maps to the real Principal kind; Status/Origin/Compliance reflect the engine record | ER.6/LU.P DTOs carry kind/status/origin engine-side; capstone asserts the three families + Origin column; Compliance renders honest `--` (no substrate; recorded) |
+| **No trust-score field renders anywhere** | structural contract test (no row key contains trust/override/score) + capstone column-header sweep + the E3 engine shape has no such field |
+| Add/edit/status/group ops commit through the engine with audit, tier- + confirm-gated | E3 audited atomic batches (crdb LU.P tests) + delegated OperatorEngine actions + ConfirmDialog gates + capstone Add-User/suspend journeys asserting the exact POST bodies |
+| IdAM-owned-field edit refusal | Phase-2 hook recorded in `commit_edit_principal` (no IdAM binding can exist yet -- the refusal site is named, not stubbed) |
+| Connector sync performs a real federation and reports its real result | `idam.*` PENDING (TRD-35 Phase 2; Auth0 first); UY.4 ships the honest not-connected shell -- capstone asserts disabled controls + no fabricated sync |
+| Section 4 three-click tasks within budget | capstone: row->drawer (1); Add(1)->form(2)->Create(3); suspend row-action(1)->confirm(2); group->members (1) |
+| Overview users container = humans only, real or 0 | crdb CN.3 (session bridge; humans by account_type, machines excluded by node kind; count-no-ribbon) + live operator confirm + overview.spec lane fixture |
+
+### Named deferrals (honest, gating work named)
+- `idam.connectors/configure/sync`: TRD-35 Phase-2 IdAM adapters; **Auth0 fast-follow** is the
+  first live connector (operator ruling).
+- Groups member-management UI: `groups.edit`/`groups.setMembers` are engine+BFF complete and
+  tested; the dedicated UX ships as polish (no dead control ships meanwhile).
+- Employee/Contractor/Partner sub-classification + Remote/Compliance columns: no engine substrate;
+  rendered honest `--` until an enterprise-record attribute lands.
+- Real user->destination Sankey ribbons: DT.4 attribution (the lane is a count-no-ribbon today).
 
 ## Notes / decisions log
 
