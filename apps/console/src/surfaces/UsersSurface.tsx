@@ -21,7 +21,12 @@ import type {
   PrincipalRow,
   PrincipalStatus,
 } from '@forge/contracts';
-import { PRINCIPAL_KINDS, PRINCIPAL_ORIGINS, PRINCIPAL_STATUSES } from '@forge/contracts';
+import {
+  IDAM_CONNECTOR_SHELLS,
+  PRINCIPAL_KINDS,
+  PRINCIPAL_ORIGINS,
+  PRINCIPAL_STATUSES,
+} from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { GroupCreateError, useCreateGroup, useGroups, useUsers } from './useUsers.js';
@@ -336,6 +341,56 @@ function GroupsTab(): ReactElement {
   );
 }
 
+/**
+ * The External IDAM tab (UY.4): the HONEST not-connected shell. The three well-known connectors
+ * render their real state -- none is connected, because the TRD-35 Phase-2 IdAM adapters are not
+ * built (`idam.*` bindings are PENDING; Auth0 is the planned first live connector). Configure and
+ * Sync Now are labelled non-live controls, never silent stubs; no fabricated last-sync exists
+ * anywhere (INV-CONSOLE-IDAM-HONEST).
+ */
+function IdamTab(): ReactElement {
+  return (
+    <>
+      <div className="fcx-surface__controls">
+        <h3 className="fcx-surface__subheading">External Identity &amp; Access Management</h3>
+        <button
+          type="button"
+          className="fcx-btn"
+          disabled
+          title="Pending: TRD-35 Phase 2 IdAM adapters (Auth0 first)"
+        >
+          Sync Now (pending)
+        </button>
+      </div>
+      <p className="fcx-users-idam-note">
+        Federation connectors arrive with the TRD-35 Phase-2 IdAM adapters; Auth0 is the planned
+        first live connector. Until then every connector below reports its real state.
+      </p>
+      <div className="fcx-users-groups-grid" role="list" aria-label="Identity connectors">
+        {IDAM_CONNECTOR_SHELLS.map((c) => (
+          <article key={c.connectorId} role="listitem" className="fcx-users-group-card">
+            <div className="fcx-users-group-card__head">
+              <h4 className="fcx-users-group-card__name">{c.displayName}</h4>
+              <Badge variant="neutral">Not Connected</Badge>
+            </div>
+            <p className="fcx-users-group-card__description">
+              {c.lastSyncAt === null ? 'No sync has ever run.' : ''}
+            </p>
+            <button
+              type="button"
+              className="fcx-btn"
+              disabled
+              title="Pending: TRD-35 Phase 2 IdAM adapters"
+            >
+              Configure (pending)
+            </button>
+          </article>
+        ))}
+      </div>
+    </>
+  );
+}
+
 /** The Users surface: the tab strip + the All Users table (Groups/IDAM land in UY.3/UY.4). */
 export function UsersSurface(): ReactElement {
   const [tab, setTab] = useState('all-users');
@@ -356,17 +411,7 @@ export function UsersSurface(): ReactElement {
         onChange={setTab}
         ariaLabel="Users sections"
       />
-      {tab === 'all-users' ? (
-        <AllUsers />
-      ) : tab === 'groups' ? (
-        <GroupsTab />
-      ) : (
-        // UY.4 renders the honest not-connected connector shells.
-        <EmptyState
-          title="No External IDAM view yet"
-          hint="The External IDAM tab lands with UY.4."
-        />
-      )}
+      {tab === 'all-users' ? <AllUsers /> : tab === 'groups' ? <GroupsTab /> : <IdamTab />}
     </section>
   );
 }

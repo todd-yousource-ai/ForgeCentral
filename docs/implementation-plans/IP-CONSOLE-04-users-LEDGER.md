@@ -82,9 +82,15 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   refusal mapping: Conflict->409 duplicate, Framing->400, else 403) -> the Create Group form with
   typed failure messages; success refetches the directory so the new card is the ENGINE's record,
   never a client-side insertion. This is the exact pattern UY.6's five remaining commands reuse.
-- **Next action:** **UY.4** (the honest IDAM shell tab) then UY.5 (drawer wiring), UY.6 (the
-  remaining commands + the Add User modal), UY.7 (homepage lane proof), UY.N (Playwright capstone +
-  the box rebuild so the live node serves E1-E3).
+- **UY.4 LANDED (2026-07-21):** the External IDAM tab renders the honest shell -- the three
+  well-known connectors (Okta / Azure AD / Google Workspace) as cards in their REAL state
+  (`Not Connected`, "No sync has ever run."), with Configure and the tab-level Sync Now as
+  labelled DISABLED controls whose tooltips name the gating work (TRD-35 Phase-2 IdAM adapters;
+  Auth0 first). No fabricated last-sync timestamp exists anywhere (the shells' honesty is tier-1
+  tested in the contract).
+- **Next action:** UY.5 (drawer wiring), UY.6 (the remaining commands + the Add User modal), UY.7
+  (homepage lane proof), UY.N (Playwright capstone + the box rebuild so the live node serves
+  E1-E3).
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -101,7 +107,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | UY.1 | `INV-CONSOLE-USERS-CONTRACT` | LANDED | `c8372db` | trust-free contract: schema revendored (E1-E3 DTOs codegen'd), `users.ts` view models + fail-closed projections, 13 live + 3 PENDING bindings registered, 10 tier-1 tests incl. the structural no-trust-key assertion |
 | UY.2 | `INV-CONSOLE-USERS-DIRECTORY` | LANDED | `410c226` | the All Users table over the real merge (LUG principals + AIG agent cross-bind); Origin replaces Override; whole-read fail-closed collapse; honest -- Remote/Compliance columns |
 | UY.3 | `INV-CONSOLE-GROUPS-REAL` | LANDED | `c6d1277` | Groups cards over `groups.list` + the REAL `groups.create` command (the first E3 command through the FC stack: wire codec -> delegated engine action -> POST route w/ typed 409/400/403 -> form w/ typed failure) |
-| UY.4 | `INV-CONSOLE-IDAM-HONEST` | PLANNED | -- | honest "Not Connected" shell; Auth0 fast-follow named |
+| UY.4 | `INV-CONSOLE-IDAM-HONEST` | LANDED | `f233284` | the honest not-connected shell: three connector cards from `IDAM_CONNECTOR_SHELLS`, Configure + Sync Now = labelled disabled controls naming the Phase-2 gate, no fabricated sync anywhere |
 | UY.5 | `INV-CONSOLE-3-CLICKS` | PLANNED | -- | reuse entity drawer (IP-CONSOLE-12) |
 | UY.6 | `INV-CONSOLE-USERS-COMMAND` | PLANNED | -- | needs E3; Add User modal minus trust field |
 | UY.7 | `INV-OVERVIEW-USER-CONTAINER-HUMAN` | PLANNED | -- | needs E2; homepage user container, humans only |
