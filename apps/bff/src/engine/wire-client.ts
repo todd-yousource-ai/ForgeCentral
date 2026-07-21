@@ -400,6 +400,60 @@ export class WireCrucibleClient implements CrucibleClient {
     );
   }
 
+  async principalCreate(
+    request: Parameters<CrucibleClient['principalCreate']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned> {
+    return this.call(
+      async (transport) =>
+        replyToLugProvisioned(await dispatch(transport, { PrincipalCreate: request })),
+      opts,
+    );
+  }
+
+  async principalEdit(
+    request: Parameters<CrucibleClient['principalEdit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned> {
+    return this.call(
+      async (transport) =>
+        replyToLugProvisioned(await dispatch(transport, { PrincipalEdit: request })),
+      opts,
+    );
+  }
+
+  async principalSetStatus(
+    request: Parameters<CrucibleClient['principalSetStatus']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned> {
+    return this.call(
+      async (transport) =>
+        replyToLugProvisioned(await dispatch(transport, { PrincipalSetStatus: request })),
+      opts,
+    );
+  }
+
+  async groupEdit(
+    request: Parameters<CrucibleClient['groupEdit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned> {
+    return this.call(
+      async (transport) => replyToLugProvisioned(await dispatch(transport, { GroupEdit: request })),
+      opts,
+    );
+  }
+
+  async groupSetMembers(
+    request: Parameters<CrucibleClient['groupSetMembers']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned> {
+    return this.call(
+      async (transport) =>
+        replyToLugProvisioned(await dispatch(transport, { GroupSetMembers: request })),
+      opts,
+    );
+  }
+
   async entityDecisions(
     request: Parameters<CrucibleClient['entityDecisions']>[0],
     opts?: EngineCallOptions,

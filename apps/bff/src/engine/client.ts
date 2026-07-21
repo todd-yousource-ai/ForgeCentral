@@ -19,12 +19,16 @@ import type {
   WireEntityConnections,
   WireEntityDecisions,
   WireGroupList,
+  WireGroupSetMembers,
   WireGroupWrite,
   WireListAgents,
   WireListGroups,
   WireListPrincipals,
   WireLugProvisioned,
+  WirePrincipalCreate,
+  WirePrincipalEdit,
   WirePrincipalList,
+  WirePrincipalSetStatus,
   WireLogExplain,
   WireLogExport,
   WireLogExportEffect,
@@ -72,6 +76,25 @@ export interface CrucibleClient {
   listGroups(request: WireListGroups, opts?: EngineCallOptions): Promise<WireGroupList>;
   /** Create an enterprise group (GROUP_CREATE, crdb E3), audited. */
   groupCreate(request: WireGroupWrite, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
+  /** Edit an enterprise group's description (GROUP_EDIT, crdb E3), audited. */
+  groupEdit(request: WireGroupWrite, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
+  /** Set an enterprise group's DIRECT subject membership (GROUP_SET_MEMBERS, crdb E3), audited. */
+  groupSetMembers(
+    request: WireGroupSetMembers,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
+  /** Provision a local enterprise principal (PRINCIPAL_CREATE, crdb E3), audited. */
+  principalCreate(
+    request: WirePrincipalCreate,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
+  /** Edit a local principal's enterprise fields (PRINCIPAL_EDIT, crdb E3), audited. */
+  principalEdit(request: WirePrincipalEdit, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
+  /** Transition a local principal's lifecycle (PRINCIPAL_SET_STATUS, crdb E3), audited. */
+  principalSetStatus(
+    request: WirePrincipalSetStatus,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
   /** List an entity's recent governed decisions (ENTITY_DECISIONS, crdb ER.2c). */
   entityDecisions(
     request: WireEntityDecisions,

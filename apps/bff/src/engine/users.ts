@@ -14,6 +14,7 @@
 
 import type {
   GroupCard,
+  PrincipalDraft,
   PrincipalRow,
   ProvisionReceipt,
   WireListAgents,
@@ -25,6 +26,7 @@ import {
   toGroupCards,
   toPrincipalRows,
   toProvisionReceipt,
+  toWirePrincipalSpec,
 } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
@@ -106,6 +108,95 @@ export async function resolveCreateGroup(
   const reply = await engine.groupCreate(
     principal,
     { request_id: requestId(), name, description },
+    opts,
+  );
+  return toProvisionReceipt(reply);
+}
+
+/**
+ * Provision a local enterprise principal (`users.create`, crdb PRINCIPAL_CREATE): the Add User
+ * form's draft, audited, duplicate-refused (TRD-35 6.3). NO trust field can travel (the draft
+ * shape has none).
+ */
+export async function resolveCreatePrincipal(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  draft: PrincipalDraft,
+  opts?: EngineCallOptions,
+): Promise<ProvisionReceipt> {
+  const reply = await engine.principalCreate(
+    principal,
+    { request_id: requestId(), spec: toWirePrincipalSpec(draft) },
+    opts,
+  );
+  return toProvisionReceipt(reply);
+}
+
+/** Edit a local principal's enterprise fields (`users.edit`, crdb PRINCIPAL_EDIT), audited. */
+export async function resolveEditPrincipal(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  draft: PrincipalDraft,
+  opts?: EngineCallOptions,
+): Promise<ProvisionReceipt> {
+  const reply = await engine.principalEdit(
+    principal,
+    { request_id: requestId(), spec: toWirePrincipalSpec(draft) },
+    opts,
+  );
+  return toProvisionReceipt(reply);
+}
+
+/**
+ * Transition a local principal's lifecycle (`users.setStatus`, crdb PRINCIPAL_SET_STATUS):
+ * activate / suspend / revoke -- never a delete, history preserved (R-LUG-23).
+ */
+export async function resolveSetPrincipalStatus(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  username: string,
+  status: 'active' | 'suspended' | 'revoked',
+  opts?: EngineCallOptions,
+): Promise<ProvisionReceipt> {
+  const reply = await engine.principalSetStatus(
+    principal,
+    { request_id: requestId(), username, status },
+    opts,
+  );
+  return toProvisionReceipt(reply);
+}
+
+/** Edit an enterprise group's description (`groups.edit`, crdb GROUP_EDIT), audited. */
+export async function resolveEditGroup(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  name: string,
+  description: string,
+  opts?: EngineCallOptions,
+): Promise<ProvisionReceipt> {
+  const reply = await engine.groupEdit(
+    principal,
+    { request_id: requestId(), name, description },
+    opts,
+  );
+  return toProvisionReceipt(reply);
+}
+
+/**
+ * Set an enterprise group's DIRECT subject membership (`groups.setMembers`, crdb
+ * GROUP_SET_MEMBERS): a set-diff engine-side (additions written, removals tombstoned; observed
+ * device memberships never touched).
+ */
+export async function resolveSetGroupMembers(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  name: string,
+  members: readonly string[],
+  opts?: EngineCallOptions,
+): Promise<ProvisionReceipt> {
+  const reply = await engine.groupSetMembers(
+    principal,
+    { request_id: requestId(), name, members: [...members] },
     opts,
   );
   return toProvisionReceipt(reply);

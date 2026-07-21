@@ -66,7 +66,12 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'ListGroups' in request ||
       // The E3 provisioning command (GROUP_CREATE, crdb LU.P) rides the QuerySubmit opcode like the
       // other data-plane writes; the engine routes it to the write path by its CBOR enum tag.
-      'GroupCreate' in request)
+      'GroupCreate' in request ||
+      'GroupEdit' in request ||
+      'GroupSetMembers' in request ||
+      'PrincipalCreate' in request ||
+      'PrincipalEdit' in request ||
+      'PrincipalSetStatus' in request)
   ) {
     return FrameType.QuerySubmit;
   }

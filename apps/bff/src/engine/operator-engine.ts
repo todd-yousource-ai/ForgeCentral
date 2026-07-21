@@ -25,12 +25,16 @@ import type {
   WireEntityConnections,
   WireEntityDecisions,
   WireGroupList,
+  WireGroupSetMembers,
   WireGroupWrite,
   WireListAgents,
   WireListGroups,
   WireListPrincipals,
   WireLugProvisioned,
+  WirePrincipalCreate,
+  WirePrincipalEdit,
   WirePrincipalList,
+  WirePrincipalSetStatus,
   WireLogExplain,
   WireLogExport,
   WireLogExportEffect,
@@ -64,6 +68,11 @@ export type EngineAction =
   | 'listPrincipals'
   | 'listGroups'
   | 'groupCreate'
+  | 'groupEdit'
+  | 'groupSetMembers'
+  | 'principalCreate'
+  | 'principalEdit'
+  | 'principalSetStatus'
   | 'entityDecisions'
   | 'entityConnections'
   | 'connectivityGraph'
@@ -143,6 +152,36 @@ export interface OperatorEngine {
   groupCreate(
     principal: OperatorPrincipal,
     request: WireGroupWrite,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
+  /** Edit an enterprise group (GROUP_EDIT) on behalf of `principal`, audited. */
+  groupEdit(
+    principal: OperatorPrincipal,
+    request: WireGroupWrite,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
+  /** Set an enterprise group's membership (GROUP_SET_MEMBERS) on behalf of `principal`, audited. */
+  groupSetMembers(
+    principal: OperatorPrincipal,
+    request: WireGroupSetMembers,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
+  /** Provision a local principal (PRINCIPAL_CREATE) on behalf of `principal`, audited. */
+  principalCreate(
+    principal: OperatorPrincipal,
+    request: WirePrincipalCreate,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
+  /** Edit a local principal (PRINCIPAL_EDIT) on behalf of `principal`, audited. */
+  principalEdit(
+    principal: OperatorPrincipal,
+    request: WirePrincipalEdit,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
+  /** Transition a local principal's lifecycle (PRINCIPAL_SET_STATUS), audited. */
+  principalSetStatus(
+    principal: OperatorPrincipal,
+    request: WirePrincipalSetStatus,
     opts?: EngineCallOptions,
   ): Promise<WireLugProvisioned>;
   /** List an entity's recent decisions (ENTITY_DECISIONS) on behalf of `principal`. */
@@ -307,6 +346,31 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'groupCreate', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.groupCreate({ ...request, operator }, opts);
+    },
+    groupEdit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'groupEdit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.groupEdit({ ...request, operator }, opts);
+    },
+    groupSetMembers: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'groupSetMembers', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.groupSetMembers({ ...request, operator }, opts);
+    },
+    principalCreate: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'principalCreate', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.principalCreate({ ...request, operator }, opts);
+    },
+    principalEdit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'principalEdit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.principalEdit({ ...request, operator }, opts);
+    },
+    principalSetStatus: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'principalSetStatus', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.principalSetStatus({ ...request, operator }, opts);
     },
     entityDecisions: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'entityDecisions', request.request_id));

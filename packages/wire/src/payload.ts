@@ -10,9 +10,14 @@ import type {
   OperatorDelegation,
   WireBundleCommit,
   WireBundleConvergenceQuery,
+  WireGroupSetMembers,
   WireGroupWrite,
   WireListGroups,
   WireListPrincipals,
+  WirePrincipalCreate,
+  WirePrincipalEdit,
+  WirePrincipalSetStatus,
+  WirePrincipalSpec,
   WireConnectivityMembers,
   WireConnectivityQuery,
   WireEntityConnections,
@@ -97,6 +102,53 @@ function groupWriteToCbor(request: WireGroupWrite): unknown {
     request_id: request.request_id,
     name: request.name,
     description: request.description,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * The local-principal spec (E3 `WirePrincipalSpec`). Rust struct order: username, subject_type,
+ * then the optional email/org OMITTED when absent (byte-identical to a spec that never carried
+ * them). NO trust field exists.
+ */
+function principalSpecToCbor(spec: WirePrincipalSpec): unknown {
+  const out: Record<string, unknown> = {
+    username: spec.username,
+    subject_type: spec.subject_type,
+  };
+  if (spec.email !== undefined && spec.email !== null) out['email'] = spec.email;
+  if (spec.org !== undefined && spec.org !== null) out['org'] = spec.org;
+  return out;
+}
+
+/** PRINCIPAL_CREATE / PRINCIPAL_EDIT (crdb E3). Rust struct order: request_id, spec, operator. */
+function principalWriteToCbor(request: WirePrincipalCreate | WirePrincipalEdit): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    spec: principalSpecToCbor(request.spec),
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** PRINCIPAL_SET_STATUS (crdb E3). Rust struct order: request_id, username, status, operator. */
+function principalSetStatusToCbor(request: WirePrincipalSetStatus): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    username: request.username,
+    status: request.status,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** GROUP_SET_MEMBERS (crdb E3). Rust struct order: request_id, name, members, operator. */
+function groupSetMembersToCbor(request: WireGroupSetMembers): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    name: request.name,
+    members: request.members,
   };
   applyOperator(out, request.operator);
   return out;
@@ -327,6 +379,15 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
     return encode({ ListGroups: directoryReadToCbor(request.ListGroups) });
   if ('GroupCreate' in request)
     return encode({ GroupCreate: groupWriteToCbor(request.GroupCreate) });
+  if ('GroupEdit' in request) return encode({ GroupEdit: groupWriteToCbor(request.GroupEdit) });
+  if ('GroupSetMembers' in request)
+    return encode({ GroupSetMembers: groupSetMembersToCbor(request.GroupSetMembers) });
+  if ('PrincipalCreate' in request)
+    return encode({ PrincipalCreate: principalWriteToCbor(request.PrincipalCreate) });
+  if ('PrincipalEdit' in request)
+    return encode({ PrincipalEdit: principalWriteToCbor(request.PrincipalEdit) });
+  if ('PrincipalSetStatus' in request)
+    return encode({ PrincipalSetStatus: principalSetStatusToCbor(request.PrincipalSetStatus) });
   if ('EntityDecisions' in request) {
     return encode({ EntityDecisions: entityDecisionsToCbor(request.EntityDecisions) });
   }

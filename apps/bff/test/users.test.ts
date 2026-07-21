@@ -17,7 +17,10 @@ import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
 import {
   resolveCreateGroup,
+  resolveCreatePrincipal,
   resolveGroupsList,
+  resolveSetGroupMembers,
+  resolveSetPrincipalStatus,
   resolveUsersList,
   UsersUnavailableError,
 } from '../src/engine/users.js';
@@ -61,6 +64,16 @@ function engineWith(parts: {
         : Promise.resolve({ commit_version: 7 }),
     listPrincipals: () => Promise.resolve(parts.principals ?? { principals: [] }),
     listGroups: () => Promise.resolve(parts.groups ?? { groups: [] }),
+    groupEdit: unused,
+    groupSetMembers: (_p: OperatorPrincipal, req: { name: string; members: string[] }) =>
+      Promise.resolve({ commit_version: req.members.length === 0 ? 0 : 5 }),
+    principalCreate: (_p: OperatorPrincipal, req: { spec: { username: string } }) =>
+      req.spec.username === 'sarah'
+        ? Promise.reject(new Error('duplicate'))
+        : Promise.resolve({ commit_version: 3 }),
+    principalEdit: unused,
+    principalSetStatus: (_p: OperatorPrincipal, req: { status: string }) =>
+      Promise.resolve({ commit_version: req.status === 'revoked' ? 9 : 4 }),
     entityDecisions: () => Promise.resolve({ decisions: [] }),
     entityConnections: unused,
     connectivityGraph: unused,
@@ -180,6 +193,30 @@ describe('resolveCreateGroup (groups.create, audited)', () => {
     return expect(resolveCreateGroup(engineWith({}), PRINCIPAL, 'Engineering', '')).rejects.toThrow(
       'duplicate',
     );
+  });
+});
+
+describe('the UY.6 command resolvers', () => {
+  it('users.create returns the audited receipt; a duplicate propagates the refusal', () => {
+    const draft = { username: 'linda', kind: 'human' as const, email: null, org: null };
+    return resolveCreatePrincipal(engineWith({}), PRINCIPAL, draft).then((r) => {
+      expect(r).toEqual({ commitVersion: 3 });
+      return expect(
+        resolveCreatePrincipal(engineWith({}), PRINCIPAL, { ...draft, username: 'sarah' }),
+      ).rejects.toThrow('duplicate');
+    });
+  });
+
+  it('users.setStatus commits the lifecycle transition', () => {
+    return resolveSetPrincipalStatus(engineWith({}), PRINCIPAL, 'linda', 'revoked').then((r) => {
+      expect(r).toEqual({ commitVersion: 9 });
+    });
+  });
+
+  it('groups.setMembers reports the no-change replay honestly (commit 0)', () => {
+    return resolveSetGroupMembers(engineWith({}), PRINCIPAL, 'Engineering', []).then((r) => {
+      expect(r).toEqual({ commitVersion: 0 });
+    });
   });
 });
 

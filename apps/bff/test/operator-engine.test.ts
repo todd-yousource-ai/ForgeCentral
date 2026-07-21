@@ -56,6 +56,31 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ groups: [] });
     },
+    groupEdit: (req) => {
+      calls.push(`groupEdit:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ commit_version: 1 });
+    },
+    groupSetMembers: (req) => {
+      calls.push(`groupSetMembers:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ commit_version: 1 });
+    },
+    principalCreate: (req) => {
+      calls.push(`principalCreate:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ commit_version: 1 });
+    },
+    principalEdit: (req) => {
+      calls.push(`principalEdit:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ commit_version: 1 });
+    },
+    principalSetStatus: (req) => {
+      calls.push(`principalSetStatus:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ commit_version: 1 });
+    },
     groupCreate: (req) => {
       calls.push(`groupCreate:${String(req.request_id)}`);
       reads.push(req);

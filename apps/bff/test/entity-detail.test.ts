@@ -46,6 +46,11 @@ function engineWith(parts: {
     // "reachable, entity not there" (a rejection would honestly degrade header/info to error).
     listPrincipals: () => Promise.resolve({ principals: [] }),
     groupCreate: unused,
+    groupEdit: unused,
+    groupSetMembers: unused,
+    principalCreate: unused,
+    principalEdit: unused,
+    principalSetStatus: unused,
     listGroups: unused,
     listAgents: () =>
       parts.failDirectory

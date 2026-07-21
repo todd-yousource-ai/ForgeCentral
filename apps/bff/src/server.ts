@@ -53,7 +53,12 @@ import {
 } from './engine/vtz.js';
 import {
   resolveCreateGroup,
+  resolveCreatePrincipal,
+  resolveEditGroup,
+  resolveEditPrincipal,
   resolveGroupsList,
+  resolveSetGroupMembers,
+  resolveSetPrincipalStatus,
   resolveUsersList,
   UsersUnavailableError,
 } from './engine/users.js';
@@ -1018,6 +1023,32 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
  * truncating, so the Console always holds the COMPLETE directory or an error -- client-side search
  * over it narrows a complete dataset, never fabricates one.
  */
+const USERS_COMMAND_PATHS = new Set([
+  '/api/users',
+  '/api/users/edit',
+  '/api/users/status',
+  '/api/users/groups',
+  '/api/users/groups/edit',
+  '/api/users/groups/members',
+]);
+
+/** A parsed principal draft from a command body, or null when malformed (400, fail-closed). */
+function parsePrincipalDraft(body: Record<string, unknown>): {
+  username: string;
+  kind: 'human' | 'service';
+  email: string | null;
+  org: string | null;
+} | null {
+  const username = typeof body['username'] === 'string' ? body['username'].trim() : '';
+  const kind = body['kind'];
+  if (username === '' || (kind !== 'human' && kind !== 'service')) return null;
+  const email =
+    typeof body['email'] === 'string' && body['email'].trim() !== '' ? body['email'].trim() : null;
+  const org =
+    typeof body['org'] === 'string' && body['org'].trim() !== '' ? body['org'].trim() : null;
+  return { username, kind, email, org };
+}
+
 async function handleUsersCommand(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1025,7 +1056,7 @@ async function handleUsersCommand(
   path: string,
   res: ServerResponse,
 ): Promise<boolean> {
-  if (path !== '/api/users/groups' || method !== 'POST') return false;
+  if (!USERS_COMMAND_PATHS.has(path) || method !== 'POST') return false;
   const session = deps.authRouter?.resolveSession(req);
   if (!session) {
     sendJson(res, 401, { error: 'unauthorized' });
@@ -1035,27 +1066,60 @@ async function handleUsersCommand(
     sendJson(res, 503, { error: 'engine_unavailable' });
     return true;
   }
-  let body: { name?: unknown; description?: unknown };
+  let body: Record<string, unknown>;
   try {
-    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as {
-      name?: unknown;
-      description?: unknown;
-    };
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as Record<string, unknown>;
   } catch {
     sendJson(res, 400, { error: 'malformed_request' });
     return true;
   }
-  const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const description = typeof body.description === 'string' ? body.description.trim() : '';
-  if (name === '') {
-    sendJson(res, 400, { error: 'malformed_request' });
-    return true;
-  }
   const principal = principalFromSession(session, activeTenantOverride(req));
+  const engine = deps.operatorEngine;
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  const name = typeof body['name'] === 'string' ? body['name'].trim() : '';
+  const description = typeof body['description'] === 'string' ? body['description'].trim() : '';
   try {
-    const receipt = await resolveCreateGroup(deps.operatorEngine, principal, name, description, {
-      timeoutMs: deps.config.requestTimeoutMs,
-    });
+    let receipt;
+    if (path === '/api/users' || path === '/api/users/edit') {
+      const draft = parsePrincipalDraft(body);
+      if (draft === null) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      receipt =
+        path === '/api/users'
+          ? await resolveCreatePrincipal(engine, principal, draft, opts)
+          : await resolveEditPrincipal(engine, principal, draft, opts);
+    } else if (path === '/api/users/status') {
+      const username = typeof body['username'] === 'string' ? body['username'].trim() : '';
+      const status = body['status'];
+      if (
+        username === '' ||
+        (status !== 'active' && status !== 'suspended' && status !== 'revoked')
+      ) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      receipt = await resolveSetPrincipalStatus(engine, principal, username, status, opts);
+    } else if (path === '/api/users/groups/members') {
+      const members = Array.isArray(body['members'])
+        ? body['members'].filter((m): m is string => typeof m === 'string')
+        : null;
+      if (name === '' || members === null) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      receipt = await resolveSetGroupMembers(engine, principal, name, members, opts);
+    } else {
+      if (name === '') {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      receipt =
+        path === '/api/users/groups'
+          ? await resolveCreateGroup(engine, principal, name, description, opts)
+          : await resolveEditGroup(engine, principal, name, description, opts);
+    }
     sendJson(res, 200, receipt);
   } catch (err) {
     if (err instanceof EngineRefusedError) {
@@ -1064,7 +1128,7 @@ async function handleUsersCommand(
       const httpStatus = cls === 'Conflict' ? 409 : cls === 'Framing' ? 400 : 403;
       sendJson(res, httpStatus, { error: 'refused', class: cls });
     } else {
-      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'group create failed');
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'users command failed');
       sendJson(res, 502, { error: 'engine_error' });
     }
   }
