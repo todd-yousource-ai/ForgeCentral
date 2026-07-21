@@ -19,7 +19,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { GroupCard, PrincipalRow, ProvisionReceipt } from '@forge/contracts';
+import type { GroupCard, PrincipalDraft, PrincipalRow, ProvisionReceipt } from '@forge/contracts';
 
 /** Fetch the complete principal directory. Throws on a non-2xx so the surface shows a load error. */
 export async function fetchUsers(): Promise<readonly PrincipalRow[]> {
@@ -53,12 +53,66 @@ export function useGroups(): UseQueryResult<readonly GroupCard[]> {
   return useQuery({ queryKey: ['groups'], queryFn: fetchGroups });
 }
 
-/** A `groups.create` refusal, typed for the form (409 duplicate vs 400 malformed vs denial). */
+/** A users/groups command refusal, typed for the form (409 duplicate vs 400 malformed vs denial). */
 export class GroupCreateError extends Error {
   constructor(readonly status: number) {
-    super(`group create failed: ${String(status)}`);
+    super(`command failed: ${String(status)}`);
     this.name = 'GroupCreateError';
   }
+}
+
+/** POST a users-surface command; throws the typed refusal on a non-2xx. */
+async function postCommand(url: string, body: unknown): Promise<ProvisionReceipt> {
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new GroupCreateError(res.status);
+  }
+  return (await res.json()) as ProvisionReceipt;
+}
+
+/** Invalidate the directory reads after a committed command (the table shows the ENGINE's record). */
+function useInvalidateDirectory(): () => void {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: ['users'] });
+    void queryClient.invalidateQueries({ queryKey: ['groups'] });
+  };
+}
+
+/** Provision a local principal (`users.create` -> crdb PRINCIPAL_CREATE, audited, 409 on duplicate). */
+export function useCreateUser(): UseMutationResult<ProvisionReceipt, Error, PrincipalDraft> {
+  const invalidate = useInvalidateDirectory();
+  return useMutation({
+    mutationFn: (draft) => postCommand('/api/users', draft),
+    onSuccess: invalidate,
+  });
+}
+
+/** Edit a local principal's enterprise fields (`users.edit` -> crdb PRINCIPAL_EDIT, audited). */
+export function useEditUser(): UseMutationResult<ProvisionReceipt, Error, PrincipalDraft> {
+  const invalidate = useInvalidateDirectory();
+  return useMutation({
+    mutationFn: (draft) => postCommand('/api/users/edit', draft),
+    onSuccess: invalidate,
+  });
+}
+
+/** Transition a local principal's lifecycle (`users.setStatus`; never a delete). */
+export function useSetUserStatus(): UseMutationResult<
+  ProvisionReceipt,
+  Error,
+  { username: string; status: 'active' | 'suspended' | 'revoked' }
+> {
+  const invalidate = useInvalidateDirectory();
+  return useMutation({
+    mutationFn: (input) => postCommand('/api/users/status', input),
+    onSuccess: invalidate,
+  });
 }
 
 /**

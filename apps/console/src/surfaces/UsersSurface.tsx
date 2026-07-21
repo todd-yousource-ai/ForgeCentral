@@ -14,8 +14,16 @@
 //   * An empty tenant renders the honest empty state; a failed read renders the error state.
 
 import { useMemo, useState, type ReactElement } from 'react';
-import { Badge, DataTable, TabStrip, type BadgeVariant, type DataTableColumn } from '@forge/design';
+import {
+  Badge,
+  ConfirmDialog,
+  DataTable,
+  TabStrip,
+  type BadgeVariant,
+  type DataTableColumn,
+} from '@forge/design';
 import type {
+  PrincipalDraft,
   PrincipalKind,
   PrincipalOrigin,
   PrincipalRow,
@@ -32,7 +40,15 @@ import { principalId } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { useDrawer } from '../shell/DrawerHost.js';
-import { GroupCreateError, useCreateGroup, useGroups, useUsers } from './useUsers.js';
+import {
+  GroupCreateError,
+  useCreateGroup,
+  useCreateUser,
+  useEditUser,
+  useGroups,
+  useSetUserStatus,
+  useUsers,
+} from './useUsers.js';
 
 /** The lifecycle badge color: active reads calm, suspended warns, revoked/compromised alarm. */
 function statusVariant(status: PrincipalStatus): BadgeVariant {
@@ -60,11 +76,124 @@ function kindLabel(kind: PrincipalKind): string {
   }
 }
 
+/** The typed failure line a command form renders (409 duplicate vs 400 malformed vs a denial). */
+function commandFailure(error: Error | null): string | null {
+  if (error === null) return null;
+  if (error instanceof GroupCreateError) {
+    if (error.status === 409) return 'A principal with that username already exists.';
+    if (error.status === 400) return 'The form is incomplete or malformed.';
+    return 'The engine refused the command.';
+  }
+  return 'The command could not reach the engine.';
+}
+
+/**
+ * The Add / Edit User form (UY.6): the mock's form MINUS every trust field (operator ruling
+ * 2026-07-21 -- no Trust Score Threshold Override exists). `users.create` provisions a local
+ * enterprise record (TRD-35 6.3); edit re-writes its enterprise fields (the username is the
+ * natural key and read-only on edit).
+ */
+function UserForm({
+  editing,
+  onDone,
+}: {
+  readonly editing: PrincipalRow | null;
+  readonly onDone: () => void;
+}): ReactElement {
+  const create = useCreateUser();
+  const edit = useEditUser();
+  const active = editing === null ? create : edit;
+  const [username, setUsername] = useState(editing?.username ?? '');
+  const [kind, setKind] = useState<'human' | 'service'>(
+    editing !== null && editing.kind === 'service' ? 'service' : 'human',
+  );
+  const [email, setEmail] = useState(editing?.email ?? '');
+  const [org, setOrg] = useState(editing?.org ?? '');
+
+  const submit = (): void => {
+    const draft: PrincipalDraft = {
+      username: username.trim(),
+      kind,
+      email: email.trim() === '' ? null : email.trim(),
+      org: org.trim() === '' ? null : org.trim(),
+    };
+    active.mutate(draft, { onSuccess: onDone });
+  };
+  const failure = commandFailure(active.error);
+
+  return (
+    <form
+      className="fcx-users-create"
+      aria-label={editing === null ? 'Add a user' : `Edit ${editing.username}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <label className="fcx-filter">
+        User Name
+        <input
+          className="fcx-input"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          readOnly={editing !== null}
+          required
+        />
+      </label>
+      <label className="fcx-filter">
+        Type
+        <select
+          className="fcx-select"
+          value={kind}
+          onChange={(e) => setKind(e.target.value === 'service' ? 'service' : 'human')}
+        >
+          <option value="human">Human</option>
+          <option value="service">Service Account</option>
+        </select>
+      </label>
+      <label className="fcx-filter">
+        Email Address
+        <input
+          type="email"
+          className="fcx-input"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </label>
+      <label className="fcx-filter">
+        Organization
+        <input className="fcx-input" value={org} onChange={(e) => setOrg(e.target.value)} />
+      </label>
+      <button
+        type="submit"
+        className="fcx-btn fcx-btn--primary"
+        disabled={active.isPending || username.trim() === ''}
+      >
+        {active.isPending ? 'Committing...' : editing === null ? 'Create User' : 'Save'}
+      </button>
+      <button type="button" className="fcx-btn" onClick={onDone}>
+        Cancel
+      </button>
+      {failure !== null ? (
+        <p role="alert" className="fcx-form-error">
+          {failure}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 /** The All Users tab: controls + the directory table. */
 function AllUsers({ initialSearch }: { readonly initialSearch: string }): ReactElement {
   const users = useUsers();
   const drawer = useDrawer();
+  const statusMutation = useSetUserStatus();
   const [search, setSearch] = useState(initialSearch);
+  const [form, setForm] = useState<'closed' | 'add' | PrincipalRow>('closed');
+  const [confirming, setConfirming] = useState<{
+    row: PrincipalRow;
+    status: 'active' | 'suspended' | 'revoked';
+  } | null>(null);
   const [kind, setKind] = useState<'' | PrincipalKind>('');
   const [status, setStatus] = useState<'' | PrincipalStatus>('');
   const [origin, setOrigin] = useState<'' | PrincipalOrigin>('');
@@ -128,6 +257,65 @@ function AllUsers({ initialSearch }: { readonly initialSearch: string }): ReactE
       // No engine substrate yet (TRD-CONSOLE-04): these render blank, never a guess.
       { id: 'remote', header: 'Remote', cell: () => '--', width: '6rem' },
       { id: 'compliance', header: 'Compliance', cell: () => '--', width: '7rem' },
+      {
+        id: 'actions',
+        header: 'Actions',
+        // Lifecycle commands apply to LOCAL enterprise records only (the engine refuses a
+        // non-local subject); an observed account's cell stays honestly empty.
+        cell: (r) =>
+          r.origin === 'local' ? (
+            <span className="fcx-users-actions">
+              <button
+                type="button"
+                className="fcx-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setForm(r);
+                }}
+              >
+                Edit
+              </button>
+              {r.status === 'active' ? (
+                <button
+                  type="button"
+                  className="fcx-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirming({ row: r, status: 'suspended' });
+                  }}
+                >
+                  Suspend
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="fcx-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirming({ row: r, status: 'active' });
+                  }}
+                >
+                  Activate
+                </button>
+              )}
+              {r.status === 'revoked' ? null : (
+                <button
+                  type="button"
+                  className="fcx-btn fcx-btn--danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirming({ row: r, status: 'revoked' });
+                  }}
+                >
+                  Revoke
+                </button>
+              )}
+            </span>
+          ) : (
+            '--'
+          ),
+        width: '13rem',
+      },
     ],
     [],
   );
@@ -142,6 +330,13 @@ function AllUsers({ initialSearch }: { readonly initialSearch: string }): ReactE
   return (
     <>
       <div className="fcx-surface__controls">
+        <button
+          type="button"
+          className="fcx-btn fcx-btn--primary"
+          onClick={() => setForm((f) => (f === 'add' ? 'closed' : 'add'))}
+        >
+          + Add
+        </button>
         <input
           type="search"
           className="fcx-input"
@@ -196,6 +391,34 @@ function AllUsers({ initialSearch }: { readonly initialSearch: string }): ReactE
           </select>
         </label>
       </div>
+
+      {form !== 'closed' ? (
+        <UserForm editing={form === 'add' ? null : form} onDone={() => setForm('closed')} />
+      ) : null}
+
+      <ConfirmDialog
+        open={confirming !== null}
+        title={
+          confirming !== null
+            ? `${confirming.status === 'active' ? 'Activate' : confirming.status === 'suspended' ? 'Suspend' : 'Revoke'} ${confirming.row.username}?`
+            : ''
+        }
+        {...(confirming?.status === 'revoked'
+          ? {
+              description:
+                'Revocation closes access; the record stays in history and is never deleted.',
+              tone: 'critical' as const,
+            }
+          : {})}
+        confirmLabel="Commit"
+        onConfirm={() => {
+          if (confirming !== null) {
+            statusMutation.mutate({ username: confirming.row.username, status: confirming.status });
+          }
+          setConfirming(null);
+        }}
+        onCancel={() => setConfirming(null)}
+      />
 
       {users.isLoading ? (
         <LoadingState label="Loading the principal directory" />
