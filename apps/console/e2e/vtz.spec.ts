@@ -361,26 +361,7 @@ test('a new zone nests under the chosen parent and commits on confirm', async ({
   expect((state.sent[0]?.body as { name: string }).name).toBe('YouSource.Corp.New');
 });
 
-test('the distribution ledger shows who has a zone policy and re-distributes to them (<= 3 clicks)', async ({
-  page,
-}) => {
-  const state = await mockBff(page);
-  await page.goto('/vtz');
-
-  // 1 click: open the zone. Its authoring view carries the distribution ledger.
-  await page.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }).click();
-
-  const panel = page.getByRole('region', { name: 'Policy distribution' });
-  await expect(panel).toBeVisible();
-  // The three states an operator must tell apart, the rejection carrying its reason.
-  await expect(panel.getByText('a.box')).toBeVisible();
-  await expect(panel.getByText('Applied')).toBeVisible();
-  await expect(panel.getByText(/Rejected: SignatureInvalid/)).toBeVisible();
-  await expect(panel.getByText('No confirmation')).toBeVisible();
-
-  // 2 clicks: re-distribute the freshly composed policy to exactly the current scope.
-  await panel.getByRole('button', { name: /Commit & re-distribute to 3 endpoints/ }).click();
-
-  await expect.poll(() => state.distributed.length).toBe(1);
-  expect(state.distributed[0]?.body).toEqual({ members: ['a.box', 'b.box', 'c.box'] });
-});
+// The FD.7c distribution-ledger e2e was REMOVED with the panel (surface-placement ruling
+// 2026-07-21: policy composes/pushes from the Policy tab, never the VTZ surface -- see
+// IP-CONSOLE-02-FORGE-DISTRIBUTION.md). The spec re-lands with the Policy-tab PR that re-homes
+// the panel; version control preserves the original test.
