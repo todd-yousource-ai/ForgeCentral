@@ -17,6 +17,7 @@ import {
   resolveObjectCatalog,
   resolveObjectDetail,
 } from '../src/engine/objects.js';
+import { resolveEntityDetail } from '../src/engine/entity-detail.js';
 import type { ObjectDraft } from '@forge/contracts';
 
 const PRINCIPAL: OperatorPrincipal = {
@@ -133,6 +134,45 @@ describe('the O10.3 command resolvers', () => {
   it('objects.delete returns the mutated name', () => {
     return resolveDeleteObject(engineWith({}), PRINCIPAL, 'corp-subnet').then((r) => {
       expect(r).toEqual({ name: 'corp-subnet' });
+    });
+  });
+});
+
+describe('the drawer resolves an object ref (O10.4)', () => {
+  it('projects header + info (selector, members, lifecycle) and PENDING governing policies', () => {
+    const engine = engineWith({ detail: { record: ipObject, members: ['10.8.0.9:443'] } });
+    return resolveEntityDetail(engine, PRINCIPAL, {
+      kind: 'object',
+      id: 'corp-subnet',
+    } as Parameters<typeof resolveEntityDetail>[2]).then((view) => {
+      expect(view.header.status).toBe('ok');
+      if (view.header.status === 'ok') {
+        expect(view.header.data.displayName).toBe('corp-subnet');
+        expect(view.header.data.kindLabel).toBe('Network');
+      }
+      expect(view.info.status).toBe('ok');
+      if (view.info.status === 'ok') {
+        expect(view.info.data.tags).toContain('selector=CIDR 10.8.0.0/16');
+        expect(view.info.data.tags).toContain('member=10.8.0.9:443');
+        expect(view.info.data.tags).toContain('lifecycle=published');
+        for (const tag of view.info.data.tags) {
+          expect(tag.toLowerCase()).not.toContain('posture');
+        }
+      }
+      // Governing policies are the Policy epic; capabilities/zones/decisions are not-applicable.
+      expect(view.effectivePolicies.status).toBe('pending');
+      expect(view.capabilities.status).toBe('not-applicable');
+      expect(view.recentDecisions.status).toBe('not-applicable');
+    });
+  });
+
+  it('an unknown object name renders honest empty header/info', () => {
+    return resolveEntityDetail(engineWith({}), PRINCIPAL, {
+      kind: 'object',
+      id: 'nope',
+    } as Parameters<typeof resolveEntityDetail>[2]).then((view) => {
+      expect(view.header.status).toBe('empty');
+      expect(view.info.status).toBe('empty');
     });
   });
 });

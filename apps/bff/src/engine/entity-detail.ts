@@ -13,6 +13,7 @@ import type {
   AgentCapabilityRow,
   CapabilitiesView,
   DecisionStatus,
+  EffectivePoliciesView,
   EntityDetailView,
   EntityInfoView,
   EntityRef,
@@ -22,12 +23,13 @@ import type {
   RecentDecisionRow,
   RecentDecisionsView,
   SectionState,
+  ZonesView,
   WireAgentRecord,
   WireDecisionRow,
   WireQueryRows,
   WireValue,
 } from '@forge/contracts';
-import { decisionId, toPrincipalRows } from '@forge/contracts';
+import { decisionId, objectKindLabel, toObjectDetail, toPrincipalRows } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -203,12 +205,88 @@ function toConstructionRows(rows: WireQueryRows): AgentCapabilityRow[] {
  * each section resolves independently and degrades to `error`/`empty`/`pending` without failing the whole
  * drawer. No fabricated section.
  */
+/**
+ * The object-ref drawer detail (O10.4): the named object + its READ-TIME resolved members, projected
+ * to the shared drawer sections. Header = name + kind label; info = the selector, lifecycle, tags, and
+ * each resolved member as a tag (empty when nothing matches -- declarative); governing policies are
+ * PENDING (the Policy epic, TRD-CONSOLE-05); zones/capabilities/decisions are not-applicable to a noun.
+ */
+async function resolveObjectEntity(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  ref: EntityRef,
+  opts?: EngineCallOptions,
+): Promise<EntityDetailView> {
+  let detail;
+  try {
+    detail = toObjectDetail(
+      await engine.objectDetail(principal, { request_id: 0, name: ref.id }, opts),
+    );
+  } catch {
+    detail = null;
+  }
+  const pendingPolicies: SectionState<EffectivePoliciesView> = {
+    status: 'pending',
+    owningRepo: 'crdb',
+    gatingTask: 'TRD-CONSOLE-05 Policy surface (object -> governing-policy resolution)',
+  };
+  const base = {
+    ref,
+    zones: { status: 'not-applicable' } as SectionState<ZonesView>,
+    capabilities: { status: 'not-applicable' } as SectionState<CapabilitiesView>,
+    effectivePolicies: pendingPolicies,
+    recentDecisions: { status: 'not-applicable' } as SectionState<RecentDecisionsView>,
+  };
+  if (detail === null) {
+    return {
+      ...base,
+      header: { status: 'error', message: 'object registry unavailable' },
+      info: { status: 'error', message: 'object registry unavailable' },
+    };
+  }
+  const object = detail.object;
+  if (object === null) {
+    return { ...base, header: { status: 'empty' }, info: { status: 'empty' } };
+  }
+  const selectorLabel =
+    object.selectorKind === 'cidr'
+      ? 'CIDR'
+      : object.selectorKind === 'group_ref'
+        ? 'group'
+        : object.selectorKind;
+  const tags = [
+    `selector=${selectorLabel} ${object.selectorValue}`,
+    `lifecycle=${object.lifecycle}`,
+    ...object.tags.map((t) => `tag=${t}`),
+    ...object.attributes.map((a) => `attribute=${a}`),
+    ...detail.members.map((m) => `member=${m}`),
+  ];
+  return {
+    ...base,
+    header: {
+      status: 'ok',
+      data: {
+        displayName: object.name,
+        kindLabel: objectKindLabel(object.kind),
+        status: 'unknown',
+      },
+    },
+    info: { status: 'ok', data: { enrolledAt: 0, tags } },
+  };
+}
+
 export async function resolveEntityDetail(
   engine: OperatorEngine,
   principal: OperatorPrincipal,
   ref: EntityRef,
   opts?: EngineCallOptions,
 ): Promise<EntityDetailView> {
+  // O10.4: an object ref resolves from the named-object registry (OBJECT_DETAIL): header + info
+  // (selector + read-time members + tags + lifecycle), governing policies PENDING (the Policy epic),
+  // and the agent-only / decision sections not-applicable. An object is a noun -- no posture here.
+  if (ref.kind === 'object') {
+    return resolveObjectEntity(engine, principal, ref, opts);
+  }
   const [directory, principals, decisions, capabilities, construction] = await Promise.allSettled([
     engine.listAgents(principal, { request_id: 0 }, opts),
     // The LUG principal directory (LIST_PRINCIPALS, ER.6): a `principal` ref that is not an agent

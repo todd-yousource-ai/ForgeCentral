@@ -14,9 +14,10 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { Badge, ConfirmDialog, type BadgeVariant } from '@forge/design';
 import type { ObjectCard, ObjectDraft, ObjectKind, SelectorKind } from '@forge/contracts';
-import { OBJECT_KINDS, objectKindLabel } from '@forge/contracts';
+import { OBJECT_KINDS, objectId, objectKindLabel } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { useDrawer } from '../shell/DrawerHost.js';
 import { ObjectCommandError, useDeleteObject, useObjectWrite, useObjects } from './useObjects.js';
 
 /** The selector rendered in its typed form, e.g. `CIDR 10.8.0.0/16` or `glob prod-*`. */
@@ -197,6 +198,7 @@ function ObjectForm({
 export function ObjectsSurface(): ReactElement {
   const objects = useObjects();
   const deleteObject = useDeleteObject();
+  const drawer = useDrawer();
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState<'' | ObjectKind>('');
   const [form, setForm] = useState<'closed' | 'add' | ObjectCard>('closed');
@@ -321,9 +323,23 @@ export function ObjectsSurface(): ReactElement {
               <h3 className="fcx-surface__subheading">{objectKindLabel(group.kind)}</h3>
               <div className="fcx-objects-grid" role="list">
                 {group.items.map((o) => (
-                  <article key={o.name} role="listitem" className="fcx-object-card">
+                  <article
+                    key={o.name}
+                    role="listitem"
+                    className="fcx-object-card"
+                    onMouseEnter={() =>
+                      drawer.prefetchEntity({ kind: 'object', id: objectId(o.name) })
+                    }
+                  >
                     <div className="fcx-object-card__head">
-                      <h4 className="fcx-object-card__name">{o.name}</h4>
+                      <button
+                        type="button"
+                        className="fcx-object-card__name fcx-btn--link"
+                        onClick={() => drawer.openEntity({ kind: 'object', id: objectId(o.name) })}
+                        aria-label={`Open the drawer for ${o.name}`}
+                      >
+                        {o.name}
+                      </button>
                       <Badge variant={lifecycleVariant(o)}>{o.lifecycle}</Badge>
                     </div>
                     <p className="fcx-object-card__selector">{selectorText(o)}</p>
