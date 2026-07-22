@@ -14,24 +14,29 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   IP-address objects first-class (no CIDR form existed -- the operator's directive).
 - **Cross-repo prerequisite:** the crdb substrate (`crdb IP-CONSOLE-OBJECT-SUBSTRATE`, OB.1-OB.N,
   authored the same date). Engine-first: OB.1-OB.3 unblock O10.1/O10.2; OB.4 unblocks O10.3.
-- **Next action:** crdb **OB.1** (the `Selector::Cidr` shared-type + TRD-32 v2 Section 18
-  amendment), then the OB roster; FC O10.1 starts after OB.3's schema regen.
+- **crdb SUBSTRATE COMPLETE (OB.1-OB.N + OB.5 DataStore, crdb main `51efb8e8`).** FC **O10.1 LANDED
+  2026-07-22:** schema revendored + codegen'd (all object DTOs incl. DataStore); `objects.ts`
+  view models + fail-closed projections; `objects.*` bindings LIVE (governingPolicies PENDING ->
+  Policy epic). Declarative/honest-empty member contract encoded.
+- **Next action:** **O10.2** -- the catalog read + kind-grouped card grid (wire codecs + delegated
+  engine actions for the two reads, `GET /api/objects` + `/api/objects/detail`, the surface grouped
+  by ObjectKind with search + kind filter). Then O10.3 commands -> O10.4 drawer -> O10.N capstone.
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
 | Id | Deliverable | Status | Commit |
 |----|-------------|--------|--------|
-| OB.1 | `Selector::Cidr` + TRD-32 v2 grammar amendment | PLANNED | -- |
-| OB.2 | `NamedObjectRecord` + keyspace + audited store | PLANNED | -- |
-| OB.3 | `OBJECT_LIST`/`OBJECT_DETAIL` read verbs + schema regen | PLANNED | -- |
-| OB.4 | `OBJECT_CREATE/EDIT/DELETE` audited commands | PLANNED | -- |
-| OB.N | in-process capstone | PLANNED | -- |
+| `Selector::Cidr` + TRD-32 v2 grammar amendment | PLANNED | -- |
+| `NamedObjectRecord` + keyspace + audited store | PLANNED | -- |
+| `OBJECT_LIST`/`OBJECT_DETAIL` read verbs + schema regen | PLANNED | -- |
+| `OBJECT_CREATE/EDIT/DELETE` audited commands | PLANNED | -- |
+| in-process capstone | PLANNED | -- |
 
 ## Roster (Console PRs)
 
 | Step | Invariant | Status | Commit | Note |
 |------|-----------|--------|--------|------|
-| O10.1 | `INV-CONSOLE-OBJECTS-CONTRACT` | PLANNED | -- | after OB.3 schema regen |
+| O10.1 | `INV-CONSOLE-OBJECTS-CONTRACT` | LANDED | `85dd550` | schema revendored (OB.1-OB.5 DTOs codegen'd); `objects.ts` view models (ObjectCard/ObjectDetailView/ObjectDraft) + fail-closed projections (whole-catalog collapse; declarative honest-empty members); DataStore kind + label; 3 live reads (governingPolicies PENDING) + 3 live commands registered; 14 tier-1 tests incl. no-posture structural assertion |
 | O10.2 | `INV-CONSOLE-OBJECTS-CATALOG` | PLANNED | -- | kind-grouped card grid |
 | O10.3 | `INV-CONSOLE-OBJECTS-COMMAND` | PLANNED | -- | after OB.4; kind-appropriate selector inputs |
 | O10.4 | `INV-CONSOLE-3-CLICKS` | PLANNED | -- | drawer + read-time members; policies panel PENDING (CONSOLE-05) |
