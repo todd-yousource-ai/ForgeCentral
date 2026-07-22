@@ -26,11 +26,17 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   registry order (the prototype's kind sections), search + kind filter narrowing the COMPLETE bounded
   catalog, the typed selector on each card (`CIDR 10.8.0.0/16`), lifecycle badge; NO posture control
   anywhere. 5 BFF resolver tests; full gate + local Playwright (20) green.
-- **Next action:** **O10.3** -- Create/Edit/Delete: `OBJECT_CREATE/EDIT/DELETE` codecs + delegated
-  actions + POST routes (typed 409/400/403), the Create Object form w/ kind select + kind-appropriate
-  selector input (CIDR for Network, path glob for Script/DataStore, group name for Group, exact for
-  Server/Service), delete confirm; NO apply/enforce control (structurally tested). Then O10.4 drawer
-  (read-time members) -> O10.N capstone + box redeploy.
+- **O10.3 LANDED (2026-07-22):** the command surface. Wire: `ObjectCreate/Edit/Delete` codecs (spec
+  optionals omitted). BFF: three delegated actions + resolvers + the POST route family
+  (`/api/objects` create, `/edit`, `/delete`) w/ typed refusal mapping + fail-closed draft parse.
+  SPA: "+ Create Object" -> the Create/Edit form (name/kind/selector/value/description -- NO posture
+  field); the KIND drives the selector input (Network->CIDR, Group->group name, Script/DataStore->
+  path glob, Server/Service->exact/glob) w/ per-kind hints; per-card Edit + Delete behind a critical
+  ConfirmDialog ("changes no enforcement; re-author on the Policy tab"). Success refetches. 2 command
+  resolver tests; full gate + local Playwright (20) green.
+- **Next action:** **O10.4** -- the drawer: a card opens the entity drawer for the object (identity +
+  selector + the READ-TIME resolved members via `objects.detail`); governing-policies panel PENDING
+  (CONSOLE-05). Then O10.N capstone + box redeploy.
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -48,6 +54,6 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 |------|-----------|--------|--------|------|
 | O10.1 | `INV-CONSOLE-OBJECTS-CONTRACT` | LANDED | `85dd550` | schema revendored (OB.1-OB.5 DTOs codegen'd); `objects.ts` view models (ObjectCard/ObjectDetailView/ObjectDraft) + fail-closed projections (whole-catalog collapse; declarative honest-empty members); DataStore kind + label; 3 live reads (governingPolicies PENDING) + 3 live commands registered; 14 tier-1 tests incl. no-posture structural assertion |
 | O10.2 | `INV-CONSOLE-OBJECTS-CATALOG` | LANDED | `4903657` | wire codecs (ObjectList/ObjectDetail) + delegated engine actions; `engine/objects.ts` resolvers (whole-catalog fail-closed collapse; declarative honest-empty detail) + `GET /api/objects`(+`/detail`); the `objects` surface = kind-grouped card grid (registry order, matching the prototype sections) w/ search + kind filter, typed selector rendered per card, NO posture control; `objects` destination replaces its placeholder. 5 BFF resolver tests + suites green |
-| O10.3 | `INV-CONSOLE-OBJECTS-COMMAND` | PLANNED | -- | after OB.4; kind-appropriate selector inputs |
+| O10.3 | `INV-CONSOLE-OBJECTS-COMMAND` | LANDED | `8f5f95e` | the three OBJECT commands end to end (codecs + delegated actions + POST routes w/ typed 409/400/403 + fail-closed draft parse); Create/Edit Object form w/ kind select -> kind-appropriate selector input (Network->CIDR, Group->group name, Script/DataStore->path glob, Server/Service->exact/glob) + per-card Edit + Delete-behind-critical-ConfirmDialog; NO apply/enforce control anywhere; success refetches (the card is the engine record). 2 command resolver tests |
 | O10.4 | `INV-CONSOLE-3-CLICKS` | PLANNED | -- | drawer + read-time members; policies panel PENDING (CONSOLE-05) |
 | O10.N | `INV-CONSOLE-OBJECTS-COMPLETE` | PLANNED | -- | Playwright capstone + no-apply structural sweep + box redeploy |
