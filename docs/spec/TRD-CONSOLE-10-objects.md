@@ -22,6 +22,19 @@ to, and the destination side of the Overview graph. Mock target: `shot-11`.
    **`Selector` gains a `Cidr` form** (TRD-32 v2 amendment, same date) so real IP-address/subnet
    objects are expressible (`Network` + `Cidr(10.8.0.0/16)`); a glob over IP strings is not a
    subnet match.
+4. **Objects are DECLARATIVE -- no active LEG entity is required to register one** (clarification
+   2026-07-22). Creating an object is authoring intent, not observing presence: the engine performs
+   no entity lookup on create, so `Server: prod-*`, a data store, or `Network: 10.8.0.0/16` can be
+   catalogued before anything by that name is ever seen. `objects.detail` resolves the selector
+   against whatever is observed AT READ TIME and returns an honest empty member list until a match
+   exists -- the object is the declared noun, resolution is the current reality.
+5. **Storage is `DataStore`, not `Uri`** (amendment 2026-07-22). Data at rest -- a database, bucket,
+   file share, or file/folder path -- is the `DataStore` kind (the policy peer of the Overview
+   `data-stores` class), NOT `Uri` (a network endpoint you connect to). File vs folder is selector
+   granularity: an `Exact` path is a file, a path `Glob` (`/data/phi/**`) a folder tree, an `Exact`
+   locator a bucket/share/DB. Live member resolution for `DataStore` is a named deferral (storage
+   entities are reached by read/write observation, not the network connectivity scan), so its member
+   list is honest-empty until that substrate lands -- the object still governs policy meanwhile.
 
 ---
 
