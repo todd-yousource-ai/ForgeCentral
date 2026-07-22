@@ -40,7 +40,34 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   governing-policies section PENDING (Policy epic), and zones/capabilities/decisions not-applicable
   (an object is a noun). The card name is a drawer-opening button (hover prefetch). 3-click: card ->
   drawer (1). 2 drawer tests; full gate + local Playwright (20) green.
-- **Next action:** **O10.N** -- the Playwright capstone (kind-grouped catalog over a mocked BFF;
+
+## IP-CONSOLE-10 surface COMPLETE (2026-07-22)
+
+**Every roster row LANDED; the crdb substrate is complete + gated; the FC surface is built + gated
+(24 e2e).** Remaining: the box redeploy so the live node serves the whole Objects surface (folds in
+like the Users precedent -- systemd restart of cdb + console-bff, operator-confirmed).
+
+### Acceptance sweep (TRD-CONSOLE-10 Section 6)
+
+| Acceptance row | Proven by |
+|---|---|
+| Every object + type/classification derives from a real engine record; no fabricated object | contract fail-closed projections (whole-catalog collapse) + BFF resolver tests + capstone empty-tenant test + fixtureless placeholder discipline |
+| Type maps to the real ObjectKind registry | the shared TRD-32 v2 ObjectKind is the taxonomy; capstone groups by kind; kernel not operator-authored (Framing) |
+| **No apply/enforce/posture control anywhere (noun-only)** | STRUCTURAL: the record type has no posture field (crdb); contract no-posture test; capstone control-sweep (`apply`/`enforce`/`posture`/`distribute` = 0 buttons); the drawer's governing-policies is the only cross-surface link (PENDING -> CONSOLE-05) |
+| Objects are DECLARATIVE (no active LEG entity required) | crdb create does no LEG lookup (OB.2); detail resolves at read time, honest-empty; contract + capstone assert empty-member objects |
+| The governing-policies panel is the engine's real resolution | PENDING binding naming TRD-CONSOLE-05 (the Policy epic is the only binder) -- honest, not stubbed |
+| Create/edit commits through the engine with audit + confirm-gated | crdb audited OBJECT_CREATE/EDIT/DELETE (OB.4) + delegated BFF actions + typed 409/400/403 + delete ConfirmDialog; capstone asserts the exact POST bodies |
+| Section 4 three-click tasks within budget | capstone: card->drawer (1); Create(1)->form(2)->Create Object(3); delete card-action(1)->confirm(2) |
+
+### Named deferrals (honest, gating work named)
+- `objects.governingPolicies`: TRD-CONSOLE-05 (the Policy epic; an object never applies policy).
+- DataStore live member resolution: storage entities are reached by Reads/Writes observation, not
+  the network ConnectsTo scan -- honest-empty until that substrate lands (the object still governs).
+- Application/Certificate/Script live members: no observed LEG source yet (honest-empty).
+- torch-forge Cidr + DataStore pin bump: the Policy epic (when rules reference catalog objects).
+- Live :7878 drive over real mTLS: the box redeploy (this ledger's remaining item).
+
+- **Next action (superseded):** O10.N Playwright capstone (kind-grouped catalog over a mocked BFF;
   Create a Network+CIDR + a DataStore; malformed-selector 400; edit; delete confirm; the card ->
   drawer with read-time members; a structural no-apply/no-posture sweep; the empty tenant honest)
   + acceptance sweep + the box redeploy so the live node serves the whole Objects surface.
@@ -63,4 +90,4 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | O10.2 | `INV-CONSOLE-OBJECTS-CATALOG` | LANDED | `4903657` | wire codecs (ObjectList/ObjectDetail) + delegated engine actions; `engine/objects.ts` resolvers (whole-catalog fail-closed collapse; declarative honest-empty detail) + `GET /api/objects`(+`/detail`); the `objects` surface = kind-grouped card grid (registry order, matching the prototype sections) w/ search + kind filter, typed selector rendered per card, NO posture control; `objects` destination replaces its placeholder. 5 BFF resolver tests + suites green |
 | O10.3 | `INV-CONSOLE-OBJECTS-COMMAND` | LANDED | `8f5f95e` | the three OBJECT commands end to end (codecs + delegated actions + POST routes w/ typed 409/400/403 + fail-closed draft parse); Create/Edit Object form w/ kind select -> kind-appropriate selector input (Network->CIDR, Group->group name, Script/DataStore->path glob, Server/Service->exact/glob) + per-card Edit + Delete-behind-critical-ConfirmDialog; NO apply/enforce control anywhere; success refetches (the card is the engine record). 2 command resolver tests |
 | O10.4 | `INV-CONSOLE-3-CLICKS` | LANDED | `15d41ff` | a card's name opens the entity drawer for the object (`resolveEntityDetail` gained an object branch over `objects.detail`): header = name + kind label; info = selector + lifecycle + tags + the READ-TIME resolved members (each a tag); governing-policies (effectivePolicies) PENDING naming CONSOLE-05; zones/capabilities/decisions not-applicable (a noun); hover prefetch. 2 drawer tests |
-| O10.N | `INV-CONSOLE-OBJECTS-COMPLETE` | PLANNED | -- | Playwright capstone + no-apply structural sweep + box redeploy |
+| O10.N | `INV-CONSOLE-OBJECTS-COMPLETE` | LANDED (surface); box redeploy PENDING | `3c95c37` | 4-test Playwright capstone (`objects.spec.ts`): kind-grouped catalog + no-apply/no-posture structural sweep + kind filter + card->drawer w/ read-time member; Create a Network+CIDR (kind drives selector=cidr) appears as engine record; DataStore authorable w/ path glob; delete behind the "changes no enforcement" confirm; empty tenant honest. Acceptance sweep below. |
