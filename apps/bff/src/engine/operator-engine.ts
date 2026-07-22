@@ -28,6 +28,10 @@ import type {
   WireGroupSetMembers,
   WireGroupWrite,
   WireListAgents,
+  WireObjectCatalog,
+  WireObjectDetail,
+  WireObjectDetailQuery,
+  WireObjectList,
   WireListGroups,
   WireListPrincipals,
   WireLugProvisioned,
@@ -67,6 +71,8 @@ export type EngineAction =
   | 'listAgents'
   | 'listPrincipals'
   | 'listGroups'
+  | 'objectList'
+  | 'objectDetail'
   | 'groupCreate'
   | 'groupEdit'
   | 'groupSetMembers'
@@ -154,6 +160,18 @@ export interface OperatorEngine {
     request: WireGroupWrite,
     opts?: EngineCallOptions,
   ): Promise<WireLugProvisioned>;
+  /** List the named-object catalog (OBJECT_LIST) on behalf of `principal`. */
+  objectList(
+    principal: OperatorPrincipal,
+    request: WireObjectList,
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectCatalog>;
+  /** Read one object + its members (OBJECT_DETAIL) on behalf of `principal`. */
+  objectDetail(
+    principal: OperatorPrincipal,
+    request: WireObjectDetailQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectDetail>;
   /** Edit an enterprise group (GROUP_EDIT) on behalf of `principal`, audited. */
   groupEdit(
     principal: OperatorPrincipal,
@@ -346,6 +364,16 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'groupCreate', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.groupCreate({ ...request, operator }, opts);
+    },
+    objectList: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'objectList', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.objectList({ ...request, operator }, opts);
+    },
+    objectDetail: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'objectDetail', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.objectDetail({ ...request, operator }, opts);
     },
     groupEdit: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'groupEdit', request.request_id));

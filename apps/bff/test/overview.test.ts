@@ -47,6 +47,8 @@ function engineWith(graph: WireConnectivityGraph): {
     principalEdit: unused,
     principalSetStatus: unused,
     listGroups: unused,
+    objectList: unused,
+    objectDetail: unused,
     entityDecisions: unused,
     entityConnections: unused,
     connectivityGraph: (_principal, request) => {
@@ -213,6 +215,8 @@ describe('resolveEntityConnections (O1.6a)', () => {
       principalEdit: unused,
       principalSetStatus: unused,
       listGroups: unused,
+      objectList: unused,
+      objectDetail: unused,
       entityDecisions: unused,
       entityConnections: (_p, request) => {
         seen.push(request);
@@ -288,6 +292,8 @@ describe('resolveClassMembers (O1.6b)', () => {
       principalEdit: unused,
       principalSetStatus: unused,
       listGroups: unused,
+      objectList: unused,
+      objectDetail: unused,
       entityDecisions: unused,
       entityConnections: unused,
       connectivityGraph: unused,
