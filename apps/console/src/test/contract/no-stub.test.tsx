@@ -15,7 +15,16 @@ import { renderWithProviders, TEST_OPERATOR } from '../render.js';
 // placeholder, this test proves nothing fake ships from the shell.
 
 /** The binding prefixes registered by a landed surface contract. A new surface adds its prefix here. */
-const REGISTERED_PREFIXES = ['entity.', 'logs.', 'overview.', 'vtz.', 'users.', 'groups.', 'idam.'];
+const REGISTERED_PREFIXES = [
+  'entity.',
+  'logs.',
+  'overview.',
+  'vtz.',
+  'users.',
+  'groups.',
+  'idam.',
+  'objects.',
+];
 
 describe('no-stub contract (F0.8 shell)', () => {
   it('binds no surface data in the shell (the registry holds only registered surface contracts, unconsumed)', () => {

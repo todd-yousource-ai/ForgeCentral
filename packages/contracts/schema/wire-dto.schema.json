@@ -1743,6 +1743,274 @@
       ],
       "type": "object"
     },
+    "WireObjectCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "objects": {
+          "items": {
+            "$ref": "#/$defs/WireObjectRecord"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "objects"
+      ],
+      "type": "object"
+    },
+    "WireObjectCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "spec": {
+          "$ref": "#/$defs/WireObjectSpec"
+        }
+      },
+      "required": [
+        "request_id",
+        "spec"
+      ],
+      "type": "object"
+    },
+    "WireObjectDelete": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "WireObjectDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "members": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "record": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/WireObjectRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "members"
+      ],
+      "type": "object"
+    },
+    "WireObjectDetailQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "WireObjectEdit": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "spec": {
+          "$ref": "#/$defs/WireObjectSpec"
+        }
+      },
+      "required": [
+        "request_id",
+        "spec"
+      ],
+      "type": "object"
+    },
+    "WireObjectList": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WireObjectMutated": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "WireObjectRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "selector_kind": {
+          "type": "string"
+        },
+        "selector_value": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "selector_kind",
+        "selector_value",
+        "attributes",
+        "description",
+        "tags",
+        "lifecycle"
+      ],
+      "type": "object"
+    },
+    "WireObjectSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "selector_kind": {
+          "type": "string"
+        },
+        "selector_value": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "selector_kind",
+        "selector_value",
+        "description",
+        "lifecycle"
+      ],
+      "type": "object"
+    },
     "WirePrincipalCreate": {
       "additionalProperties": false,
       "properties": {
@@ -2101,6 +2369,42 @@
           },
           "required": [
             "GroupList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ObjectCatalog": {
+              "$ref": "#/$defs/WireObjectCatalog"
+            }
+          },
+          "required": [
+            "ObjectCatalog"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ObjectDetail": {
+              "$ref": "#/$defs/WireObjectDetail"
+            }
+          },
+          "required": [
+            "ObjectDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ObjectMutated": {
+              "$ref": "#/$defs/WireObjectMutated"
+            }
+          },
+          "required": [
+            "ObjectMutated"
           ],
           "type": "object"
         },
@@ -2877,6 +3181,66 @@
           },
           "required": [
             "ListGroups"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ObjectList": {
+              "$ref": "#/$defs/WireObjectList"
+            }
+          },
+          "required": [
+            "ObjectList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ObjectDetail": {
+              "$ref": "#/$defs/WireObjectDetailQuery"
+            }
+          },
+          "required": [
+            "ObjectDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ObjectCreate": {
+              "$ref": "#/$defs/WireObjectCreate"
+            }
+          },
+          "required": [
+            "ObjectCreate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ObjectEdit": {
+              "$ref": "#/$defs/WireObjectEdit"
+            }
+          },
+          "required": [
+            "ObjectEdit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ObjectDelete": {
+              "$ref": "#/$defs/WireObjectDelete"
+            }
+          },
+          "required": [
+            "ObjectDelete"
           ],
           "type": "object"
         },

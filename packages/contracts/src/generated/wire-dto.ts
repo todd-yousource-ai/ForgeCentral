@@ -409,6 +409,70 @@ export interface WireNamedDest {
   count: number;
 }
 
+export interface WireObjectCatalog {
+  objects: Array<WireObjectRecord>;
+}
+
+export interface WireObjectCreate {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  spec: WireObjectSpec;
+}
+
+export interface WireObjectDelete {
+  name: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireObjectDetail {
+  members: Array<string>;
+  record?: WireObjectRecord | null;
+}
+
+export interface WireObjectDetailQuery {
+  name: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireObjectEdit {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  spec: WireObjectSpec;
+}
+
+export interface WireObjectList {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireObjectMutated {
+  name: string;
+}
+
+export interface WireObjectRecord {
+  attributes: Array<string>;
+  description: string;
+  kind: string;
+  lifecycle: string;
+  name: string;
+  selector_kind: string;
+  selector_value: string;
+  tags: Array<string>;
+}
+
+export interface WireObjectSpec {
+  attributes?: Array<string>;
+  description: string;
+  kind: string;
+  lifecycle: string;
+  name: string;
+  selector_kind: string;
+  selector_value: string;
+  tags?: Array<string>;
+}
+
 export interface WirePrincipalCreate {
   operator?: OperatorDelegation | null;
   request_id: number;
@@ -474,6 +538,9 @@ export type WireReply =
   | { AgentList: WireAgentList; }
   | { PrincipalList: WirePrincipalList; }
   | { GroupList: WireGroupList; }
+  | { ObjectCatalog: WireObjectCatalog; }
+  | { ObjectDetail: WireObjectDetail; }
+  | { ObjectMutated: WireObjectMutated; }
   | { LugProvisioned: WireLugProvisioned; }
   | { DecisionList: WireDecisionList; }
   | { ConnectionList: WireConnectionList; }
@@ -519,6 +586,11 @@ export type WireRequest =
   | { ListAgents: WireListAgents; }
   | { ListPrincipals: WireListPrincipals; }
   | { ListGroups: WireListGroups; }
+  | { ObjectList: WireObjectList; }
+  | { ObjectDetail: WireObjectDetailQuery; }
+  | { ObjectCreate: WireObjectCreate; }
+  | { ObjectEdit: WireObjectEdit; }
+  | { ObjectDelete: WireObjectDelete; }
   | { PrincipalCreate: WirePrincipalCreate; }
   | { PrincipalEdit: WirePrincipalEdit; }
   | { PrincipalSetStatus: WirePrincipalSetStatus; }
