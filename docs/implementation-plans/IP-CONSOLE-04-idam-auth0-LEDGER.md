@@ -37,6 +37,7 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 | ID.2 | `INV-CONSOLE-IDAM-CONNECTORS-REAL` | PLANNED | -- | deletes `IDAM_CONNECTOR_SHELLS` + its no-stub allowlist entry |
 | ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | PLANNED | -- | |
 | ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | PLANNED | -- | |
+| ID.4a | `INV-CONSOLE-IDAM-CADENCE-EDITABLE` | PLANNED | -- | operator directive 2026-07-22; needs crdb IA.7 |
 | ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | PLANNED | -- | needs crdb IA.6 |
 | ID.N | `INV-CONSOLE-IDAM-COMPLETE` | PLANNED | -- | needs a real synced tenant (crdb IA.5/IA.N) |
 
@@ -44,7 +45,7 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 
 | Id | Deliverable | Status | Commit |
 |----|-------------|--------|--------|
-| IA.7 | `Auth0ConnectorConfig` + `Auth0ConnectorState` (committed, fail-closed, secret held by reference) | PLANNED | -- |
+| IA.7 | `Auth0ConnectorConfig` + `Auth0ConnectorState` (committed, fail-closed, secret held by reference) + **both cadences range-bounded engine-side and applied without restart** | PLANNED | -- |
 | IA.8 | `IDAM_CONNECTORS` / `IDAM_SYNC` / `IDAM_CONFIGURE` verbs + `idam:auth0` principal origin | PLANNED | -- |
 | IA.6 | IdAM-owned-field edit refusal in `commit_edit_principal`, typed, naming the connector | PLANNED | -- |
 | IA.5 / IA.N | A real full sync against the live dev tenant | PLANNED | -- |
@@ -61,6 +62,14 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 **Not carried (stay deferred, different gating work):** the Groups member-management UI polish;
 Employee/Contractor/Partner sub-classification and the Remote/Compliance columns (no engine
 substrate); real user->destination Sankey ribbons (DT.4 attribution).
+
+## Operator directives
+
+- **2026-07-22: the poll cadence must be operator-adjustable from the UI.** Landed as **ID.4a**
+  (both cadences as bounded, unit-labelled controls on the Configure form, plus the live interval on
+  the connector card) over crdb **IA.7** (engine-side range validation + no-restart application).
+  The engine holds the bound, not the form: the Console's range hints are UX, and ID.4a tests that
+  an out-of-range value sent straight at the BFF is still refused by the engine.
 
 ## Session log (append per session)
 
