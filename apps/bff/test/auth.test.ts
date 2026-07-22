@@ -37,6 +37,12 @@ describe('deriveTier', () => {
   it('is case-insensitive', () => {
     expect(deriveTier(['CONSOLE-ADMIN'])).toBe('Admin');
   });
+
+  it('the platform global-admin carries Admin clearance (live-found 2026-07-22)', () => {
+    // Without this mapping the box owner fail-closed to User (Internal clearance) and could not
+    // read Confidential engine records: the LUG directory + the Overview users lane read empty.
+    expect(deriveTier(['global-admin'])).toBe('Admin');
+  });
 });
 
 describe('SessionStore', () => {

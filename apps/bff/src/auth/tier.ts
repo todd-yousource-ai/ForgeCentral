@@ -19,6 +19,12 @@ const DEFAULT_ROLE_TIERS: Readonly<Record<string, ExplainTier>> = {
   'console-developer': 'Developer',
   'console-admin': 'Admin',
   'console-security-audit': 'SecurityAudit',
+  // The platform administrator (the FC_RBAC_CONFIG `global-admin` role, which also unlocks the
+  // tenant selector) carries Admin clearance: without this mapping the global admin fail-closed to
+  // `User` (Internal clearance) and could not read Confidential-classified engine records -- the
+  // live-found defect where the LUG identity directory and the Overview users lane read empty for
+  // the box owner (2026-07-22).
+  'global-admin': 'Admin',
 };
 
 /** Derive the EXPLAIN tier from an operator's roles. Fail-closed to `User` (least privilege). */
