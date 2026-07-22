@@ -13,10 +13,17 @@
 import type {
   ObjectCard,
   ObjectDetailView,
+  ObjectDraft,
+  ObjectMutation,
   WireObjectDetailQuery,
   WireObjectList,
 } from '@forge/contracts';
-import { toObjectCatalog, toObjectDetail } from '@forge/contracts';
+import {
+  toObjectCatalog,
+  toObjectDetail,
+  toObjectMutation,
+  toWireObjectSpec,
+} from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -49,6 +56,55 @@ export async function resolveObjectCatalog(
     throw new ObjectsUnavailableError('an object record carries an unknown engine tag');
   }
   return cards;
+}
+
+/** A command the engine refused, carried typed for the route (409 dup / 400 malformed / 403 deny). */
+export class ObjectCommandError extends Error {
+  constructor(readonly wireClass: string) {
+    super(`object command refused: ${wireClass}`);
+    this.name = 'ObjectCommandError';
+  }
+}
+
+/** Register a named object (`objects.create` -> crdb OBJECT_CREATE, audited, duplicate-refused). */
+export async function resolveCreateObject(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  draft: ObjectDraft,
+  opts?: EngineCallOptions,
+): Promise<ObjectMutation> {
+  const reply = await engine.objectCreate(
+    principal,
+    { request_id: requestId(), spec: toWireObjectSpec(draft) },
+    opts,
+  );
+  return toObjectMutation(reply);
+}
+
+/** Edit a named object's definition (`objects.edit` -> crdb OBJECT_EDIT, audited). */
+export async function resolveEditObject(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  draft: ObjectDraft,
+  opts?: EngineCallOptions,
+): Promise<ObjectMutation> {
+  const reply = await engine.objectEdit(
+    principal,
+    { request_id: requestId(), spec: toWireObjectSpec(draft) },
+    opts,
+  );
+  return toObjectMutation(reply);
+}
+
+/** Delete a named object (`objects.delete` -> crdb OBJECT_DELETE, tombstoned; history preserved). */
+export async function resolveDeleteObject(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  name: string,
+  opts?: EngineCallOptions,
+): Promise<ObjectMutation> {
+  const reply = await engine.objectDelete(principal, { request_id: requestId(), name }, opts);
+  return toObjectMutation(reply);
 }
 
 /** Resolve one object's detail + its read-time members (the drawer). */

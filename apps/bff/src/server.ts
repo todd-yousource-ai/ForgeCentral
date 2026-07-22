@@ -52,8 +52,12 @@ import {
   resolveVtzTree,
 } from './engine/vtz.js';
 import {
+  resolveCreateObject,
+  resolveDeleteObject,
+  resolveEditObject,
   resolveObjectCatalog,
   resolveObjectDetail,
+  ObjectCommandError,
   ObjectsUnavailableError,
 } from './engine/objects.js';
 import {
@@ -1184,6 +1188,123 @@ async function handleUsers(
  * gated, engine-gated, operator-delegated; the engine bounds and refuses rather than truncating, so
  * the Console holds the COMPLETE catalog or an error.
  */
+
+/** A parsed object draft from a command body, or null when malformed (400, fail-closed). */
+function parseObjectDraft(
+  body: Record<string, unknown>,
+): import('@forge/contracts').ObjectDraft | null {
+  const str = (k: string): string => (typeof body[k] === 'string' ? body[k].trim() : '');
+  const name = str('name');
+  const kind = body['kind'];
+  const selectorKind = body['selectorKind'];
+  const selectorValue = str('selectorValue');
+  const lifecycle = body['lifecycle'];
+  const KINDS = new Set([
+    'user',
+    'group',
+    'agent',
+    'service',
+    'server',
+    'application',
+    'uri',
+    'network',
+    'registry_key',
+    'certificate',
+    'script',
+    'data_store',
+  ]);
+  const SELECTORS = new Set(['exact', 'glob', 'group_ref', 'cidr']);
+  if (
+    name === '' ||
+    typeof kind !== 'string' ||
+    !KINDS.has(kind) ||
+    typeof selectorKind !== 'string' ||
+    !SELECTORS.has(selectorKind) ||
+    selectorValue === '' ||
+    (lifecycle !== 'draft' && lifecycle !== 'published')
+  ) {
+    return null;
+  }
+  const tags = Array.isArray(body['tags'])
+    ? (body['tags'] as unknown[]).filter((t): t is string => typeof t === 'string')
+    : [];
+  return {
+    name,
+    kind: kind as import('@forge/contracts').ObjectKind,
+    selectorKind: selectorKind as import('@forge/contracts').SelectorKind,
+    selectorValue,
+    description: str('description'),
+    tags,
+    lifecycle,
+  };
+}
+
+/**
+ * The Objects-surface commands (IP-CONSOLE-10 O10.3): POST /api/objects (create), /api/objects/edit,
+ * /api/objects/delete. Audited engine commands with typed refusals (Conflict -> 409 duplicate,
+ * Framing -> 400 malformed, else 403). NO apply/enforce command exists -- objects are nouns.
+ */
+async function handleObjectsCommand(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const paths = new Set(['/api/objects', '/api/objects/edit', '/api/objects/delete']);
+  if (!paths.has(path) || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as Record<string, unknown>;
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    let receipt;
+    if (path === '/api/objects/delete') {
+      const name = typeof body['name'] === 'string' ? body['name'].trim() : '';
+      if (name === '') {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      receipt = await resolveDeleteObject(deps.operatorEngine, principal, name, opts);
+    } else {
+      const draft = parseObjectDraft(body);
+      if (draft === null) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      receipt =
+        path === '/api/objects'
+          ? await resolveCreateObject(deps.operatorEngine, principal, draft, opts)
+          : await resolveEditObject(deps.operatorEngine, principal, draft, opts);
+    }
+    sendJson(res, 200, receipt);
+  } catch (err) {
+    if (err instanceof ObjectCommandError || err instanceof EngineRefusedError) {
+      const cls = err instanceof EngineRefusedError ? err.wireError.class : err.wireClass;
+      const httpStatus = cls === 'Conflict' ? 409 : cls === 'Framing' ? 400 : 403;
+      sendJson(res, httpStatus, { error: 'refused', class: cls });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'objects command failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleObjects(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1283,6 +1404,9 @@ async function route(
     return;
   }
   if (await handleUsers(deps, req, path, res)) {
+    return;
+  }
+  if (await handleObjectsCommand(deps, req, method, path, res)) {
     return;
   }
   if (await handleObjects(deps, req, path, res)) {

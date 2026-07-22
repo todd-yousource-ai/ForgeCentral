@@ -9,8 +9,14 @@
 // The catalog read is engine-BOUNDED AND COMPLETE (the per-tenant ceiling refuses rather than
 // truncating), so the surface's search/kind filters narrow a complete dataset client-side.
 
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { ObjectCard, ObjectDetailView } from '@forge/contracts';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import type { ObjectCard, ObjectDetailView, ObjectDraft, ObjectMutation } from '@forge/contracts';
 
 /** Fetch the complete object catalog. Throws on a non-2xx so the surface shows a load error. */
 export async function fetchObjects(): Promise<readonly ObjectCard[]> {
@@ -34,8 +40,50 @@ export async function fetchObjectDetail(name: string): Promise<ObjectDetailView>
 
 /**
  * The object catalog. Not polled: the catalog changes on operator commands, so it refetches when a
- * mutation invalidates it (O10.3) rather than on a timer.
+ * mutation invalidates it rather than on a timer.
  */
 export function useObjects(): UseQueryResult<readonly ObjectCard[]> {
   return useQuery({ queryKey: ['objects'], queryFn: fetchObjects });
+}
+
+/** An object command refusal, typed for the form (409 duplicate vs 400 malformed vs a denial). */
+export class ObjectCommandError extends Error {
+  constructor(readonly status: number) {
+    super(`object command failed: ${String(status)}`);
+    this.name = 'ObjectCommandError';
+  }
+}
+
+async function postCommand(url: string, body: unknown): Promise<ObjectMutation> {
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new ObjectCommandError(res.status);
+  }
+  return (await res.json()) as ObjectMutation;
+}
+
+/** Create/edit a named object (audited; the card that appears is the ENGINE's record). */
+export function useObjectWrite(
+  mode: 'create' | 'edit',
+): UseMutationResult<ObjectMutation, Error, ObjectDraft> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (draft) =>
+      postCommand(mode === 'create' ? '/api/objects' : '/api/objects/edit', draft),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['objects'] }),
+  });
+}
+
+/** Delete a named object (tombstoned engine-side; the catalog refetches without it). */
+export function useDeleteObject(): UseMutationResult<ObjectMutation, Error, { name: string }> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => postCommand('/api/objects/delete', input),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['objects'] }),
+  });
 }

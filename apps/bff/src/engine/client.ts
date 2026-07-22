@@ -25,9 +25,13 @@ import type {
   WireListGroups,
   WireListPrincipals,
   WireObjectCatalog,
+  WireObjectCreate,
+  WireObjectDelete,
   WireObjectDetail,
   WireObjectDetailQuery,
+  WireObjectEdit,
   WireObjectList,
+  WireObjectMutated,
   WireLugProvisioned,
   WirePrincipalCreate,
   WirePrincipalEdit,
@@ -103,6 +107,12 @@ export interface CrucibleClient {
   objectList(request: WireObjectList, opts?: EngineCallOptions): Promise<WireObjectCatalog>;
   /** Read one named object + its resolved members (OBJECT_DETAIL, crdb OB.3). */
   objectDetail(request: WireObjectDetailQuery, opts?: EngineCallOptions): Promise<WireObjectDetail>;
+  /** Register a named object (OBJECT_CREATE, crdb OB.4), audited. */
+  objectCreate(request: WireObjectCreate, opts?: EngineCallOptions): Promise<WireObjectMutated>;
+  /** Edit a named object's definition (OBJECT_EDIT, crdb OB.4), audited. */
+  objectEdit(request: WireObjectEdit, opts?: EngineCallOptions): Promise<WireObjectMutated>;
+  /** Delete a named object (OBJECT_DELETE, crdb OB.4), audited. */
+  objectDelete(request: WireObjectDelete, opts?: EngineCallOptions): Promise<WireObjectMutated>;
   /** List an entity's recent governed decisions (ENTITY_DECISIONS, crdb ER.2c). */
   entityDecisions(
     request: WireEntityDecisions,

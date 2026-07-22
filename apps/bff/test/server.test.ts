@@ -52,6 +52,9 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     principalSetStatus: unused,
     listGroups: unused,
     objectList: unused,
+    objectCreate: unused,
+    objectEdit: unused,
+    objectDelete: unused,
     objectDetail: unused,
     entityDecisions: unused,
     entityConnections: unused,
@@ -103,6 +106,9 @@ function operatorEngineWith(): OperatorEngine {
     principalSetStatus: unused,
     listGroups: unused,
     objectList: unused,
+    objectCreate: unused,
+    objectEdit: unused,
+    objectDelete: unused,
     objectDetail: unused,
     querySubmit: () =>
       Promise.resolve({

@@ -27,6 +27,7 @@ import type {
   WireLugProvisioned,
   WireObjectCatalog,
   WireObjectDetail,
+  WireObjectMutated,
   WirePrincipalList,
   WireConnectionList,
   WireConnectivityGraph,
@@ -116,6 +117,14 @@ export function replyToObjectCatalog(reply: WireReply): WireObjectCatalog {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for an object-list read');
+}
+
+/** Map an engine `WireReply` to `WireObjectMutated` (an OB.4 object command ack). */
+export function replyToObjectMutated(reply: WireReply): WireObjectMutated {
+  if (typeof reply === 'object' && 'ObjectMutated' in reply) return reply.ObjectMutated;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for an object command');
 }
 
 /** Map an engine `WireReply` to `WireObjectDetail` (OBJECT_DETAIL, crdb OB.3). */
@@ -489,6 +498,38 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToObjectDetail(await dispatch(transport, { ObjectDetail: request })),
+      opts,
+    );
+  }
+
+  async objectCreate(
+    request: Parameters<CrucibleClient['objectCreate']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectMutated> {
+    return this.call(
+      async (transport) =>
+        replyToObjectMutated(await dispatch(transport, { ObjectCreate: request })),
+      opts,
+    );
+  }
+
+  async objectEdit(
+    request: Parameters<CrucibleClient['objectEdit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectMutated> {
+    return this.call(
+      async (transport) => replyToObjectMutated(await dispatch(transport, { ObjectEdit: request })),
+      opts,
+    );
+  }
+
+  async objectDelete(
+    request: Parameters<CrucibleClient['objectDelete']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectMutated> {
+    return this.call(
+      async (transport) =>
+        replyToObjectMutated(await dispatch(transport, { ObjectDelete: request })),
       opts,
     );
   }

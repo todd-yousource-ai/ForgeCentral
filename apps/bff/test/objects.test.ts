@@ -12,9 +12,12 @@ import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
 import {
   ObjectsUnavailableError,
+  resolveCreateObject,
+  resolveDeleteObject,
   resolveObjectCatalog,
   resolveObjectDetail,
 } from '../src/engine/objects.js';
+import type { ObjectDraft } from '@forge/contracts';
 
 const PRINCIPAL: OperatorPrincipal = {
   principalId: 'op-1',
@@ -41,6 +44,14 @@ function engineWith(parts: {
   return {
     objectList: () => Promise.resolve(parts.catalog ?? { objects: [] }),
     objectDetail: () => Promise.resolve(parts.detail ?? { record: null, members: [] }),
+    objectCreate: (_p: OperatorPrincipal, req: { spec: { name: string } }) =>
+      req.spec.name === 'corp-subnet'
+        ? Promise.reject(new Error('duplicate'))
+        : Promise.resolve({ name: req.spec.name }),
+    objectEdit: (_p: OperatorPrincipal, req: { spec: { name: string } }) =>
+      Promise.resolve({ name: req.spec.name }),
+    objectDelete: (_p: OperatorPrincipal, req: { name: string }) =>
+      Promise.resolve({ name: req.name }),
     querySubmit: unused,
     cursorFetch: unused,
     cursorClose: unused,
@@ -95,6 +106,33 @@ describe('resolveObjectCatalog', () => {
   it('an empty tenant resolves an honest empty catalog', () => {
     return resolveObjectCatalog(engineWith({}), PRINCIPAL).then((cards) => {
       expect(cards).toEqual([]);
+    });
+  });
+});
+
+describe('the O10.3 command resolvers', () => {
+  const draft = (name: string): ObjectDraft => ({
+    name,
+    kind: 'network',
+    selectorKind: 'cidr',
+    selectorValue: '10.0.0.0/8',
+    description: '',
+    tags: [],
+    lifecycle: 'draft',
+  });
+
+  it('objects.create returns the audited receipt; a duplicate propagates the refusal', () => {
+    return resolveCreateObject(engineWith({}), PRINCIPAL, draft('new-net')).then((r) => {
+      expect(r).toEqual({ name: 'new-net' });
+      return expect(
+        resolveCreateObject(engineWith({}), PRINCIPAL, draft('corp-subnet')),
+      ).rejects.toThrow('duplicate');
+    });
+  });
+
+  it('objects.delete returns the mutated name', () => {
+    return resolveDeleteObject(engineWith({}), PRINCIPAL, 'corp-subnet').then((r) => {
+      expect(r).toEqual({ name: 'corp-subnet' });
     });
   });
 });
