@@ -14,8 +14,12 @@ import type {
   WireGroupWrite,
   WireListGroups,
   WireListPrincipals,
+  WireObjectCreate,
+  WireObjectDelete,
   WireObjectDetailQuery,
+  WireObjectEdit,
   WireObjectList,
+  WireObjectSpec,
   WirePrincipalCreate,
   WirePrincipalEdit,
   WirePrincipalSetStatus,
@@ -165,6 +169,46 @@ function objectListToCbor(request: WireObjectList): unknown {
 
 /** OBJECT_DETAIL (crdb OB.3). Rust struct order: request_id, name, operator. */
 function objectDetailToCbor(request: WireObjectDetailQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    name: request.name,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * The named-object spec (crdb OB.4 `WireObjectSpec`). Rust struct order: name, kind, selector_kind,
+ * selector_value, then the optional attributes (omitted when empty), description, then the optional
+ * tags (omitted when empty), lifecycle. NO posture field.
+ */
+function objectSpecToCbor(spec: WireObjectSpec): unknown {
+  const out: Record<string, unknown> = {
+    name: spec.name,
+    kind: spec.kind,
+    selector_kind: spec.selector_kind,
+    selector_value: spec.selector_value,
+  };
+  if (spec.attributes !== undefined && spec.attributes.length > 0)
+    out['attributes'] = spec.attributes;
+  out['description'] = spec.description;
+  if (spec.tags !== undefined && spec.tags.length > 0) out['tags'] = spec.tags;
+  out['lifecycle'] = spec.lifecycle;
+  return out;
+}
+
+/** OBJECT_CREATE / OBJECT_EDIT (crdb OB.4). Rust struct order: request_id, spec, operator. */
+function objectWriteToCbor(request: WireObjectCreate | WireObjectEdit): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    spec: objectSpecToCbor(request.spec),
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** OBJECT_DELETE (crdb OB.4). Rust struct order: request_id, name, operator. */
+function objectDeleteToCbor(request: WireObjectDelete): unknown {
   const out: Record<string, unknown> = {
     request_id: request.request_id,
     name: request.name,
@@ -399,6 +443,11 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   if ('ObjectList' in request) return encode({ ObjectList: objectListToCbor(request.ObjectList) });
   if ('ObjectDetail' in request)
     return encode({ ObjectDetail: objectDetailToCbor(request.ObjectDetail) });
+  if ('ObjectCreate' in request)
+    return encode({ ObjectCreate: objectWriteToCbor(request.ObjectCreate) });
+  if ('ObjectEdit' in request) return encode({ ObjectEdit: objectWriteToCbor(request.ObjectEdit) });
+  if ('ObjectDelete' in request)
+    return encode({ ObjectDelete: objectDeleteToCbor(request.ObjectDelete) });
   if ('GroupCreate' in request)
     return encode({ GroupCreate: groupWriteToCbor(request.GroupCreate) });
   if ('GroupEdit' in request) return encode({ GroupEdit: groupWriteToCbor(request.GroupEdit) });

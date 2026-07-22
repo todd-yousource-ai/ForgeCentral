@@ -68,6 +68,11 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // opcode; the engine discriminates them by their CBOR enum tag.
       'ObjectList' in request ||
       'ObjectDetail' in request ||
+      // The Objects-surface commands (OBJECT_CREATE/EDIT/DELETE, crdb OB.4) ride the QuerySubmit
+      // opcode like the other data-plane writes; the engine routes them to the write path by tag.
+      'ObjectCreate' in request ||
+      'ObjectEdit' in request ||
+      'ObjectDelete' in request ||
       // The E3 provisioning command (GROUP_CREATE, crdb LU.P) rides the QuerySubmit opcode like the
       // other data-plane writes; the engine routes it to the write path by its CBOR enum tag.
       'GroupCreate' in request ||

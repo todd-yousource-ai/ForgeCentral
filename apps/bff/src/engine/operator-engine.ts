@@ -29,9 +29,13 @@ import type {
   WireGroupWrite,
   WireListAgents,
   WireObjectCatalog,
+  WireObjectCreate,
+  WireObjectDelete,
   WireObjectDetail,
   WireObjectDetailQuery,
+  WireObjectEdit,
   WireObjectList,
+  WireObjectMutated,
   WireListGroups,
   WireListPrincipals,
   WireLugProvisioned,
@@ -73,6 +77,9 @@ export type EngineAction =
   | 'listGroups'
   | 'objectList'
   | 'objectDetail'
+  | 'objectCreate'
+  | 'objectEdit'
+  | 'objectDelete'
   | 'groupCreate'
   | 'groupEdit'
   | 'groupSetMembers'
@@ -172,6 +179,24 @@ export interface OperatorEngine {
     request: WireObjectDetailQuery,
     opts?: EngineCallOptions,
   ): Promise<WireObjectDetail>;
+  /** Register a named object (OBJECT_CREATE) on behalf of `principal`, audited. */
+  objectCreate(
+    principal: OperatorPrincipal,
+    request: WireObjectCreate,
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectMutated>;
+  /** Edit a named object (OBJECT_EDIT) on behalf of `principal`, audited. */
+  objectEdit(
+    principal: OperatorPrincipal,
+    request: WireObjectEdit,
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectMutated>;
+  /** Delete a named object (OBJECT_DELETE) on behalf of `principal`, audited. */
+  objectDelete(
+    principal: OperatorPrincipal,
+    request: WireObjectDelete,
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectMutated>;
   /** Edit an enterprise group (GROUP_EDIT) on behalf of `principal`, audited. */
   groupEdit(
     principal: OperatorPrincipal,
@@ -374,6 +399,21 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'objectDetail', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.objectDetail({ ...request, operator }, opts);
+    },
+    objectCreate: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'objectCreate', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.objectCreate({ ...request, operator }, opts);
+    },
+    objectEdit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'objectEdit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.objectEdit({ ...request, operator }, opts);
+    },
+    objectDelete: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'objectDelete', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.objectDelete({ ...request, operator }, opts);
     },
     groupEdit: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'groupEdit', request.request_id));

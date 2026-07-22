@@ -53,6 +53,9 @@ function engineWith(parts: {
     principalSetStatus: unused,
     listGroups: unused,
     objectList: unused,
+    objectCreate: unused,
+    objectEdit: unused,
+    objectDelete: unused,
     objectDetail: unused,
     listAgents: () =>
       parts.failDirectory
