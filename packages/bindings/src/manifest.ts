@@ -544,6 +544,81 @@ const usersCommands: readonly CommandBinding[] = [
   },
 ];
 
+// -- IP-CONSOLE-10 (Objects, O10.1) the `objects.*` bindings -----------------------------------------
+//
+// The crdb named-object registry (IP-CONSOLE-OBJECT-SUBSTRATE OB.1-OB.N, landed): OBJECT_LIST /
+// OBJECT_DETAIL reads + OBJECT_CREATE/EDIT/DELETE audited commands, all live engine ops, so every
+// binding registers LIVE. An object never applies policy (operator ruling: the Policy surface is the
+// only binder), so NO apply/enforce binding exists; the drawer's governing-policies panel is a
+// separate PENDING binding naming the Policy epic (CONSOLE-05).
+
+const objectReads: readonly ReadBinding[] = [
+  {
+    // The catalog: the tenant's named objects grouped by kind, tenant-private, bounded (crdb OB.3).
+    id: bindingId('objects.list'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'object_list_v1',
+    viewModel: 'ObjectCard',
+    status: { kind: 'live' },
+  },
+  {
+    // One object + its read-time resolved members (the drawer detail; crdb OB.3).
+    id: bindingId('objects.detail'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'object_detail_v1',
+    viewModel: 'ObjectDetailView',
+    status: { kind: 'live' },
+  },
+  {
+    // The governing policies for an object: resolved Policy-side (TRD-04 scope), no queryable
+    // crdb surface yet -- PENDING behind the Policy epic (CONSOLE-05).
+    id: bindingId('objects.governingPolicies'),
+    kind: 'read',
+    surface: 'forge',
+    op: 'object_governing_policies_v1',
+    viewModel: 'GoverningPoliciesView',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'TRD-CONSOLE-05 Policy surface (object -> governing-policy resolution)',
+    },
+  },
+];
+
+const objectCommands: readonly CommandBinding[] = [
+  {
+    // Register a named object (crdb OBJECT_CREATE), audited, duplicate-refused.
+    id: bindingId('objects.create'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'object_create_v1',
+    authz: 'operator:objects.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    id: bindingId('objects.edit'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'object_edit_v1',
+    authz: 'operator:objects.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Delete (tombstone; history preserved) a named object.
+    id: bindingId('objects.delete'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'object_delete_v1',
+    authz: 'operator:objects.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+];
+
 function register(target: Record<string, Binding>, entries: readonly Binding[]): void {
   for (const entry of entries) {
     target[entry.id] = entry;
@@ -559,6 +634,8 @@ register(registry, vtzReads);
 register(registry, vtzCommands);
 register(registry, usersReads);
 register(registry, usersCommands);
+register(registry, objectReads);
+register(registry, objectCommands);
 
 /** The Console binding registry. Keyed by `BindingId`; populated by the surface IPs. */
 export const bindings: BindingManifest = registry;
