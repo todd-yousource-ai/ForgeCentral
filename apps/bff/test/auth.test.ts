@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
   SessionStore,
   deriveTier,
+  maxTier,
   operatorFromClaims,
+  tierForRole,
   type ExplainTier,
   type OperatorIdentity,
 } from '../src/auth/index.js';
@@ -37,11 +39,20 @@ describe('deriveTier', () => {
   it('is case-insensitive', () => {
     expect(deriveTier(['CONSOLE-ADMIN'])).toBe('Admin');
   });
+});
 
-  it('the platform global-admin carries Admin clearance (live-found 2026-07-22)', () => {
-    // Without this mapping the box owner fail-closed to User (Internal clearance) and could not
-    // read Confidential engine records: the LUG directory + the Overview users lane read empty.
-    expect(deriveTier(['global-admin'])).toBe('Admin');
+describe('tierForRole / maxTier', () => {
+  it('maps the resolved RBAC role to its EXPLAIN tier', () => {
+    // The platform/tenant admin reads Confidential engine records; the tenant-user stays at User.
+    expect(tierForRole('global-admin')).toBe('Admin');
+    expect(tierForRole('tenant-admin')).toBe('Admin');
+    expect(tierForRole('tenant-user')).toBe('User');
+  });
+
+  it('returns the more-privileged tier', () => {
+    expect(maxTier('User', 'Admin')).toBe('Admin');
+    expect(maxTier('SecurityAudit', 'Admin')).toBe('SecurityAudit');
+    expect(maxTier('User', 'User')).toBe('User');
   });
 });
 
@@ -111,5 +122,19 @@ describe('operatorFromClaims', () => {
     expect(operatorFromClaims({ sub: 'x', [ROLE]: ['unknown'] }, ROLE, rbac)).toBeUndefined();
     // No group at all, and no local RBAC entry -> refused.
     expect(operatorFromClaims({ sub: 'x' }, ROLE, rbac)).toBeUndefined();
+  });
+
+  it('grants Admin to a localRbac global-admin that carries NO group claim (live-found 2026-07-22)', () => {
+    // The box owner: authority comes from localRbac (not a token group), so deriveTier(groups=[])
+    // alone fail-closed to User (Internal clearance) and the Overview users lane read empty. The tier
+    // must be lifted by the resolved global-admin role -> Admin (Secret clearance).
+    const localAdmin = {
+      groupRoles: {},
+      localRbac: { 'auth0|owner': { role: 'global-admin' as const } },
+      defaultTenant: 'tenant-x',
+    };
+    const op = operatorFromClaims({ sub: 'auth0|owner' }, ROLE, localAdmin);
+    expect(op?.role).toBe('global-admin');
+    expect(op?.tier).toBe('Admin');
   });
 });

@@ -11,7 +11,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import { operatorPrincipalId } from './operator-id.js';
 import { resolveAuthority, type RbacConfig } from './rbac.js';
 import { type OperatorIdentity } from './session.js';
-import { deriveTier } from './tier.js';
+import { deriveTier, maxTier, tierForRole } from './tier.js';
 
 /** The OIDC endpoints + client the device flow uses (from IdP discovery). */
 export interface OidcConfig {
@@ -130,9 +130,13 @@ export function operatorFromClaims(
   // resolvable authority has no tenant and cannot be delegated, so the login is refused (undefined).
   const authority = resolveAuthority(subject, groups, rbac);
   if (authority === undefined) return undefined;
+  // The tier is the more-privileged of the token-group tier and the resolved RBAC-role tier: a group
+  // claim can lift an operator (console-security-audit), and the resolved role (global-admin via
+  // localRbac, which carries no group claim) grants Admin. Fail-closed remains User for a bare
+  // tenant-user with no groups.
   return {
     subject,
-    tier: deriveTier(groups),
+    tier: maxTier(deriveTier(groups), tierForRole(authority.role)),
     principalId: operatorPrincipalId(subject),
     tenant: authority.activeTenant,
     role: authority.role,
