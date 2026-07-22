@@ -18,9 +18,19 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   2026-07-22:** schema revendored + codegen'd (all object DTOs incl. DataStore); `objects.ts`
   view models + fail-closed projections; `objects.*` bindings LIVE (governingPolicies PENDING ->
   Policy epic). Declarative/honest-empty member contract encoded.
-- **Next action:** **O10.2** -- the catalog read + kind-grouped card grid (wire codecs + delegated
-  engine actions for the two reads, `GET /api/objects` + `/api/objects/detail`, the surface grouped
-  by ObjectKind with search + kind filter). Then O10.3 commands -> O10.4 drawer -> O10.N capstone.
+- **O10.2 LANDED (2026-07-22):** the catalog surface end to end. Wire: `ObjectList`/`ObjectDetail`
+  ride the QuerySubmit opcode w/ CBOR encoders; reply parsers + client methods + delegated
+  `OperatorEngine` actions. BFF: `engine/objects.ts` (whole-catalog fail-closed collapse ->
+  `ObjectsUnavailableError` -> 503; declarative honest-empty detail) + `GET /api/objects`(+`/detail`).
+  SPA: `ObjectsSurface` replaces the `objects` placeholder -- the catalog grouped by ObjectKind in
+  registry order (the prototype's kind sections), search + kind filter narrowing the COMPLETE bounded
+  catalog, the typed selector on each card (`CIDR 10.8.0.0/16`), lifecycle badge; NO posture control
+  anywhere. 5 BFF resolver tests; full gate + local Playwright (20) green.
+- **Next action:** **O10.3** -- Create/Edit/Delete: `OBJECT_CREATE/EDIT/DELETE` codecs + delegated
+  actions + POST routes (typed 409/400/403), the Create Object form w/ kind select + kind-appropriate
+  selector input (CIDR for Network, path glob for Script/DataStore, group name for Group, exact for
+  Server/Service), delete confirm; NO apply/enforce control (structurally tested). Then O10.4 drawer
+  (read-time members) -> O10.N capstone + box redeploy.
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
 
@@ -37,7 +47,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | Step | Invariant | Status | Commit | Note |
 |------|-----------|--------|--------|------|
 | O10.1 | `INV-CONSOLE-OBJECTS-CONTRACT` | LANDED | `85dd550` | schema revendored (OB.1-OB.5 DTOs codegen'd); `objects.ts` view models (ObjectCard/ObjectDetailView/ObjectDraft) + fail-closed projections (whole-catalog collapse; declarative honest-empty members); DataStore kind + label; 3 live reads (governingPolicies PENDING) + 3 live commands registered; 14 tier-1 tests incl. no-posture structural assertion |
-| O10.2 | `INV-CONSOLE-OBJECTS-CATALOG` | PLANNED | -- | kind-grouped card grid |
+| O10.2 | `INV-CONSOLE-OBJECTS-CATALOG` | LANDED | `4903657` | wire codecs (ObjectList/ObjectDetail) + delegated engine actions; `engine/objects.ts` resolvers (whole-catalog fail-closed collapse; declarative honest-empty detail) + `GET /api/objects`(+`/detail`); the `objects` surface = kind-grouped card grid (registry order, matching the prototype sections) w/ search + kind filter, typed selector rendered per card, NO posture control; `objects` destination replaces its placeholder. 5 BFF resolver tests + suites green |
 | O10.3 | `INV-CONSOLE-OBJECTS-COMMAND` | PLANNED | -- | after OB.4; kind-appropriate selector inputs |
 | O10.4 | `INV-CONSOLE-3-CLICKS` | PLANNED | -- | drawer + read-time members; policies panel PENDING (CONSOLE-05) |
 | O10.N | `INV-CONSOLE-OBJECTS-COMPLETE` | PLANNED | -- | Playwright capstone + no-apply structural sweep + box redeploy |
