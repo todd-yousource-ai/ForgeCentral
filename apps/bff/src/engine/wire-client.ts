@@ -25,6 +25,8 @@ import type {
   WireAgentList,
   WireGroupList,
   WireLugProvisioned,
+  WireObjectCatalog,
+  WireObjectDetail,
   WirePrincipalList,
   WireConnectionList,
   WireConnectivityGraph,
@@ -106,6 +108,22 @@ export function replyToLugProvisioned(reply: WireReply): WireLugProvisioned {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a provisioning command');
+}
+
+/** Map an engine `WireReply` to `WireObjectCatalog` (OBJECT_LIST, crdb OB.3). */
+export function replyToObjectCatalog(reply: WireReply): WireObjectCatalog {
+  if (typeof reply === 'object' && 'ObjectCatalog' in reply) return reply.ObjectCatalog;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for an object-list read');
+}
+
+/** Map an engine `WireReply` to `WireObjectDetail` (OBJECT_DETAIL, crdb OB.3). */
+export function replyToObjectDetail(reply: WireReply): WireObjectDetail {
+  if (typeof reply === 'object' && 'ObjectDetail' in reply) return reply.ObjectDetail;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for an object-detail read');
 }
 
 /** Map an engine `WireReply` to `WireDecisionList` (ENTITY_DECISIONS), throwing a typed error on a refusal. */
@@ -450,6 +468,27 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToLugProvisioned(await dispatch(transport, { GroupSetMembers: request })),
+      opts,
+    );
+  }
+
+  async objectList(
+    request: Parameters<CrucibleClient['objectList']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectCatalog> {
+    return this.call(
+      async (transport) => replyToObjectCatalog(await dispatch(transport, { ObjectList: request })),
+      opts,
+    );
+  }
+
+  async objectDetail(
+    request: Parameters<CrucibleClient['objectDetail']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireObjectDetail> {
+    return this.call(
+      async (transport) =>
+        replyToObjectDetail(await dispatch(transport, { ObjectDetail: request })),
       opts,
     );
   }

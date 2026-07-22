@@ -24,6 +24,10 @@ import type {
   WireListAgents,
   WireListGroups,
   WireListPrincipals,
+  WireObjectCatalog,
+  WireObjectDetail,
+  WireObjectDetailQuery,
+  WireObjectList,
   WireLugProvisioned,
   WirePrincipalCreate,
   WirePrincipalEdit,
@@ -95,6 +99,10 @@ export interface CrucibleClient {
     request: WirePrincipalSetStatus,
     opts?: EngineCallOptions,
   ): Promise<WireLugProvisioned>;
+  /** List the tenant's named-object catalog (OBJECT_LIST, crdb OB.3). */
+  objectList(request: WireObjectList, opts?: EngineCallOptions): Promise<WireObjectCatalog>;
+  /** Read one named object + its resolved members (OBJECT_DETAIL, crdb OB.3). */
+  objectDetail(request: WireObjectDetailQuery, opts?: EngineCallOptions): Promise<WireObjectDetail>;
   /** List an entity's recent governed decisions (ENTITY_DECISIONS, crdb ER.2c). */
   entityDecisions(
     request: WireEntityDecisions,

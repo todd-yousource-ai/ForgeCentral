@@ -14,6 +14,8 @@ import type {
   WireGroupWrite,
   WireListGroups,
   WireListPrincipals,
+  WireObjectDetailQuery,
+  WireObjectList,
   WirePrincipalCreate,
   WirePrincipalEdit,
   WirePrincipalSetStatus,
@@ -149,6 +151,23 @@ function groupSetMembersToCbor(request: WireGroupSetMembers): unknown {
     request_id: request.request_id,
     name: request.name,
     members: request.members,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** OBJECT_LIST (crdb OB.3). Rust struct order: request_id, then the optional operator. */
+function objectListToCbor(request: WireObjectList): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** OBJECT_DETAIL (crdb OB.3). Rust struct order: request_id, name, operator. */
+function objectDetailToCbor(request: WireObjectDetailQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    name: request.name,
   };
   applyOperator(out, request.operator);
   return out;
@@ -377,6 +396,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('ListGroups' in request)
     return encode({ ListGroups: directoryReadToCbor(request.ListGroups) });
+  if ('ObjectList' in request) return encode({ ObjectList: objectListToCbor(request.ObjectList) });
+  if ('ObjectDetail' in request)
+    return encode({ ObjectDetail: objectDetailToCbor(request.ObjectDetail) });
   if ('GroupCreate' in request)
     return encode({ GroupCreate: groupWriteToCbor(request.GroupCreate) });
   if ('GroupEdit' in request) return encode({ GroupEdit: groupWriteToCbor(request.GroupEdit) });

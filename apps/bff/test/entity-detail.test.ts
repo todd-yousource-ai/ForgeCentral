@@ -52,6 +52,8 @@ function engineWith(parts: {
     principalEdit: unused,
     principalSetStatus: unused,
     listGroups: unused,
+    objectList: unused,
+    objectDetail: unused,
     listAgents: () =>
       parts.failDirectory
         ? Promise.reject(new Error('engine down'))
