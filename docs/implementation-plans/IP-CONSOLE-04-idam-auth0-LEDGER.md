@@ -37,9 +37,28 @@ ledger is a defect.
 - **`IP-LUG-IDAM-CONNECT` (provisioning) AUTHORED, not started**: `IDAM_CONNECT` verb (connectivity + secret
   ref, no secret value) + live re-spawn, paired with a crypto-sidecar secret-set leg. Unblocks **ID.4** (the
   UI onboarding form).
-- **Next action: crdb `IP-LUG-IDAM-CONNECT` CO.1/CO.2 + the sidecar leg -> FC ID.4** (the UI onboarding
-  form: connectivity over `IDAM_CONNECT`, secret browser->BFF->sidecar->mode-protected file). ID.4a
-  (cadences, crdb IA.7 ready) follows ID.4. FC branch: `feat/id4-idam-configure`.
+- **ID.4 IN PROGRESS.** crdb `IP-LUG-IDAM-CONNECT` CO.1/CO.2 landed (crdb `4987fa51`); FC ID.4 part 1
+  (contract, `97e9233`) + part 2 (BFF `POST /api/idam/connect`, `a131790`) landed. **Two parts remain:**
+  - **Part 3 -- the crypto-sidecar secret-set leg** (`sidecar/`, security-sensitive Rust). Model it on
+    `sidecar/src/sign_service.rs` (loopback-only NDJSON leg, per-request byte cap, per-connection isolation,
+    typed request/response). Add an OPTIONAL config pair to `SidecarConfig` (`config.rs`) like
+    `sign_addr`/`sign_seed`: `secret_addr: Option<String>` (loopback, `assert_loopback_addr` in `validate`)
+    + `secret_path: Option<PathBuf>` (the `client_secret_ref` target, MUST match the BFF's `IDAM_SECRET_REF`
+    -- move both to shared config in this part). The leg accepts `{ provider, secret }` on loopback from the
+    BFF and writes the secret to `secret_path` ATOMICALLY (temp in the same dir + `OpenOptionsExt.mode(0o640)`
+    + rename), returning a typed ok/refused that carries NO secret. Ownership: 0640 owner-rw/group-r; the
+    engine (`cdb` user) reads via a shared group -- an installer/ops binding to note (the sidecar seed is
+    0600 under the sidecar user; the connector secret must be group-readable by `cdb`). Wire it into `main.rs`
+    beside the sign leg (`tokio::select!`). The secret VALUE never leaves loopback and is never logged. Gate:
+    `sidecar/` runs under the FC `scripts/ci.sh` step `[11]` (the Rust sidecar tests).
+  - **Part 4 -- the SPA onboarding form.** Replace the per-card `Configure (pending)` button (`IdamTab` in
+    `apps/console/src/surfaces/UsersSurface.tsx`) with a form: domain, client id, audience, **secret**, +
+    the two cadences (ID.4a). On submit: POST the secret to the sidecar leg (browser -> BFF passthrough ->
+    sidecar), then POST connectivity to `/api/idam/connect` (a `useIdamConnect` mutation invalidating
+    `['idam','connectors']`), confirm-gated. The secret field is write-only (a configured connector shows
+    "secret set", never returns it). e2e: the form round-trips connectivity; a structural check that the
+    secret is never in a Console-stored type. ID.4a cadences fold in here (crdb IA.7 ready).
+- ID.5 done; the remaining IdAM surface work is ID.4 parts 3-4 + ID.N capstone.
 - **The three verbs ID.2-ID.4 bind to** (all live on the engine, `cdb-wire` names in brackets):
   - `idam.connectors` -> **`IDAM_CONNECTORS`** [`WireIdamConnectors` -> `WireIdamConnectorList`
     of `WireIdamConnectorRecord`]. Read; returns the connector card.
@@ -89,7 +108,7 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 | ID.1 | `INV-CONSOLE-IDAM-CONTRACT` | **LANDED** | `e19e084` | regenerated from `wire-dto.schema.json`; bindings live; no secret in any type |
 | ID.2 | `INV-CONSOLE-IDAM-CONNECTORS-REAL` | **LANDED** | `2b2ff5b` | External IDAM tab live; `IDAM_CONNECTOR_SHELLS` + guard test deleted |
 | ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | **LANDED** | `7dd1d7b` | `Sync Now` real+audited, confirm-gated, engine-truth in-flight |
-| ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | PLANNED (RESCOPED) | -- | UI onboarding of the whole connector (domain/client id/audience + secret + cadences); connectivity over `IDAM_CONNECT`, secret browser->BFF(transient)->sidecar->mode-protected file, never the engine wire (operator ruling 2026-07-23 final); **needs crdb `IP-LUG-IDAM-CONNECT`** |
+| ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | **IN PROGRESS** | `97e9233` / `a131790` | crdb engine ready (`IP-LUG-IDAM-CONNECT` CO.1/CO.2 landed). **Part 1 (contract) LANDED `97e9233`**: `IdamConnectDraft` + `toWireIdamConnectFields` (secret-free) + live `idam.connect` binding. **Part 2 (BFF) LANDED `a131790`**: `IdamConnect` wire codec + `resolveIdamConnect` + `POST /api/idam/connect` (connectivity + the secret-ref PATH; secret value NOT accepted here). **Remaining: part 3 (sidecar) + part 4 (SPA form)** -- see Resume-here |
 | ID.4a | `INV-CONSOLE-IDAM-CADENCE-EDITABLE` | PLANNED | -- | operator directive 2026-07-22; needs crdb IA.7 |
 | ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | **LANDED** | `7bdb02d` | Origin column renders the connector (Auth0) for federated identities (over crdb DR.2). Scope reality: a federated ExternalAccount row is provider-managed + origin observed, so it has NO local Edit and the engine never makes an operator-editable record IdAM-owned -- the read-only-edit-form / forced-edit-refusal is unreachable and not built (owned_fields carried for a future detail view). Proposed MAY_REPRESENT surfacing deferred |
 | ID.N | `INV-CONSOLE-IDAM-COMPLETE` | PLANNED | -- | needs a real synced tenant (crdb IA.5/IA.N) |
