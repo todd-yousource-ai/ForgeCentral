@@ -58,7 +58,16 @@ ledger is a defect.
     `['idam','connectors']`), confirm-gated. The secret field is write-only (a configured connector shows
     "secret set", never returns it). e2e: the form round-trips connectivity; a structural check that the
     secret is never in a Console-stored type. ID.4a cadences fold in here (crdb IA.7 ready).
-- ID.5 done; the remaining IdAM surface work is ID.4 parts 3-4 + ID.N capstone.
+- **ID.4 COMPLETE** (parts 1-4 landed: contract `97e9233`, BFF connect `a131790`, sidecar secret leg
+  `26798be`, SPA form + secret-forward `70b16eb`). The whole connector -- domain, client id, audience, and
+  the secret -- is onboarded through the UI; the secret is written to the node's mode-protected store by the
+  sidecar and never crosses the engine wire.
+- **Remaining IdAM work:** (1) **ID.4a** -- fold the two cadence controls (crdb IA.7 ready via
+  `IDAM_CONFIGURE`) into the onboarding form (deferred from ID.4 to keep it focused; a small follow-on).
+  (2) The **live capstones** -- crdb DR.N (attributed directory) + CO.N (the connect re-spawn asserting the
+  secret never hits the engine wire) + FC ID.N -- all need a running node + the sidecar provisioned. (3) The
+  deployment binding for the secret file's group ownership (installer). The IdAM epic is otherwise
+  code-complete end to end.
 - **The three verbs ID.2-ID.4 bind to** (all live on the engine, `cdb-wire` names in brackets):
   - `idam.connectors` -> **`IDAM_CONNECTORS`** [`WireIdamConnectors` -> `WireIdamConnectorList`
     of `WireIdamConnectorRecord`]. Read; returns the connector card.
@@ -108,7 +117,7 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 | ID.1 | `INV-CONSOLE-IDAM-CONTRACT` | **LANDED** | `e19e084` | regenerated from `wire-dto.schema.json`; bindings live; no secret in any type |
 | ID.2 | `INV-CONSOLE-IDAM-CONNECTORS-REAL` | **LANDED** | `2b2ff5b` | External IDAM tab live; `IDAM_CONNECTOR_SHELLS` + guard test deleted |
 | ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | **LANDED** | `7dd1d7b` | `Sync Now` real+audited, confirm-gated, engine-truth in-flight |
-| ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | **IN PROGRESS** | `97e9233` / `a131790` | crdb engine ready (`IP-LUG-IDAM-CONNECT` CO.1/CO.2 landed). **Part 1 (contract) LANDED `97e9233`**: `IdamConnectDraft` + `toWireIdamConnectFields` (secret-free) + live `idam.connect` binding. **Part 2 (BFF) LANDED `a131790`**: `IdamConnect` wire codec + `resolveIdamConnect` + `POST /api/idam/connect` (connectivity + the secret-ref PATH; secret value NOT accepted here). **Remaining: part 3 (sidecar) + part 4 (SPA form)** -- see Resume-here |
+| ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | **COMPLETE** | `97e9233` / `a131790` / `26798be` / `70b16eb` | The whole connector is onboarded through the UI. Part 1 contract (`97e9233`); part 2 BFF `POST /api/idam/connect` (`a131790`); part 3 crypto-sidecar secret-set leg -- atomic 0640 write, loopback-only (`26798be`); part 4 SPA onboarding form + `POST /api/idam/secret` secret-forward (`70b16eb`). The secret rides browser -> BFF (transient) -> sidecar -> mode-protected file, never a Console value, never the engine wire; a fail-closed re-spawn applies it. **Deployment binding:** provision the sidecar `secret_addr`/`secret_path` + the BFF `FC_IDAM_SECRET_PORT`, and the secret file's group must be readable by the `cdb` engine user (installer/ops). |
 | ID.4a | `INV-CONSOLE-IDAM-CADENCE-EDITABLE` | PLANNED | -- | operator directive 2026-07-22; needs crdb IA.7 |
 | ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | **LANDED** | `7bdb02d` | Origin column renders the connector (Auth0) for federated identities (over crdb DR.2). Scope reality: a federated ExternalAccount row is provider-managed + origin observed, so it has NO local Edit and the engine never makes an operator-editable record IdAM-owned -- the read-only-edit-form / forced-edit-refusal is unreachable and not built (owned_fields carried for a future detail view). Proposed MAY_REPRESENT surfacing deferred |
 | ID.N | `INV-CONSOLE-IDAM-COMPLETE` | PLANNED | -- | needs a real synced tenant (crdb IA.5/IA.N) |
