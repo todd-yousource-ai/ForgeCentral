@@ -1379,4 +1379,35 @@ describe('BFF HTTP surface', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  // Every command (POST) route must be dispatched BEFORE the read-only 405 gate in route(): a handler
+  // registered below the gate is dead code every POST 405s past (the defect that shipped the IdAM
+  // onboarding form unusable). Unauthenticated, each must answer 401 from ITS OWN handler -- a 405
+  // here means the gate swallowed the route and the handler never ran.
+  it('every command route reaches its handler (401 unauthenticated), never the read-only 405 gate', async () => {
+    const base = await start(mockClient(() => Promise.resolve()));
+    const commandPaths = [
+      '/api/users',
+      '/api/users/edit',
+      '/api/users/status',
+      '/api/users/groups',
+      '/api/users/groups/edit',
+      '/api/users/groups/members',
+      '/api/objects',
+      '/api/objects/edit',
+      '/api/objects/delete',
+      '/api/idam/sync',
+      '/api/idam/connect',
+      '/api/idam/secret',
+      '/api/idam/configure',
+    ];
+    for (const path of commandPaths) {
+      const res = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(res.status, `${path} must reach its handler, not the 405 gate`).toBe(401);
+    }
+  });
 });

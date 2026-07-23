@@ -1641,6 +1641,24 @@ async function route(
   if (await handleVtzCommand(deps, req, method, path, res)) {
     return;
   }
+  if (await handleUsersCommand(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleObjectsCommand(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleIdamCommand(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleIdamConnect(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleIdamSecret(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleIdamConfigure(deps, req, method, path, res)) {
+    return;
+  }
   if (method !== 'GET') {
     sendJson(res, 405, { error: 'method_not_allowed' });
     return;
@@ -1673,25 +1691,7 @@ async function route(
   if (await handleOverview(deps, req, path, res)) {
     return;
   }
-  if (await handleUsersCommand(deps, req, method, path, res)) {
-    return;
-  }
   if (await handleUsers(deps, req, path, res)) {
-    return;
-  }
-  if (await handleObjectsCommand(deps, req, method, path, res)) {
-    return;
-  }
-  if (await handleIdamCommand(deps, req, method, path, res)) {
-    return;
-  }
-  if (await handleIdamConnect(deps, req, method, path, res)) {
-    return;
-  }
-  if (await handleIdamSecret(deps, req, method, path, res)) {
-    return;
-  }
-  if (await handleIdamConfigure(deps, req, method, path, res)) {
     return;
   }
   if (await handleObjects(deps, req, path, res)) {
