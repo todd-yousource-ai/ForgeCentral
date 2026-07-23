@@ -60,7 +60,7 @@ import {
   ObjectCommandError,
   ObjectsUnavailableError,
 } from './engine/objects.js';
-import { resolveIdamConnectors, resolveIdamSync } from './engine/idam.js';
+import { resolveIdamConnect, resolveIdamConnectors, resolveIdamSync } from './engine/idam.js';
 import {
   resolveCreateGroup,
   resolveCreatePrincipal,
@@ -1349,6 +1349,78 @@ async function handleObjects(
   return true;
 }
 
+/**
+ * The path the on-node crypto-sidecar writes the Auth0 client secret to, and the engine reads it from
+ * (crdb `client_secret_ref`). The secret VALUE never reaches this tier; the BFF only ever names the
+ * path. A later increment moves this to config so the BFF and the sidecar share one source.
+ */
+const IDAM_SECRET_REF = '/etc/cdb/secrets/auth0-management.secret';
+
+async function handleIdamConnect(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/idam/connect' || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as Record<string, unknown>;
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const str = (key: string): string => {
+    const value = body[key];
+    return typeof value === 'string' ? value : '';
+  };
+  const draft = {
+    provider: str('provider').trim(),
+    domain: str('domain').trim(),
+    clientId: str('clientId').trim(),
+    audience: str('audience').trim(),
+  };
+  // The connectivity that authenticates the connector must be present (audience may be empty; the
+  // engine re-validates and derives the conventional audience). The secret is NOT accepted here.
+  if (draft.provider === '' || draft.domain === '' || draft.clientId === '') {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    const receipt = await resolveIdamConnect(
+      deps.operatorEngine,
+      principal,
+      draft,
+      IDAM_SECRET_REF,
+      opts,
+    );
+    sendJson(res, 200, receipt);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      const cls = err.wireError.class;
+      // Conflict = no connector / unreadable secret file; Framing = malformed connectivity; else denial.
+      const httpStatus = cls === 'Conflict' ? 409 : cls === 'Framing' ? 400 : 403;
+      sendJson(res, httpStatus, { error: 'refused', class: cls });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'idam connect failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleIdamCommand(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1491,6 +1563,9 @@ async function route(
     return;
   }
   if (await handleIdamCommand(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleIdamConnect(deps, req, method, path, res)) {
     return;
   }
   if (await handleObjects(deps, req, path, res)) {

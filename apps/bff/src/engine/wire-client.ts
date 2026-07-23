@@ -530,6 +530,17 @@ export class WireCrucibleClient implements CrucibleClient {
     );
   }
 
+  async idamConnect(
+    request: Parameters<CrucibleClient['idamConnect']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned> {
+    return this.call(
+      async (transport) =>
+        replyToLugProvisioned(await dispatch(transport, { IdamConnect: request })),
+      opts,
+    );
+  }
+
   async objectDetail(
     request: Parameters<CrucibleClient['objectDetail']>[0],
     opts?: EngineCallOptions,
