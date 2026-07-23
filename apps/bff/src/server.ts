@@ -60,6 +60,7 @@ import {
   ObjectCommandError,
   ObjectsUnavailableError,
 } from './engine/objects.js';
+import { resolveIdamConnectors } from './engine/idam.js';
 import {
   resolveCreateGroup,
   resolveCreatePrincipal,
@@ -1348,6 +1349,38 @@ async function handleObjects(
   return true;
 }
 
+async function handleIdam(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/idam/connectors') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    const view = await resolveIdamConnectors(deps.operatorEngine, principal, opts);
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'idam read failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function route(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1410,6 +1443,9 @@ async function route(
     return;
   }
   if (await handleObjects(deps, req, path, res)) {
+    return;
+  }
+  if (await handleIdam(deps, req, path, res)) {
     return;
   }
   if (await handleVtz(deps, req, path, res)) {

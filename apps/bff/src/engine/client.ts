@@ -24,6 +24,8 @@ import type {
   WireListAgents,
   WireListGroups,
   WireListPrincipals,
+  WireIdamConnectorList,
+  WireIdamConnectors,
   WireObjectCatalog,
   WireObjectCreate,
   WireObjectDelete,
@@ -105,6 +107,11 @@ export interface CrucibleClient {
   ): Promise<WireLugProvisioned>;
   /** List the tenant's named-object catalog (OBJECT_LIST, crdb OB.3). */
   objectList(request: WireObjectList, opts?: EngineCallOptions): Promise<WireObjectCatalog>;
+  /** List the tenant's External IDAM connectors (IDAM_CONNECTORS, crdb IA.8). */
+  idamConnectors(
+    request: WireIdamConnectors,
+    opts?: EngineCallOptions,
+  ): Promise<WireIdamConnectorList>;
   /** Read one named object + its resolved members (OBJECT_DETAIL, crdb OB.3). */
   objectDetail(request: WireObjectDetailQuery, opts?: EngineCallOptions): Promise<WireObjectDetail>;
   /** Register a named object (OBJECT_CREATE, crdb OB.4), audited. */

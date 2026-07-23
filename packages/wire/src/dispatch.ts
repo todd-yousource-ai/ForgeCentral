@@ -68,6 +68,9 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // opcode; the engine discriminates them by their CBOR enum tag.
       'ObjectList' in request ||
       'ObjectDetail' in request ||
+      // The External IDAM connector read (IDAM_CONNECTORS, crdb IA.8) rides the QuerySubmit opcode
+      // too; the engine discriminates it by its CBOR enum tag.
+      'IdamConnectors' in request ||
       // The Objects-surface commands (OBJECT_CREATE/EDIT/DELETE, crdb OB.4) ride the QuerySubmit
       // opcode like the other data-plane writes; the engine routes them to the write path by tag.
       'ObjectCreate' in request ||

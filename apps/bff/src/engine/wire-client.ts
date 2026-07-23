@@ -24,6 +24,7 @@ import {
 import type {
   WireAgentList,
   WireGroupList,
+  WireIdamConnectorList,
   WireLugProvisioned,
   WireObjectCatalog,
   WireObjectDetail,
@@ -117,6 +118,14 @@ export function replyToObjectCatalog(reply: WireReply): WireObjectCatalog {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for an object-list read');
+}
+
+/** Map an engine `WireReply` to `WireIdamConnectorList` (IDAM_CONNECTORS, crdb IA.8). */
+export function replyToIdamConnectors(reply: WireReply): WireIdamConnectorList {
+  if (typeof reply === 'object' && 'IdamConnectors' in reply) return reply.IdamConnectors;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for an idam-connectors read');
 }
 
 /** Map an engine `WireReply` to `WireObjectMutated` (an OB.4 object command ack). */
@@ -487,6 +496,17 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireObjectCatalog> {
     return this.call(
       async (transport) => replyToObjectCatalog(await dispatch(transport, { ObjectList: request })),
+      opts,
+    );
+  }
+
+  async idamConnectors(
+    request: Parameters<CrucibleClient['idamConnectors']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireIdamConnectorList> {
+    return this.call(
+      async (transport) =>
+        replyToIdamConnectors(await dispatch(transport, { IdamConnectors: request })),
       opts,
     );
   }

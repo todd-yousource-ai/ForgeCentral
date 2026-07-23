@@ -53,6 +53,7 @@ function engineWith(parts: {
     principalSetStatus: unused,
     listGroups: unused,
     objectList: unused,
+    idamConnectors: unused,
     objectCreate: unused,
     objectEdit: unused,
     objectDelete: unused,

@@ -51,6 +51,7 @@ const unusedClient: CrucibleClient = {
   principalSetStatus: () => Promise.reject(new Error('unused')),
   listGroups: () => Promise.reject(new Error('unused')),
   objectList: () => Promise.reject(new Error('unused')),
+  idamConnectors: () => Promise.reject(new Error('unused')),
   objectCreate: () => Promise.reject(new Error('unused')),
   objectEdit: () => Promise.reject(new Error('unused')),
   objectDelete: () => Promise.reject(new Error('unused')),

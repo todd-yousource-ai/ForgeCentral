@@ -1,0 +1,113 @@
+// apps/bff/test/idam.test.ts -- IP-CONSOLE-04 ID.2 tier-2 tests for the External IDAM read resolver.
+//
+// Proves the ID.2 slice of INV-CONSOLE-IDAM-CONNECTORS-REAL: `idam.connectors` projects the engine's
+// connector list into cards; an unfederated node (empty list) resolves an honest empty (never an
+// error); the fail-closed card state survives the resolver (an unrecognized completeness renders
+// `unknown`, never `healthy`).
+
+import { describe, expect, it } from 'vitest';
+import type { WireIdamConnectorList, WireIdamConnectorRecord } from '@forge/contracts';
+
+import type { OperatorEngine } from '../src/engine/operator-engine.js';
+import type { OperatorPrincipal } from '../src/engine/principal.js';
+import { resolveIdamConnectors } from '../src/engine/idam.js';
+
+const PRINCIPAL: OperatorPrincipal = {
+  principalId: 'op-1',
+  tenant: 'tenant-1',
+  tier: 'Admin',
+} as unknown as OperatorPrincipal;
+
+const connector = (overrides: Partial<WireIdamConnectorRecord> = {}): WireIdamConnectorRecord => ({
+  provider: 'auth0',
+  display_name: 'Auth0',
+  provider_tenant: 'dev-6rcwumbp1tsae8me.us.auth0.com',
+  enabled: true,
+  running: false,
+  last_completeness: 'complete',
+  last_error: null,
+  last_sync_unix_ms: 1_700_000_000_000,
+  objects_synced: 20,
+  poll_interval_secs: 300,
+  full_sync_cadence_hours: 24,
+  ...overrides,
+});
+
+function engineWith(list: WireIdamConnectorList): OperatorEngine {
+  const unused = () => Promise.reject(new Error('unused'));
+  return {
+    idamConnectors: () => Promise.resolve(list),
+    objectList: unused,
+    objectDetail: unused,
+    objectCreate: unused,
+    objectEdit: unused,
+    objectDelete: unused,
+    querySubmit: unused,
+    cursorFetch: unused,
+    cursorClose: unused,
+    listAgents: unused,
+    listPrincipals: unused,
+    listGroups: unused,
+    groupCreate: unused,
+    groupEdit: unused,
+    groupSetMembers: unused,
+    principalCreate: unused,
+    principalEdit: unused,
+    principalSetStatus: unused,
+    entityDecisions: unused,
+    entityConnections: unused,
+    connectivityGraph: unused,
+    connectivityMembers: unused,
+    contain: unused,
+    logQuery: unused,
+    logExplain: unused,
+    logExport: unused,
+    usageOverview: unused,
+    vtzTree: unused,
+    vtzDetail: unused,
+    bundleConvergence: unused,
+    distributeBundle: unused,
+    vtzCreate: unused,
+    vtzEdit: unused,
+    vtzRescope: unused,
+    vtzDelete: unused,
+  } as unknown as OperatorEngine;
+}
+
+describe('resolveIdamConnectors', () => {
+  it('projects a healthy connector card from the engine record', () => {
+    const engine = engineWith({ connectors: [connector()] });
+    return resolveIdamConnectors(engine, PRINCIPAL).then((cards) => {
+      expect(cards).toHaveLength(1);
+      expect(cards[0]?.connectorId).toBe('auth0');
+      expect(cards[0]?.providerTenant).toBe('dev-6rcwumbp1tsae8me.us.auth0.com');
+      expect(cards[0]?.state).toBe('healthy');
+      expect(cards[0]?.lastSyncAt).toBe(1_700_000_000_000);
+      expect(cards[0]?.objectsSynced).toBe(20);
+    });
+  });
+
+  it('an unfederated node (empty list) resolves an honest empty, never an error', () => {
+    return resolveIdamConnectors(engineWith({ connectors: [] }), PRINCIPAL).then((cards) => {
+      expect(cards).toEqual([]);
+    });
+  });
+
+  it('renders Never (null), not an epoch, when the connector has never synced', () => {
+    const engine = engineWith({
+      connectors: [connector({ last_sync_unix_ms: null, last_completeness: null })],
+    });
+    return resolveIdamConnectors(engine, PRINCIPAL).then((cards) => {
+      expect(cards[0]?.lastSyncAt).toBeNull();
+      expect(cards[0]?.state).toBe('never-synced');
+    });
+  });
+
+  it('never renders a green card on an unrecognized completeness (fail-closed survives the resolver)', () => {
+    const engine = engineWith({ connectors: [connector({ last_completeness: 'mostly-ok' })] });
+    return resolveIdamConnectors(engine, PRINCIPAL).then((cards) => {
+      expect(cards[0]?.state).toBe('unknown');
+      expect(cards[0]?.state).not.toBe('healthy');
+    });
+  });
+});

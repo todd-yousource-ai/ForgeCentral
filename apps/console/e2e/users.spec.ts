@@ -58,6 +58,22 @@ const AGENT = {
   firstSeen: 300,
 };
 
+// A live Auth0 connector card (the ID.2 IDAM_CONNECTORS projection), exactly as the BFF emits it.
+const AUTH0_CONNECTOR = {
+  connectorId: 'auth0',
+  displayName: 'Auth0',
+  providerTenant: 'dev-6rcwumbp1tsae8me.us.auth0.com',
+  state: 'healthy',
+  enabled: true,
+  running: false,
+  lastSyncAt: 1_700_000_000_000,
+  lastSyncOutcome: 'complete',
+  objectsSynced: 20,
+  lastError: null,
+  pollIntervalSecs: 300,
+  fullSyncCadenceHours: 24,
+};
+
 const GROUPS = [
   {
     groupId: 'lug:local_group:posix_host%3Am1:gid:27',
@@ -105,13 +121,17 @@ function json(route: Route, body: unknown): Promise<void> {
  */
 async function mockBff(page: Page): Promise<{
   commands: Array<{ url: string; body: unknown }>;
-  state: { rows: unknown[] };
+  state: { rows: unknown[]; idamConnectors: unknown[] };
 }> {
   const commands: Array<{ url: string; body: unknown }> = [];
-  const state = { rows: [OBSERVED, LOCAL, AGENT] as unknown[] };
+  const state = {
+    rows: [OBSERVED, LOCAL, AGENT] as unknown[],
+    idamConnectors: [AUTH0_CONNECTOR] as unknown[],
+  };
 
   await page.route('**/auth/me', (route) => json(route, { operator: OPERATOR }));
   await page.route(/\/api\/entity\//, (route) => json(route, ENTITY));
+  await page.route(/\/api\/idam\/connectors$/, (route) => json(route, state.idamConnectors));
   await page.route(/\/api\/users\/groups$/, (route) => {
     if (route.request().method() === 'POST') {
       commands.push({ url: '/api/users/groups', body: route.request().postDataJSON() });
@@ -266,16 +286,26 @@ test('suspend commits through the confirm gate; groups + the honest IDAM shell',
   await expect(page.getByText('sarah', { exact: true })).toBeVisible();
   await expect(page.getByText('todd', { exact: true })).toBeHidden();
 
-  // The External IDAM shell is honest: three real not-connected states, non-live controls,
-  // no fabricated sync timestamp anywhere.
+  // The External IDAM tab is LIVE: the real Auth0 connector card renders engine truth -- real state,
+  // real tenant, real last-sync + object count. Sync/Configure remain non-live (ID.3/ID.4).
   await page.getByRole('tab', { name: 'External IDAM' }).click();
-  for (const name of ['Okta', 'Azure AD', 'Google Workspace']) {
-    await expect(page.getByText(name, { exact: true })).toBeVisible();
-  }
-  await expect(page.getByText('Not Connected')).toHaveCount(3);
-  await expect(page.getByText('No sync has ever run.')).toHaveCount(3);
+  await expect(page.getByText('Auth0', { exact: true })).toBeVisible();
+  await expect(page.getByText('dev-6rcwumbp1tsae8me.us.auth0.com')).toBeVisible();
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  await expect(page.getByText('2023-11-14 22:13:20')).toBeVisible();
+  await expect(page.getByText('20', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Configure \(pending\)/ }).first()).toBeDisabled();
   await expect(page.getByRole('button', { name: /Sync Now \(pending\)/ })).toBeDisabled();
+});
+
+test('the External IDAM tab shows an honest empty when no connector is configured', async ({
+  page,
+}) => {
+  const bff = await mockBff(page);
+  bff.state.idamConnectors = [];
+  await page.goto('/users');
+  await page.getByRole('tab', { name: 'External IDAM' }).click();
+  await expect(page.getByText('No IdAM connector configured')).toBeVisible();
 });
 
 test('an empty tenant renders the honest empty state, never a fabricated principal', async ({
