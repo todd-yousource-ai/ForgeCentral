@@ -242,6 +242,44 @@ describe('IP-CONSOLE-02 V2.1: the Virtual Trust Zones (vtz.*) governance binding
   });
 });
 
+describe('IP-CONSOLE-04 ID.1: the External IDAM (idam.*) bindings', () => {
+  const idamBindings = Object.values(bindings).filter((b) => b.id.startsWith('idam.'));
+
+  it('registers the three IdAM bindings (connectors/configure/sync)', () => {
+    const ids = idamBindings.map((b) => b.id).sort();
+    expect(ids).toEqual(['idam.configure', 'idam.connectors', 'idam.sync']);
+  });
+
+  it('binds the connector list LIVE to the crdb IDAM_CONNECTORS producer (IA.8)', () => {
+    // Backed by crdb IP-LUG-IDAM-AUTH0 IA.8 (live Auth0 capstone green 2026-07-23); genuinely live.
+    const connectors = bindings['idam.connectors'];
+    expect(connectors?.kind).toBe('read');
+    expect(connectors?.surface).toBe('cruciblql');
+    expect(connectors?.op).toBe('idam_connectors_v1');
+    expect(connectors?.status.kind).toBe('live');
+  });
+
+  it('exposes configure + sync as real audited LIVE commands (never a stub)', () => {
+    for (const [id, op] of [
+      ['idam.configure', 'idam_configure_v1'],
+      ['idam.sync', 'idam_sync_v1'],
+    ] as const) {
+      const command = bindings[id];
+      expect(command?.kind).toBe('command');
+      expect(command?.op).toBe(op);
+      expect(command?.status.kind).toBe('live');
+      if (command?.kind === 'command') {
+        expect(command.audited).toBe(true);
+        expect(command.authz).toBe('operator:users.manage');
+      }
+    }
+  });
+
+  it('leaves NO idam.* binding PENDING (the engine half fully landed)', () => {
+    expect(idamBindings.every((b) => b.status.kind === 'live')).toBe(true);
+  });
+});
+
 describe('INV-CONSOLE-NO-STUB: the enforcement rules', () => {
   it('accepts a well-formed live read binding', () => {
     const manifest: BindingManifest = { [liveRead.id]: liveRead };

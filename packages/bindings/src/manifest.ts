@@ -396,9 +396,11 @@ const vtzCommands: readonly CommandBinding[] = [
 // (LIST_PRINCIPALS / LIST_GROUPS over the TRD-35 Local User Graph) and the LU.P provisioning
 // commands (PRINCIPAL_CREATE/EDIT/SET_STATUS + GROUP_CREATE/EDIT/SET_MEMBERS, audited atomic
 // batches attributed to the delegated operator) are all live engine ops, so every users/groups
-// binding registers LIVE. Only `idam.*` is PENDING: the External IDAM tab needs the TRD-35 Phase-2
-// IdAM adapters (Auth0 is the planned first live connector); UY.4 renders the honest not-connected
-// shell with non-live controls until then. NO trust binding exists (operator ruling 2026-07-21).
+// binding registers LIVE. The `idam.*` bindings are now LIVE too: the crdb TRD-35 Phase-2 IdAM
+// adapters landed (IP-LUG-IDAM-AUTH0 IA.7/IA.8, live Auth0 capstone green 2026-07-23), so
+// `IDAM_CONNECTORS` / `IDAM_SYNC` / `IDAM_CONFIGURE` are real engine ops. ID.1 flips the bindings; the
+// BFF resolver + SPA wiring (and deleting the shell) follow in ID.2-ID.4. NO trust binding exists
+// (operator ruling 2026-07-21).
 
 const usersReads: readonly ReadBinding[] = [
   {
@@ -440,19 +442,14 @@ const usersReads: readonly ReadBinding[] = [
     status: { kind: 'live' },
   },
   {
-    // The External IDAM connector list: PENDING until the TRD-35 Phase-2 IdAM adapters land
-    // (Auth0 first). UY.4 renders the static honest shell (IDAM_CONNECTOR_SHELLS), never a
-    // fabricated sync state.
+    // The External IDAM connector list: LIVE on crdb IDAM_CONNECTORS (IA.8). An unfederated node
+    // returns an empty list (rendered "no connector configured"), never a fabricated card.
     id: bindingId('idam.connectors'),
     kind: 'read',
     surface: 'cruciblql',
     op: 'idam_connectors_v1',
     viewModel: 'IdamConnector',
-    status: {
-      kind: 'pending',
-      owningRepo: 'crdb',
-      gatingTask: 'TRD-35 Phase 2 IdAM adapters (ExternalAccount/federation sync; Auth0 first)',
-    },
+    status: { kind: 'live' },
   },
 ];
 
@@ -516,31 +513,26 @@ const usersCommands: readonly CommandBinding[] = [
     status: { kind: 'live' },
   },
   {
-    // Configure / sync a federation connector: PENDING with the Phase-2 adapters.
+    // Configure a federation connector (enabled + the two cadences; NO secret): LIVE on crdb
+    // IDAM_CONFIGURE (IA.8), audited, applied without restart.
     id: bindingId('idam.configure'),
     kind: 'command',
     surface: 'cruciblql',
     op: 'idam_configure_v1',
     authz: 'operator:users.manage',
     audited: true,
-    status: {
-      kind: 'pending',
-      owningRepo: 'crdb',
-      gatingTask: 'TRD-35 Phase 2 IdAM adapters (connector config store + federation sync)',
-    },
+    status: { kind: 'live' },
   },
   {
+    // Trigger a real federation sync: LIVE on crdb IDAM_SYNC (IA.8), audited. An ACK, not a result --
+    // the sync loop picks up the queued walk and the connector card reports progress.
     id: bindingId('idam.sync'),
     kind: 'command',
     surface: 'cruciblql',
     op: 'idam_sync_v1',
     authz: 'operator:users.manage',
     audited: true,
-    status: {
-      kind: 'pending',
-      owningRepo: 'crdb',
-      gatingTask: 'TRD-35 Phase 2 IdAM adapters (connector config store + federation sync)',
-    },
+    status: { kind: 'live' },
   },
 ];
 
