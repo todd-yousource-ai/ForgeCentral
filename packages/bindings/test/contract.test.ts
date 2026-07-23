@@ -245,9 +245,9 @@ describe('IP-CONSOLE-02 V2.1: the Virtual Trust Zones (vtz.*) governance binding
 describe('IP-CONSOLE-04 ID.1: the External IDAM (idam.*) bindings', () => {
   const idamBindings = Object.values(bindings).filter((b) => b.id.startsWith('idam.'));
 
-  it('registers the three IdAM bindings (connectors/configure/sync)', () => {
+  it('registers the four IdAM bindings (connectors/configure/connect/sync)', () => {
     const ids = idamBindings.map((b) => b.id).sort();
-    expect(ids).toEqual(['idam.configure', 'idam.connectors', 'idam.sync']);
+    expect(ids).toEqual(['idam.configure', 'idam.connect', 'idam.connectors', 'idam.sync']);
   });
 
   it('binds the connector list LIVE to the crdb IDAM_CONNECTORS producer (IA.8)', () => {
@@ -259,9 +259,10 @@ describe('IP-CONSOLE-04 ID.1: the External IDAM (idam.*) bindings', () => {
     expect(connectors?.status.kind).toBe('live');
   });
 
-  it('exposes configure + sync as real audited LIVE commands (never a stub)', () => {
+  it('exposes configure + connect + sync as real audited LIVE commands (never a stub)', () => {
     for (const [id, op] of [
       ['idam.configure', 'idam_configure_v1'],
+      ['idam.connect', 'idam_connect_v1'],
       ['idam.sync', 'idam_sync_v1'],
     ] as const) {
       const command = bindings[id];

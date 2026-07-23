@@ -294,6 +294,16 @@ export interface WireIdamConfigure {
   request_id: number;
 }
 
+export interface WireIdamConnect {
+  audience: string;
+  client_id: string;
+  client_secret_ref: string;
+  domain: string;
+  operator?: OperatorDelegation | null;
+  provider: string;
+  request_id: number;
+}
+
 export interface WireIdamConnectorList {
   connectors: Array<WireIdamConnectorRecord>;
 }
@@ -641,6 +651,7 @@ export type WireRequest =
   | { IdamConnectors: WireIdamConnectors; }
   | { IdamSync: WireIdamSync; }
   | { IdamConfigure: WireIdamConfigure; }
+  | { IdamConnect: WireIdamConnect; }
   | { PrincipalCreate: WirePrincipalCreate; }
   | { PrincipalEdit: WirePrincipalEdit; }
   | { PrincipalSetStatus: WirePrincipalSetStatus; }
