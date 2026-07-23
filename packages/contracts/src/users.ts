@@ -34,6 +34,10 @@ import type {
   WireAgentRecord,
   WireGroupList,
   WireGroupRecord,
+  WireIdamConfigure,
+  WireIdamConnectorList,
+  WireIdamConnectorRecord,
+  WireIdamSyncStarted,
   WireLugProvisioned,
   WirePrincipalList,
   WirePrincipalRecord,
@@ -118,20 +122,93 @@ export interface GroupCard {
 }
 
 /**
- * One External IDAM connector card (TRD-CONSOLE-04 Section 2.3). UY.4 ships the HONEST shell: the
- * three well-known connectors render `not-connected` with non-live controls until the TRD-35
- * Phase-2 IdAM adapters land (Auth0 is the planned first live connector). `lastSyncAt` is null
- * until a real sync has happened -- never a fabricated timestamp.
+ * The completeness of a connector's last sync, narrowed CLOSED from the engine's
+ * `last_completeness` string (`complete` / `partial` / `failed`, crdb `LugCompleteness`). An
+ * unrecognized value narrows to `null` (see {@link toIdamConnector}) rather than a guessed outcome,
+ * so a card can never claim `complete` on a tag the Console does not understand.
+ */
+export const IDAM_SYNC_OUTCOMES = ['complete', 'partial', 'failed'] as const;
+export type IdamSyncOutcome = (typeof IDAM_SYNC_OUTCOMES)[number];
+
+/**
+ * The derived health state of a connector card. This is NOT an engine tag -- the engine record
+ * carries `enabled` / `running` / `last_error` / `last_sync_unix_ms` / `last_completeness`, and this
+ * state is {@link toIdamConnector}'s conservative projection of them. FAIL-CLOSED: any combination the
+ * projection does not confidently recognize as healthy yields `unknown`, never `healthy`, so an
+ * unparseable record never renders as a connected connector (INV-CONSOLE-IDAM-CONTRACT).
+ */
+export const IDAM_CONNECTOR_STATES = [
+  'disabled',
+  'never-synced',
+  'syncing',
+  'healthy',
+  'partial',
+  'error',
+  'unknown',
+] as const;
+export type IdamConnectorState = (typeof IDAM_CONNECTOR_STATES)[number];
+
+/**
+ * One External IDAM connector card (TRD-CONSOLE-04 Section 2.3), the camelCase mirror of the engine's
+ * `WireIdamConnectorRecord` (crdb IA.8). Every field derives from a real connector record; there is
+ * NO secret or secret reference here (the Auth0 client secret is placed on the node out of band and
+ * is not representable in any Console type). `lastSyncAt` is `null` until a real sync has run --
+ * rendered `Never`, never a fabricated timestamp.
  */
 export interface IdamConnector {
-  /** The connector's stable id (e.g. `okta`, `azure-ad`, `google-workspace`). */
+  /** The connector's stable provider id (e.g. `auth0`). Engine `provider`. */
   readonly connectorId: string;
-  /** The display name. */
+  /** The display name (engine `display_name`, e.g. `Auth0`). */
   readonly displayName: string;
-  /** The connection state; only `not-connected` is producible until Phase 2. */
-  readonly state: 'not-connected' | 'connected';
-  /** The last successful sync (unix seconds), or null if none has ever run. */
+  /** The provider tenant/domain (engine `provider_tenant`, e.g. the Auth0 domain). */
+  readonly providerTenant: string;
+  /** The derived, fail-closed health state (see {@link IdamConnectorState}). */
+  readonly state: IdamConnectorState;
+  /** Whether the connector is enabled (engine `enabled`). */
+  readonly enabled: boolean;
+  /** Whether a sync is running right now (engine `running`); drives the in-flight indicator. */
+  readonly running: boolean;
+  /** The last sync time (unix MILLISECONDS, engine `last_sync_unix_ms`), or null if none ever ran. */
   readonly lastSyncAt: number | null;
+  /** The last sync's completeness, narrowed closed, or null when absent/unrecognized. */
+  readonly lastSyncOutcome: IdamSyncOutcome | null;
+  /** The object count from the last sync (engine `objects_synced`; 0 before any sync). */
+  readonly objectsSynced: number;
+  /** The last error string the engine reported, or null. */
+  readonly lastError: string | null;
+  /** The delta-poll interval in seconds (engine `poll_interval_secs`). */
+  readonly pollIntervalSecs: number;
+  /** The full-directory-sync cadence in hours (engine `full_sync_cadence_hours`). */
+  readonly fullSyncCadenceHours: number;
+}
+
+/**
+ * The Configure form's authored shape (`idam.configure`), the camelCase mirror of the NON-transport
+ * fields of `WireIdamConfigure` (crdb IA.8). The engine's configure verb carries ONLY these settings
+ * plus `enabled`: domain, client id, and the client secret are ABSENT from the wire DTO by
+ * construction (re-pointing a connector at a different tenant is a deployment act, not a settings
+ * one). There is deliberately no secret or secret-reference field -- a form that could carry a secret
+ * is unrepresentable. The BFF wire codec (ID.4) adds `request_id` + the operator delegation.
+ */
+export interface IdamConnectorDraft {
+  /** The connector this configuration targets (engine `provider`). */
+  readonly provider: string;
+  /** Whether the connector should be enabled. */
+  readonly enabled: boolean;
+  /** The delta-poll interval in seconds (engine-bounded 60..=86400; the engine re-validates). */
+  readonly pollIntervalSecs: number;
+  /** The full-directory-sync cadence in hours (engine-bounded 1..=168; the engine re-validates). */
+  readonly fullSyncCadenceHours: number;
+}
+
+/**
+ * A `idam.sync` acknowledgment (`WireIdamSyncStarted`). IDAM_SYNC is an ACK, not a result: it marks a
+ * sync DUE and returns immediately, naming the provider it queued. The card's `running` / `lastSyncAt`
+ * (re-read via `idam.connectors`) is the source of truth for progress -- never a client-side timer.
+ */
+export interface SyncReceipt {
+  /** The connector the sync was queued for (engine `provider`). */
+  readonly provider: string;
 }
 
 /** The Add/Edit User form's engine shape (E3 `WirePrincipalSpec`); NO trust field. */
@@ -266,18 +343,148 @@ export function toProvisionReceipt(reply: WireLugProvisioned): ProvisionReceipt 
   return { commitVersion: reply.commit_version };
 }
 
+/** Narrow the engine `last_completeness` string, fail-closed (unrecognized/absent -> null). */
+function toIdamSyncOutcome(tag: string | null | undefined): IdamSyncOutcome | null {
+  if (tag == null) {
+    return null;
+  }
+  return (IDAM_SYNC_OUTCOMES as readonly string[]).includes(tag) ? (tag as IdamSyncOutcome) : null;
+}
+
 /**
- * The three well-known connector shells UY.4 renders (TRD-CONSOLE-04 Section 2.3), honest
- * `not-connected` until TRD-35 Phase 2. A REAL connector list replaces this constant when the
- * `idam.connectors` binding goes live; nothing here fabricates a sync.
+ * Derive the connector card's health state from the engine record, CONSERVATIVELY. Precedence:
+ * disabled (config off) -> syncing (a walk is in flight) -> error (the engine reported one) ->
+ * never-synced (no sync has ever completed) -> the last completeness. The final branch is
+ * FAIL-CLOSED: a synced, error-free connector whose completeness the Console does not recognize is
+ * `unknown`, NOT `healthy`, so an unparseable record can never render as a green connected card.
+ */
+function deriveIdamState(record: WireIdamConnectorRecord): IdamConnectorState {
+  if (!record.enabled) {
+    return 'disabled';
+  }
+  if (record.running) {
+    return 'syncing';
+  }
+  if (record.last_error != null) {
+    return 'error';
+  }
+  if (record.last_sync_unix_ms == null) {
+    return 'never-synced';
+  }
+  const outcome = toIdamSyncOutcome(record.last_completeness);
+  if (outcome === 'complete') {
+    return 'healthy';
+  }
+  if (outcome === 'partial') {
+    return 'partial';
+  }
+  if (outcome === 'failed') {
+    return 'error';
+  }
+  return 'unknown';
+}
+
+/**
+ * Project one engine connector record into its card. Total (every engine field is well-typed by the
+ * schema), with the fail-closed derivations {@link deriveIdamState} and {@link toIdamSyncOutcome}:
+ * an unrecognized completeness never becomes a healthy card, and an absent `last_sync_unix_ms`
+ * renders `Never` (null) rather than an epoch. No field is defaulted or invented.
+ */
+export function toIdamConnector(record: WireIdamConnectorRecord): IdamConnector {
+  return {
+    connectorId: record.provider,
+    displayName: record.display_name,
+    providerTenant: record.provider_tenant,
+    state: deriveIdamState(record),
+    enabled: record.enabled,
+    running: record.running,
+    lastSyncAt: record.last_sync_unix_ms ?? null,
+    lastSyncOutcome: toIdamSyncOutcome(record.last_completeness),
+    objectsSynced: record.objects_synced,
+    lastError: record.last_error ?? null,
+    pollIntervalSecs: record.poll_interval_secs,
+    fullSyncCadenceHours: record.full_sync_cadence_hours,
+  };
+}
+
+/**
+ * Project the `idam.connectors` reply into cards. An unfederated node returns an EMPTY list (not an
+ * error), which projects to `[]` and renders as "no connector configured" -- the engine deliberately
+ * made those distinguishable, so the Console never turns an empty directory into a failure state.
+ */
+export function toIdamConnectors(list: WireIdamConnectorList): readonly IdamConnector[] {
+  return list.connectors.map(toIdamConnector);
+}
+
+/** Project a sync acknowledgment (`WireIdamSyncStarted` -> the view-model {@link SyncReceipt}). */
+export function toSyncReceipt(reply: WireIdamSyncStarted): SyncReceipt {
+  return { provider: reply.provider };
+}
+
+/**
+ * Compile a Configure draft into the NON-transport fields of the engine's `WireIdamConfigure`. The
+ * BFF wire codec (ID.4) adds `request_id` + the operator delegation; this helper is the ONE home for
+ * the camelCase->snake_case field mapping. By type there is no secret to carry. The engine
+ * re-validates the cadence bounds and refuses out-of-range values regardless of this projection.
+ */
+export function toWireIdamConfigureFields(
+  draft: IdamConnectorDraft,
+): Omit<WireIdamConfigure, 'request_id' | 'operator'> {
+  return {
+    provider: draft.provider,
+    enabled: draft.enabled,
+    poll_interval_secs: draft.pollIntervalSecs,
+    full_sync_cadence_hours: draft.fullSyncCadenceHours,
+  };
+}
+
+/**
+ * The three well-known connector shells the External IDAM tab still renders in ID.1 (no UI change
+ * yet). They are honest `disabled` placeholders -- not a fabricated sync -- and are DELETED in ID.2
+ * when the tab renders the engine's real connector list. Their `state` is `disabled` because
+ * `enabled` is false; the SPA reads only `connectorId` / `displayName` / `lastSyncAt` from them.
  */
 export const IDAM_CONNECTOR_SHELLS: readonly IdamConnector[] = [
-  { connectorId: 'okta', displayName: 'Okta', state: 'not-connected', lastSyncAt: null },
-  { connectorId: 'azure-ad', displayName: 'Azure AD', state: 'not-connected', lastSyncAt: null },
+  {
+    connectorId: 'okta',
+    displayName: 'Okta',
+    providerTenant: '',
+    state: 'disabled',
+    enabled: false,
+    running: false,
+    lastSyncAt: null,
+    lastSyncOutcome: null,
+    objectsSynced: 0,
+    lastError: null,
+    pollIntervalSecs: 0,
+    fullSyncCadenceHours: 0,
+  },
+  {
+    connectorId: 'azure-ad',
+    displayName: 'Azure AD',
+    providerTenant: '',
+    state: 'disabled',
+    enabled: false,
+    running: false,
+    lastSyncAt: null,
+    lastSyncOutcome: null,
+    objectsSynced: 0,
+    lastError: null,
+    pollIntervalSecs: 0,
+    fullSyncCadenceHours: 0,
+  },
   {
     connectorId: 'google-workspace',
     displayName: 'Google Workspace',
-    state: 'not-connected',
+    providerTenant: '',
+    state: 'disabled',
+    enabled: false,
+    running: false,
     lastSyncAt: null,
+    lastSyncOutcome: null,
+    objectsSynced: 0,
+    lastError: null,
+    pollIntervalSecs: 0,
+    fullSyncCadenceHours: 0,
   },
 ];

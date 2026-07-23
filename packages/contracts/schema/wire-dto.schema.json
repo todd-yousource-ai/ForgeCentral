@@ -1156,6 +1156,189 @@
       ],
       "type": "object"
     },
+    "WireIdamConfigure": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "full_sync_cadence_hours": {
+          "type": "integer"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "poll_interval_secs": {
+          "type": "integer"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "provider",
+        "enabled",
+        "poll_interval_secs",
+        "full_sync_cadence_hours"
+      ],
+      "type": "object"
+    },
+    "WireIdamConnectorList": {
+      "additionalProperties": false,
+      "properties": {
+        "connectors": {
+          "items": {
+            "$ref": "#/$defs/WireIdamConnectorRecord"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "connectors"
+      ],
+      "type": "object"
+    },
+    "WireIdamConnectorRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "full_sync_cadence_hours": {
+          "type": "integer"
+        },
+        "last_completeness": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_error": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_sync_unix_ms": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "objects_synced": {
+          "type": "integer"
+        },
+        "poll_interval_secs": {
+          "type": "integer"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "provider_tenant": {
+          "type": "string"
+        },
+        "running": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "provider",
+        "display_name",
+        "provider_tenant",
+        "enabled",
+        "running",
+        "poll_interval_secs",
+        "full_sync_cadence_hours",
+        "objects_synced"
+      ],
+      "type": "object"
+    },
+    "WireIdamConnectors": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WireIdamSync": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "provider"
+      ],
+      "type": "object"
+    },
+    "WireIdamSyncStarted": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "type": "object"
+    },
     "WireListAgents": {
       "additionalProperties": false,
       "properties": {
@@ -2423,6 +2606,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "IdamConnectors": {
+              "$ref": "#/$defs/WireIdamConnectorList"
+            }
+          },
+          "required": [
+            "IdamConnectors"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "IdamSyncStarted": {
+              "$ref": "#/$defs/WireIdamSyncStarted"
+            }
+          },
+          "required": [
+            "IdamSyncStarted"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "DecisionList": {
               "$ref": "#/$defs/WireDecisionList"
             }
@@ -3241,6 +3448,42 @@
           },
           "required": [
             "ObjectDelete"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "IdamConnectors": {
+              "$ref": "#/$defs/WireIdamConnectors"
+            }
+          },
+          "required": [
+            "IdamConnectors"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "IdamSync": {
+              "$ref": "#/$defs/WireIdamSync"
+            }
+          },
+          "required": [
+            "IdamSync"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "IdamConfigure": {
+              "$ref": "#/$defs/WireIdamConfigure"
+            }
+          },
+          "required": [
+            "IdamConfigure"
           ],
           "type": "object"
         },

@@ -285,6 +285,48 @@ export interface WireGroupWrite {
   request_id: number;
 }
 
+export interface WireIdamConfigure {
+  enabled: boolean;
+  full_sync_cadence_hours: number;
+  operator?: OperatorDelegation | null;
+  poll_interval_secs: number;
+  provider: string;
+  request_id: number;
+}
+
+export interface WireIdamConnectorList {
+  connectors: Array<WireIdamConnectorRecord>;
+}
+
+export interface WireIdamConnectorRecord {
+  display_name: string;
+  enabled: boolean;
+  full_sync_cadence_hours: number;
+  last_completeness?: string | null;
+  last_error?: string | null;
+  last_sync_unix_ms?: number | null;
+  objects_synced: number;
+  poll_interval_secs: number;
+  provider: string;
+  provider_tenant: string;
+  running: boolean;
+}
+
+export interface WireIdamConnectors {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireIdamSync {
+  operator?: OperatorDelegation | null;
+  provider: string;
+  request_id: number;
+}
+
+export interface WireIdamSyncStarted {
+  provider: string;
+}
+
 export interface WireListAgents {
   operator?: OperatorDelegation | null;
   request_id: number;
@@ -542,6 +584,8 @@ export type WireReply =
   | { ObjectDetail: WireObjectDetail; }
   | { ObjectMutated: WireObjectMutated; }
   | { LugProvisioned: WireLugProvisioned; }
+  | { IdamConnectors: WireIdamConnectorList; }
+  | { IdamSyncStarted: WireIdamSyncStarted; }
   | { DecisionList: WireDecisionList; }
   | { ConnectionList: WireConnectionList; }
   | 'CursorClosed'
@@ -591,6 +635,9 @@ export type WireRequest =
   | { ObjectCreate: WireObjectCreate; }
   | { ObjectEdit: WireObjectEdit; }
   | { ObjectDelete: WireObjectDelete; }
+  | { IdamConnectors: WireIdamConnectors; }
+  | { IdamSync: WireIdamSync; }
+  | { IdamConfigure: WireIdamConfigure; }
   | { PrincipalCreate: WirePrincipalCreate; }
   | { PrincipalEdit: WirePrincipalEdit; }
   | { PrincipalSetStatus: WirePrincipalSetStatus; }

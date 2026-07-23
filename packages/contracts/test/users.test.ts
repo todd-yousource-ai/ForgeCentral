@@ -13,12 +13,22 @@ import {
   IDAM_CONNECTOR_SHELLS,
   toAgentPrincipalRow,
   toGroupCards,
+  toIdamConnector,
+  toIdamConnectors,
   toPrincipalRow,
   toPrincipalRows,
   toProvisionReceipt,
+  toSyncReceipt,
+  toWireIdamConfigureFields,
   toWirePrincipalSpec,
 } from '../src/index.js';
-import type { PrincipalDraft, WireGroupList, WirePrincipalRecord } from '../src/index.js';
+import type {
+  IdamConnectorDraft,
+  PrincipalDraft,
+  WireGroupList,
+  WireIdamConnectorRecord,
+  WirePrincipalRecord,
+} from '../src/index.js';
 
 /** An observed device account, exactly as the ER.6 read emits it. */
 const observed = (overrides: Partial<WirePrincipalRecord> = {}): WirePrincipalRecord => ({
@@ -188,12 +198,115 @@ describe('the AI-Agent cross-bind (LIST_AGENTS, ER.1)', () => {
   });
 });
 
-describe('the IDAM shells are honest', () => {
-  it('every shell is not-connected with no fabricated sync timestamp', () => {
+describe('the IDAM shells are honest (ID.1 keeps them; ID.2 deletes them)', () => {
+  it('every shell is a disabled placeholder with no fabricated sync timestamp', () => {
     expect(IDAM_CONNECTOR_SHELLS).toHaveLength(3);
     for (const shell of IDAM_CONNECTOR_SHELLS) {
-      expect(shell.state).toBe('not-connected');
+      expect(shell.state).toBe('disabled');
+      expect(shell.enabled).toBe(false);
       expect(shell.lastSyncAt).toBeNull();
+      expect(shell.lastSyncOutcome).toBeNull();
+      expect(shell.objectsSynced).toBe(0);
     }
+  });
+});
+
+/** A healthy Auth0 connector record, exactly as the IA.8 IDAM_CONNECTORS read emits it. */
+const connector = (overrides: Partial<WireIdamConnectorRecord> = {}): WireIdamConnectorRecord => ({
+  provider: 'auth0',
+  display_name: 'Auth0',
+  provider_tenant: 'dev-6rcwumbp1tsae8me.us.auth0.com',
+  enabled: true,
+  running: false,
+  last_completeness: 'complete',
+  last_error: null,
+  last_sync_unix_ms: 1_700_000_000_000,
+  objects_synced: 20,
+  poll_interval_secs: 300,
+  full_sync_cadence_hours: 24,
+  ...overrides,
+});
+
+describe('IdamConnector projection (INV-CONSOLE-IDAM-CONTRACT)', () => {
+  it('projects a healthy connector, renaming every engine field', () => {
+    const card = toIdamConnector(connector());
+    expect(card).toEqual({
+      connectorId: 'auth0',
+      displayName: 'Auth0',
+      providerTenant: 'dev-6rcwumbp1tsae8me.us.auth0.com',
+      state: 'healthy',
+      enabled: true,
+      running: false,
+      lastSyncAt: 1_700_000_000_000,
+      lastSyncOutcome: 'complete',
+      objectsSynced: 20,
+      lastError: null,
+      pollIntervalSecs: 300,
+      fullSyncCadenceHours: 24,
+    });
+  });
+
+  it('renders Never (null), not an epoch, when no sync has ever run', () => {
+    const card = toIdamConnector(connector({ last_sync_unix_ms: null, last_completeness: null }));
+    expect(card.lastSyncAt).toBeNull();
+    expect(card.state).toBe('never-synced');
+  });
+
+  it('derives state fail-closed by precedence: disabled > syncing > error > never-synced', () => {
+    expect(toIdamConnector(connector({ enabled: false })).state).toBe('disabled');
+    // running wins over a stale last_error/last_completeness: a walk is in flight now.
+    expect(toIdamConnector(connector({ running: true, last_error: 'x' })).state).toBe('syncing');
+    expect(toIdamConnector(connector({ last_error: 'token expired' })).state).toBe('error');
+    expect(toIdamConnector(connector({ last_sync_unix_ms: null })).state).toBe('never-synced');
+    expect(toIdamConnector(connector({ last_completeness: 'partial' })).state).toBe('partial');
+    expect(toIdamConnector(connector({ last_completeness: 'failed' })).state).toBe('error');
+  });
+
+  it('NEVER renders a green card on an unrecognized completeness (the trust-most failure mode)', () => {
+    const card = toIdamConnector(connector({ last_completeness: 'mostly-ok' }));
+    expect(card.state).toBe('unknown');
+    expect(card.state).not.toBe('healthy');
+    expect(card.lastSyncOutcome).toBeNull();
+  });
+
+  it('projects an empty connector list as an honest empty, not a failure', () => {
+    expect(toIdamConnectors({ connectors: [] })).toEqual([]);
+  });
+});
+
+describe('IdAM command shapes carry NO secret (INV-CONSOLE-IDAM-CONTRACT)', () => {
+  it('the Configure draft maps to enabled + the two cadences ONLY -- no secret on the wire', () => {
+    const draft: IdamConnectorDraft = {
+      provider: 'auth0',
+      enabled: true,
+      pollIntervalSecs: 600,
+      fullSyncCadenceHours: 12,
+    };
+    const fields = toWireIdamConfigureFields(draft);
+    expect(fields).toEqual({
+      provider: 'auth0',
+      enabled: true,
+      poll_interval_secs: 600,
+      full_sync_cadence_hours: 12,
+    });
+    // request_id + operator are transport fields the BFF codec adds (ID.4); the contract omits them.
+    expect('request_id' in fields).toBe(false);
+    expect('operator' in fields).toBe(false);
+  });
+
+  it('no configure-draft key names a credential -- a secret is unrepresentable by type', () => {
+    const draft: IdamConnectorDraft = {
+      provider: 'auth0',
+      enabled: true,
+      pollIntervalSecs: 300,
+      fullSyncCadenceHours: 24,
+    };
+    for (const key of Object.keys({ ...draft, ...toWireIdamConfigureFields(draft) })) {
+      expect(key.toLowerCase()).not.toMatch(/secret|password|token/);
+    }
+  });
+
+  it('a sync ack projects the queued provider (an ACK, not a result)', () => {
+    expect(toSyncReceipt({ provider: 'auth0' })).toEqual({ provider: 'auth0' });
   });
 });
