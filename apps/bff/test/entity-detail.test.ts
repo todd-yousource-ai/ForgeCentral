@@ -55,6 +55,7 @@ function engineWith(parts: {
     objectList: unused,
     idamConnectors: unused,
     idamSync: unused,
+    idamConnect: unused,
     objectCreate: unused,
     objectEdit: unused,
     objectDelete: unused,

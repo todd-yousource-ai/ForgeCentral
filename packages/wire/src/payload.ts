@@ -13,6 +13,7 @@ import type {
   WireGroupSetMembers,
   WireGroupWrite,
   WireIdamConnectors,
+  WireIdamConnect,
   WireIdamSync,
   WireListGroups,
   WireListPrincipals,
@@ -181,6 +182,23 @@ function idamSyncToCbor(request: WireIdamSync): unknown {
   const out: Record<string, unknown> = {
     request_id: request.request_id,
     provider: request.provider,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * IDAM_CONNECT (crdb IP-LUG-IDAM-CONNECT CO.1). Rust struct order: request_id, provider, domain,
+ * client_id, audience, client_secret_ref, then the optional operator. The ref is a PATH, never a secret.
+ */
+function idamConnectToCbor(request: WireIdamConnect): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    provider: request.provider,
+    domain: request.domain,
+    client_id: request.client_id,
+    audience: request.audience,
+    client_secret_ref: request.client_secret_ref,
   };
   applyOperator(out, request.operator);
   return out;
@@ -463,6 +481,8 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   if ('IdamConnectors' in request)
     return encode({ IdamConnectors: idamConnectorsToCbor(request.IdamConnectors) });
   if ('IdamSync' in request) return encode({ IdamSync: idamSyncToCbor(request.IdamSync) });
+  if ('IdamConnect' in request)
+    return encode({ IdamConnect: idamConnectToCbor(request.IdamConnect) });
   if ('ObjectDetail' in request)
     return encode({ ObjectDetail: objectDetailToCbor(request.ObjectDetail) });
   if ('ObjectCreate' in request)

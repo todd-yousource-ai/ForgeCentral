@@ -13,12 +13,20 @@
 // -- honest, not an error.
 
 import type {
+  IdamConnectDraft,
   IdamConnector,
+  ProvisionReceipt,
   SyncReceipt,
+  WireIdamConnect,
   WireIdamConnectors,
   WireIdamSync,
 } from '@forge/contracts';
-import { toIdamConnectors, toSyncReceipt } from '@forge/contracts';
+import {
+  toIdamConnectors,
+  toProvisionReceipt,
+  toSyncReceipt,
+  toWireIdamConnectFields,
+} from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -57,4 +65,27 @@ export async function resolveIdamSync(
   const request: WireIdamSync = { request_id: requestId(), provider };
   const started = await engine.idamSync(principal, request, opts);
   return toSyncReceipt(started);
+}
+
+/**
+ * Set a connector's connectivity live (IDAM_CONNECT, crdb CO.1/CO.2). Carries the connectivity from
+ * the draft plus the `secretRef` PATH -- never the secret value, which the on-node crypto-sidecar
+ * writes to that path out of band. The engine re-spawns the connector fail-closed; a bad secret file
+ * or a spawn failure surfaces as an `EngineRefusedError` (`Conflict`) for the route to map. Returns the
+ * audited commit version.
+ */
+export async function resolveIdamConnect(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  draft: IdamConnectDraft,
+  secretRef: string,
+  opts?: EngineCallOptions,
+): Promise<ProvisionReceipt> {
+  const request: WireIdamConnect = {
+    request_id: requestId(),
+    ...toWireIdamConnectFields(draft),
+    client_secret_ref: secretRef,
+  };
+  const reply = await engine.idamConnect(principal, request, opts);
+  return toProvisionReceipt(reply);
 }

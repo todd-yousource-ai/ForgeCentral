@@ -10,7 +10,7 @@ import type { WireIdamConnectorList, WireIdamConnectorRecord } from '@forge/cont
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
-import { resolveIdamConnectors, resolveIdamSync } from '../src/engine/idam.js';
+import { resolveIdamConnect, resolveIdamConnectors, resolveIdamSync } from '../src/engine/idam.js';
 import { EngineRefusedError } from '../src/engine/wire-client.js';
 
 const PRINCIPAL: OperatorPrincipal = {
@@ -37,11 +37,13 @@ const connector = (overrides: Partial<WireIdamConnectorRecord> = {}): WireIdamCo
 function engineWith(
   list: WireIdamConnectorList,
   sync?: OperatorEngine['idamSync'],
+  connect?: OperatorEngine['idamConnect'],
 ): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   return {
     idamConnectors: () => Promise.resolve(list),
     idamSync: sync ?? (() => Promise.resolve({ provider: 'auth0' })),
+    idamConnect: connect ?? (() => Promise.resolve({ commit_version: 3 })),
     objectList: unused,
     objectDetail: unused,
     objectCreate: unused,
@@ -146,5 +148,46 @@ describe('resolveIdamSync', () => {
       expect(err).toBeInstanceOf(EngineRefusedError);
       expect((err as EngineRefusedError).wireError.class).toBe('Denied');
     });
+  });
+});
+
+describe('resolveIdamConnect', () => {
+  const draft = {
+    provider: 'auth0',
+    domain: 'dev-x.us.auth0.com',
+    clientId: 'abc123',
+    audience: '',
+  };
+
+  it('sends connectivity + the secret ref and returns the audited commit version', () => {
+    let sent: unknown;
+    const engine = engineWith({ connectors: [] }, undefined, (_p, request) => {
+      sent = request;
+      return Promise.resolve({ commit_version: 5 });
+    });
+    return resolveIdamConnect(engine, PRINCIPAL, draft, '/etc/cdb/secrets/auth0.secret').then(
+      (receipt) => {
+        expect(receipt).toEqual({ commitVersion: 5 });
+        const req = sent as Record<string, unknown>;
+        expect(req['domain']).toBe('dev-x.us.auth0.com');
+        expect(req['client_id']).toBe('abc123');
+        expect(req['client_secret_ref']).toBe('/etc/cdb/secrets/auth0.secret');
+        // The secret VALUE is never in the wire request -- only the path reference.
+        for (const key of Object.keys(req)) {
+          expect(key.toLowerCase()).not.toMatch(/password|token/);
+        }
+      },
+    );
+  });
+
+  it('propagates the engine refusal (a bad secret file / unconfigured connector is Conflict)', () => {
+    const engine = engineWith({ connectors: [] }, undefined, () =>
+      Promise.reject(
+        new EngineRefusedError({ class: 'Conflict', code: 0, retry: 'Never', correlation_id: 0 }),
+      ),
+    );
+    return expect(
+      resolveIdamConnect(engine, PRINCIPAL, draft, '/etc/cdb/secrets/auth0.secret'),
+    ).rejects.toBeInstanceOf(EngineRefusedError);
   });
 });
