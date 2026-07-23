@@ -10,7 +10,8 @@ import type { WireIdamConnectorList, WireIdamConnectorRecord } from '@forge/cont
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
-import { resolveIdamConnectors } from '../src/engine/idam.js';
+import { resolveIdamConnectors, resolveIdamSync } from '../src/engine/idam.js';
+import { EngineRefusedError } from '../src/engine/wire-client.js';
 
 const PRINCIPAL: OperatorPrincipal = {
   principalId: 'op-1',
@@ -33,10 +34,14 @@ const connector = (overrides: Partial<WireIdamConnectorRecord> = {}): WireIdamCo
   ...overrides,
 });
 
-function engineWith(list: WireIdamConnectorList): OperatorEngine {
+function engineWith(
+  list: WireIdamConnectorList,
+  sync?: OperatorEngine['idamSync'],
+): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   return {
     idamConnectors: () => Promise.resolve(list),
+    idamSync: sync ?? (() => Promise.resolve({ provider: 'auth0' })),
     objectList: unused,
     objectDetail: unused,
     objectCreate: unused,
@@ -108,6 +113,38 @@ describe('resolveIdamConnectors', () => {
     return resolveIdamConnectors(engine, PRINCIPAL).then((cards) => {
       expect(cards[0]?.state).toBe('unknown');
       expect(cards[0]?.state).not.toBe('healthy');
+    });
+  });
+});
+
+describe('resolveIdamSync', () => {
+  it('acks a queued sync, naming the provider (an ACK, not a result)', () => {
+    const engine = engineWith({ connectors: [] }, () => Promise.resolve({ provider: 'auth0' }));
+    return resolveIdamSync(engine, PRINCIPAL, 'auth0').then((receipt) => {
+      expect(receipt).toEqual({ provider: 'auth0' });
+    });
+  });
+
+  it('propagates the engine refusal for a disabled/unconfigured connector (Conflict)', () => {
+    const engine = engineWith({ connectors: [] }, () =>
+      Promise.reject(
+        new EngineRefusedError({ class: 'Conflict', code: 0, retry: 'Never', correlation_id: 0 }),
+      ),
+    );
+    return expect(resolveIdamSync(engine, PRINCIPAL, 'auth0')).rejects.toBeInstanceOf(
+      EngineRefusedError,
+    );
+  });
+
+  it('propagates a tier/delegation denial (Denied)', () => {
+    const engine = engineWith({ connectors: [] }, () =>
+      Promise.reject(
+        new EngineRefusedError({ class: 'Denied', code: 0, retry: 'Never', correlation_id: 0 }),
+      ),
+    );
+    return resolveIdamSync(engine, PRINCIPAL, 'auth0').catch((err: unknown) => {
+      expect(err).toBeInstanceOf(EngineRefusedError);
+      expect((err as EngineRefusedError).wireError.class).toBe('Denied');
     });
   });
 });

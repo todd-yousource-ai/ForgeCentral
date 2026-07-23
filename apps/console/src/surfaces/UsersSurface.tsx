@@ -35,7 +35,7 @@ import { PRINCIPAL_KINDS, PRINCIPAL_ORIGINS, PRINCIPAL_STATUSES } from '@forge/c
 import { principalId } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { useIdamConnectors } from './useIdam.js';
+import { IdamSyncError, useIdamConnectors, useIdamSync } from './useIdam.js';
 import { useDrawer } from '../shell/DrawerHost.js';
 import {
   GroupCreateError,
@@ -611,22 +611,35 @@ function formatSyncTime(lastSyncAt: number | null): string {
   return new Date(lastSyncAt).toISOString().replace('T', ' ').slice(0, 19);
 }
 
+/** The typed failure line the Sync Now control renders from an engine refusal. */
+function syncFailure(error: Error | null): string | null {
+  if (error === null) return null;
+  if (error instanceof IdamSyncError) {
+    if (error.status === 409) return 'The connector is disabled or not configured.';
+    if (error.status === 403) return 'You do not have permission to run a sync.';
+    return 'The engine refused the sync.';
+  }
+  return 'The sync could not reach the engine.';
+}
+
 /**
- * The External IDAM tab (ID.2): the LIVE connector list. Every card is a projection of a real crdb
- * connector record (IDAM_CONNECTORS, crdb IA.8) -- real state, real last-sync (or an honest `Never`),
- * real object count, real last error. An unfederated node returns no connectors and the tab says so.
- * Sync Now (ID.3) and Configure (ID.4) remain labelled non-live controls until their engine commands
- * are wired; nothing here is a silent stub (INV-CONSOLE-IDAM-CONNECTORS-REAL).
+ * The External IDAM tab: the LIVE connector list (ID.2) with a real `Sync Now` per connector (ID.3).
+ * Every card is a projection of a real crdb connector record (IDAM_CONNECTORS, crdb IA.8). Sync Now is
+ * a real audited engine command (IDAM_SYNC), confirm-gated; the engine ACKs immediately and marks the
+ * sync DUE, so in-flight is driven by the card's `running` flag (polled from engine truth, never a
+ * client timer) and completion shows the real object count / state / error. A refused sync renders the
+ * failure; it never silently succeeds. Configure (ID.4) stays a labelled non-live control.
  */
 function IdamTab(): ReactElement {
   const connectors = useIdamConnectors();
+  const sync = useIdamSync();
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const failure = syncFailure(sync.error);
+  const failedProvider = sync.error !== null ? (sync.variables?.provider ?? null) : null;
   return (
     <>
       <div className="fcx-surface__controls">
         <h3 className="fcx-surface__subheading">External Identity &amp; Access Management</h3>
-        <button type="button" className="fcx-btn" disabled title="Pending: IDAM_SYNC wiring (ID.3)">
-          Sync Now (pending)
-        </button>
       </div>
       {connectors.isLoading ? (
         <LoadingState label="Loading identity connectors" />
@@ -644,6 +657,8 @@ function IdamTab(): ReactElement {
         <div className="fcx-users-groups-grid" role="list" aria-label="Identity connectors">
           {(connectors.data ?? []).map((c) => {
             const badge = connectorStateBadge(c.state);
+            const syncingThis =
+              c.running || (sync.isPending && sync.variables?.provider === c.connectorId);
             return (
               <article key={c.connectorId} role="listitem" className="fcx-users-group-card">
                 <div className="fcx-users-group-card__head">
@@ -668,19 +683,47 @@ function IdamTab(): ReactElement {
                     {c.lastError}
                   </p>
                 ) : null}
-                <button
-                  type="button"
-                  className="fcx-btn"
-                  disabled
-                  title="Pending: IDAM_CONFIGURE wiring (ID.4)"
-                >
-                  Configure (pending)
-                </button>
+                {failure !== null && failedProvider === c.connectorId ? (
+                  <p className="fcx-users-idam-card__error" role="alert">
+                    {failure}
+                  </p>
+                ) : null}
+                <div className="fcx-users-group-card__actions">
+                  <button
+                    type="button"
+                    className="fcx-btn"
+                    disabled={syncingThis}
+                    onClick={() => setConfirming(c.connectorId)}
+                  >
+                    {syncingThis ? 'Syncing...' : 'Sync Now'}
+                  </button>
+                  <button
+                    type="button"
+                    className="fcx-btn"
+                    disabled
+                    title="Pending: IDAM_CONFIGURE wiring (ID.4)"
+                  >
+                    Configure (pending)
+                  </button>
+                </div>
               </article>
             );
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={confirming !== null}
+        title={confirming !== null ? `Run a federation sync for ${confirming}?` : ''}
+        description="This runs a real audited directory sync against the provider."
+        confirmLabel="Sync"
+        onConfirm={() => {
+          if (confirming !== null) {
+            sync.mutate({ provider: confirming });
+          }
+          setConfirming(null);
+        }}
+        onCancel={() => setConfirming(null)}
+      />
     </>
   );
 }

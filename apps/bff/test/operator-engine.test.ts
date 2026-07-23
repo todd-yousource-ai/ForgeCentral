@@ -91,6 +91,11 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ connectors: [] });
     },
+    idamSync: (req) => {
+      calls.push(`idamSync:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ provider: req.provider });
+    },
     objectDetail: (req) => {
       calls.push(`objectDetail:${String(req.request_id)}`);
       reads.push(req);

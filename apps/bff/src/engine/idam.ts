@@ -12,8 +12,13 @@
 // unfederated node returns an EMPTY list, which projects to `[]` and renders "no connector configured"
 // -- honest, not an error.
 
-import type { IdamConnector, WireIdamConnectors } from '@forge/contracts';
-import { toIdamConnectors } from '@forge/contracts';
+import type {
+  IdamConnector,
+  SyncReceipt,
+  WireIdamConnectors,
+  WireIdamSync,
+} from '@forge/contracts';
+import { toIdamConnectors, toSyncReceipt } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -34,4 +39,22 @@ export async function resolveIdamConnectors(
   const request: WireIdamConnectors = { request_id: requestId() };
   const list = await engine.idamConnectors(principal, request, opts);
   return toIdamConnectors(list);
+}
+
+/**
+ * Trigger a federation sync for one connector. An ACK, not a result: the engine marks the sync DUE
+ * and returns immediately (the poll loop picks it up), so the caller re-reads `idam.connectors` for
+ * progress. An `EngineRefusedError` propagates for the route to map (a disabled or unconfigured
+ * connector is `Conflict`; a tier/delegation refusal is `Denied`). There is no "already running"
+ * refusal -- the engine accepts the request idempotently.
+ */
+export async function resolveIdamSync(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  provider: string,
+  opts?: EngineCallOptions,
+): Promise<SyncReceipt> {
+  const request: WireIdamSync = { request_id: requestId(), provider };
+  const started = await engine.idamSync(principal, request, opts);
+  return toSyncReceipt(started);
 }
