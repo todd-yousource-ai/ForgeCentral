@@ -12,6 +12,7 @@ use console_crypto_sidecar::admin::AdminTerminator;
 use console_crypto_sidecar::bind::SidecarError;
 use console_crypto_sidecar::config::SidecarConfig;
 use console_crypto_sidecar::engine::EngineOriginator;
+use console_crypto_sidecar::secret_service::SecretService;
 use console_crypto_sidecar::sign_service::SignService;
 use console_crypto_sidecar::signing::BundleSigner;
 use console_crypto_sidecar::tls::admin_server_config;
@@ -141,15 +142,35 @@ async fn main() -> Result<(), SidecarError> {
         _ => None,
     };
 
+    // The IdAM secret-set service (ID.4 part 3), only when its pair is provisioned. Writes an operator's
+    // connector secret to the node's mode-protected store so it never crosses the engine wire.
+    let secret = match (&config.secret_addr, &config.secret_path) {
+        (Some(addr), Some(path)) => Some(SecretService::bind(addr, path.clone()).await?),
+        _ => None,
+    };
+
     // Serve every configured leg; the first listener error, or a shutdown signal, ends the process.
-    match sign {
-        Some(sign) => tokio::select! {
+    match (sign, secret) {
+        (Some(sign), Some(secret)) => tokio::select! {
+            result = admin.run() => result,
+            result = engine.run() => result,
+            result = sign.run() => result,
+            result = secret.run() => result,
+            result = shutdown_signal() => result,
+        },
+        (Some(sign), None) => tokio::select! {
             result = admin.run() => result,
             result = engine.run() => result,
             result = sign.run() => result,
             result = shutdown_signal() => result,
         },
-        None => tokio::select! {
+        (None, Some(secret)) => tokio::select! {
+            result = admin.run() => result,
+            result = engine.run() => result,
+            result = secret.run() => result,
+            result = shutdown_signal() => result,
+        },
+        (None, None) => tokio::select! {
             result = admin.run() => result,
             result = engine.run() => result,
             result = shutdown_signal() => result,

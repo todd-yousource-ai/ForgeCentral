@@ -55,6 +55,17 @@ pub struct SidecarConfig {
     /// Path to the ML-DSA-87 signing seed the sidecar owns (FD.2), or absent. See `sign_addr`.
     #[serde(default)]
     pub sign_seed: Option<PathBuf>,
+    /// The loopback `ip:port` the IdAM secret-set service listens on (ID.4 part 3), or absent.
+    ///
+    /// OPTIONAL like the signing pair, and provisioned with `secret_path`: a connector onboarding
+    /// capability, absent on a sidecar not yet configured for it. Setting one of the pair without the
+    /// other IS a refused misconfiguration (see `validate`).
+    #[serde(default)]
+    pub secret_addr: Option<String>,
+    /// Path the accepted connector secret is written to, the engine's `client_secret_ref` (ID.4 part
+    /// 3), or absent. See `secret_addr`. MUST match the path the BFF names to `IDAM_CONNECT`.
+    #[serde(default)]
+    pub secret_path: Option<PathBuf>,
 }
 
 impl SidecarConfig {
@@ -98,6 +109,16 @@ impl SidecarConfig {
                 return Err(SidecarError::Config(
                     "sign_addr and sign_seed must be set together (FD.5 provisions both)"
                         .to_owned(),
+                ))
+            }
+        }
+        // The IdAM secret-set pair travels together too: half of it cannot accept a secret.
+        match (&self.secret_addr, &self.secret_path) {
+            (Some(addr), Some(_)) => assert_loopback_addr(addr)?,
+            (None, None) => {}
+            _ => {
+                return Err(SidecarError::Config(
+                    "secret_addr and secret_path must be set together".to_owned(),
                 ))
             }
         }
