@@ -91,7 +91,12 @@ install -d -m 0750 "$SIDECAR_ETC"
 ENGINE_CA="$SIDECAR_ETC/engine-ca.pem"
 ENGINE_CERT="$SIDECAR_ETC/engine-client.pem"
 ENGINE_KEY="$SIDECAR_ETC/engine-client.key"
-OUT_DIR="$SIDECAR_ETC" NODE_IP="$NODE_IP" \
+# Pass SIDECAR_BIN so the FD.N Forge signing plane is provisioned as a STANDARD capability (the seed is
+# one-time + idempotent -- provision-sidecar reads its anchor rather than re-minting on a re-run). The
+# IdAM secret-set leg is provisioned unconditionally. CONSOLE_SKIP_SIGN=1 opts out of the signing plane.
+SIDECAR_BIN_ARG="$BIN_PREFIX/console-crypto-sidecar"
+[ "${CONSOLE_SKIP_SIGN:-0}" = "1" ] && SIDECAR_BIN_ARG=""
+OUT_DIR="$SIDECAR_ETC" NODE_IP="$NODE_IP" SIDECAR_BIN="$SIDECAR_BIN_ARG" \
   ENGINE_CA="$ENGINE_CA" ENGINE_CERT="$ENGINE_CERT" ENGINE_KEY="$ENGINE_KEY" \
   bash "$repo_root/sidecar/deploy/provision-sidecar.sh"
 
@@ -186,6 +191,13 @@ fi
 # Pin FC_SPA_DIST at the installed SPA (idempotent; an older config.env may predate the line).
 sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_SPA_DIST=/d' "$BFF_ETC/config.env"
 printf 'FC_SPA_DIST=%s\n' "$BFF_LIB/spa" >>"$BFF_ETC/config.env"
+# Pin the sidecar plane ports so the standard capabilities work out of the box (idempotent): the FD.N
+# Forge signing plane (FC_SIGNER_PORT) and the IdAM connector secret-set plane (FC_IDAM_SECRET_PORT).
+# These MUST match provision-sidecar.sh (SIGN_PORT / SECRET_PORT). Overridable via CONSOLE_SIGNER_PORT /
+# CONSOLE_IDAM_SECRET_PORT.
+sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_SIGNER_PORT=/d;/^[[:space:]]*#?[[:space:]]*FC_IDAM_SECRET_PORT=/d' "$BFF_ETC/config.env"
+printf 'FC_SIGNER_PORT=%s\n' "${CONSOLE_SIGNER_PORT:-8790}" >>"$BFF_ETC/config.env"
+printf 'FC_IDAM_SECRET_PORT=%s\n' "${CONSOLE_IDAM_SECRET_PORT:-8791}" >>"$BFF_ETC/config.env"
 chown -R console-bff:console-bff "$BFF_ETC"
 install -m 0644 "$repo_root/sidecar/deploy/console-crypto-sidecar.service" /etc/systemd/system/
 install -m 0644 "$repo_root/apps/bff/deploy/console-bff.service"           /etc/systemd/system/
