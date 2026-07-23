@@ -45,6 +45,7 @@ const human: WirePrincipalRecord = {
   groups: ['sudo'],
   privileges: ['sudo_all'],
   first_seen: 100,
+  owned_fields: [],
 };
 
 function engineWith(parts: {

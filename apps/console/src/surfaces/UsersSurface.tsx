@@ -73,6 +73,26 @@ function kindLabel(kind: PrincipalKind): string {
   }
 }
 
+/** The friendly display name of an IdAM connector slug (e.g. `auth0` -> `Auth0`). */
+function connectorLabel(slug: string): string {
+  if (slug === 'auth0') return 'Auth0';
+  // An unknown provider still reads honestly, title-cased, never a fabricated name.
+  return slug.charAt(0).toUpperCase() + slug.slice(1);
+}
+
+/**
+ * The Origin cell (crdb DR.2): a federated (IdAM-imported) identity shows its CONNECTOR (e.g. `Auth0`)
+ * from `boundConnector`; a device account shows `Observed`; an operator-provisioned record shows
+ * `Local`. A federated account is provider-managed (its `ownedFields` come from the connector and it
+ * carries no local Edit action), which is the honest read-only story on the surface.
+ */
+function originLabel(row: PrincipalRow): string {
+  if (row.boundConnector) {
+    return connectorLabel(row.boundConnector);
+  }
+  return row.origin === 'local' ? 'Local' : 'Observed';
+}
+
 /** The typed failure line a command form renders (409 duplicate vs 400 malformed vs a denial). */
 function commandFailure(error: Error | null): string | null {
   if (error === null) return null;
@@ -248,7 +268,7 @@ function AllUsers({ initialSearch }: { readonly initialSearch: string }): ReactE
       {
         id: 'origin',
         header: 'Origin',
-        cell: (r) => (r.origin === 'local' ? 'Local' : 'Observed'),
+        cell: (r) => originLabel(r),
         width: '7rem',
       },
       // No engine substrate yet (TRD-CONSOLE-04): these render blank, never a guess.

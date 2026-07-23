@@ -27,14 +27,19 @@ ledger is a defect.
   at-rest-crypto subsystem. This SUPERSEDES the earlier same-day "secret transits to the engine" note
   (reconsidered once recon showed it reverses three shipped engine invariants and that at-rest
   encryption is a deferred subsystem). Rescopes ID.4; still engine-first.
-- **Two crdb engine IPs AUTHORED 2026-07-23** (crdb main `ebd77492`), each unblocking an FC step:
-  - `IP-LUG-IDAM-DIRECTORY` (read-side, low-risk): DR.1 projects federated identities into
-    `LIST_PRINCIPALS`; DR.2 adds `bound_connector`/`binding_status`/`owned_fields`. Unblocks **ID.5**.
-  - `IP-LUG-IDAM-CONNECT` (provisioning): `IDAM_CONNECT` verb (connectivity + secret ref, no secret value)
-    + live re-spawn, paired with a crypto-sidecar secret-set leg. Unblocks **ID.4** (the UI onboarding form).
-- **Next action (engine-first): crdb DR.1**, then DR.2 -> FC ID.5; and crdb CO.1/CO.2 + the sidecar leg
-  -> FC ID.4. ID.4a (cadences) follows ID.4. FC branches: `feat/id5-idam-owned` (after DR.2),
-  `feat/id4-idam-configure` (after CO.2 + sidecar leg).
+- **crdb `IP-LUG-IDAM-DIRECTORY` DR.1 + DR.2 LANDED** (crdb main `9796da36`): federated identities are
+  projected + attributed (`bound_connector`/`binding_status`/`owned_fields`). Only its DR.N live capstone
+  remains (needs a synced node).
+- **FC ID.5 LANDED 2026-07-23** (`7bdb02d`): the All Users Origin column renders the connector (Auth0) for
+  federated identities. The read-only-edit / forced-edit-refusal proved unreachable in the engine model
+  (federated rows are provider-managed with no local Edit; local records are never IdAM-owned) and was not
+  built; owned_fields is carried for a future provider-managed detail view.
+- **`IP-LUG-IDAM-CONNECT` (provisioning) AUTHORED, not started**: `IDAM_CONNECT` verb (connectivity + secret
+  ref, no secret value) + live re-spawn, paired with a crypto-sidecar secret-set leg. Unblocks **ID.4** (the
+  UI onboarding form).
+- **Next action: crdb `IP-LUG-IDAM-CONNECT` CO.1/CO.2 + the sidecar leg -> FC ID.4** (the UI onboarding
+  form: connectivity over `IDAM_CONNECT`, secret browser->BFF->sidecar->mode-protected file). ID.4a
+  (cadences, crdb IA.7 ready) follows ID.4. FC branch: `feat/id4-idam-configure`.
 - **The three verbs ID.2-ID.4 bind to** (all live on the engine, `cdb-wire` names in brackets):
   - `idam.connectors` -> **`IDAM_CONNECTORS`** [`WireIdamConnectors` -> `WireIdamConnectorList`
     of `WireIdamConnectorRecord`]. Read; returns the connector card.
@@ -86,7 +91,7 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 | ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | **LANDED** | `7dd1d7b` | `Sync Now` real+audited, confirm-gated, engine-truth in-flight |
 | ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | PLANNED (RESCOPED) | -- | UI onboarding of the whole connector (domain/client id/audience + secret + cadences); connectivity over `IDAM_CONNECT`, secret browser->BFF(transient)->sidecar->mode-protected file, never the engine wire (operator ruling 2026-07-23 final); **needs crdb `IP-LUG-IDAM-CONNECT`** |
 | ID.4a | `INV-CONSOLE-IDAM-CADENCE-EDITABLE` | PLANNED | -- | operator directive 2026-07-22; needs crdb IA.7 |
-| ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | PLANNED | -- | Origin=Auth0 + proactive read-only + drawer binding; **needs crdb `IP-LUG-IDAM-DIRECTORY` DR.2** (federated identities are invisible to LIST_PRINCIPALS today, and no connector/binding/owned-field attribution is exposed). IA.6 refusal is the server-side backstop |
+| ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | **LANDED** | `7bdb02d` | Origin column renders the connector (Auth0) for federated identities (over crdb DR.2). Scope reality: a federated ExternalAccount row is provider-managed + origin observed, so it has NO local Edit and the engine never makes an operator-editable record IdAM-owned -- the read-only-edit-form / forced-edit-refusal is unreachable and not built (owned_fields carried for a future detail view). Proposed MAY_REPRESENT surfacing deferred |
 | ID.N | `INV-CONSOLE-IDAM-COMPLETE` | PLANNED | -- | needs a real synced tenant (crdb IA.5/IA.N) |
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
@@ -157,6 +162,14 @@ substrate); real user->destination Sankey ribbons (DT.4 attribution).
   code was written today -- this entry exists so the next session starts from fact rather than from
   re-reading the engine. Next = ID.1, and it begins by regenerating `@forge/contracts` from the
   committed wire schema rather than hand-authoring the types.
+- 2026-07-23: **ID.5 LANDED (`7bdb02d`).** Over crdb `IP-LUG-IDAM-DIRECTORY` DR.1+DR.2 (both landed,
+  crdb `9796da36`): revendored the wire schema + regenerated `@forge/contracts`, extended `PrincipalRow` /
+  `toPrincipalRow` with `boundConnector`/`bindingStatus`/`ownedFields`, and rendered the All Users Origin
+  column as the connector name (Auth0) for federated identities. **Scope reality recorded:** the engine
+  never makes an operator-editable record IdAM-owned (only ExternalAccount->idam-subject bindings confirm,
+  and federated rows are origin observed with no local Edit), so the read-only-edit-form + forced-edit
+  refusal are unreachable and were not built; `ownedFields` is carried for a future detail view. Full gate +
+  26/26 e2e. Next = the ID.4 UI onboarding form, engine-first on the new `IP-LUG-IDAM-CONNECT`.
 - 2026-07-23: **ID.3 LANDED (`7dd1d7b`).** `Sync Now` is a real audited `IDAM_SYNC` command, per
   connector, confirm-gated. `packages/wire` IdamSync encoder + dispatch, BFF `idamSync` seam +
   `resolveIdamSync` + `POST /api/idam/sync` (refusal mapped by class: Conflict->409, Framing->400,

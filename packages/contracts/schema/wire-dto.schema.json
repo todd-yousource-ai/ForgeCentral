@@ -2267,6 +2267,26 @@
         "account_type": {
           "type": "string"
         },
+        "binding_status": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bound_connector": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "email": {
           "type": "string"
         },
@@ -2300,6 +2320,12 @@
         },
         "origin": {
           "type": "string"
+        },
+        "owned_fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "principal_id": {
           "type": "string"
@@ -2339,7 +2365,8 @@
         "org",
         "groups",
         "privileges",
-        "first_seen"
+        "first_seen",
+        "owned_fields"
       ],
       "type": "object"
     },
