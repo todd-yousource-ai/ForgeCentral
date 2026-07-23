@@ -35,7 +35,13 @@ import { PRINCIPAL_KINDS, PRINCIPAL_ORIGINS, PRINCIPAL_STATUSES } from '@forge/c
 import { principalId } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { IdamSyncError, useIdamConnectors, useIdamSync } from './useIdam.js';
+import {
+  IdamConnectError,
+  IdamSyncError,
+  useIdamConnect,
+  useIdamConnectors,
+  useIdamSync,
+} from './useIdam.js';
 import { useDrawer } from '../shell/DrawerHost.js';
 import {
   GroupCreateError,
@@ -650,10 +656,131 @@ function syncFailure(error: Error | null): string | null {
  * client timer) and completion shows the real object count / state / error. A refused sync renders the
  * failure; it never silently succeeds. Configure (ID.4) stays a labelled non-live control.
  */
+/** The typed failure line the onboarding form renders from a connect refusal. */
+function connectFailure(error: Error | null): string | null {
+  if (error === null) return null;
+  if (error instanceof IdamConnectError) {
+    if (error.status === 409) return 'The engine rejected the connectivity or the secret.';
+    if (error.status === 403) return 'You do not have permission to configure connectors.';
+    if (error.status === 503) return 'The secret store is not available on this node.';
+    return 'The connector could not be configured.';
+  }
+  return 'The request could not reach the server.';
+}
+
+/**
+ * The connector onboarding form (ID.4): the operator enters the connectivity AND the client secret.
+ * On submit the secret is written to the node's mode-protected store via the on-node sidecar (never a
+ * Console-stored value, never the engine wire), then the connectivity is applied live. The secret field
+ * is WRITE-ONLY -- a configured connector shows "secret set", never the value.
+ */
+function IdamConnectForm({
+  provider,
+  domain,
+  onDone,
+}: {
+  readonly provider: string;
+  readonly domain: string;
+  readonly onDone: () => void;
+}): ReactElement {
+  const connect = useIdamConnect();
+  const [domainValue, setDomainValue] = useState(domain);
+  const [clientId, setClientId] = useState('');
+  const [audience, setAudience] = useState('');
+  const [secret, setSecret] = useState('');
+  const failure = connectFailure(connect.error);
+
+  const submit = (): void => {
+    connect.mutate(
+      {
+        provider,
+        domain: domainValue.trim(),
+        clientId: clientId.trim(),
+        audience: audience.trim(),
+        secret,
+      },
+      { onSuccess: onDone },
+    );
+  };
+
+  return (
+    <form
+      className="fcx-users-create"
+      aria-label={`Configure ${provider}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <label className="fcx-filter">
+        Provider Domain
+        <input
+          className="fcx-input"
+          value={domainValue}
+          onChange={(e) => setDomainValue(e.target.value)}
+          placeholder="dev-xxxx.us.auth0.com"
+          required
+        />
+      </label>
+      <label className="fcx-filter">
+        Client ID
+        <input
+          className="fcx-input"
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          required
+        />
+      </label>
+      <label className="fcx-filter">
+        Audience
+        <input
+          className="fcx-input"
+          value={audience}
+          onChange={(e) => setAudience(e.target.value)}
+          placeholder="(defaults to the Management API)"
+        />
+      </label>
+      <label className="fcx-filter">
+        Client Secret
+        <input
+          type="password"
+          className="fcx-input"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          autoComplete="off"
+          required
+        />
+      </label>
+      <p className="fcx-users-idam-note">
+        The secret is written to this node&apos;s protected store and never leaves it; the console
+        never stores it or sends it over the engine wire.
+      </p>
+      <button
+        type="submit"
+        className="fcx-btn fcx-btn--primary"
+        disabled={
+          connect.isPending || domainValue.trim() === '' || clientId.trim() === '' || secret === ''
+        }
+      >
+        {connect.isPending ? 'Configuring...' : 'Save connector'}
+      </button>
+      <button type="button" className="fcx-btn" onClick={onDone}>
+        Cancel
+      </button>
+      {failure !== null ? (
+        <p role="alert" className="fcx-form-error">
+          {failure}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 function IdamTab(): ReactElement {
   const connectors = useIdamConnectors();
   const sync = useIdamSync();
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [configuring, setConfiguring] = useState<{ provider: string; domain: string } | null>(null);
   const failure = syncFailure(sync.error);
   const failedProvider = sync.error !== null ? (sync.variables?.provider ?? null) : null;
   return (
@@ -661,7 +788,13 @@ function IdamTab(): ReactElement {
       <div className="fcx-surface__controls">
         <h3 className="fcx-surface__subheading">External Identity &amp; Access Management</h3>
       </div>
-      {connectors.isLoading ? (
+      {configuring !== null ? (
+        <IdamConnectForm
+          provider={configuring.provider}
+          domain={configuring.domain}
+          onDone={() => setConfiguring(null)}
+        />
+      ) : connectors.isLoading ? (
         <LoadingState label="Loading identity connectors" />
       ) : connectors.isError ? (
         <ErrorState
@@ -672,6 +805,15 @@ function IdamTab(): ReactElement {
         <EmptyState
           title="No IdAM connector configured"
           hint="No external identity connector is configured on this node yet."
+          action={
+            <button
+              type="button"
+              className="fcx-btn fcx-btn--primary"
+              onClick={() => setConfiguring({ provider: 'auth0', domain: '' })}
+            >
+              Onboard Auth0
+            </button>
+          }
         />
       ) : (
         <div className="fcx-users-groups-grid" role="list" aria-label="Identity connectors">
@@ -720,10 +862,11 @@ function IdamTab(): ReactElement {
                   <button
                     type="button"
                     className="fcx-btn"
-                    disabled
-                    title="Pending: IDAM_CONFIGURE wiring (ID.4)"
+                    onClick={() =>
+                      setConfiguring({ provider: c.connectorId, domain: c.providerTenant })
+                    }
                   >
-                    Configure (pending)
+                    Configure
                   </button>
                 </div>
               </article>

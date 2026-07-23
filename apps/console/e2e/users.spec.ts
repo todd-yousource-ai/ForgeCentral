@@ -156,6 +156,14 @@ async function mockBff(page: Page): Promise<{
     commands.push({ url: '/api/idam/sync', body: route.request().postDataJSON() });
     return json(route, { provider: 'auth0' });
   });
+  await page.route(/\/api\/idam\/secret$/, (route) => {
+    commands.push({ url: '/api/idam/secret', body: route.request().postDataJSON() });
+    return json(route, { ok: true });
+  });
+  await page.route(/\/api\/idam\/connect$/, (route) => {
+    commands.push({ url: '/api/idam/connect', body: route.request().postDataJSON() });
+    return json(route, { commitVersion: 1 });
+  });
   await page.route(/\/api\/users\/groups$/, (route) => {
     if (route.request().method() === 'POST') {
       commands.push({ url: '/api/users/groups', body: route.request().postDataJSON() });
@@ -321,7 +329,7 @@ test('suspend commits through the confirm gate; groups + the honest IDAM shell',
   await expect(page.getByText('Connected', { exact: true })).toBeVisible();
   await expect(page.getByText('2023-11-14 22:13:20')).toBeVisible();
   await expect(page.getByText('20', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Configure \(pending\)/ }).first()).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Configure' }).first()).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Sync Now' }).first()).toBeEnabled();
 });
 
@@ -336,6 +344,36 @@ test('Sync Now runs a real audited sync through the confirm gate', async ({ page
   await page.getByRole('alertdialog').getByRole('button', { name: 'Sync' }).click();
   await expect.poll(() => bff.commands.filter((c) => c.url === '/api/idam/sync').length).toBe(1);
   expect(bff.commands.find((c) => c.url === '/api/idam/sync')?.body).toEqual({ provider: 'auth0' });
+});
+
+test('the onboarding form sends the secret to the sidecar and connectivity to the engine', async ({
+  page,
+}) => {
+  const bff = await mockBff(page);
+  await page.goto('/users');
+  await page.getByRole('tab', { name: 'External IDAM' }).click();
+
+  // Configure the connector: the form collects connectivity + the secret.
+  await page.getByRole('button', { name: 'Configure' }).click();
+  await page.getByLabel('Provider Domain').fill('dev-new.us.auth0.com');
+  await page.getByLabel('Client ID').fill('m2m-client');
+  await page.getByLabel('Audience').fill('');
+  await page.getByLabel('Client Secret').fill('super-secret-value');
+  await page.getByRole('button', { name: 'Save connector' }).click();
+
+  // The connectivity POST fires last (after the secret is placed); wait for it, then check both.
+  await expect.poll(() => bff.commands.filter((c) => c.url === '/api/idam/connect').length).toBe(1);
+  const secretCmd = bff.commands.find((c) => c.url === '/api/idam/secret');
+  expect(secretCmd?.body).toEqual({ provider: 'auth0', secret: 'super-secret-value' });
+  const connectCmd = bff.commands.find((c) => c.url === '/api/idam/connect');
+  expect(connectCmd?.body).toEqual({
+    provider: 'auth0',
+    domain: 'dev-new.us.auth0.com',
+    clientId: 'm2m-client',
+    audience: '',
+  });
+  // The secret is NEVER in the connectivity request to the engine.
+  expect(JSON.stringify(connectCmd?.body)).not.toContain('super-secret-value');
 });
 
 test('the External IDAM tab shows an honest empty when no connector is configured', async ({
