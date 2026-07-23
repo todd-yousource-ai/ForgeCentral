@@ -11,5 +11,7 @@
   "admin_cert": "/etc/console-sidecar/admin-cert.pem",
   "admin_key": "/etc/console-sidecar/admin-key.pem",
   "sign_addr": "127.0.0.1:8790",
+  "secret_addr": "127.0.0.1:8791",
+  "secret_path": "/etc/cdb/secrets/auth0-management.secret",
   "sign_seed": "/etc/console-sidecar/sign.seed"
 }
