@@ -35,6 +35,7 @@ import type {
   WireGroupList,
   WireGroupRecord,
   WireIdamConfigure,
+  WireIdamConnect,
   WireIdamConnectorList,
   WireIdamConnectorRecord,
   WireIdamSyncStarted,
@@ -216,6 +217,26 @@ export interface IdamConnectorDraft {
   readonly pollIntervalSecs: number;
   /** The full-directory-sync cadence in hours (engine-bounded 1..=168; the engine re-validates). */
   readonly fullSyncCadenceHours: number;
+}
+
+/**
+ * The onboarding form's connectivity shape (`idam.connect`), the camelCase mirror of the NON-transport,
+ * NON-secret fields of `WireIdamConnect` (crdb IP-LUG-IDAM-CONNECT CO.1). This carries where the
+ * connector authenticates -- domain, client id, audience -- but NEVER the secret and NEVER the secret
+ * PATH: the client secret is written server-side by the on-node crypto-sidecar (never a Console type or
+ * the engine wire), and the BFF adds the `request_id`, the operator delegation, and the
+ * `client_secret_ref` path when it builds `WireIdamConnect`. A secret field is unrepresentable here by
+ * type (INV-CONSOLE-IDAM-CONFIGURE-SAFE).
+ */
+export interface IdamConnectDraft {
+  /** The connector this connectivity targets (engine `provider`). */
+  readonly provider: string;
+  /** The provider tenant domain (`dev-xxxx.us.auth0.com`). */
+  readonly domain: string;
+  /** The client id of the machine-to-machine application. */
+  readonly clientId: string;
+  /** The Management API audience; empty derives the conventional value engine-side. */
+  readonly audience: string;
 }
 
 /**
@@ -458,5 +479,23 @@ export function toWireIdamConfigureFields(
     enabled: draft.enabled,
     poll_interval_secs: draft.pollIntervalSecs,
     full_sync_cadence_hours: draft.fullSyncCadenceHours,
+  };
+}
+
+/**
+ * Compile an onboarding Connect draft into the NON-transport, NON-secret fields of the engine's
+ * `WireIdamConnect`. The BFF adds `request_id`, the operator delegation, AND the `client_secret_ref`
+ * path (after the on-node crypto-sidecar has written the secret to it); this helper is the ONE home for
+ * the camelCase->snake_case connectivity mapping. By type there is no secret and no secret path to
+ * carry -- the secret never touches a Console type or the engine wire.
+ */
+export function toWireIdamConnectFields(
+  draft: IdamConnectDraft,
+): Omit<WireIdamConnect, 'request_id' | 'operator' | 'client_secret_ref'> {
+  return {
+    provider: draft.provider,
+    domain: draft.domain,
+    client_id: draft.clientId,
+    audience: draft.audience,
   };
 }

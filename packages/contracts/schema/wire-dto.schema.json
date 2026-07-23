@@ -1194,6 +1194,48 @@
       ],
       "type": "object"
     },
+    "WireIdamConnect": {
+      "additionalProperties": false,
+      "properties": {
+        "audience": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret_ref": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "provider",
+        "domain",
+        "client_id",
+        "audience",
+        "client_secret_ref"
+      ],
+      "type": "object"
+    },
     "WireIdamConnectorList": {
       "additionalProperties": false,
       "properties": {
@@ -3511,6 +3553,18 @@
           },
           "required": [
             "IdamConfigure"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "IdamConnect": {
+              "$ref": "#/$defs/WireIdamConnect"
+            }
+          },
+          "required": [
+            "IdamConnect"
           ],
           "type": "object"
         },

@@ -19,9 +19,11 @@ import {
   toProvisionReceipt,
   toSyncReceipt,
   toWireIdamConfigureFields,
+  toWireIdamConnectFields,
   toWirePrincipalSpec,
 } from '../src/index.js';
 import type {
+  IdamConnectDraft,
   IdamConnectorDraft,
   PrincipalDraft,
   WireGroupList,
@@ -321,5 +323,29 @@ describe('IdAM command shapes carry NO secret (INV-CONSOLE-IDAM-CONTRACT)', () =
 
   it('a sync ack projects the queued provider (an ACK, not a result)', () => {
     expect(toSyncReceipt({ provider: 'auth0' })).toEqual({ provider: 'auth0' });
+  });
+
+  it('the Connect draft maps connectivity ONLY -- no secret, no secret ref on the wire (ID.4)', () => {
+    const draft: IdamConnectDraft = {
+      provider: 'auth0',
+      domain: 'dev-x.us.auth0.com',
+      clientId: 'abc123',
+      audience: '',
+    };
+    const fields = toWireIdamConnectFields(draft);
+    expect(fields).toEqual({
+      provider: 'auth0',
+      domain: 'dev-x.us.auth0.com',
+      client_id: 'abc123',
+      audience: '',
+    });
+    // The BFF adds request_id + operator + client_secret_ref (after the sidecar writes the secret).
+    expect('request_id' in fields).toBe(false);
+    expect('operator' in fields).toBe(false);
+    expect('client_secret_ref' in fields).toBe(false);
+    // No key on the draft or the wire fields names a credential -- the secret is unrepresentable.
+    for (const key of Object.keys({ ...draft, ...fields })) {
+      expect(key.toLowerCase()).not.toMatch(/secret|password|token/);
+    }
   });
 });

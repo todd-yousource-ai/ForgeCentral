@@ -524,6 +524,19 @@ const usersCommands: readonly CommandBinding[] = [
     status: { kind: 'live' },
   },
   {
+    // Onboard a connector's connectivity (domain/client id/audience + a secret REFERENCE, never a
+    // secret value): LIVE on crdb IDAM_CONNECT (IP-LUG-IDAM-CONNECT CO.1/CO.2), audited, applied live
+    // via a fail-closed re-spawn. The secret itself is written by the on-node crypto-sidecar, never on
+    // this wire.
+    id: bindingId('idam.connect'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'idam_connect_v1',
+    authz: 'operator:users.manage',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
     // Trigger a real federation sync: LIVE on crdb IDAM_SYNC (IA.8), audited. An ACK, not a result --
     // the sync loop picks up the queued walk and the connector card reports progress.
     id: bindingId('idam.sync'),
