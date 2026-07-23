@@ -103,6 +103,23 @@ export interface PrincipalRow {
   readonly privileges: readonly string[];
   /** When this principal was first observed/provisioned (unix seconds). */
   readonly firstSeen: number;
+  /**
+   * The connector that owns this identity when it is a federated (IdAM-imported) account: the
+   * provider slug (e.g. `auth0`), rendered as the Origin for such a row. Null for a device-observed
+   * or operator-provisioned row (crdb DR.2).
+   */
+  readonly boundConnector: string | null;
+  /**
+   * The identity binding's status when the row carries a connector (`confirmed` for a
+   * provider-managed federated account). Null when there is no connector binding; a proposed
+   * correlation is never rendered as confirmed.
+   */
+  readonly bindingStatus: string | null;
+  /**
+   * The fields the row's connector governs, which the operator cannot edit locally (the IA.6 owned
+   * set, `email`/`org`, for a federated account). Empty for a non-federated row.
+   */
+  readonly ownedFields: readonly string[];
 }
 
 /** One Groups-tab card (TRD-CONSOLE-04 Section 2.2) -- a projection of `WireGroupRecord`. */
@@ -264,6 +281,9 @@ export function toPrincipalRow(record: WirePrincipalRecord): PrincipalRow | null
     subjectId: record.subject_id ?? null,
     privileges: record.privileges,
     firstSeen: record.first_seen,
+    boundConnector: record.bound_connector ?? null,
+    bindingStatus: record.binding_status ?? null,
+    ownedFields: record.owned_fields,
   };
 }
 
@@ -320,6 +340,9 @@ export function toAgentPrincipalRow(record: WireAgentRecord): PrincipalRow | nul
     subjectId: null,
     privileges: [],
     firstSeen: record.enrolled_at,
+    boundConnector: null,
+    bindingStatus: null,
+    ownedFields: [],
   };
 }
 

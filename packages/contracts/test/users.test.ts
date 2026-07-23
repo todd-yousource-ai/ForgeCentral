@@ -43,6 +43,7 @@ const observed = (overrides: Partial<WirePrincipalRecord> = {}): WirePrincipalRe
   groups: ['sudo'],
   privileges: ['sudo_all'],
   first_seen: 100,
+  owned_fields: [],
   ...overrides,
 });
 
@@ -61,6 +62,7 @@ const local = (overrides: Partial<WirePrincipalRecord> = {}): WirePrincipalRecor
   subject_id: 'enterprise:sarah',
   privileges: [],
   first_seen: 200,
+  owned_fields: [],
   ...overrides,
 });
 
@@ -85,6 +87,31 @@ describe('principal rows project both engine families through one shape', () => 
     expect(row?.org).toBe('YouSource Healthcare');
     expect(row?.subjectId).toBe('enterprise:sarah');
     expect(row?.groups).toEqual(['Engineering']);
+  });
+
+  it('attributes a federated identity to its connector (crdb DR.2 / ID.5)', () => {
+    const row = toPrincipalRow(
+      observed({
+        principal_id: 'lug:external_account:idp:auth0:auth0%7C42',
+        username: 'sarah',
+        email: 'sarah@corp.example',
+        bound_connector: 'auth0',
+        binding_status: 'confirmed',
+        owned_fields: ['email', 'org'],
+      }),
+    );
+    expect(row?.boundConnector).toBe('auth0');
+    expect(row?.bindingStatus).toBe('confirmed');
+    expect(row?.ownedFields).toEqual(['email', 'org']);
+  });
+
+  it('carries no connector attribution on a device or operator row (null / null / empty)', () => {
+    const dev = toPrincipalRow(observed());
+    expect(dev?.boundConnector).toBeNull();
+    expect(dev?.bindingStatus).toBeNull();
+    expect(dev?.ownedFields).toEqual([]);
+    const rec = toPrincipalRow(local());
+    expect(rec?.boundConnector).toBeNull();
   });
 
   it('carries NO trust field on any row (the amendment is structural)', () => {

@@ -74,6 +74,26 @@ const AUTH0_CONNECTOR = {
   fullSyncCadenceHours: 24,
 };
 
+// A federated (IdAM-imported) Auth0 identity, as the BFF projects it (crdb DR.2 / ID.5): origin
+// observed, but bound to the auth0 connector so the Origin column renders "Auth0".
+const FEDERATED = {
+  principalId: 'lug:external_account:idp:auth0:auth0%7C42',
+  username: 'priya',
+  namespace: 'idp:auth0:dev-x.us.auth0.com',
+  kind: 'human',
+  status: 'active',
+  origin: 'observed',
+  email: 'priya@corp.example',
+  org: '',
+  groups: ['Engineering'],
+  subjectId: null,
+  privileges: [],
+  firstSeen: 400,
+  boundConnector: 'auth0',
+  bindingStatus: 'confirmed',
+  ownedFields: ['email', 'org'],
+};
+
 const GROUPS = [
   {
     groupId: 'lug:local_group:posix_host%3Am1:gid:27',
@@ -125,7 +145,7 @@ async function mockBff(page: Page): Promise<{
 }> {
   const commands: Array<{ url: string; body: unknown }> = [];
   const state = {
-    rows: [OBSERVED, LOCAL, AGENT] as unknown[],
+    rows: [OBSERVED, LOCAL, AGENT, FEDERATED] as unknown[],
     idamConnectors: [AUTH0_CONNECTOR] as unknown[],
   };
 
@@ -196,9 +216,12 @@ test('the directory journey: one table over every principal family, no trust fie
   for (const banned of [/trust/i, /override/i, /score/i]) {
     await expect(table.getByRole('columnheader', { name: banned })).toHaveCount(0);
   }
-  // Origin replaces Override: both sources render, distinctly.
+  // Origin replaces Override: local, observed, and a federated identity's CONNECTOR each render.
   await expect(table.getByRole('columnheader', { name: 'Origin' })).toBeVisible();
   await expect(table.getByText('Local', { exact: true })).toBeVisible();
+  // The IdAM-imported identity shows its connector (ID.5), not a bare Observed.
+  await expect(table.getByText('priya', { exact: true })).toBeVisible();
+  await expect(table.getByText('Auth0', { exact: true })).toBeVisible();
 
   // The group chips + the honest empty columns are real row data.
   await expect(table.getByText('sudo', { exact: true })).toBeVisible();

@@ -533,6 +533,8 @@ export interface WirePrincipalList {
 
 export interface WirePrincipalRecord {
   account_type: string;
+  binding_status?: string | null;
+  bound_connector?: string | null;
   email: string;
   enabled: boolean;
   first_seen: number;
@@ -541,6 +543,7 @@ export interface WirePrincipalRecord {
   namespace: string;
   org: string;
   origin: string;
+  owned_fields: Array<string>;
   principal_id: string;
   privileges: Array<string>;
   status: string;
