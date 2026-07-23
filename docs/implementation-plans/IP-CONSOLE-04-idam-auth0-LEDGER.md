@@ -27,12 +27,14 @@ ledger is a defect.
   at-rest-crypto subsystem. This SUPERSEDES the earlier same-day "secret transits to the engine" note
   (reconsidered once recon showed it reverses three shipped engine invariants and that at-rest
   encryption is a deferred subsystem). Rescopes ID.4; still engine-first.
-- **Next action: a NEW crdb IP** (working name `IP-LUG-IDAM-CONNECT`; NOT "IA.9", which is already a
-  landed step -- the delta-log leg): connectivity-over-wire (a new verb carrying domain/client_id/
-  audience, NO secret) + an on-node sidecar/admin secret-set that writes the mode-protected file + a
-  live connector re-spawn so a new secret/connectivity applies without restart. Once it lands, **ID.4**
-  builds the setup form against it (`feat/id4-idam-configure`). ID.4a (cadences) follows ID.4; ID.5
-  (IdAM-owned readonly, crdb IA.6 ready) is independent and can land any time.
+- **Two crdb engine IPs AUTHORED 2026-07-23** (crdb main `ebd77492`), each unblocking an FC step:
+  - `IP-LUG-IDAM-DIRECTORY` (read-side, low-risk): DR.1 projects federated identities into
+    `LIST_PRINCIPALS`; DR.2 adds `bound_connector`/`binding_status`/`owned_fields`. Unblocks **ID.5**.
+  - `IP-LUG-IDAM-CONNECT` (provisioning): `IDAM_CONNECT` verb (connectivity + secret ref, no secret value)
+    + live re-spawn, paired with a crypto-sidecar secret-set leg. Unblocks **ID.4** (the UI onboarding form).
+- **Next action (engine-first): crdb DR.1**, then DR.2 -> FC ID.5; and crdb CO.1/CO.2 + the sidecar leg
+  -> FC ID.4. ID.4a (cadences) follows ID.4. FC branches: `feat/id5-idam-owned` (after DR.2),
+  `feat/id4-idam-configure` (after CO.2 + sidecar leg).
 - **The three verbs ID.2-ID.4 bind to** (all live on the engine, `cdb-wire` names in brackets):
   - `idam.connectors` -> **`IDAM_CONNECTORS`** [`WireIdamConnectors` -> `WireIdamConnectorList`
     of `WireIdamConnectorRecord`]. Read; returns the connector card.
@@ -82,9 +84,9 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 | ID.1 | `INV-CONSOLE-IDAM-CONTRACT` | **LANDED** | `e19e084` | regenerated from `wire-dto.schema.json`; bindings live; no secret in any type |
 | ID.2 | `INV-CONSOLE-IDAM-CONNECTORS-REAL` | **LANDED** | `2b2ff5b` | External IDAM tab live; `IDAM_CONNECTOR_SHELLS` + guard test deleted |
 | ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | **LANDED** | `7dd1d7b` | `Sync Now` real+audited, confirm-gated, engine-truth in-flight |
-| ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | PLANNED (RESCOPED) | -- | full connectivity over the wire + a secret entered via the on-node sidecar/admin (NOT the browser/wire); posture-preserving (operator ruling 2026-07-23 final); **needs the new crdb `IP-LUG-IDAM-CONNECT`** |
+| ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | PLANNED (RESCOPED) | -- | UI onboarding of the whole connector (domain/client id/audience + secret + cadences); connectivity over `IDAM_CONNECT`, secret browser->BFF(transient)->sidecar->mode-protected file, never the engine wire (operator ruling 2026-07-23 final); **needs crdb `IP-LUG-IDAM-CONNECT`** |
 | ID.4a | `INV-CONSOLE-IDAM-CADENCE-EDITABLE` | PLANNED | -- | operator directive 2026-07-22; needs crdb IA.7 |
-| ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | PLANNED | -- | needs crdb IA.6 |
+| ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | PLANNED | -- | Origin=Auth0 + proactive read-only + drawer binding; **needs crdb `IP-LUG-IDAM-DIRECTORY` DR.2** (federated identities are invisible to LIST_PRINCIPALS today, and no connector/binding/owned-field attribution is exposed). IA.6 refusal is the server-side backstop |
 | ID.N | `INV-CONSOLE-IDAM-COMPLETE` | PLANNED | -- | needs a real synced tenant (crdb IA.5/IA.N) |
 
 ## Cross-repo engine prerequisites (crdb -- tracked here, land in crdb)
@@ -95,7 +97,8 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 | IA.8 | `IDAM_CONNECTORS` / `IDAM_SYNC` / `IDAM_CONFIGURE` verbs + the committed `idam_connector` runtime section | LANDED | `3bfe7dde` + `c7eb2037` |
 | IA.6 | IdAM-owned-field edit refusal in `commit_edit_principal`, typed, naming the connector | LANDED | `137ace6b` |
 | IA.5 / IA.N | A real full sync against the live dev tenant | LANDED, ran GREEN 2026-07-23 | `704234eb` / `bf9da415` |
-| `IP-LUG-IDAM-CONNECT` (new crdb IP; NOT "IA.9", which is a landed step) | **NEW (operator ruling 2026-07-23 final, posture-preserving).** Connectivity-over-wire: a new verb carrying domain/client_id/audience (**NO secret**) applied to the runtime connector; an on-node crypto-sidecar/admin secret-set that writes the mode-protected file and hands the engine a `client_secret_ref` (the secret NEVER transits the browser/wire, keeping `INV-IDAM-NO-SECRET-INGEST`); and a live connector re-spawn so a new secret/connectivity applies without restart. Backs the rescoped ID.4. | NOT STARTED | -- |
+| `IP-LUG-IDAM-DIRECTORY` (new crdb IP, AUTHORED 2026-07-23, crdb main `ebd77492`) | Federated identities are invisible to `LIST_PRINCIPALS` today (they are `ExternalAccount` / `origin=idam` nodes, neither projected branch). DR.1 projects them; DR.2 adds `bound_connector` / `binding_status` / `owned_fields` to the principal record. Backs ID.5. See `crdb/docs/implementation-plans/IP-LUG-IDAM-DIRECTORY.md`. | AUTHORED | `ebd77492` |
+| `IP-LUG-IDAM-CONNECT` (new crdb IP, AUTHORED 2026-07-23, crdb main `ebd77492`; NOT "IA.9", a landed step) | **Operator ruling 2026-07-23 final.** `IDAM_CONNECT` verb carrying domain/client_id/audience + the secret REFERENCE (**never a secret value**) applied to the runtime connector; a live connector re-spawn (via `Auth0ConnectorHandle`) so new connectivity/secret applies without restart. Paired with a crypto-sidecar secret-set leg (FC) that receives the secret browser->BFF(transient)->sidecar and writes the mode-protected file; the secret never crosses the engine wire, keeping `INV-IDAM-NO-SECRET-INGEST`. Backs the rescoped ID.4. See `crdb/docs/implementation-plans/IP-LUG-IDAM-CONNECT.md`. | AUTHORED | `ebd77492` |
 
 ## Carried from `IP-CONSOLE-04-users` (this IP closes them)
 
@@ -112,14 +115,19 @@ substrate); real user->destination Sankey ribbons (DT.4 attribution).
 
 ## Operator directives
 
-- **2026-07-23 (FINAL, posture-preserving): the console sets up connectivity; the secret does NOT
-  transit the browser/wire.** The customer enters the full connectivity in the console Configure form;
-  domain/client id/audience travel the wire to the engine, but the **client secret** is entered through
-  the on-node crypto-sidecar/admin channel (server-side mTLS), which writes the mode-protected secret
-  file and hands the engine a `client_secret_ref`. Safeguards: the secret is never persisted
-  Console-side (`INV-CONSOLE-NO-2ND-DB`), never in a Console type, never logged; a configured connector
-  reports "secret set", never returns the secret; crdb `INV-IDAM-NO-SECRET-INGEST` stays intact.
-  Engine-first on the new crdb `IP-LUG-IDAM-CONNECT`. Rescopes **ID.4**.
+- **2026-07-23 (FINAL): the operator onboards the whole IdAM connector THROUGH THE UI; the secret is
+  saved to a protected, mode-protected store off the engine wire.** The customer enters the full
+  connector -- domain, client id, audience, AND the **client secret** -- in the Console setup form.
+  Domain/client id/audience travel the wire to the engine (new `IDAM_CONNECT` verb). The secret travels
+  **browser -> BFF (a transient pass-through: never persisted, never a Console durable type, never
+  logged) -> the on-node crypto-sidecar**, which writes the mode-protected secret file (`0640 cdb:cdb`,
+  engine-user readable); the engine keeps only a `client_secret_ref`. The secret NEVER crosses the engine
+  wire. **Protection level (operator-chosen): mode-protected file + full-disk encryption at rest;
+  field-level AES-256-GCM at-rest (crdb `CQH-GOV-01`) stays deferred and out of scope.** Safeguards:
+  `INV-CONSOLE-NO-2ND-DB` holds (no Console-side connector/secret store); a configured connector reports
+  "secret set", never returns the secret; crdb `INV-IDAM-NO-SECRET-INGEST` stays intact (no secret value
+  on the engine wire). Engine-first on the new crdb `IP-LUG-IDAM-CONNECT` (+ a paired crypto-sidecar
+  secret-set leg). Rescopes **ID.4**.
 - **2026-07-23 (SUPERSEDED, same day): "the client secret transits to the engine, stored server-side."**
   Withdrawn after recon showed it reverses three shipped crdb engine invariants
   (`INV-IDAM-NO-SECRET-INGEST`, the IA.8 no-secret contract, the plan's out-of-scope secret-storage
