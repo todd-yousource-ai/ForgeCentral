@@ -10,7 +10,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  IDAM_CONNECTOR_SHELLS,
   toAgentPrincipalRow,
   toGroupCards,
   toIdamConnector,
@@ -195,19 +194,6 @@ describe('the AI-Agent cross-bind (LIST_AGENTS, ER.1)', () => {
         attributes: [],
       }),
     ).toBeNull();
-  });
-});
-
-describe('the IDAM shells are honest (ID.1 keeps them; ID.2 deletes them)', () => {
-  it('every shell is a disabled placeholder with no fabricated sync timestamp', () => {
-    expect(IDAM_CONNECTOR_SHELLS).toHaveLength(3);
-    for (const shell of IDAM_CONNECTOR_SHELLS) {
-      expect(shell.state).toBe('disabled');
-      expect(shell.enabled).toBe(false);
-      expect(shell.lastSyncAt).toBeNull();
-      expect(shell.lastSyncOutcome).toBeNull();
-      expect(shell.objectsSynced).toBe(0);
-    }
   });
 });
 

@@ -12,6 +12,7 @@ import type {
   WireBundleConvergenceQuery,
   WireGroupSetMembers,
   WireGroupWrite,
+  WireIdamConnectors,
   WireListGroups,
   WireListPrincipals,
   WireObjectCreate,
@@ -162,6 +163,13 @@ function groupSetMembersToCbor(request: WireGroupSetMembers): unknown {
 
 /** OBJECT_LIST (crdb OB.3). Rust struct order: request_id, then the optional operator. */
 function objectListToCbor(request: WireObjectList): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** IDAM_CONNECTORS (crdb IA.8). Rust struct order: request_id, then the optional operator. */
+function idamConnectorsToCbor(request: WireIdamConnectors): unknown {
   const out: Record<string, unknown> = { request_id: request.request_id };
   applyOperator(out, request.operator);
   return out;
@@ -441,6 +449,8 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   if ('ListGroups' in request)
     return encode({ ListGroups: directoryReadToCbor(request.ListGroups) });
   if ('ObjectList' in request) return encode({ ObjectList: objectListToCbor(request.ObjectList) });
+  if ('IdamConnectors' in request)
+    return encode({ IdamConnectors: idamConnectorsToCbor(request.IdamConnectors) });
   if ('ObjectDetail' in request)
     return encode({ ObjectDetail: objectDetailToCbor(request.ObjectDetail) });
   if ('ObjectCreate' in request)

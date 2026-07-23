@@ -23,22 +23,19 @@ import {
   type DataTableColumn,
 } from '@forge/design';
 import type {
+  IdamConnectorState,
   PrincipalDraft,
   PrincipalKind,
   PrincipalOrigin,
   PrincipalRow,
   PrincipalStatus,
 } from '@forge/contracts';
-import {
-  IDAM_CONNECTOR_SHELLS,
-  PRINCIPAL_KINDS,
-  PRINCIPAL_ORIGINS,
-  PRINCIPAL_STATUSES,
-} from '@forge/contracts';
+import { PRINCIPAL_KINDS, PRINCIPAL_ORIGINS, PRINCIPAL_STATUSES } from '@forge/contracts';
 
 import { principalId } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { useIdamConnectors } from './useIdam.js';
 import { useDrawer } from '../shell/DrawerHost.js';
 import {
   GroupCreateError,
@@ -586,52 +583,104 @@ function GroupsTab({
   );
 }
 
+/** The connector state's badge label + color. `healthy` reads calm; anything ambiguous warns. */
+function connectorStateBadge(state: IdamConnectorState): { label: string; variant: BadgeVariant } {
+  switch (state) {
+    case 'healthy':
+      return { label: 'Connected', variant: 'good' };
+    case 'syncing':
+      return { label: 'Syncing', variant: 'neutral' };
+    case 'never-synced':
+      return { label: 'Never synced', variant: 'neutral' };
+    case 'disabled':
+      return { label: 'Disabled', variant: 'neutral' };
+    case 'partial':
+      return { label: 'Partial sync', variant: 'caution' };
+    case 'unknown':
+      return { label: 'Unknown', variant: 'caution' };
+    case 'error':
+      return { label: 'Error', variant: 'critical' };
+  }
+}
+
+/** Render a last-sync time as the deterministic UTC stamp, or the honest `Never` when null. */
+function formatSyncTime(lastSyncAt: number | null): string {
+  if (lastSyncAt === null) {
+    return 'Never';
+  }
+  return new Date(lastSyncAt).toISOString().replace('T', ' ').slice(0, 19);
+}
+
 /**
- * The External IDAM tab (UY.4): the HONEST not-connected shell. The three well-known connectors
- * render their real state -- none is connected, because the TRD-35 Phase-2 IdAM adapters are not
- * built (`idam.*` bindings are PENDING; Auth0 is the planned first live connector). Configure and
- * Sync Now are labelled non-live controls, never silent stubs; no fabricated last-sync exists
- * anywhere (INV-CONSOLE-IDAM-HONEST).
+ * The External IDAM tab (ID.2): the LIVE connector list. Every card is a projection of a real crdb
+ * connector record (IDAM_CONNECTORS, crdb IA.8) -- real state, real last-sync (or an honest `Never`),
+ * real object count, real last error. An unfederated node returns no connectors and the tab says so.
+ * Sync Now (ID.3) and Configure (ID.4) remain labelled non-live controls until their engine commands
+ * are wired; nothing here is a silent stub (INV-CONSOLE-IDAM-CONNECTORS-REAL).
  */
 function IdamTab(): ReactElement {
+  const connectors = useIdamConnectors();
   return (
     <>
       <div className="fcx-surface__controls">
         <h3 className="fcx-surface__subheading">External Identity &amp; Access Management</h3>
-        <button
-          type="button"
-          className="fcx-btn"
-          disabled
-          title="Pending: TRD-35 Phase 2 IdAM adapters (Auth0 first)"
-        >
+        <button type="button" className="fcx-btn" disabled title="Pending: IDAM_SYNC wiring (ID.3)">
           Sync Now (pending)
         </button>
       </div>
-      <p className="fcx-users-idam-note">
-        Federation connectors arrive with the TRD-35 Phase-2 IdAM adapters; Auth0 is the planned
-        first live connector. Until then every connector below reports its real state.
-      </p>
-      <div className="fcx-users-groups-grid" role="list" aria-label="Identity connectors">
-        {IDAM_CONNECTOR_SHELLS.map((c) => (
-          <article key={c.connectorId} role="listitem" className="fcx-users-group-card">
-            <div className="fcx-users-group-card__head">
-              <h4 className="fcx-users-group-card__name">{c.displayName}</h4>
-              <Badge variant="neutral">Not Connected</Badge>
-            </div>
-            <p className="fcx-users-group-card__description">
-              {c.lastSyncAt === null ? 'No sync has ever run.' : ''}
-            </p>
-            <button
-              type="button"
-              className="fcx-btn"
-              disabled
-              title="Pending: TRD-35 Phase 2 IdAM adapters"
-            >
-              Configure (pending)
-            </button>
-          </article>
-        ))}
-      </div>
+      {connectors.isLoading ? (
+        <LoadingState label="Loading identity connectors" />
+      ) : connectors.isError ? (
+        <ErrorState
+          title="Could not load identity connectors."
+          onRetry={() => void connectors.refetch()}
+        />
+      ) : (connectors.data ?? []).length === 0 ? (
+        <EmptyState
+          title="No IdAM connector configured"
+          hint="No external identity connector is configured on this node yet."
+        />
+      ) : (
+        <div className="fcx-users-groups-grid" role="list" aria-label="Identity connectors">
+          {(connectors.data ?? []).map((c) => {
+            const badge = connectorStateBadge(c.state);
+            return (
+              <article key={c.connectorId} role="listitem" className="fcx-users-group-card">
+                <div className="fcx-users-group-card__head">
+                  <h4 className="fcx-users-group-card__name">{c.displayName}</h4>
+                  <Badge variant={badge.variant}>{badge.label}</Badge>
+                </div>
+                <p className="fcx-users-group-card__description">
+                  {c.providerTenant || 'No tenant configured'}
+                </p>
+                <dl className="fcx-users-idam-card__facts">
+                  <div>
+                    <dt>Last sync</dt>
+                    <dd>{formatSyncTime(c.lastSyncAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Objects synced</dt>
+                    <dd>{c.objectsSynced}</dd>
+                  </div>
+                </dl>
+                {c.lastError !== null ? (
+                  <p className="fcx-users-idam-card__error" role="alert">
+                    {c.lastError}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className="fcx-btn"
+                  disabled
+                  title="Pending: IDAM_CONFIGURE wiring (ID.4)"
+                >
+                  Configure (pending)
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }

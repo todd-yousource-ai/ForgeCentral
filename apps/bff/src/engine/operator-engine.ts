@@ -28,6 +28,8 @@ import type {
   WireGroupSetMembers,
   WireGroupWrite,
   WireListAgents,
+  WireIdamConnectorList,
+  WireIdamConnectors,
   WireObjectCatalog,
   WireObjectCreate,
   WireObjectDelete,
@@ -77,6 +79,7 @@ export type EngineAction =
   | 'listGroups'
   | 'objectList'
   | 'objectDetail'
+  | 'idamConnectors'
   | 'objectCreate'
   | 'objectEdit'
   | 'objectDelete'
@@ -173,6 +176,12 @@ export interface OperatorEngine {
     request: WireObjectList,
     opts?: EngineCallOptions,
   ): Promise<WireObjectCatalog>;
+  /** List the External IDAM connectors (IDAM_CONNECTORS) on behalf of `principal`. */
+  idamConnectors(
+    principal: OperatorPrincipal,
+    request: WireIdamConnectors,
+    opts?: EngineCallOptions,
+  ): Promise<WireIdamConnectorList>;
   /** Read one object + its members (OBJECT_DETAIL) on behalf of `principal`. */
   objectDetail(
     principal: OperatorPrincipal,
@@ -394,6 +403,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'objectList', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.objectList({ ...request, operator }, opts);
+    },
+    idamConnectors: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'idamConnectors', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.idamConnectors({ ...request, operator }, opts);
     },
     objectDetail: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'objectDetail', request.request_id));
