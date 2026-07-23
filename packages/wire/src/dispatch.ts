@@ -73,6 +73,7 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'IdamConnectors' in request ||
       'IdamSync' in request ||
       'IdamConnect' in request ||
+      'IdamConfigure' in request ||
       // The Objects-surface commands (OBJECT_CREATE/EDIT/DELETE, crdb OB.4) ride the QuerySubmit
       // opcode like the other data-plane writes; the engine routes them to the write path by tag.
       'ObjectCreate' in request ||

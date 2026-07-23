@@ -164,6 +164,10 @@ async function mockBff(page: Page): Promise<{
     commands.push({ url: '/api/idam/connect', body: route.request().postDataJSON() });
     return json(route, { commitVersion: 1 });
   });
+  await page.route(/\/api\/idam\/configure$/, (route) => {
+    commands.push({ url: '/api/idam/configure', body: route.request().postDataJSON() });
+    return json(route, { commitVersion: 2 });
+  });
   await page.route(/\/api\/users\/groups$/, (route) => {
     if (route.request().method() === 'POST') {
       commands.push({ url: '/api/users/groups', body: route.request().postDataJSON() });
@@ -359,10 +363,21 @@ test('the onboarding form sends the secret to the sidecar and connectivity to th
   await page.getByLabel('Client ID').fill('m2m-client');
   await page.getByLabel('Audience').fill('');
   await page.getByLabel('Client Secret').fill('super-secret-value');
+  await page.getByLabel('Delta poll interval (seconds)').fill('600');
+  await page.getByLabel('Full directory sync (hours)').fill('12');
   await page.getByRole('button', { name: 'Save connector' }).click();
 
-  // The connectivity POST fires last (after the secret is placed); wait for it, then check both.
-  await expect.poll(() => bff.commands.filter((c) => c.url === '/api/idam/connect').length).toBe(1);
+  // The configure POST fires last (secret -> connect -> configure); wait for it, then check all three.
+  await expect
+    .poll(() => bff.commands.filter((c) => c.url === '/api/idam/configure').length)
+    .toBe(1);
+  const configureCmd = bff.commands.find((c) => c.url === '/api/idam/configure');
+  expect(configureCmd?.body).toEqual({
+    provider: 'auth0',
+    enabled: true,
+    pollIntervalSecs: 600,
+    fullSyncCadenceHours: 12,
+  });
   const secretCmd = bff.commands.find((c) => c.url === '/api/idam/secret');
   expect(secretCmd?.body).toEqual({ provider: 'auth0', secret: 'super-secret-value' });
   const connectCmd = bff.commands.find((c) => c.url === '/api/idam/connect');

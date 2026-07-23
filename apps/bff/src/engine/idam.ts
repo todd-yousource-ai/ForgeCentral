@@ -15,8 +15,10 @@
 import type {
   IdamConnectDraft,
   IdamConnector,
+  IdamConnectorDraft,
   ProvisionReceipt,
   SyncReceipt,
+  WireIdamConfigure,
   WireIdamConnect,
   WireIdamConnectors,
   WireIdamSync,
@@ -25,6 +27,7 @@ import {
   toIdamConnectors,
   toProvisionReceipt,
   toSyncReceipt,
+  toWireIdamConfigureFields,
   toWireIdamConnectFields,
 } from '@forge/contracts';
 
@@ -87,5 +90,25 @@ export async function resolveIdamConnect(
     client_secret_ref: secretRef,
   };
   const reply = await engine.idamConnect(principal, request, opts);
+  return toProvisionReceipt(reply);
+}
+
+/**
+ * Set a connector's runtime knobs -- enabled + the two cadences (IDAM_CONFIGURE, crdb IA.8), applied
+ * live with no restart. The cadence BOUNDS are engine-side: an out-of-range value passes through this
+ * resolver and is refused by the engine (`EngineRefusedError`, `Framing`), so the form's range hints
+ * are UX, never the enforcement point. Returns the audited commit version.
+ */
+export async function resolveIdamConfigure(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  draft: IdamConnectorDraft,
+  opts?: EngineCallOptions,
+): Promise<ProvisionReceipt> {
+  const request: WireIdamConfigure = {
+    request_id: requestId(),
+    ...toWireIdamConfigureFields(draft),
+  };
+  const reply = await engine.idamConfigure(principal, request, opts);
   return toProvisionReceipt(reply);
 }

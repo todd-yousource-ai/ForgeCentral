@@ -81,25 +81,35 @@ export class IdamConnectError extends Error {
   }
 }
 
-/** The onboarding form's input: connectivity + the write-only secret. */
+/** The engine-enforced cadence bounds (crdb IA.7); the form's hints are UX, the engine holds the bound. */
+export const IDAM_POLL_INTERVAL_SECS_MIN = 60;
+export const IDAM_POLL_INTERVAL_SECS_MAX = 86_400;
+export const IDAM_FULL_SYNC_HOURS_MIN = 1;
+export const IDAM_FULL_SYNC_HOURS_MAX = 168;
+
+/** The onboarding form's input: connectivity, the write-only secret, and the two cadences (ID.4a). */
 export interface IdamConnectInput {
   readonly provider: string;
   readonly domain: string;
   readonly clientId: string;
   readonly audience: string;
   readonly secret: string;
+  readonly pollIntervalSecs: number;
+  readonly fullSyncCadenceHours: number;
 }
 
 /**
  * Onboard a connector: write the secret to the node's mode-protected store via the sidecar
- * (`/api/idam/secret`), THEN set the connectivity live (`/api/idam/connect`). The secret is sent
- * write-only and never read back; the connectivity apply re-spawns the connector fail-closed. On
+ * (`/api/idam/secret`), set the connectivity live (`/api/idam/connect`), then apply the enabled state
+ * + the two cadences (`/api/idam/configure`, ID.4a). The secret is sent write-only and never read back;
+ * the connectivity apply re-spawns the connector fail-closed; the cadence bounds are engine-enforced. On
  * success the connector list is invalidated so the card reflects the new state.
  */
 export function useIdamConnect(): UseMutationResult<void, Error, IdamConnectInput> {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ provider, domain, clientId, audience, secret }) => {
+    mutationFn: async (input) => {
+      const { provider, domain, clientId, audience, secret } = input;
       // 1. The secret goes to the on-node sidecar first (browser -> BFF passthrough -> sidecar file).
       const secretRes = await fetch('/api/idam/secret', {
         method: 'POST',
@@ -119,6 +129,22 @@ export function useIdamConnect(): UseMutationResult<void, Error, IdamConnectInpu
       });
       if (!connectRes.ok) {
         throw new IdamConnectError(connectRes.status);
+      }
+      // 3. Finally the runtime knobs: enable the connector + set the two cadences (ID.4a). The engine
+      // re-validates the bounds and refuses an out-of-range value regardless of the form's hints.
+      const configureRes = await fetch('/api/idam/configure', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider,
+          enabled: true,
+          pollIntervalSecs: input.pollIntervalSecs,
+          fullSyncCadenceHours: input.fullSyncCadenceHours,
+        }),
+      });
+      if (!configureRes.ok) {
+        throw new IdamConnectError(configureRes.status);
       }
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: CONNECTORS_KEY }),

@@ -60,7 +60,12 @@ import {
   ObjectCommandError,
   ObjectsUnavailableError,
 } from './engine/objects.js';
-import { resolveIdamConnect, resolveIdamConnectors, resolveIdamSync } from './engine/idam.js';
+import {
+  resolveIdamConfigure,
+  resolveIdamConnect,
+  resolveIdamConnectors,
+  resolveIdamSync,
+} from './engine/idam.js';
 import { SecretRefusedError, setConnectorSecret } from './engine/secret-client.js';
 import {
   resolveCreateGroup,
@@ -1357,6 +1362,66 @@ async function handleObjects(
  */
 const IDAM_SECRET_REF = '/etc/cdb/secrets/auth0-management.secret';
 
+async function handleIdamConfigure(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/idam/configure' || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as Record<string, unknown>;
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const provider = typeof body['provider'] === 'string' ? body['provider'].trim() : '';
+  const enabled = body['enabled'];
+  const poll = body['pollIntervalSecs'];
+  const full = body['fullSyncCadenceHours'];
+  if (
+    provider === '' ||
+    typeof enabled !== 'boolean' ||
+    typeof poll !== 'number' ||
+    !Number.isInteger(poll) ||
+    typeof full !== 'number' ||
+    !Number.isInteger(full)
+  ) {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const draft = { provider, enabled, pollIntervalSecs: poll, fullSyncCadenceHours: full };
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    const receipt = await resolveIdamConfigure(deps.operatorEngine, principal, draft, opts);
+    sendJson(res, 200, receipt);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      const cls = err.wireError.class;
+      // Framing = an out-of-range cadence / bad provider (the engine holds the bound); Conflict = no
+      // connector; else a denial. The form's range hints are UX; this is where the engine refuses.
+      const httpStatus = cls === 'Framing' ? 400 : cls === 'Conflict' ? 409 : 403;
+      sendJson(res, httpStatus, { error: 'refused', class: cls });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'idam configure failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleIdamSecret(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1624,6 +1689,9 @@ async function route(
     return;
   }
   if (await handleIdamSecret(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleIdamConfigure(deps, req, method, path, res)) {
     return;
   }
   if (await handleObjects(deps, req, path, res)) {
