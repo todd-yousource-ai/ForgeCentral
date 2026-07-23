@@ -61,6 +61,7 @@ import {
   ObjectsUnavailableError,
 } from './engine/objects.js';
 import { resolveIdamConnect, resolveIdamConnectors, resolveIdamSync } from './engine/idam.js';
+import { SecretRefusedError, setConnectorSecret } from './engine/secret-client.js';
 import {
   resolveCreateGroup,
   resolveCreatePrincipal,
@@ -1356,6 +1357,60 @@ async function handleObjects(
  */
 const IDAM_SECRET_REF = '/etc/cdb/secrets/auth0-management.secret';
 
+async function handleIdamSecret(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/idam/secret' || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  // The secret-set plane is provisioned with the sidecar's secret leg; absent = 503, never a stub.
+  if (deps.config.secretPort === undefined) {
+    sendJson(res, 503, { error: 'secret_plane_unprovisioned' });
+    return true;
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as Record<string, unknown>;
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const provider = typeof body['provider'] === 'string' ? body['provider'].trim() : '';
+  const secret = typeof body['secret'] === 'string' ? body['secret'] : '';
+  if (provider === '' || secret === '') {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  try {
+    // The secret is forwarded to the on-node sidecar over loopback and never persisted, logged, or
+    // returned; the BFF holds it only for the duration of this call.
+    await setConnectorSecret(
+      deps.config.engineHost,
+      deps.config.secretPort,
+      provider,
+      secret,
+      deps.config.requestTimeoutMs,
+    );
+    sendJson(res, 200, { ok: true });
+  } catch (err) {
+    if (err instanceof SecretRefusedError) {
+      sendJson(res, 409, { error: 'refused' });
+    } else {
+      // Never log the error message here -- a transport error could echo request context.
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'idam secret set failed');
+      sendJson(res, 503, { error: 'secret_plane_unavailable' });
+    }
+  }
+  return true;
+}
+
 async function handleIdamConnect(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1566,6 +1621,9 @@ async function route(
     return;
   }
   if (await handleIdamConnect(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleIdamSecret(deps, req, method, path, res)) {
     return;
   }
   if (await handleObjects(deps, req, path, res)) {

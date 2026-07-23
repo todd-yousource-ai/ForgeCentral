@@ -72,3 +72,55 @@ export function useIdamSync(): UseMutationResult<SyncReceipt, Error, { provider:
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: CONNECTORS_KEY }),
   });
 }
+
+/** A connect refusal, typed for the form (409 bad secret / connectivity, 403 tier, 503 sidecar). */
+export class IdamConnectError extends Error {
+  constructor(readonly status: number) {
+    super(`idam connect failed: ${String(status)}`);
+    this.name = 'IdamConnectError';
+  }
+}
+
+/** The onboarding form's input: connectivity + the write-only secret. */
+export interface IdamConnectInput {
+  readonly provider: string;
+  readonly domain: string;
+  readonly clientId: string;
+  readonly audience: string;
+  readonly secret: string;
+}
+
+/**
+ * Onboard a connector: write the secret to the node's mode-protected store via the sidecar
+ * (`/api/idam/secret`), THEN set the connectivity live (`/api/idam/connect`). The secret is sent
+ * write-only and never read back; the connectivity apply re-spawns the connector fail-closed. On
+ * success the connector list is invalidated so the card reflects the new state.
+ */
+export function useIdamConnect(): UseMutationResult<void, Error, IdamConnectInput> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ provider, domain, clientId, audience, secret }) => {
+      // 1. The secret goes to the on-node sidecar first (browser -> BFF passthrough -> sidecar file).
+      const secretRes = await fetch('/api/idam/secret', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider, secret }),
+      });
+      if (!secretRes.ok) {
+        throw new IdamConnectError(secretRes.status);
+      }
+      // 2. Then the connectivity (no secret) sets + re-spawns the connector on the engine.
+      const connectRes = await fetch('/api/idam/connect', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider, domain, clientId, audience }),
+      });
+      if (!connectRes.ok) {
+        throw new IdamConnectError(connectRes.status);
+      }
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: CONNECTORS_KEY }),
+  });
+}
