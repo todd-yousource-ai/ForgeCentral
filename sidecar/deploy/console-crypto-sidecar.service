@@ -2,8 +2,10 @@
 #
 # Installer-provisioned. The sidecar runs as a dedicated non-root user, terminates the admin-plane TLS on
 # node-IP:8443 and originates the engine mTLS on the :7879 control plane, forwarding to/from the BFF over
-# plaintext loopback. It needs no special privileges: 8443 and the loopback ports are unprivileged, it
-# writes nothing, and the engine-identity key is a software Console-CA leaf file (no TPM device access).
+# plaintext loopback. It needs no special privileges: 8443 and the loopback ports are unprivileged, and
+# the engine-identity key is a software Console-CA leaf file (no TPM device access). Its only write is
+# the IdAM secret-set leg (ID.4): an operator-entered connector secret placed into the node's protected
+# store, carved out below as the single writable path.
 
 [Unit]
 Description=Console AWS-LC crypto sidecar (admin TLS termination + engine mTLS origination)
@@ -19,9 +21,12 @@ ExecStart=/usr/local/bin/console-crypto-sidecar /etc/console-sidecar/config.json
 Restart=on-failure
 RestartSec=2
 
-# Hardening: no privileges, no writes, minimal syscall/address-family surface.
+# Hardening: no privileges, minimal syscall/address-family surface, and exactly ONE writable path.
 NoNewPrivileges=true
 ProtectSystem=strict
+# The IdAM secret-set leg (ID.4) writes the operator-entered connector secret here (atomic temp+rename,
+# 0640, group-readable by the engine). Everything else stays read-only under ProtectSystem=strict.
+ReadWritePaths=/etc/cdb/secrets
 ProtectHome=true
 PrivateTmp=true
 # The engine key is a software leaf file (no TPM), so the service needs no device access at all.
