@@ -60,7 +60,7 @@ import {
   ObjectCommandError,
   ObjectsUnavailableError,
 } from './engine/objects.js';
-import { resolveIdamConnectors } from './engine/idam.js';
+import { resolveIdamConnectors, resolveIdamSync } from './engine/idam.js';
 import {
   resolveCreateGroup,
   resolveCreatePrincipal,
@@ -1349,6 +1349,54 @@ async function handleObjects(
   return true;
 }
 
+async function handleIdamCommand(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/idam/sync' || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as Record<string, unknown>;
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const provider = typeof body['provider'] === 'string' ? body['provider'].trim() : '';
+  if (provider === '') {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    const receipt = await resolveIdamSync(deps.operatorEngine, principal, provider, opts);
+    sendJson(res, 200, receipt);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      const cls = err.wireError.class;
+      // Conflict = a disabled or unconfigured connector; Framing = unknown provider; else a denial.
+      const httpStatus = cls === 'Conflict' ? 409 : cls === 'Framing' ? 400 : 403;
+      sendJson(res, httpStatus, { error: 'refused', class: cls });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'idam sync failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleIdam(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -1440,6 +1488,9 @@ async function route(
     return;
   }
   if (await handleObjectsCommand(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleIdamCommand(deps, req, method, path, res)) {
     return;
   }
   if (await handleObjects(deps, req, path, res)) {

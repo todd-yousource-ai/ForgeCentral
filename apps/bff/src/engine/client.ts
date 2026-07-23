@@ -26,6 +26,8 @@ import type {
   WireListPrincipals,
   WireIdamConnectorList,
   WireIdamConnectors,
+  WireIdamSync,
+  WireIdamSyncStarted,
   WireObjectCatalog,
   WireObjectCreate,
   WireObjectDelete,
@@ -112,6 +114,8 @@ export interface CrucibleClient {
     request: WireIdamConnectors,
     opts?: EngineCallOptions,
   ): Promise<WireIdamConnectorList>;
+  /** Trigger a federation sync for one connector (IDAM_SYNC, crdb IA.8); an ACK, not a result. */
+  idamSync(request: WireIdamSync, opts?: EngineCallOptions): Promise<WireIdamSyncStarted>;
   /** Read one named object + its resolved members (OBJECT_DETAIL, crdb OB.3). */
   objectDetail(request: WireObjectDetailQuery, opts?: EngineCallOptions): Promise<WireObjectDetail>;
   /** Register a named object (OBJECT_CREATE, crdb OB.4), audited. */

@@ -132,6 +132,10 @@ async function mockBff(page: Page): Promise<{
   await page.route('**/auth/me', (route) => json(route, { operator: OPERATOR }));
   await page.route(/\/api\/entity\//, (route) => json(route, ENTITY));
   await page.route(/\/api\/idam\/connectors$/, (route) => json(route, state.idamConnectors));
+  await page.route(/\/api\/idam\/sync$/, (route) => {
+    commands.push({ url: '/api/idam/sync', body: route.request().postDataJSON() });
+    return json(route, { provider: 'auth0' });
+  });
   await page.route(/\/api\/users\/groups$/, (route) => {
     if (route.request().method() === 'POST') {
       commands.push({ url: '/api/users/groups', body: route.request().postDataJSON() });
@@ -295,7 +299,20 @@ test('suspend commits through the confirm gate; groups + the honest IDAM shell',
   await expect(page.getByText('2023-11-14 22:13:20')).toBeVisible();
   await expect(page.getByText('20', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Configure \(pending\)/ }).first()).toBeDisabled();
-  await expect(page.getByRole('button', { name: /Sync Now \(pending\)/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Sync Now' }).first()).toBeEnabled();
+});
+
+test('Sync Now runs a real audited sync through the confirm gate', async ({ page }) => {
+  const bff = await mockBff(page);
+  await page.goto('/users');
+  await page.getByRole('tab', { name: 'External IDAM' }).click();
+
+  // Sync Now (1) -> confirm (2): the command carries the connector's provider to the audited route.
+  await page.getByRole('button', { name: 'Sync Now' }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('Run a federation sync for auth0?');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Sync' }).click();
+  await expect.poll(() => bff.commands.filter((c) => c.url === '/api/idam/sync').length).toBe(1);
+  expect(bff.commands.find((c) => c.url === '/api/idam/sync')?.body).toEqual({ provider: 'auth0' });
 });
 
 test('the External IDAM tab shows an honest empty when no connector is configured', async ({

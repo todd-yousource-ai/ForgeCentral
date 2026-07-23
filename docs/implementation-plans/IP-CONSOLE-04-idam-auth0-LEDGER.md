@@ -14,16 +14,25 @@ ledger is a defect.
   + real connector cards (fail-closed state, honest `Never`, honest empty). `IDAM_CONNECTOR_SHELLS` and
   its guard test DELETED. `toIdamConnectors` is total (no closed-enum tag to collapse; fail-closed lives
   at the card level). Full gate + 25/25 e2e green.
-- **OPERATOR RULING 2026-07-23 reverses the secret posture** (see Operator directives). The console
-  Configure form must let the customer enter the FULL connectivity (domain, client id, audience, and
-  **the client secret**), and the secret is TRANSMITTED to the engine and stored server-side
-  (encrypted at rest, never logged), not placed out of band. This is a scope expansion of ID.4 and is
-  **engine-first**: it needs a new crdb step (`IA.9`, see Cross-repo prerequisites) before the FC form
-  can bind it without a stub. It does NOT affect ID.1/ID.2/ID.3.
-- **Next action: crdb `IA.9`** (operator ruling: land the engine-first secret-bearing configure path)
-  so ID.4 (the priority) is unblocked. Then **ID.4** builds the setup form (full connectivity + the
-  secret) against it, and **ID.3** (`Sync Now` live on `IDAM_SYNC`, engine already ready) slots in
-  independently. ID.3 branch would be `feat/id3-idam-sync`; ID.4 `feat/id4-idam-configure`.
+- **ID.3 LANDED 2026-07-23** (`7dd1d7b`). `Sync Now` is a real audited engine command (`IDAM_SYNC`),
+  per connector, confirm-gated; in-flight is driven by the card's `running` flag polled from engine
+  truth (never a client timer); a refusal renders the typed failure (409 disabled/unconfigured, 403
+  tier). Full gate + 26/26 e2e green.
+- **OPERATOR RULING 2026-07-23 (final), on how the customer sets up a connector from the console:**
+  the console form collects the FULL connectivity, but the client SECRET is handled POSTURE-PRESERVING
+  -- it does NOT transit the browser or the wire. Non-secret connectivity (domain, client id,
+  audience) travels the wire to the engine; the SECRET is entered through the on-node
+  crypto-sidecar/admin channel (server-side mTLS) which writes the mode-protected file and hands the
+  engine a `client_secret_ref`. This keeps crdb `INV-IDAM-NO-SECRET-INGEST` intact and needs no
+  at-rest-crypto subsystem. This SUPERSEDES the earlier same-day "secret transits to the engine" note
+  (reconsidered once recon showed it reverses three shipped engine invariants and that at-rest
+  encryption is a deferred subsystem). Rescopes ID.4; still engine-first.
+- **Next action: a NEW crdb IP** (working name `IP-LUG-IDAM-CONNECT`; NOT "IA.9", which is already a
+  landed step -- the delta-log leg): connectivity-over-wire (a new verb carrying domain/client_id/
+  audience, NO secret) + an on-node sidecar/admin secret-set that writes the mode-protected file + a
+  live connector re-spawn so a new secret/connectivity applies without restart. Once it lands, **ID.4**
+  builds the setup form against it (`feat/id4-idam-configure`). ID.4a (cadences) follows ID.4; ID.5
+  (IdAM-owned readonly, crdb IA.6 ready) is independent and can land any time.
 - **The three verbs ID.2-ID.4 bind to** (all live on the engine, `cdb-wire` names in brackets):
   - `idam.connectors` -> **`IDAM_CONNECTORS`** [`WireIdamConnectors` -> `WireIdamConnectorList`
     of `WireIdamConnectorRecord`]. Read; returns the connector card.
@@ -72,8 +81,8 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 |------|-----------|--------|--------|------|
 | ID.1 | `INV-CONSOLE-IDAM-CONTRACT` | **LANDED** | `e19e084` | regenerated from `wire-dto.schema.json`; bindings live; no secret in any type |
 | ID.2 | `INV-CONSOLE-IDAM-CONNECTORS-REAL` | **LANDED** | `2b2ff5b` | External IDAM tab live; `IDAM_CONNECTOR_SHELLS` + guard test deleted |
-| ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | PLANNED | -- | engine ready (`IDAM_SYNC`); independent of IA.9 |
-| ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | PLANNED (RESCOPED) | -- | now full connectivity + the client secret (operator ruling 2026-07-23); secret transits to the engine, stored server-side; **needs crdb IA.9** |
+| ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | **LANDED** | `7dd1d7b` | `Sync Now` real+audited, confirm-gated, engine-truth in-flight |
+| ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | PLANNED (RESCOPED) | -- | full connectivity over the wire + a secret entered via the on-node sidecar/admin (NOT the browser/wire); posture-preserving (operator ruling 2026-07-23 final); **needs the new crdb `IP-LUG-IDAM-CONNECT`** |
 | ID.4a | `INV-CONSOLE-IDAM-CADENCE-EDITABLE` | PLANNED | -- | operator directive 2026-07-22; needs crdb IA.7 |
 | ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | PLANNED | -- | needs crdb IA.6 |
 | ID.N | `INV-CONSOLE-IDAM-COMPLETE` | PLANNED | -- | needs a real synced tenant (crdb IA.5/IA.N) |
@@ -86,7 +95,7 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 | IA.8 | `IDAM_CONNECTORS` / `IDAM_SYNC` / `IDAM_CONFIGURE` verbs + the committed `idam_connector` runtime section | LANDED | `3bfe7dde` + `c7eb2037` |
 | IA.6 | IdAM-owned-field edit refusal in `commit_edit_principal`, typed, naming the connector | LANDED | `137ace6b` |
 | IA.5 / IA.N | A real full sync against the live dev tenant | LANDED, ran GREEN 2026-07-23 | `704234eb` / `bf9da415` |
-| IA.9 | **NEW (operator ruling 2026-07-23).** Extend the connector-config-over-wire so the console can set the full connectivity (domain, client id, audience) AND ingest the client secret: the secret arrives over the wire from the console, is written to the node secret store encrypted at rest, is NEVER logged/audited/echoed, and the engine keeps a `client_secret_ref`. Backs the rescoped ID.4 setup form. | NOT STARTED | -- |
+| `IP-LUG-IDAM-CONNECT` (new crdb IP; NOT "IA.9", which is a landed step) | **NEW (operator ruling 2026-07-23 final, posture-preserving).** Connectivity-over-wire: a new verb carrying domain/client_id/audience (**NO secret**) applied to the runtime connector; an on-node crypto-sidecar/admin secret-set that writes the mode-protected file and hands the engine a `client_secret_ref` (the secret NEVER transits the browser/wire, keeping `INV-IDAM-NO-SECRET-INGEST`); and a live connector re-spawn so a new secret/connectivity applies without restart. Backs the rescoped ID.4. | NOT STARTED | -- |
 
 ## Carried from `IP-CONSOLE-04-users` (this IP closes them)
 
@@ -103,17 +112,19 @@ substrate); real user->destination Sankey ribbons (DT.4 attribution).
 
 ## Operator directives
 
-- **2026-07-23: the console must set up connectivity, and the client secret transits to the engine.**
-  The customer enters the full connector connectivity in the console Configure form -- domain, client
-  id, audience, and the **client secret** -- and the secret is TRANSMITTED (browser -> BFF -> engine)
-  and stored SERVER-SIDE (encrypted at rest, never logged), with the engine keeping a
-  `client_secret_ref`. This **reverses** the 2026-07-22 scope decision below (reference-only, placed
-  out of band). Consequences: (1) engine-first -- crdb **IA.9** must land the connectivity + secret
-  ingest before the FC form binds it (no stub ships); (2) safeguards are mandatory and tested -- the
-  secret is never persisted Console-side (`INV-CONSOLE-NO-2ND-DB`), never logged, stripped from every
-  error surfaced to the browser, and absent from any audit payload; (3) the secret is write-only from
-  the console (a configured connector reports "secret set", never returns the secret). Rescopes
-  **ID.4** (`INV-CONSOLE-IDAM-CONFIGURE-SAFE`).
+- **2026-07-23 (FINAL, posture-preserving): the console sets up connectivity; the secret does NOT
+  transit the browser/wire.** The customer enters the full connectivity in the console Configure form;
+  domain/client id/audience travel the wire to the engine, but the **client secret** is entered through
+  the on-node crypto-sidecar/admin channel (server-side mTLS), which writes the mode-protected secret
+  file and hands the engine a `client_secret_ref`. Safeguards: the secret is never persisted
+  Console-side (`INV-CONSOLE-NO-2ND-DB`), never in a Console type, never logged; a configured connector
+  reports "secret set", never returns the secret; crdb `INV-IDAM-NO-SECRET-INGEST` stays intact.
+  Engine-first on the new crdb `IP-LUG-IDAM-CONNECT`. Rescopes **ID.4**.
+- **2026-07-23 (SUPERSEDED, same day): "the client secret transits to the engine, stored server-side."**
+  Withdrawn after recon showed it reverses three shipped crdb engine invariants
+  (`INV-IDAM-NO-SECRET-INGEST`, the IA.8 no-secret contract, the plan's out-of-scope secret-storage
+  line) and that at-rest encryption is a deferred subsystem (`CQH-GOV-01`), not available. Replaced by
+  the posture-preserving directive above. Kept here for the audit trail.
 - **2026-07-22: the poll cadence must be operator-adjustable from the UI.** Landed as **ID.4a**
   (both cadences as bounded, unit-labelled controls on the Configure form, plus the live interval on
   the connector card) over crdb **IA.7** (engine-side range validation + no-restart application).
@@ -138,6 +149,16 @@ substrate); real user->destination Sankey ribbons (DT.4 attribution).
   code was written today -- this entry exists so the next session starts from fact rather than from
   re-reading the engine. Next = ID.1, and it begins by regenerating `@forge/contracts` from the
   committed wire schema rather than hand-authoring the types.
+- 2026-07-23: **ID.3 LANDED (`7dd1d7b`).** `Sync Now` is a real audited `IDAM_SYNC` command, per
+  connector, confirm-gated. `packages/wire` IdamSync encoder + dispatch, BFF `idamSync` seam +
+  `resolveIdamSync` + `POST /api/idam/sync` (refusal mapped by class: Conflict->409, Framing->400,
+  else 403), SPA `useIdamSync` + per-card Sync Now with the running-flag poll (engine truth, no client
+  timer) and typed failure. Followed the REAL engine taxonomy: there is no "already running" refusal
+  (the engine marks a sync due idempotently), so no 409-already-running path was invented. Full gate +
+  26/26 e2e. **Also this session: the secret-path directive was finalized POSTURE-PRESERVING** (secret
+  via on-node sidecar/admin, not the browser/wire) after recon; the crdb prerequisite is the new
+  `IP-LUG-IDAM-CONNECT`, not "IA.9" (taken). Next = that crdb IP (engine-first for ID.4); ID.5 is
+  independent and ready.
 - 2026-07-23: **ID.2 LANDED (`2b2ff5b`).** The External IDAM tab renders live over `IDAM_CONNECTORS`:
   `packages/wire` encoder + dispatch arm, BFF `idamConnectors` seam + `engine/idam.ts` resolver +
   `GET /api/idam/connectors`, SPA `useIdam.ts` + the `IdamTab` rewrite (real cards, fail-closed state,
