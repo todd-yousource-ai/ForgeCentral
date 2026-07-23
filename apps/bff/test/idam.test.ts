@@ -10,7 +10,12 @@ import type { WireIdamConnectorList, WireIdamConnectorRecord } from '@forge/cont
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
-import { resolveIdamConnect, resolveIdamConnectors, resolveIdamSync } from '../src/engine/idam.js';
+import {
+  resolveIdamConfigure,
+  resolveIdamConnect,
+  resolveIdamConnectors,
+  resolveIdamSync,
+} from '../src/engine/idam.js';
 import { EngineRefusedError } from '../src/engine/wire-client.js';
 
 const PRINCIPAL: OperatorPrincipal = {
@@ -38,12 +43,14 @@ function engineWith(
   list: WireIdamConnectorList,
   sync?: OperatorEngine['idamSync'],
   connect?: OperatorEngine['idamConnect'],
+  configure?: OperatorEngine['idamConfigure'],
 ): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   return {
     idamConnectors: () => Promise.resolve(list),
     idamSync: sync ?? (() => Promise.resolve({ provider: 'auth0' })),
     idamConnect: connect ?? (() => Promise.resolve({ commit_version: 3 })),
+    idamConfigure: configure ?? (() => Promise.resolve({ commit_version: 4 })),
     objectList: unused,
     objectDetail: unused,
     objectCreate: unused,
@@ -188,6 +195,41 @@ describe('resolveIdamConnect', () => {
     );
     return expect(
       resolveIdamConnect(engine, PRINCIPAL, draft, '/etc/cdb/secrets/auth0.secret'),
+    ).rejects.toBeInstanceOf(EngineRefusedError);
+  });
+});
+
+describe('resolveIdamConfigure', () => {
+  const draft = {
+    provider: 'auth0',
+    enabled: true,
+    pollIntervalSecs: 600,
+    fullSyncCadenceHours: 12,
+  };
+
+  it('sends enabled + the two cadences and returns the audited commit version', () => {
+    let sent: unknown;
+    const engine = engineWith({ connectors: [] }, undefined, undefined, (_p, request) => {
+      sent = request;
+      return Promise.resolve({ commit_version: 7 });
+    });
+    return resolveIdamConfigure(engine, PRINCIPAL, draft).then((receipt) => {
+      expect(receipt).toEqual({ commitVersion: 7 });
+      const req = sent as Record<string, unknown>;
+      expect(req['poll_interval_secs']).toBe(600);
+      expect(req['full_sync_cadence_hours']).toBe(12);
+      expect(req['enabled']).toBe(true);
+    });
+  });
+
+  it('propagates the engine refusal for an out-of-range cadence (the bound is engine-side)', () => {
+    const engine = engineWith({ connectors: [] }, undefined, undefined, () =>
+      Promise.reject(
+        new EngineRefusedError({ class: 'Framing', code: 0, retry: 'Never', correlation_id: 0 }),
+      ),
+    );
+    return expect(
+      resolveIdamConfigure(engine, PRINCIPAL, { ...draft, pollIntervalSecs: 1 }),
     ).rejects.toBeInstanceOf(EngineRefusedError);
   });
 });

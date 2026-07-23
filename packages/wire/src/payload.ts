@@ -13,6 +13,7 @@ import type {
   WireGroupSetMembers,
   WireGroupWrite,
   WireIdamConnectors,
+  WireIdamConfigure,
   WireIdamConnect,
   WireIdamSync,
   WireListGroups,
@@ -182,6 +183,22 @@ function idamSyncToCbor(request: WireIdamSync): unknown {
   const out: Record<string, unknown> = {
     request_id: request.request_id,
     provider: request.provider,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * IDAM_CONFIGURE (crdb IA.8). Rust struct order: request_id, provider, enabled, poll_interval_secs,
+ * full_sync_cadence_hours, then the optional operator. Carries only runtime knobs; NO secret.
+ */
+function idamConfigureToCbor(request: WireIdamConfigure): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    provider: request.provider,
+    enabled: request.enabled,
+    poll_interval_secs: request.poll_interval_secs,
+    full_sync_cadence_hours: request.full_sync_cadence_hours,
   };
   applyOperator(out, request.operator);
   return out;
@@ -483,6 +500,8 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   if ('IdamSync' in request) return encode({ IdamSync: idamSyncToCbor(request.IdamSync) });
   if ('IdamConnect' in request)
     return encode({ IdamConnect: idamConnectToCbor(request.IdamConnect) });
+  if ('IdamConfigure' in request)
+    return encode({ IdamConfigure: idamConfigureToCbor(request.IdamConfigure) });
   if ('ObjectDetail' in request)
     return encode({ ObjectDetail: objectDetailToCbor(request.ObjectDetail) });
   if ('ObjectCreate' in request)

@@ -28,6 +28,7 @@ import type {
   WireGroupSetMembers,
   WireGroupWrite,
   WireListAgents,
+  WireIdamConfigure,
   WireIdamConnect,
   WireIdamConnectorList,
   WireIdamConnectors,
@@ -85,6 +86,7 @@ export type EngineAction =
   | 'idamConnectors'
   | 'idamSync'
   | 'idamConnect'
+  | 'idamConfigure'
   | 'objectCreate'
   | 'objectEdit'
   | 'objectDelete'
@@ -197,6 +199,12 @@ export interface OperatorEngine {
   idamConnect(
     principal: OperatorPrincipal,
     request: WireIdamConnect,
+    opts?: EngineCallOptions,
+  ): Promise<WireLugProvisioned>;
+  /** Set a connector's enabled + cadences (IDAM_CONFIGURE) on behalf of `principal`; audited. */
+  idamConfigure(
+    principal: OperatorPrincipal,
+    request: WireIdamConfigure,
     opts?: EngineCallOptions,
   ): Promise<WireLugProvisioned>;
   /** Read one object + its members (OBJECT_DETAIL) on behalf of `principal`. */
@@ -435,6 +443,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'idamConnect', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.idamConnect({ ...request, operator }, opts);
+    },
+    idamConfigure: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'idamConfigure', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.idamConfigure({ ...request, operator }, opts);
     },
     objectDetail: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'objectDetail', request.request_id));

@@ -36,6 +36,10 @@ import { principalId } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import {
+  IDAM_FULL_SYNC_HOURS_MAX,
+  IDAM_FULL_SYNC_HOURS_MIN,
+  IDAM_POLL_INTERVAL_SECS_MAX,
+  IDAM_POLL_INTERVAL_SECS_MIN,
   IdamConnectError,
   IdamSyncError,
   useIdamConnect,
@@ -688,6 +692,8 @@ function IdamConnectForm({
   const [clientId, setClientId] = useState('');
   const [audience, setAudience] = useState('');
   const [secret, setSecret] = useState('');
+  const [pollSecs, setPollSecs] = useState(300);
+  const [fullHours, setFullHours] = useState(24);
   const failure = connectFailure(connect.error);
 
   const submit = (): void => {
@@ -698,6 +704,8 @@ function IdamConnectForm({
         clientId: clientId.trim(),
         audience: audience.trim(),
         secret,
+        pollIntervalSecs: pollSecs,
+        fullSyncCadenceHours: fullHours,
       },
       { onSuccess: onDone },
     );
@@ -751,9 +759,33 @@ function IdamConnectForm({
           required
         />
       </label>
+      <label className="fcx-filter">
+        Delta poll interval (seconds)
+        <input
+          type="number"
+          className="fcx-input"
+          value={pollSecs}
+          min={IDAM_POLL_INTERVAL_SECS_MIN}
+          max={IDAM_POLL_INTERVAL_SECS_MAX}
+          onChange={(e) => setPollSecs(Number(e.target.value))}
+        />
+      </label>
+      <label className="fcx-filter">
+        Full directory sync (hours)
+        <input
+          type="number"
+          className="fcx-input"
+          value={fullHours}
+          min={IDAM_FULL_SYNC_HOURS_MIN}
+          max={IDAM_FULL_SYNC_HOURS_MAX}
+          onChange={(e) => setFullHours(Number(e.target.value))}
+        />
+      </label>
       <p className="fcx-users-idam-note">
         The secret is written to this node&apos;s protected store and never leaves it; the console
-        never stores it or sends it over the engine wire.
+        never stores it or sends it over the engine wire. Cadences are engine-bounded (poll{' '}
+        {IDAM_POLL_INTERVAL_SECS_MIN}-{IDAM_POLL_INTERVAL_SECS_MAX}s, full sync{' '}
+        {IDAM_FULL_SYNC_HOURS_MIN}-{IDAM_FULL_SYNC_HOURS_MAX}h).
       </p>
       <button
         type="submit"
@@ -838,6 +870,10 @@ function IdamTab(): ReactElement {
                   <div>
                     <dt>Objects synced</dt>
                     <dd>{c.objectsSynced}</dd>
+                  </div>
+                  <div>
+                    <dt>Poll interval</dt>
+                    <dd>{c.pollIntervalSecs}s</dd>
                   </div>
                 </dl>
                 {c.lastError !== null ? (

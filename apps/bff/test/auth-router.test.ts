@@ -54,6 +54,7 @@ const unusedClient: CrucibleClient = {
   idamConnectors: () => Promise.reject(new Error('unused')),
   idamSync: () => Promise.reject(new Error('unused')),
   idamConnect: () => Promise.reject(new Error('unused')),
+  idamConfigure: () => Promise.reject(new Error('unused')),
   objectCreate: () => Promise.reject(new Error('unused')),
   objectEdit: () => Promise.reject(new Error('unused')),
   objectDelete: () => Promise.reject(new Error('unused')),

@@ -101,6 +101,11 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ commit_version: 0 });
     },
+    idamConfigure: (req) => {
+      calls.push(`idamConfigure:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ commit_version: 0 });
+    },
     objectDetail: (req) => {
       calls.push(`objectDetail:${String(req.request_id)}`);
       reads.push(req);

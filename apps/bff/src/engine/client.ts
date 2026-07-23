@@ -24,6 +24,7 @@ import type {
   WireListAgents,
   WireListGroups,
   WireListPrincipals,
+  WireIdamConfigure,
   WireIdamConnect,
   WireIdamConnectorList,
   WireIdamConnectors,
@@ -119,6 +120,8 @@ export interface CrucibleClient {
   idamSync(request: WireIdamSync, opts?: EngineCallOptions): Promise<WireIdamSyncStarted>;
   /** Set a connector's connectivity + secret reference (IDAM_CONNECT, crdb CO.1); audited, applied live. */
   idamConnect(request: WireIdamConnect, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
+  /** Set a connector's runtime knobs -- enabled + the two cadences (IDAM_CONFIGURE, crdb IA.8); audited. */
+  idamConfigure(request: WireIdamConfigure, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
   /** Read one named object + its resolved members (OBJECT_DETAIL, crdb OB.3). */
   objectDetail(request: WireObjectDetailQuery, opts?: EngineCallOptions): Promise<WireObjectDetail>;
   /** Register a named object (OBJECT_CREATE, crdb OB.4), audited. */
