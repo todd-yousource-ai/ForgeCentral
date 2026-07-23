@@ -7,22 +7,23 @@ ledger is a defect.
 
 ## Resume here (rewrite at every merge)
 
-- **ID.1 LANDED 2026-07-23** (`e19e084`). The IdAM connector contract is generated from the
-  revendored wire schema, `IdamConnector` carries the real `WireIdamConnectorRecord` shape with
-  fail-closed state derivation, and `idam.connectors` / `idam.configure` / `idam.sync` are LIVE.
-  No UI change yet; `IDAM_CONNECTOR_SHELLS` retyped as honest `disabled` placeholders (ID.2 deletes).
+- **ID.1 LANDED 2026-07-23** (`e19e084`). Contract generated from the revendored wire schema; the
+  three `idam.*` bindings LIVE; no secret representable in any Console type.
+- **ID.2 LANDED 2026-07-23** (`2b2ff5b`). The External IDAM tab is LIVE on `IDAM_CONNECTORS`: wire
+  encoder + dispatch, BFF `engine/idam.ts` resolver + `GET /api/idam/connectors`, SPA `useIdamConnectors`
+  + real connector cards (fail-closed state, honest `Never`, honest empty). `IDAM_CONNECTOR_SHELLS` and
+  its guard test DELETED. `toIdamConnectors` is total (no closed-enum tag to collapse; fail-closed lives
+  at the card level). Full gate + 25/25 e2e green.
 - **OPERATOR RULING 2026-07-23 reverses the secret posture** (see Operator directives). The console
   Configure form must let the customer enter the FULL connectivity (domain, client id, audience, and
   **the client secret**), and the secret is TRANSMITTED to the engine and stored server-side
   (encrypted at rest, never logged), not placed out of band. This is a scope expansion of ID.4 and is
   **engine-first**: it needs a new crdb step (`IA.9`, see Cross-repo prerequisites) before the FC form
   can bind it without a stub. It does NOT affect ID.1/ID.2/ID.3.
-- **Next action: ID.2** (`INV-CONSOLE-IDAM-CONNECTORS-REAL`), branch `feat/id2-idam-connectors`.
-  BFF `IDAM_CONNECTORS` wire codec + delegated `OperatorEngine` action + `engine/idam.ts` resolver
-  (whole-list fail-closed collapse) + `GET /api/idam/connectors`; SPA renders the engine's real
-  connector cards (honest `Never` / empty state) and DELETES `IDAM_CONNECTOR_SHELLS` + its no-stub
-  allowlist entry. Unaffected by the secret ruling. ID.3 (sync) follows; ID.4 (configure) waits on
-  crdb `IA.9`.
+- **Next action: crdb `IA.9`** (operator ruling: land the engine-first secret-bearing configure path)
+  so ID.4 (the priority) is unblocked. Then **ID.4** builds the setup form (full connectivity + the
+  secret) against it, and **ID.3** (`Sync Now` live on `IDAM_SYNC`, engine already ready) slots in
+  independently. ID.3 branch would be `feat/id3-idam-sync`; ID.4 `feat/id4-idam-configure`.
 - **The three verbs ID.2-ID.4 bind to** (all live on the engine, `cdb-wire` names in brackets):
   - `idam.connectors` -> **`IDAM_CONNECTORS`** [`WireIdamConnectors` -> `WireIdamConnectorList`
     of `WireIdamConnectorRecord`]. Read; returns the connector card.
@@ -70,8 +71,8 @@ fabricated timestamp; full `scripts/ci.sh` before every push (run Playwright loc
 | Step | Invariant | Status | Commit | Note |
 |------|-----------|--------|--------|------|
 | ID.1 | `INV-CONSOLE-IDAM-CONTRACT` | **LANDED** | `e19e084` | regenerated from `wire-dto.schema.json`; bindings live; no secret in any type |
-| ID.2 | `INV-CONSOLE-IDAM-CONNECTORS-REAL` | **NEXT** | -- | deletes `IDAM_CONNECTOR_SHELLS` + its no-stub allowlist entry |
-| ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | PLANNED | -- | |
+| ID.2 | `INV-CONSOLE-IDAM-CONNECTORS-REAL` | **LANDED** | `2b2ff5b` | External IDAM tab live; `IDAM_CONNECTOR_SHELLS` + guard test deleted |
+| ID.3 | `INV-CONSOLE-IDAM-SYNC-REAL` | PLANNED | -- | engine ready (`IDAM_SYNC`); independent of IA.9 |
 | ID.4 | `INV-CONSOLE-IDAM-CONFIGURE-SAFE` | PLANNED (RESCOPED) | -- | now full connectivity + the client secret (operator ruling 2026-07-23); secret transits to the engine, stored server-side; **needs crdb IA.9** |
 | ID.4a | `INV-CONSOLE-IDAM-CADENCE-EDITABLE` | PLANNED | -- | operator directive 2026-07-22; needs crdb IA.7 |
 | ID.5 | `INV-CONSOLE-IDAM-OWNED-READONLY` | PLANNED | -- | needs crdb IA.6 |
@@ -137,6 +138,15 @@ substrate); real user->destination Sankey ribbons (DT.4 attribution).
   code was written today -- this entry exists so the next session starts from fact rather than from
   re-reading the engine. Next = ID.1, and it begins by regenerating `@forge/contracts` from the
   committed wire schema rather than hand-authoring the types.
+- 2026-07-23: **ID.2 LANDED (`2b2ff5b`).** The External IDAM tab renders live over `IDAM_CONNECTORS`:
+  `packages/wire` encoder + dispatch arm, BFF `idamConnectors` seam + `engine/idam.ts` resolver +
+  `GET /api/idam/connectors`, SPA `useIdam.ts` + the `IdamTab` rewrite (real cards, fail-closed state,
+  honest `Never`, honest "No IdAM connector configured"). Deleted `IDAM_CONNECTOR_SHELLS` + its guard
+  test. Design note recorded: `toIdamConnectors` is TOTAL -- an IdAM connector record has no closed-enum
+  tag, so there is no partial-directory lie to collapse (the Objects/Users collapse does not transfer);
+  fail-closed lives at the card level (ID.1). Full `scripts/ci.sh --skip-net` green + 25/25 Playwright
+  e2e (live Auth0 card + honest empty). Next per operator ruling = crdb `IA.9`, then ID.4; ID.3 is
+  independent.
 - 2026-07-23: **ID.1 LANDED (`e19e084`).** Revendored `wire-dto.schema.json` (only the six IdAM DTOs
   added; no existing def changed) and regenerated `src/generated/wire-dto.ts`. Extended `IdamConnector`
   to the real `WireIdamConnectorRecord` shape with a fail-closed derived state (an unrecognized
