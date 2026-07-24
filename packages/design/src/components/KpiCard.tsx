@@ -1,8 +1,8 @@
 // packages/design/src/components/KpiCard.tsx -- a dashboard metric card (F0.2b).
 //
-// A single labeled metric with an optional status badge (the Dashboards mockup: Active VTZs, Active
+// A single labeled metric with an optional status badge (the SOC Ops mockup, nee Dashboards: Active VTZs, Active
 // Sessions, TrustLock Rotations with Live/Today badges). A shell: it takes an already-resolved value and
-// renders it; the data binding lands with the Dashboards surface.
+// renders it; the data binding lands with the SOC Ops surface.
 
 import type { ReactElement, ReactNode } from 'react';
 

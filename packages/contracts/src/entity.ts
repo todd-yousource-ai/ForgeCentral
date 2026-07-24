@@ -246,7 +246,7 @@ export interface ReassignZoneRequest extends CommandEnvelope {
   readonly zoneId: VtzId;
 }
 
-/** The View-Remediation action: open the entity's remediation workflow (AIOps Workflows, TRD-CONSOLE-07). */
+/** The View-Remediation action: open the entity's remediation workflow (Network Ops Workflows, TRD-CONSOLE-07). */
 export type RemediationRequest = CommandEnvelope;
 
 /** The Open-full-report action: open the entity's full report (TRD-CONSOLE-08). Navigation, not a mutation. */

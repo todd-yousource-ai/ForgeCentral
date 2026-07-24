@@ -66,11 +66,12 @@ test('authenticated: the shell, the IA, empty states, and the drawer frame', asy
   await expect(page.getByText('No connectivity observed')).toBeVisible();
   await expect(page.locator('.fcx-topbar').getByText('Live')).toBeVisible();
 
-  // One-click navigation to a still-placeholder destination (Dashboards), an honest empty placeholder. The
-  // Overview unmounts, so it stops driving freshness and the shell indicator returns to the deferred "Not
-  // live". (Policies is now a real surface, P5.3; Dashboards remains a placeholder until its phase lands.)
-  await rail.getByRole('link', { name: 'Dashboards' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Dashboards' })).toBeVisible();
-  await expect(page.getByText('No Dashboards data yet')).toBeVisible();
+  // One-click navigation to a still-placeholder destination (SOC Ops, the renamed Dashboards per the
+  // 2026-07-24 IA revision), an honest empty placeholder. The Overview unmounts, so it stops driving
+  // freshness and the shell indicator returns to the deferred "Not live". (Policies is now a real
+  // surface, P5.3; SOC Ops remains a placeholder until its phase lands.)
+  await rail.getByRole('link', { name: 'SOC Ops' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'SOC Ops' })).toBeVisible();
+  await expect(page.getByText('No SOC Ops data yet')).toBeVisible();
   await expect(page.getByText('Not live')).toBeVisible();
 });
