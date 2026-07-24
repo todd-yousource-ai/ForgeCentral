@@ -136,24 +136,44 @@ async function withServer(
 describe('signBundle (the sidecar seam)', () => {
   const draft = (): BundleDraft => draftForZone(zone(), 1, ['box-1.crucible'], NO_RULES, 0).draft;
 
-  it('returns the signed bundle and echoes the draft to the signer verbatim', async () => {
+  it('returns the typed bundle AND the canonical cbor bytes, echoing the draft verbatim', async () => {
     await withServer(
       (line) => {
         const parsed = JSON.parse(line) as BundleDraft;
         return JSON.stringify({
           signed: {
-            ...parsed,
-            signing_key_id: 'k1',
-            signature_algorithm: 'MlDsa87',
-            signature: [1, 2, 3],
+            bundle: {
+              ...parsed,
+              signing_key_id: 'k1',
+              signature_algorithm: 'MlDsa87',
+              signature: [1, 2, 3],
+            },
+            cbor: [0xa1, 0x01, 0x02],
           },
         });
       },
       async (port) => {
         const signed = await signBundle('127.0.0.1', port, draft(), 2000);
-        expect(signed.version).toBe(1);
-        expect(signed.signing_key_id).toBe('k1');
-        expect(signed.signature).toEqual([1, 2, 3]);
+        expect(signed.bundle.version).toBe(1);
+        expect(signed.bundle.signing_key_id).toBe('k1');
+        expect(signed.bundle.signature).toEqual([1, 2, 3]);
+        // The canonical bytes are surfaced verbatim (what the producer commits, never a re-encode).
+        expect(signed.cbor).toEqual([0xa1, 0x01, 0x02]);
+      },
+    );
+  });
+
+  it('a signed response missing the canonical cbor bytes fails closed', async () => {
+    await withServer(
+      (line) => {
+        const parsed = JSON.parse(line) as BundleDraft;
+        // No `cbor` field: the producer must never fall back to re-encoding the lossy JSON bundle.
+        return JSON.stringify({ signed: { bundle: { ...parsed, signature: [1] } } });
+      },
+      async (port) => {
+        await expect(signBundle('127.0.0.1', port, draft(), 2000)).rejects.toBeInstanceOf(
+          SigningUnavailableError,
+        );
       },
     );
   });
@@ -241,15 +261,20 @@ describe('resolveDistribute composes the authored rules from POLICY_EFFECTIVE (P
   it('signs a draft carrying the composed rules + contributors and reports the carriage', async () => {
     const { engine, committed } = engineWith({ policies: [wireRecord()] });
     let signedDraft: BundleDraft | null = null;
+    const canonicalBytes = [0xa2, 0x11, 0x22, 0x33];
     await withServer(
       (line) => {
         signedDraft = JSON.parse(line) as BundleDraft;
         return JSON.stringify({
           signed: {
-            ...signedDraft,
-            signing_key_id: 'k1',
-            signature_algorithm: 'MlDsa87',
-            signature: [1],
+            bundle: {
+              ...signedDraft,
+              signing_key_id: 'k1',
+              signature_algorithm: 'MlDsa87',
+              signature: [1],
+            },
+            // The sidecar's canonical ciborium bytes; the producer forwards THESE to the carrier.
+            cbor: canonicalBytes,
           },
         });
       },
@@ -262,6 +287,8 @@ describe('resolveDistribute composes the authored rules from POLICY_EFFECTIVE (P
         );
         expect(result.carriedRules).toBe(1);
         expect(result.carriedPolicies).toBe(1);
+        // The carrier received the sidecar's canonical bytes VERBATIM, not a re-encode of the JSON.
+        expect(committed).toEqual([canonicalBytes]);
       },
     );
     // The draft the SIDECAR signed carries the authored rule (the signature binds it, v2 domain).

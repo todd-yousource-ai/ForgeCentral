@@ -13,6 +13,18 @@ import { createConnection } from 'node:net';
 
 import type { SignedPolicyBundle } from '@forge/contracts';
 
+/**
+ * A signed bundle as the sidecar returns it: the typed `bundle` plus the CANONICAL ciborium `cbor`
+ * bytes the engine's bundle store parses and stores verbatim. The producer commits `cbor` as-is and
+ * MUST NOT re-encode `bundle` -- a JSON round-trip is lossy (the contributor `PolicyId` is a uuid,
+ * serde-human-readable, so it is a string here but 16 bytes in the engine's CBOR), which the engine
+ * then rejects as malformed.
+ */
+export interface SignedBundleResult {
+  readonly bundle: SignedPolicyBundle;
+  readonly cbor: readonly number[];
+}
+
 /** The unsigned parts of a bundle, exactly as the sidecar's `BundleDraft` deserializes them. */
 export interface BundleDraft {
   readonly version: number;
@@ -41,7 +53,7 @@ export class SigningUnavailableError extends Error {
 }
 
 /** Narrow the sidecar's externally tagged response line, fail-closed. */
-function parseResponse(line: string): SignedPolicyBundle {
+function parseResponse(line: string): SignedBundleResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
@@ -50,7 +62,18 @@ function parseResponse(line: string): SignedPolicyBundle {
   }
   if (typeof parsed === 'object' && parsed !== null) {
     if ('signed' in parsed) {
-      return (parsed as { signed: SignedPolicyBundle }).signed;
+      const signed = (parsed as { signed: { bundle?: unknown; cbor?: unknown } }).signed;
+      const cbor = signed.cbor;
+      if (
+        typeof signed.bundle !== 'object' ||
+        signed.bundle === null ||
+        !Array.isArray(cbor) ||
+        !cbor.every((b) => typeof b === 'number')
+      ) {
+        // A signed response missing the canonical bytes is unusable -- never fall back to re-encoding.
+        throw new SigningUnavailableError('signed response missing bundle or canonical cbor bytes');
+      }
+      return { bundle: signed.bundle as SignedPolicyBundle, cbor };
     }
     if ('refused' in parsed) {
       const refused = (parsed as { refused: { reason?: unknown } }).refused;
@@ -73,7 +96,7 @@ export async function signBundle(
   port: number,
   draft: BundleDraft,
   timeoutMs: number,
-): Promise<SignedPolicyBundle> {
+): Promise<SignedBundleResult> {
   return new Promise((resolve, reject) => {
     const socket = createConnection({ host, port });
     let buffer = '';

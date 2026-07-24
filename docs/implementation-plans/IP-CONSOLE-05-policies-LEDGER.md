@@ -17,9 +17,24 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
   `policySpecToCbor` (mirroring the Rust field order + `skip_serializing_if`) + a payload seam test that
   drives the REAL encode/round-trip for every policy verb (the regression guard the mocks could not
   give). **Every other surface already had its encode arm; only policy was missing.**
+  **LIVE-LEG DEFECT #2 (fix PR `fix/bundle-canonical-cbor`): the distribute BUNDLE_COMMIT was refused
+  `Framing` (the engine's `commit_store_bundle` could not `ciborium`-parse the bundle).** Root cause
+  (proven by an out-of-band round-trip repro): the sidecar returned the signed bundle as JSON and the
+  BFF RE-ENCODED it to CBOR (`Array.from(encodeCbor(signed))`) before committing -- but that re-encode
+  is LOSSY. The contributor `PolicyId` wraps a `uuid`, which is serde-`is_human_readable`: serde_json
+  emits it as a STRING, ciborium as 16 BYTES. So the BFF's re-encode produced a CBOR text string where
+  the engine's ciborium expected a byte array -> `invalid type: string, expected bytes` -> Malformed ->
+  Framing. It only bit once a policy actually CONTRIBUTED (every published-policy distribute); an
+  empty-contributors bundle round-tripped fine, which is why no mocked test caught it. Fix: the sidecar
+  now returns the CANONICAL `ciborium::into_writer(bundle)` bytes alongside the typed bundle, and the
+  producer forwards those verbatim (never re-encodes). Regression guards: a sidecar test signs a
+  contributor-carrying draft and asserts the returned `cbor` ciborium-round-trips to the same bundle +
+  equals a fresh canonical encode; a BFF test asserts the carrier receives the sidecar's bytes verbatim
+  and that a signed response missing `cbor` fails closed (never falls back to re-encoding).
   Remaining after the fix redeploys: finish the drive (author -> publish -> distribute -> torchd pull
   -> convergence; enforcement OFF; `FC_SIGNER_PORT` in the running BFF env; live-proof stitching lands
-  in installer/production code, never scratchpad).
+  in installer/production code, never scratchpad). Author + publish are ALREADY PROVEN LIVE on the box
+  (a real policy authored -> minted v1.0.0 Draft -> published, through the fixed policy-verb encode).
   Box state so far: crdb rebuilt from main `5be841b3` + swapped (hash-verified running); torch revs
   bumped to `5be841b3` (torch merge `ffe0d3c`) + torchd/torch-placed rebuilt/redeployed/re-enrolled;
   FC BFF/SPA/sidecar/contracts/wire redeployed (`.bak-p55-20260724`); operator re-logged-in; the
