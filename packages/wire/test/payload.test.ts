@@ -4,6 +4,7 @@ import type { WireReply, WireRequest } from '@forge/contracts';
 
 import { describe, expect, it } from 'vitest';
 
+import { decode } from '../src/cbor.js';
 import { decodeWireReply, encodeWireRequest } from '../src/index.js';
 
 const hex = (bytes: Uint8Array): string =>
@@ -185,6 +186,149 @@ describe('encodeWireRequest', () => {
   it('throws on an unsupported (write-path) variant rather than emitting a wrong shape', () => {
     const request = { TxnCommit: { txn: [], request_id: 1 } } as unknown as WireRequest;
     expect(() => encodeWireRequest(request)).toThrow(/not yet supported/);
+  });
+});
+
+describe('encodeWireRequest: the policy verbs (IP-CONSOLE-05)', () => {
+  // The Policies surface reads + commands ride the QuerySubmit opcode; each MUST have an encode arm,
+  // or the request throws "not yet supported" before it ever reaches the wire. This block is the
+  // seam guard the mocked BFF/e2e tests could not provide: it drives the REAL CBOR encode. A missing
+  // arm here is exactly the live-leg defect that shipped the policy surface wired only to mocks.
+  const asMap = (request: WireRequest): Record<string, unknown> =>
+    decode(encodeWireRequest(request)) as Record<string, unknown>;
+
+  it('POLICY_LIST_BY_ZONE encodes with request_id (+ delegated operator)', () => {
+    const map = asMap({ PolicyListByZone: { request_id: 7 } });
+    expect(map).toEqual({ PolicyListByZone: { request_id: 7 } });
+    const delegated = asMap({
+      PolicyListByZone: {
+        request_id: 7,
+        operator: { principal: 'p', tenant: 't' },
+      },
+    });
+    expect(delegated).toEqual({
+      PolicyListByZone: { request_id: 7, operator: { principal: 'p', tenant: 't' } },
+    });
+  });
+
+  it('POLICY_DETAIL / POLICY_EFFECTIVE encode their vtz (+ id) in Rust field order', () => {
+    expect(asMap({ PolicyDetail: { request_id: 1, vtz: 'YouSource.Corp', id: 'p-1' } })).toEqual({
+      PolicyDetail: { request_id: 1, vtz: 'YouSource.Corp', id: 'p-1' },
+    });
+    expect(asMap({ PolicyEffective: { request_id: 2, vtz: 'YouSource.Corp' } })).toEqual({
+      PolicyEffective: { request_id: 2, vtz: 'YouSource.Corp' },
+    });
+  });
+
+  it('POLICY_CREATE emits the spec, omitting empty optionals like the engine serde', () => {
+    const map = asMap({
+      PolicyCreate: {
+        request_id: 3,
+        spec: {
+          vtz: 'YouSource.Corp',
+          name: 'contain-egress',
+          description: '',
+          rules: [
+            {
+              source_kind: 'agent',
+              source_selector_kind: 'exact',
+              source_selector_value: 'demo-agent',
+              destination_kind: 'network',
+              destination_selector_kind: 'cidr',
+              destination_selector_value: '10.8.0.0/16',
+              action: 'quarantine',
+            },
+          ],
+          logging: 'full',
+          max_classification: 'confidential',
+        },
+      },
+    });
+    // The required fields survive; NONE of the skip-if-empty optionals (protocols, ports, schedule_*,
+    // active_*, geo, restriction_tags, applied_to, default_postures) appear.
+    expect(map).toEqual({
+      PolicyCreate: {
+        request_id: 3,
+        spec: {
+          vtz: 'YouSource.Corp',
+          name: 'contain-egress',
+          description: '',
+          rules: [
+            {
+              source_kind: 'agent',
+              source_selector_kind: 'exact',
+              source_selector_value: 'demo-agent',
+              destination_kind: 'network',
+              destination_selector_kind: 'cidr',
+              destination_selector_value: '10.8.0.0/16',
+              action: 'quarantine',
+            },
+          ],
+          logging: 'full',
+          max_classification: 'confidential',
+        },
+      },
+    });
+  });
+
+  it('POLICY_CREATE carries the present optionals (network, schedule, applied_to, postures)', () => {
+    const map = asMap({
+      PolicyCreate: {
+        request_id: 4,
+        spec: {
+          vtz: 'YouSource.Corp',
+          name: 'p',
+          description: 'd',
+          rules: [],
+          protocols: ['https'],
+          ports: '443',
+          schedule_days: ['mon'],
+          schedule_start_minute: 540,
+          schedule_end_minute: 1020,
+          active_until: 999,
+          geo: ['us'],
+          restriction_tags: ['PHI'],
+          logging: 'sampled',
+          applied_to: [{ endpoint_cn: 'host-01.corp', agent: 'demo-agent' }],
+          max_classification: 'restricted',
+          default_postures: [{ domain: 'ordinary-network', posture: 'permit', floor: false }],
+        },
+        operator: { principal: 'p', tenant: 't' },
+      },
+    })['PolicyCreate'] as { spec: Record<string, unknown>; operator: unknown };
+    expect(map.spec['protocols']).toEqual(['https']);
+    expect(map.spec['ports']).toBe('443');
+    expect(map.spec['schedule_start_minute']).toBe(540);
+    expect(map.spec['active_until']).toBe(999);
+    expect(map.spec['applied_to']).toEqual([{ endpoint_cn: 'host-01.corp', agent: 'demo-agent' }]);
+    expect(map.spec['default_postures']).toEqual([
+      { domain: 'ordinary-network', posture: 'permit', floor: false },
+    ]);
+    expect(map.operator).toEqual({ principal: 'p', tenant: 't' });
+  });
+
+  it('POLICY_EDIT / POLICY_PUBLISH / POLICY_DELETE encode their identity keys', () => {
+    const spec = {
+      vtz: 'YouSource.Corp',
+      name: 'p',
+      description: '',
+      rules: [],
+      logging: 'off',
+      max_classification: 'internal',
+    };
+    expect(asMap({ PolicyEdit: { request_id: 5, id: 'p-1', spec } })).toEqual({
+      PolicyEdit: { request_id: 5, id: 'p-1', spec },
+    });
+    expect(
+      asMap({
+        PolicyPublish: { request_id: 6, vtz: 'YouSource.Corp', id: 'p-1', version: '1.0.0' },
+      }),
+    ).toEqual({
+      PolicyPublish: { request_id: 6, vtz: 'YouSource.Corp', id: 'p-1', version: '1.0.0' },
+    });
+    expect(asMap({ PolicyDelete: { request_id: 8, vtz: 'YouSource.Corp', id: 'p-1' } })).toEqual({
+      PolicyDelete: { request_id: 8, vtz: 'YouSource.Corp', id: 'p-1' },
+    });
   });
 });
 
