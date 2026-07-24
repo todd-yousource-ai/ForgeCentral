@@ -31,10 +31,26 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
   contributor-carrying draft and asserts the returned `cbor` ciborium-round-trips to the same bundle +
   equals a fresh canonical encode; a BFF test asserts the carrier receives the sidecar's bytes verbatim
   and that a signed response missing `cbor` fails closed (never falls back to re-encoding).
-  Remaining after the fix redeploys: finish the drive (author -> publish -> distribute -> torchd pull
-  -> convergence; enforcement OFF; `FC_SIGNER_PORT` in the running BFF env; live-proof stitching lands
-  in installer/production code, never scratchpad). Author + publish are ALREADY PROVEN LIVE on the box
-  (a real policy authored -> minted v1.0.0 Draft -> published, through the fixed policy-verb encode).
+  **THE P5.5 PRODUCER PATH IS NOW PROVEN LIVE ON THE BOX (2026-07-24), enforcement OFF:**
+  author `contain-agent-egress` (real POLICY_CREATE -> minted `v1.0.0` Draft) -> publish (-> Published,
+  breaking-flag correct) -> **distribute**: composed the zone's 1 published rule over POLICY_EFFECTIVE,
+  signed the v2 rules-carrying bundle in the sidecar, and BUNDLE_COMMIT ACCEPTED it (committed
+  `v203219`, `carriedRules:1`, `carriedPolicies:1`, with honest `unexpressedDomains`/`unexpressedFields`
+  telemetry). Both wire-seam defects above were fixed to get here; the whole compose->sign->push chain
+  works end to end over the real :7878 node.
+  **CONVERGENCE-OBSERVATION TAIL = a two-part CROSS-REPO deferral (named, gating owners):**
+  (1) **crdb FD.7c convergence-read delegation gap** -- `BUNDLE_COMMIT` is operator-DELEGATED (writes
+  under the operator's tenant, df46dcb7) but `BUNDLE_CONVERGENCE` is NOT: `WireBundleConvergenceQuery`
+  carries no operator field and the handler reads under the raw peer `session.tenant` (the sidecar
+  device), so the operator cannot observe convergence of a bundle they just committed (`hasBundle:false`
+  live, despite the successful commit). Fix belongs in crdb (IP-CONSOLE-02-FORGE-DISTRIBUTION): add the
+  operator to the convergence query + `effective_delegated_session` in `bundle_convergence`, regen the
+  wire schema, then regen the FC contract. (2) **torchd does not fetch** -- the policy-refresh lane is
+  OFF unless `TORCH_POLICY_ANCHOR` (the trusted distribution key) is provisioned; the running torchd has
+  none, so no BUNDLE_FETCH + no apply report + no `applied` member. Provisioning the anchor (matching the
+  sidecar's signing key) is a torchd deployment step; enforcement stays AG.7-OFF regardless (an applied
+  bundle realizes nothing). Neither is FC policy-epic code; both match the epic's existing cross-repo
+  deferrals.
   Box state so far: crdb rebuilt from main `5be841b3` + swapped (hash-verified running); torch revs
   bumped to `5be841b3` (torch merge `ffe0d3c`) + torchd/torch-placed rebuilt/redeployed/re-enrolled;
   FC BFF/SPA/sidecar/contracts/wire redeployed (`.bak-p55-20260724`); operator re-logged-in; the
