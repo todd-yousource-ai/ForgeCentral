@@ -15,6 +15,7 @@ export * from './overview.js';
 export * from './vtz.js';
 export * from './users.js';
 export * from './objects.js';
+export * from './policies.js';
 export * from './forge.js';
 export * from './openapi.js';
 export * from './schema.js';

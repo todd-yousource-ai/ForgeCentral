@@ -24,6 +24,7 @@ const REGISTERED_PREFIXES = [
   'groups.',
   'idam.',
   'objects.',
+  'policies.',
 ];
 
 describe('no-stub contract (F0.8 shell)', () => {

@@ -624,6 +624,95 @@ const objectCommands: readonly CommandBinding[] = [
   },
 ];
 
+// -- IP-CONSOLE-05 (Policies, P5.1) the `policies.*` bindings -----------------------------------------
+//
+// The crdb policy store (IP-CONSOLE-POLICY-SUBSTRATE PS.1-PS.N, all landed 2026-07-24): POLICY_LIST_BY_ZONE
+// / POLICY_DETAIL reads (PS.5) + POLICY_CREATE/EDIT/PUBLISH/DELETE audited commands (PS.6), all live engine
+// ops, so every authoring binding registers LIVE (the live :7878 drive folds into P5.N, the Objects/VTZ
+// precedent). Compose->sign->push + the convergence ledger are the FD-plane re-home, registered with P5.5.
+// Host-side RUNTIME ENFORCEMENT of the authored schedule/geo/port dimensions is PENDING behind torch
+// IP-TORCH-POLICY-ENFORCE (gated on the enforcement toggle, AG.7-OFF): authoring + distribution + audit are
+// real without it, so the deferral is the host realizing a time/geo/port rule, honestly named.
+
+const policyReads: readonly ReadBinding[] = [
+  {
+    // The tenant's policies grouped by VTZ, tenant-private, bounded, clearance-filtered (crdb PS.5).
+    id: bindingId('policies.byZone'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'policy_list_by_zone_v1',
+    viewModel: 'PolicyZoneGroup',
+    status: { kind: 'live' },
+  },
+  {
+    // One policy's newest record + its version history (the editor/view drawer; crdb PS.5).
+    id: bindingId('policies.detail'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'policy_detail_v1',
+    viewModel: 'PolicyDetailView',
+    status: { kind: 'live' },
+  },
+  {
+    // Whether the host REALIZES a policy's schedule/geo/port dimensions at runtime. No enforcement plane
+    // ships yet -- PENDING behind torch IP-TORCH-POLICY-ENFORCE (enforcement toggle AG.7-OFF). Authoring +
+    // distribution + audit are real without it; this binding is the honest host-realization deferral.
+    id: bindingId('policies.enforcement'),
+    kind: 'read',
+    surface: 'torch',
+    op: 'policy_enforcement_status_v1',
+    viewModel: 'PolicyEnforcementStatus',
+    status: {
+      kind: 'pending',
+      owningRepo: 'torch',
+      gatingTask: 'IP-TORCH-POLICY-ENFORCE (host realization of schedule/geo/port rules; AG.7-OFF)',
+    },
+  },
+];
+
+const policyCommands: readonly CommandBinding[] = [
+  {
+    // Author a policy draft (crdb POLICY_CREATE, PS.6), audited, duplicate-name refused.
+    id: bindingId('policies.create'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'policy_create_v1',
+    authz: 'operator:policies.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Edit a draft into a new draft version without mutating a published version (crdb POLICY_EDIT, PS.6).
+    id: bindingId('policies.edit'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'policy_edit_v1',
+    authz: 'operator:policies.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Publish a version atomically; a breaking publish is flagged (crdb POLICY_PUBLISH, PS.6).
+    id: bindingId('policies.publish'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'policy_publish_v1',
+    authz: 'operator:policies.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Delete (tombstone; history preserved) a policy (crdb POLICY_DELETE, PS.6).
+    id: bindingId('policies.delete'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'policy_delete_v1',
+    authz: 'operator:policies.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+];
+
 function register(target: Record<string, Binding>, entries: readonly Binding[]): void {
   for (const entry of entries) {
     target[entry.id] = entry;
@@ -641,6 +730,8 @@ register(registry, usersReads);
 register(registry, usersCommands);
 register(registry, objectReads);
 register(registry, objectCommands);
+register(registry, policyReads);
+register(registry, policyCommands);
 
 /** The Console binding registry. Keyed by `BindingId`; populated by the surface IPs. */
 export const bindings: BindingManifest = registry;

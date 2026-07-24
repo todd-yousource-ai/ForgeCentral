@@ -525,6 +525,125 @@ export interface WireObjectSpec {
   tags?: Array<string>;
 }
 
+export interface WirePolicyCreate {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  spec: WirePolicySpec;
+}
+
+export interface WirePolicyDelete {
+  id: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  vtz: string;
+}
+
+export interface WirePolicyDetail {
+  record?: WirePolicyRecord | null;
+  versions: Array<WirePolicyVersionRow>;
+}
+
+export interface WirePolicyDetailQuery {
+  id: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  vtz: string;
+}
+
+export interface WirePolicyEdit {
+  id: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  spec: WirePolicySpec;
+}
+
+export interface WirePolicyList {
+  zones: Array<WirePolicyZone>;
+}
+
+export interface WirePolicyListQuery {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WirePolicyMutated {
+  breaking?: boolean | null;
+  id: string;
+  lifecycle: string;
+  version: string;
+}
+
+export interface WirePolicyPublish {
+  id: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  version: string;
+  vtz: string;
+}
+
+export interface WirePolicyRecord {
+  active_from?: number | null;
+  active_until?: number | null;
+  applied_to?: Array<WireScopeMember>;
+  default_postures?: Array<WireDomainPosture>;
+  description: string;
+  geo?: Array<string>;
+  id: string;
+  lifecycle: string;
+  logging: string;
+  max_classification: string;
+  name: string;
+  ports?: string;
+  protocols?: Array<string>;
+  restriction_tags?: Array<string>;
+  rules: Array<WirePolicyRule>;
+  schedule_days?: Array<string>;
+  schedule_end_minute?: number | null;
+  schedule_start_minute?: number | null;
+  version: string;
+  vtz: string;
+}
+
+export interface WirePolicyRule {
+  action: string;
+  destination_kind: string;
+  destination_selector_kind: string;
+  destination_selector_value: string;
+  source_kind: string;
+  source_selector_kind: string;
+  source_selector_value: string;
+}
+
+export interface WirePolicySpec {
+  active_from?: number | null;
+  active_until?: number | null;
+  applied_to?: Array<WireScopeMember>;
+  default_postures?: Array<WireDomainPosture>;
+  description: string;
+  geo?: Array<string>;
+  logging: string;
+  max_classification: string;
+  name: string;
+  ports?: string;
+  protocols?: Array<string>;
+  restriction_tags?: Array<string>;
+  rules: Array<WirePolicyRule>;
+  schedule_days?: Array<string>;
+  schedule_end_minute?: number | null;
+  schedule_start_minute?: number | null;
+  vtz: string;
+}
+
+export interface WirePolicyVersionRow {
+  lifecycle: string;
+  version: string;
+}
+
+export interface WirePolicyZone {
+  policies: Array<WirePolicyRecord>;
+  vtz: string;
+}
+
 export interface WirePrincipalCreate {
   operator?: OperatorDelegation | null;
   request_id: number;
@@ -627,7 +746,10 @@ export type WireReply =
   | { UsageOverview: WireUsageOverviewResult; }
   | { VtzTree: WireVtzTree; }
   | { VtzDetail: WireVtzDetail; }
-  | { VtzMutated: WireVtzMutation; };
+  | { VtzMutated: WireVtzMutation; }
+  | { PolicyList: WirePolicyList; }
+  | { PolicyDetail: WirePolicyDetail; }
+  | { PolicyMutated: WirePolicyMutated; };
 
 export type WireRequest =
   | { QuerySubmit: WireQuerySubmit; }
@@ -673,6 +795,12 @@ export type WireRequest =
   | { VtzEdit: WireVtzEdit; }
   | { VtzRescope: WireVtzRescope; }
   | { VtzDelete: WireVtzDelete; }
+  | { PolicyListByZone: WirePolicyListQuery; }
+  | { PolicyDetail: WirePolicyDetailQuery; }
+  | { PolicyCreate: WirePolicyCreate; }
+  | { PolicyEdit: WirePolicyEdit; }
+  | { PolicyPublish: WirePolicyPublish; }
+  | { PolicyDelete: WirePolicyDelete; }
   | { BundleCommit: WireBundleCommit; }
   | { BundleFetch: WireBundleFetch; }
   | { BundleReport: WireBundleReport; }
@@ -685,6 +813,11 @@ export interface WireRiskBand {
   escalate: number;
   level: string;
   observe: number;
+}
+
+export interface WireScopeMember {
+  agent?: string | null;
+  endpoint_cn: string;
 }
 
 export interface WireSourceVtzEdge {

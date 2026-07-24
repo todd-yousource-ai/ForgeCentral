@@ -2236,6 +2236,559 @@
       ],
       "type": "object"
     },
+    "WirePolicyCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "spec": {
+          "$ref": "#/$defs/WirePolicySpec"
+        }
+      },
+      "required": [
+        "request_id",
+        "spec"
+      ],
+      "type": "object"
+    },
+    "WirePolicyDelete": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "vtz": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz",
+        "id"
+      ],
+      "type": "object"
+    },
+    "WirePolicyDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "record": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/WirePolicyRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "versions": {
+          "items": {
+            "$ref": "#/$defs/WirePolicyVersionRow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "versions"
+      ],
+      "type": "object"
+    },
+    "WirePolicyDetailQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "vtz": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz",
+        "id"
+      ],
+      "type": "object"
+    },
+    "WirePolicyEdit": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "spec": {
+          "$ref": "#/$defs/WirePolicySpec"
+        }
+      },
+      "required": [
+        "request_id",
+        "id",
+        "spec"
+      ],
+      "type": "object"
+    },
+    "WirePolicyList": {
+      "additionalProperties": false,
+      "properties": {
+        "zones": {
+          "items": {
+            "$ref": "#/$defs/WirePolicyZone"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "zones"
+      ],
+      "type": "object"
+    },
+    "WirePolicyListQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WirePolicyMutated": {
+      "additionalProperties": false,
+      "properties": {
+        "breaking": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "lifecycle"
+      ],
+      "type": "object"
+    },
+    "WirePolicyPublish": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        },
+        "vtz": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz",
+        "id",
+        "version"
+      ],
+      "type": "object"
+    },
+    "WirePolicyRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "active_from": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active_until": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_to": {
+          "items": {
+            "$ref": "#/$defs/WireScopeMember"
+          },
+          "type": "array"
+        },
+        "default_postures": {
+          "items": {
+            "$ref": "#/$defs/WireDomainPosture"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "geo": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "logging": {
+          "type": "string"
+        },
+        "max_classification": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ports": {
+          "type": "string"
+        },
+        "protocols": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "restriction_tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/WirePolicyRule"
+          },
+          "type": "array"
+        },
+        "schedule_days": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "schedule_end_minute": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schedule_start_minute": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "vtz": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "vtz",
+        "name",
+        "description",
+        "rules",
+        "logging",
+        "max_classification",
+        "lifecycle"
+      ],
+      "type": "object"
+    },
+    "WirePolicyRule": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "destination_kind": {
+          "type": "string"
+        },
+        "destination_selector_kind": {
+          "type": "string"
+        },
+        "destination_selector_value": {
+          "type": "string"
+        },
+        "source_kind": {
+          "type": "string"
+        },
+        "source_selector_kind": {
+          "type": "string"
+        },
+        "source_selector_value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_kind",
+        "source_selector_kind",
+        "source_selector_value",
+        "destination_kind",
+        "destination_selector_kind",
+        "destination_selector_value",
+        "action"
+      ],
+      "type": "object"
+    },
+    "WirePolicySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "active_from": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active_until": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_to": {
+          "items": {
+            "$ref": "#/$defs/WireScopeMember"
+          },
+          "type": "array"
+        },
+        "default_postures": {
+          "items": {
+            "$ref": "#/$defs/WireDomainPosture"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "geo": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logging": {
+          "type": "string"
+        },
+        "max_classification": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ports": {
+          "type": "string"
+        },
+        "protocols": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "restriction_tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/WirePolicyRule"
+          },
+          "type": "array"
+        },
+        "schedule_days": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "schedule_end_minute": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schedule_start_minute": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vtz": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "vtz",
+        "name",
+        "description",
+        "rules",
+        "logging",
+        "max_classification"
+      ],
+      "type": "object"
+    },
+    "WirePolicyVersionRow": {
+      "additionalProperties": false,
+      "properties": {
+        "lifecycle": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "lifecycle"
+      ],
+      "type": "object"
+    },
+    "WirePolicyZone": {
+      "additionalProperties": false,
+      "properties": {
+        "policies": {
+          "items": {
+            "$ref": "#/$defs/WirePolicyRecord"
+          },
+          "type": "array"
+        },
+        "vtz": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "vtz",
+        "policies"
+      ],
+      "type": "object"
+    },
     "WirePrincipalCreate": {
       "additionalProperties": false,
       "properties": {
@@ -3144,6 +3697,42 @@
             "VtzMutated"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyList": {
+              "$ref": "#/$defs/WirePolicyList"
+            }
+          },
+          "required": [
+            "PolicyList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyDetail": {
+              "$ref": "#/$defs/WirePolicyDetail"
+            }
+          },
+          "required": [
+            "PolicyDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyMutated": {
+              "$ref": "#/$defs/WirePolicyMutated"
+            }
+          },
+          "required": [
+            "PolicyMutated"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -3823,6 +4412,78 @@
         {
           "additionalProperties": false,
           "properties": {
+            "PolicyListByZone": {
+              "$ref": "#/$defs/WirePolicyListQuery"
+            }
+          },
+          "required": [
+            "PolicyListByZone"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyDetail": {
+              "$ref": "#/$defs/WirePolicyDetailQuery"
+            }
+          },
+          "required": [
+            "PolicyDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyCreate": {
+              "$ref": "#/$defs/WirePolicyCreate"
+            }
+          },
+          "required": [
+            "PolicyCreate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyEdit": {
+              "$ref": "#/$defs/WirePolicyEdit"
+            }
+          },
+          "required": [
+            "PolicyEdit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyPublish": {
+              "$ref": "#/$defs/WirePolicyPublish"
+            }
+          },
+          "required": [
+            "PolicyPublish"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyDelete": {
+              "$ref": "#/$defs/WirePolicyDelete"
+            }
+          },
+          "required": [
+            "PolicyDelete"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "BundleCommit": {
               "$ref": "#/$defs/WireBundleCommit"
             }
@@ -3915,6 +4576,28 @@
         "escalate",
         "candidate",
         "observe"
+      ],
+      "type": "object"
+    },
+    "WireScopeMember": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endpoint_cn": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint_cn"
       ],
       "type": "object"
     },
