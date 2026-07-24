@@ -38,9 +38,26 @@ prohibited family (GPL/AGPL/...) is never exceptable. Current entries:
 
 ## Advisories
 
-`pnpm audit --audit-level=high` runs in the gate (skipped under `--skip-net`, which needs the advisory
-DB). High/critical advisories fail the gate. Remediation deadlines follow CRAFTED standards: Critical
-24h, High 7 days, Medium 30 days.
+`scripts/audit-bulk.mjs --level=high` runs in the gate (skipped under `--skip-net`, which needs the
+advisory DB; the npm quick-audit endpoint `pnpm audit` calls was retired 2026-07, so this script queries
+the documented bulk endpoint over the same lockfile-derived package set). High/critical advisories fail
+the gate. Remediation deadlines follow CRAFTED standards: Critical 24h, High 7 days, Medium 30 days.
+
+**Remediation is a version bump, not a suppression** -- prefer upgrading the affected package (or forcing
+a patched transitive version through `pnpm.overrides`, as done for `vite`/`esbuild`/`postcss`).
+
+**Waivers (documented not-applicable advisories).** A single advisory may be waived ONLY when the
+vulnerable code path is provably unreachable in this codebase, via the `WAIVERS` table in
+`scripts/audit-bulk.mjs`. A waiver is fail-closed and never a silent drop: it is keyed by GHSA id, must
+name the affected package + the reason the path is unreachable + the real fix, and carries an **expiry**
+after which it stops suppressing (forcing review). A waived advisory is still printed on every gate run;
+an expired waiver, an unparseable expiry, or a package mismatch fails the gate. Current waivers:
+
+- **`GHSA-qwww-vcr4-c8h2`** (`react-router`, High) -- an RSC-mode-only CSRF; the advisory states it "only
+  affects your application if you are using the unstable RSC APIs". The Console is a Vite `BrowserRouter`
+  SPA and imports no react-router RSC API, so the path is unreachable. The fix is `react-router@8.3.0`, a
+  v7->v8 migration (`react-router-dom` is removed in v8); revisit at that upgrade (waiver expires
+  2026-10-24).
 
 ## Supply-chain hardening (malicious-package defense)
 

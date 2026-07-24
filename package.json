@@ -30,10 +30,11 @@
     "typescript-eslint": "^8.19.0"
   },
   "pnpm": {
-    "//overrides": "Force patched transitive dev deps so `pnpm audit --audit-level=high` is clean. vitest 3.2's default resolution keeps an older vite (<=6.4.2) which carries the server.fs.deny bypass (GHSA-fx2h-pf6j-xcff) and pulls a vulnerable esbuild; vite >=6.4.3 depends on esbuild >=0.25. Dev-only (never in dist/). Revisit when vitest bumps its bundled vite.",
+    "//overrides": "Force patched transitive dev deps so `pnpm audit --audit-level=high` is clean. (1) vitest 3.2's default resolution keeps an older vite (<=6.4.2) which carries the server.fs.deny bypass (GHSA-fx2h-pf6j-xcff) and pulls a vulnerable esbuild; vite >=6.4.3 depends on esbuild >=0.25. (2) vite pulls postcss <=8.5.17, which carries the source-map path-traversal (GHSA-r28c-9q8g-f849); >=8.5.18 is patched. All dev-only (build-time CSS/bundle tooling, never in dist/). Revisit when vitest bumps its bundled vite.",
     "overrides": {
       "vite": "^6.4.3",
-      "esbuild": "^0.25.0"
+      "esbuild": "^0.25.0",
+      "postcss": "^8.5.18"
     },
     "//onlyBuiltDependencies": "Install-script lockdown (deny-by-default): ONLY these packages may run lifecycle scripts (preinstall/install/postinstall); pnpm blocks every other package. esbuild needs its postinstall to link the platform binary. (Playwright 1.49 carries NO install script; its browser binary is fetched by an explicit `playwright install chromium` in the e2e stage, not on npm install, so it needs no entry here.) check-supply-chain.mjs fails the gate if any non-listed package introduces a script. See DEPENDENCY-POLICY.md.",
     "onlyBuiltDependencies": [
