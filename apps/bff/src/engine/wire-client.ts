@@ -32,6 +32,7 @@ import type {
   WireObjectMutated,
   WirePolicyDetail,
   WirePolicyList,
+  WirePolicyMutated,
   WirePrincipalList,
   WireConnectionList,
   WireConnectivityGraph,
@@ -169,6 +170,14 @@ export function replyToPolicyDetail(reply: WireReply): WirePolicyDetail {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a policy-detail read');
+}
+
+/** Map an engine `WireReply` to `WirePolicyMutated` (a PS.6 policy command ack). */
+export function replyToPolicyMutated(reply: WireReply): WirePolicyMutated {
+  if (typeof reply === 'object' && 'PolicyMutated' in reply) return reply.PolicyMutated;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a policy command');
 }
 
 /** Map an engine `WireReply` to `WireDecisionList` (ENTITY_DECISIONS), throwing a typed error on a refusal. */
@@ -631,6 +640,49 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToPolicyDetail(await dispatch(transport, { PolicyDetail: request })),
+      opts,
+    );
+  }
+
+  async policyCreate(
+    request: Parameters<CrucibleClient['policyCreate']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyMutated> {
+    return this.call(
+      async (transport) =>
+        replyToPolicyMutated(await dispatch(transport, { PolicyCreate: request })),
+      opts,
+    );
+  }
+
+  async policyEdit(
+    request: Parameters<CrucibleClient['policyEdit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyMutated> {
+    return this.call(
+      async (transport) => replyToPolicyMutated(await dispatch(transport, { PolicyEdit: request })),
+      opts,
+    );
+  }
+
+  async policyPublish(
+    request: Parameters<CrucibleClient['policyPublish']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyMutated> {
+    return this.call(
+      async (transport) =>
+        replyToPolicyMutated(await dispatch(transport, { PolicyPublish: request })),
+      opts,
+    );
+  }
+
+  async policyDelete(
+    request: Parameters<CrucibleClient['policyDelete']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyMutated> {
+    return this.call(
+      async (transport) =>
+        replyToPolicyMutated(await dispatch(transport, { PolicyDelete: request })),
       opts,
     );
   }

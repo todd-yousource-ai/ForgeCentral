@@ -14,7 +14,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 
-import { objectId, principalId, toVtzSpecInput, vtzId } from '@forge/contracts';
+import { objectId, principalId, toPolicyDraftInput, toVtzSpecInput, vtzId } from '@forge/contracts';
 import type {
   EntityRef,
   IsolateRequest,
@@ -62,8 +62,12 @@ import {
 } from './engine/objects.js';
 import {
   PoliciesUnavailableError,
+  resolveCreatePolicy,
+  resolveDeletePolicy,
+  resolveEditPolicy,
   resolvePolicyDetail,
   resolvePolicyZones,
+  resolvePublishPolicy,
 } from './engine/policies.js';
 import {
   resolveIdamConfigure,
@@ -1441,6 +1445,103 @@ async function handlePolicies(
 }
 
 /**
+ * The Policies-surface commands (IP-CONSOLE-05 P5.4): POST /api/policies (create), /api/policies/edit,
+ * /api/policies/publish, /api/policies/delete. Audited engine commands with typed refusals (Conflict ->
+ * 409 duplicate/state-conflict, Framing -> 400 malformed, else 403). The draft body is parsed fail-closed
+ * (`toPolicyDraftInput`) so a malformed authoring payload never reaches the engine. A successful mutation
+ * drops the tenant's warm policy projection so the operator's own edit is never masked by a stale read.
+ */
+async function handlePoliciesCommand(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const paths = new Set([
+    '/api/policies',
+    '/api/policies/edit',
+    '/api/policies/publish',
+    '/api/policies/delete',
+  ]);
+  if (!paths.has(path) || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as Record<string, unknown>;
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const str = (key: string): string => (typeof body[key] === 'string' ? body[key].trim() : '');
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const engine = deps.operatorEngine;
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    let receipt;
+    if (path === '/api/policies/delete') {
+      const vtz = str('vtz');
+      const id = str('id');
+      if (vtz === '' || id === '') {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      receipt = await resolveDeletePolicy(engine, principal, vtz, id, opts);
+    } else if (path === '/api/policies/publish') {
+      const vtz = str('vtz');
+      const id = str('id');
+      const version = str('version');
+      if (vtz === '' || id === '' || version === '') {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      receipt = await resolvePublishPolicy(engine, principal, vtz, id, version, opts);
+    } else {
+      const draft = toPolicyDraftInput(body);
+      if (draft === null) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      if (path === '/api/policies') {
+        receipt = await resolveCreatePolicy(engine, principal, draft, opts);
+      } else {
+        const id = str('id');
+        if (id === '') {
+          sendJson(res, 400, { error: 'malformed_request' });
+          return true;
+        }
+        receipt = await resolveEditPolicy(engine, principal, id, draft, opts);
+      }
+    }
+    deps.cache.deletePrefix(policiesCachePrefix(principal.tenant));
+    sendJson(res, 200, receipt);
+  } catch (err) {
+    if (err instanceof PoliciesUnavailableError) {
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      const cls = err.wireError.class;
+      const httpStatus = cls === 'Conflict' ? 409 : cls === 'Framing' ? 400 : 403;
+      sendJson(res, httpStatus, { error: 'refused', class: cls });
+    } else {
+      deps.log.warn(
+        { err: err instanceof Error ? err.name : 'unknown' },
+        'policies command failed',
+      );
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
+/**
  * The path the on-node crypto-sidecar writes the Auth0 client secret to, and the engine reads it from
  * (crdb `client_secret_ref`). The secret VALUE never reaches this tier; the BFF only ever names the
  * path. A later increment moves this to config so the BFF and the sidecar share one source.
@@ -1730,6 +1831,9 @@ async function route(
     return;
   }
   if (await handleObjectsCommand(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handlePoliciesCommand(deps, req, method, path, res)) {
     return;
   }
   if (await handleIdamCommand(deps, req, method, path, res)) {

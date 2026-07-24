@@ -464,6 +464,167 @@ export function toPolicyMutation(reply: WirePolicyMutated): PolicyMutation | nul
   return { id: reply.id, version: reply.version, lifecycle, breaking: reply.breaking ?? false };
 }
 
+// -- fail-closed input parsing (the BFF trust boundary; unknown/malformed -> null -> a typed 400) -----
+
+/** Project one untrusted rule endpoint. FAIL-CLOSED on a non-object, unknown kind, or unknown selector. */
+function toEndpointInput(raw: unknown): RuleEndpoint | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const e = raw as Record<string, unknown>;
+  const kind = typeof e['kind'] === 'string' ? toObjectKind(e['kind']) : null;
+  const selectorKind =
+    typeof e['selectorKind'] === 'string' ? toSelectorKind(e['selectorKind']) : null;
+  const selectorValue = e['selectorValue'];
+  if (kind === null || selectorKind === null || typeof selectorValue !== 'string') return null;
+  return { kind, selectorKind, selectorValue };
+}
+
+/** Project one untrusted rule. FAIL-CLOSED on a malformed endpoint or unknown action. */
+function toRuleInput(raw: unknown): PolicyRule | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const source = toEndpointInput(r['source']);
+  const destination = toEndpointInput(r['destination']);
+  const action = typeof r['action'] === 'string' ? toAction(r['action']) : null;
+  if (source === null || destination === null || action === null) return null;
+  return { source, destination, action };
+}
+
+/** Project the untrusted network qualifier. Absent = unrestricted; a present-but-malformed one refuses. */
+function toNetworkInput(raw: unknown): NetworkMatchView | null {
+  if (raw === undefined || raw === null) return { protocols: [], ports: '' };
+  if (typeof raw !== 'object') return null;
+  const n = raw as Record<string, unknown>;
+  const rawProtocols = n['protocols'] ?? [];
+  if (!Array.isArray(rawProtocols)) return null;
+  const protocols: PolicyProtocol[] = [];
+  for (const p of rawProtocols) {
+    const proto = typeof p === 'string' ? toProtocol(p) : null;
+    if (proto === null) return null;
+    protocols.push(proto);
+  }
+  const ports = n['ports'];
+  if (ports !== undefined && typeof ports !== 'string') return null;
+  return { protocols, ports: typeof ports === 'string' ? ports : '' };
+}
+
+/** Read an optional nullable epoch (HLC) field: absent/null -> null; a non-number refuses. */
+function toEpochInput(raw: unknown): { ok: true; value: number | null } | { ok: false } {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return { ok: false };
+  return { ok: true, value: raw };
+}
+
+/** Read an optional string-array field: absent -> []; a non-string entry refuses. */
+function toStringArrayInput(raw: unknown): readonly string[] | null {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) return null;
+  for (const s of raw) {
+    if (typeof s !== 'string') return null;
+  }
+  return raw as readonly string[];
+}
+
+/** Project the untrusted restrictions block. Absent = no restrictions; a malformed one refuses. */
+function toRestrictionsInput(raw: unknown): PolicyRestrictionsView | null {
+  const empty: PolicyRestrictionsView = {
+    scheduleDays: [],
+    scheduleStartMinute: null,
+    scheduleEndMinute: null,
+    activeFrom: null,
+    activeUntil: null,
+    geo: [],
+    tags: [],
+  };
+  if (raw === undefined || raw === null) return empty;
+  if (typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const rawDays = r['scheduleDays'] ?? [];
+  if (!Array.isArray(rawDays)) return null;
+  const scheduleDays: ScheduleDay[] = [];
+  for (const d of rawDays) {
+    const day = typeof d === 'string' ? toScheduleDay(d) : null;
+    if (day === null) return null;
+    scheduleDays.push(day);
+  }
+  const start = toEpochInput(r['scheduleStartMinute']);
+  const end = toEpochInput(r['scheduleEndMinute']);
+  const from = toEpochInput(r['activeFrom']);
+  const until = toEpochInput(r['activeUntil']);
+  const geo = toStringArrayInput(r['geo']);
+  const tags = toStringArrayInput(r['tags']);
+  if (!start.ok || !end.ok || !from.ok || !until.ok || geo === null || tags === null) return null;
+  return {
+    scheduleDays,
+    scheduleStartMinute: start.value,
+    scheduleEndMinute: end.value,
+    activeFrom: from.value,
+    activeUntil: until.value,
+    geo,
+    tags,
+  };
+}
+
+/** Project the untrusted Applied-To scope. Absent = empty (distributes nowhere); malformed refuses. */
+function toAppliedToInput(raw: unknown): readonly AppliedToMember[] | null {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) return null;
+  const members: AppliedToMember[] = [];
+  for (const m of raw) {
+    if (typeof m !== 'object' || m === null) return null;
+    const rec = m as Record<string, unknown>;
+    if (typeof rec['endpointCn'] !== 'string') return null;
+    const agent = rec['agent'];
+    if (agent !== undefined && agent !== null && typeof agent !== 'string') return null;
+    members.push({
+      endpointCn: rec['endpointCn'],
+      agent: typeof agent === 'string' ? agent : null,
+    });
+  }
+  return members;
+}
+
+/**
+ * Parse an untrusted command body into a typed `PolicyDraft`, or `null` when it is malformed (the BFF
+ * maps `null` to a 400 before the engine is touched). FAIL-CLOSED at every axis: a missing name/vtz, an
+ * unknown action/logging/protocol/selector/kind/day/classification, an empty ruleset, or a malformed
+ * restriction refuses the whole draft (the engine re-validates as the authority; this is the first line).
+ */
+export function toPolicyDraftInput(body: unknown): PolicyDraft | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const b = body as Record<string, unknown>;
+  const name = typeof b['name'] === 'string' ? b['name'].trim() : '';
+  const vtz = typeof b['vtz'] === 'string' ? b['vtz'].trim() : '';
+  const description = typeof b['description'] === 'string' ? b['description'] : '';
+  if (name === '' || vtz === '') return null;
+  const logging = typeof b['logging'] === 'string' ? toLogging(b['logging']) : null;
+  const maxClassification =
+    typeof b['maxClassification'] === 'string' ? toClassification(b['maxClassification']) : null;
+  if (logging === null || maxClassification === null) return null;
+  const rawRules = b['rules'];
+  if (!Array.isArray(rawRules) || rawRules.length === 0) return null;
+  const rules: PolicyRule[] = [];
+  for (const raw of rawRules) {
+    const rule = toRuleInput(raw);
+    if (rule === null) return null;
+    rules.push(rule);
+  }
+  const network = toNetworkInput(b['network']);
+  const restrictions = toRestrictionsInput(b['restrictions']);
+  const appliedTo = toAppliedToInput(b['appliedTo']);
+  if (network === null || restrictions === null || appliedTo === null) return null;
+  return {
+    vtz,
+    name,
+    description,
+    rules,
+    network,
+    restrictions,
+    logging,
+    appliedTo,
+    maxClassification,
+  };
+}
+
 /** The human display label for a lattice action (the Action control + column). */
 export function policyActionLabel(action: PolicyAction): string {
   switch (action) {

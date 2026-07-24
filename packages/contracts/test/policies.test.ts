@@ -16,6 +16,7 @@ import {
   policyLoggingLabel,
   policyProtocolLabel,
   toPolicyDetail,
+  toPolicyDraftInput,
   toPolicyMutation,
   toPolicyRow,
   toPolicyZones,
@@ -305,5 +306,82 @@ describe('command acknowledgment', () => {
 
   it('fail-closes on an unknown lifecycle in the ack', () => {
     expect(toPolicyMutation({ id: 'p-1', version: '1.0.0', lifecycle: 'zombie' })).toBeNull();
+  });
+});
+
+describe('toPolicyDraftInput parses an untrusted command body fail-closed', () => {
+  const body = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    name: 'contain-egress',
+    vtz: 'corp.prod',
+    description: 'quarantine agent egress',
+    logging: 'full',
+    maxClassification: 'confidential',
+    rules: [
+      {
+        source: { kind: 'agent', selectorKind: 'exact', selectorValue: 'demo-agent' },
+        destination: { kind: 'network', selectorKind: 'cidr', selectorValue: '10.8.0.0/16' },
+        action: 'quarantine',
+      },
+    ],
+    network: { protocols: ['https'], ports: '443' },
+    restrictions: { scheduleDays: ['mon'], activeUntil: 999, tags: ['PHI'] },
+    appliedTo: [{ endpointCn: 'host-01.corp', agent: 'demo-agent' }],
+    ...over,
+  });
+
+  it('parses a complete body into a typed draft', () => {
+    const draft = toPolicyDraftInput(body());
+    expect(draft).not.toBeNull();
+    expect(draft?.name).toBe('contain-egress');
+    expect(draft?.rules[0]?.action).toBe('quarantine');
+    expect(draft?.network.protocols).toEqual(['https']);
+    expect(draft?.restrictions.scheduleDays).toEqual(['mon']);
+    expect(draft?.restrictions.activeUntil).toBe(999);
+    expect(draft?.appliedTo).toEqual([{ endpointCn: 'host-01.corp', agent: 'demo-agent' }]);
+  });
+
+  it('defaults the optional axes and round-trips to a valid wire spec', () => {
+    const draft = toPolicyDraftInput(
+      body({ network: undefined, restrictions: undefined, appliedTo: undefined }),
+    );
+    expect(draft?.network).toEqual({ protocols: [], ports: '' });
+    expect(draft?.restrictions.scheduleDays).toEqual([]);
+    expect(draft?.appliedTo).toEqual([]);
+    // The parsed draft is a valid spec input (no dropped required field).
+    const spec = toWirePolicySpec(draft as NonNullable<typeof draft>);
+    expect(spec.name).toBe('contain-egress');
+    expect('protocols' in spec).toBe(false);
+  });
+
+  it('refuses a missing name/vtz, an empty ruleset, or an unknown enum tag', () => {
+    expect(toPolicyDraftInput(body({ name: '  ' }))).toBeNull();
+    expect(toPolicyDraftInput(body({ vtz: '' }))).toBeNull();
+    expect(toPolicyDraftInput(body({ rules: [] }))).toBeNull();
+    expect(toPolicyDraftInput(body({ logging: 'verbose' }))).toBeNull();
+    expect(toPolicyDraftInput(body({ maxClassification: 'cosmic' }))).toBeNull();
+    expect(toPolicyDraftInput(body({ network: { protocols: ['quic'], ports: '' } }))).toBeNull();
+  });
+
+  it('refuses a malformed rule endpoint or a malformed restriction', () => {
+    expect(
+      toPolicyDraftInput(
+        body({
+          rules: [
+            {
+              source: { kind: 'wormhole', selectorKind: 'exact', selectorValue: 'x' },
+              destination: { kind: 'uri', selectorKind: 'exact', selectorValue: 'y' },
+              action: 'deny',
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
+    expect(toPolicyDraftInput(body({ restrictions: { scheduleDays: ['funday'] } }))).toBeNull();
+    expect(toPolicyDraftInput(body({ restrictions: { activeUntil: 'soon' } }))).toBeNull();
+  });
+
+  it('refuses a non-object body', () => {
+    expect(toPolicyDraftInput(null)).toBeNull();
+    expect(toPolicyDraftInput('policy')).toBeNull();
   });
 });

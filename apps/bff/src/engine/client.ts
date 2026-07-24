@@ -38,10 +38,15 @@ import type {
   WireObjectEdit,
   WireObjectList,
   WireObjectMutated,
+  WirePolicyCreate,
+  WirePolicyDelete,
   WirePolicyDetail,
   WirePolicyDetailQuery,
+  WirePolicyEdit,
   WirePolicyList,
   WirePolicyListQuery,
+  WirePolicyMutated,
+  WirePolicyPublish,
   WireLugProvisioned,
   WirePrincipalCreate,
   WirePrincipalEdit,
@@ -134,6 +139,14 @@ export interface CrucibleClient {
   /** Read one policy's full definition + version history (POLICY_DETAIL, crdb PS.5). An unknown id
    * returns an empty detail (no record, no versions), never an error. */
   policyDetail(request: WirePolicyDetailQuery, opts?: EngineCallOptions): Promise<WirePolicyDetail>;
+  /** Author a new policy (POLICY_CREATE, crdb PS.6): the store mints v1.0.0 as a Draft. Audited. */
+  policyCreate(request: WirePolicyCreate, opts?: EngineCallOptions): Promise<WirePolicyMutated>;
+  /** Edit a policy into a new Draft version without mutating a published one (POLICY_EDIT, PS.6). Audited. */
+  policyEdit(request: WirePolicyEdit, opts?: EngineCallOptions): Promise<WirePolicyMutated>;
+  /** Publish a version atomically; a breaking publish is flagged (POLICY_PUBLISH, PS.6). Audited. */
+  policyPublish(request: WirePolicyPublish, opts?: EngineCallOptions): Promise<WirePolicyMutated>;
+  /** Delete a policy (tombstone; history preserved) (POLICY_DELETE, PS.6). Audited. */
+  policyDelete(request: WirePolicyDelete, opts?: EngineCallOptions): Promise<WirePolicyMutated>;
   /** Register a named object (OBJECT_CREATE, crdb OB.4), audited. */
   objectCreate(request: WireObjectCreate, opts?: EngineCallOptions): Promise<WireObjectMutated>;
   /** Edit a named object's definition (OBJECT_EDIT, crdb OB.4), audited. */

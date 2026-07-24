@@ -774,3 +774,46 @@ body {
   flex-wrap: wrap;
   gap: var(--fc-space-xs);
 }
+
+/* Policy authoring form (P5.4): a stacked form with a two-column grid, chip toggles, and collapsibles. */
+.fcx-policy-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-md);
+  padding: var(--fc-space-md);
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-lg);
+  background: var(--fc-color-surface-card);
+  margin-bottom: var(--fc-space-md);
+}
+.fcx-policy-form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--fc-space-md);
+}
+.fcx-policy-form__protocols,
+.fcx-policy-form__days {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fc-space-md);
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-md);
+  padding: var(--fc-space-sm) var(--fc-space-md);
+}
+.fcx-chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fc-space-xs);
+  font-size: var(--fc-font-size-sm);
+}
+.fcx-policy-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--fc-space-sm);
+}
+.fcx-form-note {
+  margin: 0;
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-sm);
+}
