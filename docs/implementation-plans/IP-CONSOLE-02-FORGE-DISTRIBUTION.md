@@ -219,6 +219,17 @@ anchor remains a provisioning deliverable (FD.5), not a side effect of the chann
 
 **FD.7c status (2026-07-21):** the BFF projection + `DistributionPanel` component exist and the convergence read is proven live, but the panel was **removed from the VTZ surface** (wrong placement) and not yet re-homed. Blocking follow-ups when resuming: (1) build the Policy-tab surface that hosts compose->sign->push + this ledger; (2) the FD.7c/FD.2 wire verbs (`BundleCommit`, `BundleConvergence`) needed CBOR-codec wiring that was missing in `packages/wire` -- **fixed 2026-07-21** in `dispatch.ts` (`frameTypeForRequest`) and `payload.ts` (`encodeWireRequest`: `bundleCommitToCbor` / `bundleConvergenceToCbor`); land those with the Policy-tab PR; (3) the BFF distribute route 503s silently if `FC_SIGNER_PORT` is not in the RUNNING env -- restart the BFF after editing `config.env`.
 
+**FD.7c RE-HOME LANDED (2026-07-24, `IP-CONSOLE-05` P5.5, FC merge `10b0398`):** the `DistributionPanel`
+now mounts per-zone on the **Policies surface** (confirm-gated; the dialog names the target endpoint set),
+the VTZ surface structurally asserts NO distribute control, and the `policies.convergence` +
+`policies.distribute` bindings are registered LIVE. The producer composes the REAL authored policies:
+crdb `501ab1ea` exposed `POLICY_EFFECTIVE` (the PS.7 seam; producer expiry engine-side) and crdb
+`5be841b3` extended the signed bundle with the authored ruleset carriage (`BundleRule` +
+`SignedPolicyBundle.rules`; the empty-rules preimage stays byte-identical v1, a rules-carrying bundle
+signs the disjoint v2 domain). `resolveDistribute` now reads POLICY_EFFECTIVE, composes
+`rules`+`contributors` fail-closed into the signed draft, and reports `carriedRules`/`carriedPolicies`.
+See `IP-CONSOLE-05-policies-LEDGER.md` (P5.5) for the full record, incl. the torchd rev-bump compat note.
+
 **CORRECTION (2026-07-20).** The original single FD.7 row claimed "the numerator already exists as durable fact: torch FG1.10 emits a GCI-attributed `ForgeAudit::Apply` fact ... onto the TRD-21 advisory path." That is FALSE in the way that matters, verified end to end: (1) no crdb store persists an apply outcome (the keyspace stops at `PolicyBundle = 0x26`); (2) every `AuditSink` impl in torch is a TEST sink (`CountingSink`/`RecordingSink`) -- the FD.4b policy lane wires `CountingSink`, so nothing ships to crdb; (3) no `report_apply`/`BUNDLE_REPORT` wire verb exists (FD.4 built only `bundle_fetch`; the lane's `report_apply` is inert). The FG1.10 fact is real but emitted to a LOCAL sink and never lands queryably in crdb. The note conflated "torch emits a fact" with "the fact is durable and queryable in crdb". The denominator (`IdentityScope` of stored bundles) IS durable today; only the numerator was missing, so FD.7 splits into the substrate (7a), the shipper (7b), and the surface (7c). The other half of the original operator ask -- "durable retry until the update goes through" -- needs nothing new: in the pull model the endpoint's refresh loop plus the fail-closed freshness lease IS convergence (see Out of scope).
 | FD.N | `INV-CONSOLE-FORGE-LIVE` | Live capstone on the node: author a zone in the Console -> compose -> sign -> torchd pulls over the real seam -> verifies -> applies -> reports the outcome -> the Console shows it. Enforcement stays OFF, so the proof is that the *policy plane* is real end to end, not that anything is enforced. Requires a fresh ZTP enrollment (the leaf expires daily). |
 

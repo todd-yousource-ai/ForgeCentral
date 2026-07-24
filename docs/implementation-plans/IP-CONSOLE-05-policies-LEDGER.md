@@ -6,8 +6,15 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-24): P5.1..P5.5 LANDED. NEXT = P5.6 (mockups + TRD grounding, docs-only), then P5.N
-  (the capstone incl. the deferred live drive).**
+- **State (2026-07-24): P5.1..P5.6 LANDED. NEXT = P5.N (the capstone: the Playwright acceptance sweep
+  against TRD-CONSOLE-05 Section 7 + the box redeploy live leg, enforcement OFF, incl. the torchd
+  rev-bump note below).**
+  P5.6 (docs-only) was a grounding CORRECTION rather than a landing: `06`/`07-*.png` were already in the
+  original 2026-07-05 set (their README rows now carry the substrate reconciliation), and the Create
+  Policy modal mock never reached disk -- the design-session attachment was reviewed but not landed, and
+  the `08-*.png` name the revision cited collides with TrustOps Rewind. TRD Section 0/3 now name Section 3
+  itself as the modal's grounding (P5.4 built to it). FORGE-DISTRIBUTION's FD.7c status is closed with the
+  P5.5 re-home record.
   P5.5 shipped as THREE PRs -- two crdb prerequisites and the FC half:
   (a) crdb `501ab1ea`: the `POLICY_EFFECTIVE` wire read (the PS.7 seam; producer expiry engine-side).
   (b) crdb `5be841b3` (operator decision: EXTEND THE BUNDLE): `BundleRule` + `SignedPolicyBundle.rules`;
@@ -62,12 +69,16 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
   with P5.5. `FC_SIGNER_PORT` must be in the running BFF env.
 - **Reused live surfaces:** `vtz.tree` (grouping axis + VTZ dropdown), `objects.list` (subject/target
   pickers). Both COMPLETE. `policies.ts` reuses `ObjectKind`/`SelectorKind` from the Objects contract.
-- **Next action:** P5.6 -- land the policy mockups into `docs/ui-examples/06,07,08-*.png` + the README
-  table rows (grounding, not truth); amend `TRD-CONSOLE-05` at any residual pixel-vs-substrate sites;
-  cross-reference `IP-CONSOLE-02-FORGE-DISTRIBUTION` so its FD.7c re-home points here. Docs-only PR.
-  Then P5.N: the Playwright capstone + acceptance sweep + the box redeploy live leg (enforcement OFF;
-  includes the torchd rev-bump note above). `FC_SIGNER_PORT` must be in the running BFF env for the
-  live leg.
+- **Next action:** P5.N -- the capstone. Much of the planned `policies.spec.ts` journey coverage already
+  landed incrementally (grouped accordion + expand-to-table, Create w/ closed-enum controls + audited
+  draft, delete confirm, distribute confirm + 3-state ledger, honest empty tenant); the REMAINING work:
+  (1) the missing journey pieces -- Save-&-Publish confirm-gated end to end, a malformed-port 400 read
+  back on the form, edit-of-published minting a new version chip; (2) the structural sweeps as named
+  capstone assertions (four actions + three logging levels on the CONTROLS, no distribute on VTZ --
+  partly present, consolidate); (3) fill the acceptance-sweep table below against `TRD-CONSOLE-05 §7`;
+  (4) the box redeploy LIVE leg (the crdb node serves the whole surface + compose->sign->torchd-pull
+  convergence, enforcement OFF; includes the torchd rev bump for the v2 rules-carrying preimage;
+  `FC_SIGNER_PORT` must be in the running BFF env). `REAL_SURFACES` already carries `policies`.
 - **P5.5 scope note (honest):** the distribute targets the CONVERGENCE members (the endpoints holding
   the prior bundle) as FD.7c always did -- an Applied-To-derived first-distribution target picker needs
   an enrolled-endpoint list read (the same deferral as the P5.4 Applied-To picker). The COMPOSED CONTENT
@@ -102,7 +113,7 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 | P5.3 | `INV-CONSOLE-POLICIES-GROUPED` | LANDED | `ce7f3f3` | net-new `AccordionGroup` primitive (`packages/design`, `.fc-accordion*`) + `usePolicies` + `PoliciesSurface`: header/search/zone-filter/disabled-Create; per-VTZ accordions (count badge, ordered by live `vtz.tree`) -> `DataTable` w/ the 07 columns (closed-enum action/logging cells, pure summaries); honest states; `policies` route replaces placeholder + no-stub `REAL_SURFACES`; read-only e2e |
 | P5.4 | `INV-CONSOLE-POLICIES-AUTHOR` | LANDED | `f00f650` | BFF command path (dispatch + `CrucibleClient`/`WireCrucibleClient` + `OperatorEngine` 4 delegated cmds + `engine/policies.ts` resolvers + `POST /api/policies[/edit|/publish|/delete]` before the 405 gate, 409/400/403 mapping, cache-drop; `@forge/contracts toPolicyDraftInput` fail-closed parser); SPA `usePolicyMutation` (`useSavePolicy` create/edit-then-publish + `useDeletePolicy`) + `PolicyForm` (08 modal: name/zone/subjects/targets cross-product/protocol chips+validated ports/action(4)/logging(3) + Restrictions[days+hours+geo+tags] + Advanced[Applied-To+classification+description]; Save-Draft vs Save-&-Publish confirm-gated) + surface Create/Edit/Delete. **Deferred: absolute active-window authoring (opaque HLC); Applied-To = endpoint CNs.** |
 | P5.5 | `INV-CONSOLE-POLICIES-DISTRIBUTED` | LANDED | `28bbfc4` | the FD.7c re-home + the REAL policy carriage: schemas re-vendored + regen (`WirePolicyEffective*`, `BundleRule`, `rules` in `FORGE_FIELD_ORDER`); sidecar revs bumped to crdb `5be841b3` + `BundleDraft.rules` passthrough (the shared `bundle_preimage_bytes` signs v2 when rules carried; seam tests green); BFF `policyEffective` read (dispatch/client/wire-client/operator-engine); `contracts composeBundleRules` (fail-closed; contributors from SemVer); `resolveDistribute` composes POLICY_EFFECTIVE -> rules+contributors into the signed draft (`DistributeCompositionError` -> 503; nothing half-composed reaches the signer); `DistributionPanel` gains the P5.5 confirm gate (names the endpoint set) and mounts per-zone on `PoliciesSurface`; `policies.convergence`+`policies.distribute` bindings LIVE; VTZ structural no-distribute assert; distribute e2e journey |
-| P5.6 | `INV-CONSOLE-POLICIES-GROUNDED` | PLANNED | -- | land `06/07/08-*.png` + README rows; residual TRD grounding; cross-ref FORGE-DISTRIBUTION FD.7c re-home; docs-only |
+| P5.6 | `INV-CONSOLE-POLICIES-GROUNDED` | LANDED | `16614e2` | grounding CORRECTED, not landed-anew: `06`/`07` were already in the 2026-07-05 set (README rows now carry the substrate reconciliation: logging 3-not-mock's, action 4-not-3, no updated-date, distribution lives here); the Create Policy modal mock NEVER landed (design-session attachment; the cited `08-*.png` collides with TrustOps Rewind) -- TRD Section 0/3 fixed to name Section 3 as the modal's grounding; FORGE-DISTRIBUTION FD.7c status closed w/ the P5.5 re-home record |
 | P5.N | `INV-CONSOLE-POLICIES-COMPLETE` | PLANNED | -- | Playwright capstone (grouped accordion; Create w/ Network+CIDR target + ports/HTTPS + Quarantine + Full + 7-day window + Applied-To devices; publish confirm; malformed-port 400; version chip on edit; distribute + convergence 3 states; no-distribute-on-VTZ + four-action + three-logging structural sweeps; empty tenant honest); `REAL_SURFACES` allowlist; acceptance sweep; box redeploy live leg (enforcement OFF) |
 
 ## Acceptance sweep (TRD-CONSOLE-05 Section 7) -- filled at P5.N
