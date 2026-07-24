@@ -62,6 +62,10 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     objectDetail: unused,
     policyListByZone: unused,
     policyDetail: unused,
+    policyCreate: unused,
+    policyEdit: unused,
+    policyPublish: unused,
+    policyDelete: unused,
     entityDecisions: unused,
     entityConnections: unused,
     connectivityGraph: unused,
@@ -126,6 +130,11 @@ function operatorEngineWith(): OperatorEngine {
         record: wirePolicyRecord(),
         versions: [{ version: '1.0.0', lifecycle: 'published' }],
       }),
+    policyCreate: () => Promise.resolve({ id: 'p-new', version: '1.0.0', lifecycle: 'draft' }),
+    policyEdit: () => Promise.resolve({ id: 'p-1', version: '1.1.0', lifecycle: 'draft' }),
+    policyPublish: () =>
+      Promise.resolve({ id: 'p-1', version: '2.0.0', lifecycle: 'published', breaking: true }),
+    policyDelete: () => Promise.resolve({ id: 'p-1', version: '1.0.0', lifecycle: 'published' }),
     querySubmit: () =>
       Promise.resolve({
         rows: [
@@ -714,6 +723,128 @@ describe('BFF HTTP surface', () => {
       { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
     );
     expect((await fetch(`${base}/api/policies`)).status).toBe(503);
+  });
+
+  const policyDraftBody = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    name: 'contain-egress',
+    vtz: 'YouSource.Corp',
+    description: '',
+    logging: 'full',
+    maxClassification: 'confidential',
+    rules: [
+      {
+        source: { kind: 'agent', selectorKind: 'exact', selectorValue: 'demo-agent' },
+        destination: { kind: 'network', selectorKind: 'cidr', selectorValue: '10.8.0.0/16' },
+        action: 'quarantine',
+      },
+    ],
+    ...over,
+  });
+
+  async function postJson(base: string, path: string, body: unknown): Promise<Response> {
+    return fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('POST /api/policies creates a draft through the audited route (P5.4)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    const res = await postJson(base, '/api/policies', policyDraftBody());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      id: 'p-new',
+      version: '1.0.0',
+      lifecycle: 'draft',
+      breaking: false,
+    });
+  });
+
+  it('POST /api/policies/publish returns the published mutation with the breaking flag', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    const res = await postJson(base, '/api/policies/publish', {
+      vtz: 'YouSource.Corp',
+      id: 'p-1',
+      version: '2.0.0',
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      id: 'p-1',
+      version: '2.0.0',
+      lifecycle: 'published',
+      breaking: true,
+    });
+    // A publish missing vtz/id/version never reaches the engine.
+    expect((await postJson(base, '/api/policies/publish', { id: 'p-1' })).status).toBe(400);
+  });
+
+  it('POST /api/policies/delete deletes by vtz+id, and 400 without them', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    expect(
+      (await postJson(base, '/api/policies/delete', { vtz: 'YouSource.Corp', id: 'p-1' })).status,
+    ).toBe(200);
+    expect((await postJson(base, '/api/policies/delete', { id: 'p-1' })).status).toBe(400);
+  });
+
+  it('a policy command is 401 without a session and 400 on a malformed draft', async () => {
+    const noSession = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(undefined),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    expect((await postJson(noSession, '/api/policies', policyDraftBody())).status).toBe(401);
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    // A malformed draft (unknown action) is refused at the BFF before the engine is touched.
+    const res = await postJson(base, '/api/policies', policyDraftBody({ logging: 'verbose' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('maps the engine refusal classes: Conflict -> 409, Framing -> 400, else 403', async () => {
+    const refuse = (cls: string) => (): Promise<never> =>
+      Promise.reject(new EngineRefusedError({ class: cls, code: 1 } as never));
+    for (const [cls, status] of [
+      ['Conflict', 409],
+      ['Framing', 400],
+      ['Denied', 403],
+    ] as const) {
+      const engine: OperatorEngine = { ...operatorEngineWith(), policyCreate: refuse(cls) };
+      const base = await start(
+        mockClient(() => Promise.resolve()),
+        {
+          authRouter: authRouterWith(operatorSession),
+          operatorEngine: engine,
+        },
+      );
+      const res = await postJson(base, '/api/policies', policyDraftBody());
+      expect(res.status).toBe(status);
+    }
   });
 
   it('GET /api/vtz/convergence projects the three endpoint states, and 400 without an id', async () => {

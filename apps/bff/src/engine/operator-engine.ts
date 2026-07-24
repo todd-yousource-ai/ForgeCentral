@@ -42,10 +42,15 @@ import type {
   WireObjectEdit,
   WireObjectList,
   WireObjectMutated,
+  WirePolicyCreate,
+  WirePolicyDelete,
   WirePolicyDetail,
   WirePolicyDetailQuery,
+  WirePolicyEdit,
   WirePolicyList,
   WirePolicyListQuery,
+  WirePolicyMutated,
+  WirePolicyPublish,
   WireListGroups,
   WireListPrincipals,
   WireLugProvisioned,
@@ -89,6 +94,10 @@ export type EngineAction =
   | 'objectDetail'
   | 'policyListByZone'
   | 'policyDetail'
+  | 'policyCreate'
+  | 'policyEdit'
+  | 'policyPublish'
+  | 'policyDelete'
   | 'idamConnectors'
   | 'idamSync'
   | 'idamConnect'
@@ -231,6 +240,30 @@ export interface OperatorEngine {
     request: WirePolicyDetailQuery,
     opts?: EngineCallOptions,
   ): Promise<WirePolicyDetail>;
+  /** Author a new policy draft (POLICY_CREATE, PS.6) on behalf of `principal`, audited. */
+  policyCreate(
+    principal: OperatorPrincipal,
+    request: WirePolicyCreate,
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyMutated>;
+  /** Edit a policy into a new draft version (POLICY_EDIT, PS.6) on behalf of `principal`, audited. */
+  policyEdit(
+    principal: OperatorPrincipal,
+    request: WirePolicyEdit,
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyMutated>;
+  /** Publish a policy version (POLICY_PUBLISH, PS.6) on behalf of `principal`, audited. */
+  policyPublish(
+    principal: OperatorPrincipal,
+    request: WirePolicyPublish,
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyMutated>;
+  /** Delete a policy (POLICY_DELETE, PS.6) on behalf of `principal`, audited. */
+  policyDelete(
+    principal: OperatorPrincipal,
+    request: WirePolicyDelete,
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyMutated>;
   /** Register a named object (OBJECT_CREATE) on behalf of `principal`, audited. */
   objectCreate(
     principal: OperatorPrincipal,
@@ -481,6 +514,29 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'policyDetail', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.policyDetail({ ...request, operator }, opts);
+    },
+    // The four audited policy commands. The operator delegation is injected from the authenticated
+    // principal (never client-asserted): the engine attributes the audit entry to THIS operator, in THIS
+    // tenant, under the peer's Delegation grant.
+    policyCreate: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'policyCreate', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.policyCreate({ ...request, operator }, opts);
+    },
+    policyEdit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'policyEdit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.policyEdit({ ...request, operator }, opts);
+    },
+    policyPublish: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'policyPublish', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.policyPublish({ ...request, operator }, opts);
+    },
+    policyDelete: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'policyDelete', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.policyDelete({ ...request, operator }, opts);
     },
     objectCreate: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'objectCreate', request.request_id));

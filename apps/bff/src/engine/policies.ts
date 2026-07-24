@@ -13,11 +13,18 @@
 
 import type {
   PolicyDetailView,
+  PolicyDraft,
+  PolicyMutation,
   PolicyZoneGroup,
   WirePolicyDetailQuery,
   WirePolicyListQuery,
 } from '@forge/contracts';
-import { toPolicyDetail, toPolicyZones } from '@forge/contracts';
+import {
+  toPolicyDetail,
+  toPolicyMutation,
+  toPolicyZones,
+  toWirePolicySpec,
+} from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -67,4 +74,77 @@ export async function resolvePolicyDetail(
     throw new PoliciesUnavailableError('the policy record carries an unknown engine tag');
   }
   return view;
+}
+
+/** Project a policy command ack into the view mutation, failing closed on an unrenderable ack. */
+function mutation(reply: import('@forge/contracts').WirePolicyMutated): PolicyMutation {
+  const view = toPolicyMutation(reply);
+  if (view === null) {
+    throw new PoliciesUnavailableError('the command ack carries an unknown lifecycle');
+  }
+  return view;
+}
+
+/**
+ * Author a new policy draft (`policies.create` -> crdb POLICY_CREATE, PS.6, audited). The store mints
+ * v1.0.0 as a Draft; a duplicate name in the zone is a typed refusal the route maps to 409. A refusal
+ * (`EngineRefusedError`) propagates unchanged for the route to classify (409/400/403).
+ */
+export async function resolveCreatePolicy(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  draft: PolicyDraft,
+  opts?: EngineCallOptions,
+): Promise<PolicyMutation> {
+  const reply = await engine.policyCreate(
+    principal,
+    { request_id: requestId(), spec: toWirePolicySpec(draft) },
+    opts,
+  );
+  return mutation(reply);
+}
+
+/** Edit a policy into a new Draft version (`policies.edit` -> crdb POLICY_EDIT, PS.6, audited). */
+export async function resolveEditPolicy(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  id: string,
+  draft: PolicyDraft,
+  opts?: EngineCallOptions,
+): Promise<PolicyMutation> {
+  const reply = await engine.policyEdit(
+    principal,
+    { request_id: requestId(), id, spec: toWirePolicySpec(draft) },
+    opts,
+  );
+  return mutation(reply);
+}
+
+/** Publish a policy version (`policies.publish` -> crdb POLICY_PUBLISH, PS.6, audited; breaking flagged). */
+export async function resolvePublishPolicy(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  vtz: string,
+  id: string,
+  version: string,
+  opts?: EngineCallOptions,
+): Promise<PolicyMutation> {
+  const reply = await engine.policyPublish(
+    principal,
+    { request_id: requestId(), vtz, id, version },
+    opts,
+  );
+  return mutation(reply);
+}
+
+/** Delete a policy (`policies.delete` -> crdb POLICY_DELETE, PS.6, tombstoned; history preserved). */
+export async function resolveDeletePolicy(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  vtz: string,
+  id: string,
+  opts?: EngineCallOptions,
+): Promise<PolicyMutation> {
+  const reply = await engine.policyDelete(principal, { request_id: requestId(), vtz, id }, opts);
+  return mutation(reply);
 }

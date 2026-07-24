@@ -85,10 +85,85 @@ function json(route: Route, body: unknown): Promise<void> {
   });
 }
 
-async function mockBff(page: Page, policiesBody: unknown = zones): Promise<void> {
+const vtzTree = {
+  zones: [
+    {
+      id: 'YouSource.Corp',
+      name: 'YouSource.Corp',
+      parent: 'YouSource',
+      zoneType: 'standard',
+      lifecycle: 'published',
+      microSegmentation: true,
+      telemetry: 'full',
+      reauthIntervalHours: 8,
+      ownPostures: [],
+      effectivePostures: [],
+      subZoneCount: 0,
+    },
+  ],
+  truncated: false,
+};
+
+const objectCatalog = [
+  {
+    name: 'demo-agent',
+    kind: 'agent',
+    selectorKind: 'exact',
+    selectorValue: 'demo-agent',
+    attributes: [],
+    description: '',
+    tags: [],
+    lifecycle: 'published',
+  },
+  {
+    name: 'corp-subnet',
+    kind: 'network',
+    selectorKind: 'cidr',
+    selectorValue: '10.8.0.0/16',
+    attributes: [],
+    description: '',
+    tags: [],
+    lifecycle: 'published',
+  },
+];
+
+/**
+ * Mock the whole BFF. `state.zones` backs the read; a create POST appends the drafted policy as the
+ * engine's row so it refetches into the surface; `commands` records every audited POST.
+ */
+async function mockBff(
+  page: Page,
+  initial: Array<Record<string, unknown>> = zones,
+): Promise<{ commands: Array<{ url: string; body: unknown }> }> {
+  const commands: Array<{ url: string; body: unknown }> = [];
+  const state = { zones: initial.map((z) => ({ ...z })) };
+
   await page.route('**/auth/me', (route) => json(route, { operator: OPERATOR }));
-  await page.route(/\/api\/vtz\/tree/, (route) => json(route, { zones: [], truncated: false }));
-  await page.route(/\/api\/policies$/, (route) => json(route, policiesBody));
+  await page.route(/\/api\/vtz\/tree/, (route) => json(route, vtzTree));
+  await page.route(/\/api\/objects$/, (route) => json(route, objectCatalog));
+  await page.route(/\/api\/policies\/(edit|publish|delete)$/, (route) => {
+    commands.push({
+      url: new URL(route.request().url()).pathname,
+      body: route.request().postDataJSON(),
+    });
+    return json(route, { id: 'p-1', version: '2.0.0', lifecycle: 'published', breaking: false });
+  });
+  await page.route(/\/api\/policies$/, (route) => {
+    if (route.request().method() === 'POST') {
+      const draft = route.request().postDataJSON() as Record<string, unknown>;
+      commands.push({ url: '/api/policies', body: draft });
+      const vtz = String(draft['vtz']);
+      const row = { id: 'p-new', version: '1.0.0', lifecycle: 'draft', ...draft };
+      const group = state.zones.find((z) => z['vtz'] === vtz) as
+        { vtz: string; policies: Record<string, unknown>[] } | undefined;
+      if (group) group.policies.push(row);
+      else state.zones.push({ vtz, policies: [row] });
+      return json(route, { id: 'p-new', version: '1.0.0', lifecycle: 'draft', breaking: false });
+    }
+    return json(route, state.zones);
+  });
+
+  return { commands };
 }
 
 test('the Policies journey: VTZ-grouped accordions expand to the real policy table', async ({
@@ -124,17 +199,68 @@ test('the Policies journey: VTZ-grouped accordions expand to the real policy tab
     'Logging',
     'Status',
   ]) {
-    await expect(page.getByRole('columnheader', { name: header })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: header, exact: true })).toBeVisible();
   }
 
-  // The Create control is present but disabled (authoring is P5.4), never a dead action.
-  await expect(page.getByRole('button', { name: '+ Create Policy' })).toBeDisabled();
+  // The Create control is live (authoring, P5.4).
+  await expect(page.getByRole('button', { name: '+ Create Policy' })).toBeEnabled();
 
   // Search narrows a complete dataset and opens the matching group in place.
   await page.getByRole('searchbox', { name: 'Search policies' }).fill('allow-dns');
   await expect(page.getByText('allow-dns')).toBeVisible();
   await expect(page.getByText('Permit')).toBeVisible();
   await expect(page.getByRole('button', { name: 'YouSource.Corp, 1 policy' })).toHaveCount(0);
+});
+
+test('Create authors a policy through the audited route and it appears as the engine row (P5.4)', async ({
+  page,
+}) => {
+  const bff = await mockBff(page, []);
+  await page.goto('/policies');
+
+  await page.getByRole('button', { name: '+ Create Policy' }).click();
+  const form = page.getByRole('form', { name: 'Create a policy' });
+  await expect(form).toBeVisible();
+
+  await form.getByLabel('Policy Name').fill('contain-egress');
+  await form.getByLabel('Zone').selectOption('YouSource.Corp');
+  // Subjects + Targets are real objects from the catalog; the policy authors the cross-product ruleset.
+  await form.getByLabel('Subjects').selectOption('demo-agent');
+  await form.getByLabel('Targets').selectOption('10.8.0.0/16');
+  await form.getByLabel('Action').selectOption('quarantine');
+  await form.getByLabel('Logging Level').selectOption('full');
+  // The Action control offers exactly the four lattice actions.
+  expect(await form.getByLabel('Action').locator('option').allTextContents()).toEqual([
+    'Permit',
+    'Monitor',
+    'Quarantine',
+    'Deny',
+  ]);
+
+  await form.getByRole('button', { name: 'Save as Draft' }).click();
+
+  // The audited create fired with the built ruleset, and the draft refetches into the surface.
+  await expect(page.getByRole('button', { name: 'YouSource.Corp, 1 policy' })).toBeVisible();
+  const created = bff.commands.find((c) => c.url === '/api/policies')?.body as {
+    name: string;
+    rules: { action: string }[];
+  };
+  expect(created.name).toBe('contain-egress');
+  expect(created.rules[0]?.action).toBe('quarantine');
+});
+
+test('Delete removes a policy through a critical confirm gate', async ({ page }) => {
+  const bff = await mockBff(page);
+  await page.goto('/policies');
+  await page.getByRole('button', { name: 'YouSource.Corp, 1 policy' }).click();
+  await page
+    .getByRole('row', { name: /contain-egress/ })
+    .getByRole('button', { name: 'Delete' })
+    .click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Delete' }).click();
+  await expect.poll(() => bff.commands.some((c) => c.url === '/api/policies/delete')).toBe(true);
 });
 
 test('an empty tenant renders the honest empty state, never a fabricated policy', async ({

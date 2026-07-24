@@ -6,8 +6,22 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-24): P5.1 + P5.2 + P5.3 LANDED (contract + read path + grouped read-only surface).
-  NEXT = P5.4 (Create/Edit + publish/delete), UNBLOCKED.**
+- **State (2026-07-24): P5.1..P5.4 LANDED (contract + read path + grouped surface + authoring).
+  NEXT = P5.5 (compose -> sign -> push + the convergence ledger, the FD.7c re-home), UNBLOCKED.**
+  P5.4 code `f00f650`: the authoring plane -- BFF command path (dispatch PolicyCreate/Edit/Publish/Delete;
+  `CrucibleClient`/`WireCrucibleClient` + `replyToPolicyMutated`; `OperatorEngine` 4 delegated commands;
+  `engine/policies.ts` resolvers; `POST /api/policies[/edit|/publish|/delete]` mounted before the 405 gate,
+  refusal mapping 409/400/403, cache-drop on success; `@forge/contracts toPolicyDraftInput` fail-closed
+  body parser). SPA: `usePolicyMutation` (`useSavePolicy` create/edit-then-publish + `useDeletePolicy`),
+  `PolicyForm` (name/zone/Subjects+Targets over `objects.list`/cross-product ruleset/protocol chips+validated
+  ports/four-action/three-logging/Restrictions+Advanced collapsibles; Save-Draft vs Save-&-Publish
+  confirm-gated), `PoliciesSurface` enables Create + per-row Edit/Delete (critical confirm). Full networked
+  gate (incl. e2e 31 + audit) green.
+  **P5.4 deferrals (honest, gating named):** (1) absolute active-window (from/until) authoring -- the engine
+  bound is an opaque HLC `u64` with no Console-facing wall-clock->HLC conversion, so a datetime control would
+  emit a wrong-scale bound (a governance lie); schedule(days/hours)/geo/tags ARE authored. Gated on a
+  documented Console-facing HLC conversion (crdb). (2) Applied-To authored as free-text endpoint CNs -- no
+  enrollable-endpoint list read exists yet.
   The design PR merged `e0f02bd`. P5.1 code `22c5cf5`: contract. P5.2 code `d8cc202`: the BFF read path.
   P5.3 code `ce7f3f3`: the grouped read-only surface -- net-new `AccordionGroup` primitive in
   `packages/design` (first collapsible-group, `.fc-accordion*`); `usePolicies` (TanStack Query over
@@ -31,19 +45,16 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
   with P5.5. `FC_SIGNER_PORT` must be in the running BFF env.
 - **Reused live surfaces:** `vtz.tree` (grouping axis + VTZ dropdown), `objects.list` (subject/target
   pickers). Both COMPLETE. `policies.ts` reuses `ObjectKind`/`SelectorKind` from the Objects contract.
-- **Next action:** P5.4 -- Create/Edit + publish/delete. Wire codecs (`PolicyCreate/Edit/Publish/Delete`)
-  + delegated actions + resolvers + the POST route family w/ typed refusal mapping (409/400/403) +
-  fail-closed draft parse. The Create Policy modal (`08-*.png`): name; VTZ dropdown; Subjects + Targets
-  multi-selects over `objects.list` + principals; Protocol chips + Ports; Action (the four); Logging (the
-  three); the Restrictions collapsible (days + hours + active-window + geo + tags); the Advanced collapsible
-  (Applied-To + description); Save-as-Draft vs Save-&-Publish (confirm-gated, breaking flagged); per-row
-  Edit; Delete behind a critical ConfirmDialog; client validation; the <=3-click paths. **Enable + wire the
-  P5.3 Create control** (present-but-disabled today) and add the per-row view/edit affordances (deferred
-  from P5.3 to avoid a dead control). UNBLOCKED (PS.6 commands landed).
-- **P5.3 deviations (honest):** (1) the Create control is present-but-disabled (a dead action would be a
-  stub affordance); P5.4 enables it. (2) per-row view/edit affordances fold into P5.4 (they need the
-  modal). (3) the mock's per-group "updated date" is omitted -- the wire record carries no updated
-  timestamp, so it would be fabricated; the count badge stands in.
+- **Next action:** P5.5 -- compose -> sign -> push + the convergence ledger, **re-homed here** (the FD.7c
+  follow-up). Land the `packages/wire` `BundleCommit`/`BundleConvergence` CBOR codecs (fixed 2026-07-21);
+  mount the FD.7c `DistributionPanel` on the Policy surface (per-zone Distribute confirm-gated over the
+  zone's policies' Applied-To, composing `effective_published_policies` (PS.7) -> sidecar `signBundle` ->
+  crdb carrier); the three-state convergence ledger (applied / rejected-with-reason / silent) over
+  `policies.convergence`. NO distribute/commit control on the VTZ surface (structural assert). The signing
+  key never enters the TS tier (hygiene test). `FC_SIGNER_PORT` must be in the running BFF env. Surface +
+  projection tests; the live leg folds into P5.N.
+- **P5.3 deviations (honest):** the mock's per-group "updated date" is omitted -- the wire record carries no
+  updated timestamp (fabrication); the count badge stands in.
 - Enforcement stays AG.7-OFF: a published + distributed bundle realizes nothing until enforcement is engaged.
 - **Note:** the repo GitHub remote is `origin` (URL uses the `github-forgecentral` SSH host alias), not a
   remote literally named `github-forgecentral` (CLAUDE.md's naming is loose). Push `git push origin main`.
@@ -68,7 +79,7 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 | P5.1 | `INV-CONSOLE-POLICIES-CONTRACT` | LANDED | `22c5cf5` | schema re-vendor (PS.5 DTOs, +683) + `policies.ts` view models (`PolicyRow`/`PolicyDetailView`/`PolicyDraft`) + fail-closed closed-enum projections (four actions, three logging levels, + protocol/selector/kind/lifecycle/day/classification); `policies.*` bindings registered (byZone/detail + create/edit/publish/delete LIVE over PS.5/PS.6; enforcement-runtime PENDING -> torch). Reuses `ObjectKind`/`SelectorKind` from Objects |
 | P5.2 | `INV-CONSOLE-POLICIES-BROKERED` | LANDED | `d8cc202` | dispatch `PolicyListByZone`/`PolicyDetail` on QuerySubmit; `CrucibleClient`+`WireCrucibleClient` methods + `replyToPolicyList`/`replyToPolicyDetail`; `OperatorEngine` delegated reads (operator+tenant injected, delegation recorded); `engine/policies.ts` fail-closed -> `PoliciesUnavailableError`; `GET /api/policies`(+`/detail?vtz=&id=`) 401/503/400/503; tenant-scoped `policies-v1` cache; resolver+route+delegation tests |
 | P5.3 | `INV-CONSOLE-POLICIES-GROUPED` | LANDED | `ce7f3f3` | net-new `AccordionGroup` primitive (`packages/design`, `.fc-accordion*`) + `usePolicies` + `PoliciesSurface`: header/search/zone-filter/disabled-Create; per-VTZ accordions (count badge, ordered by live `vtz.tree`) -> `DataTable` w/ the 07 columns (closed-enum action/logging cells, pure summaries); honest states; `policies` route replaces placeholder + no-stub `REAL_SURFACES`; read-only e2e |
-| P5.4 | `INV-CONSOLE-POLICIES-AUTHOR` | PLANNED | -- | command codecs + POST routes (typed 409/400/403); the Create Policy modal (`08-*.png`): name/VTZ/subjects/targets/protocol chips/ports/action(4)/logging(3) + Restrictions collapsible (days+hours+active-window+geo+tags) + Advanced collapsible (Applied-To+description); Save-Draft vs Save-&-Publish; per-row edit/delete; client validation; 3-click paths |
+| P5.4 | `INV-CONSOLE-POLICIES-AUTHOR` | LANDED | `f00f650` | BFF command path (dispatch + `CrucibleClient`/`WireCrucibleClient` + `OperatorEngine` 4 delegated cmds + `engine/policies.ts` resolvers + `POST /api/policies[/edit|/publish|/delete]` before the 405 gate, 409/400/403 mapping, cache-drop; `@forge/contracts toPolicyDraftInput` fail-closed parser); SPA `usePolicyMutation` (`useSavePolicy` create/edit-then-publish + `useDeletePolicy`) + `PolicyForm` (08 modal: name/zone/subjects/targets cross-product/protocol chips+validated ports/action(4)/logging(3) + Restrictions[days+hours+geo+tags] + Advanced[Applied-To+classification+description]; Save-Draft vs Save-&-Publish confirm-gated) + surface Create/Edit/Delete. **Deferred: absolute active-window authoring (opaque HLC); Applied-To = endpoint CNs.** |
 | P5.5 | `INV-CONSOLE-POLICIES-DISTRIBUTED` | PLANNED | -- | re-home FD.7c: land `packages/wire` BundleCommit/Convergence codecs; mount `DistributionPanel` here (Distribute confirm-gated over Applied-To; compose `effective_published_policies`(PS.7) -> sidecar sign -> crdb carrier); 3-state convergence ledger; NO distribute control on VTZ surface (structural); signing key never in TS (hygiene) |
 | P5.6 | `INV-CONSOLE-POLICIES-GROUNDED` | PLANNED | -- | land `06/07/08-*.png` + README rows; residual TRD grounding; cross-ref FORGE-DISTRIBUTION FD.7c re-home; docs-only |
 | P5.N | `INV-CONSOLE-POLICIES-COMPLETE` | PLANNED | -- | Playwright capstone (grouped accordion; Create w/ Network+CIDR target + ports/HTTPS + Quarantine + Full + 7-day window + Applied-To devices; publish confirm; malformed-port 400; version chip on edit; distribute + convergence 3 states; no-distribute-on-VTZ + four-action + three-logging structural sweeps; empty tenant honest); `REAL_SURFACES` allowlist; acceptance sweep; box redeploy live leg (enforcement OFF) |
@@ -90,6 +101,11 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 ## Named deferrals (honest, gating work named)
 
 - Runtime enforcement of schedule/geo/ports: `torch IP-TORCH-POLICY-ENFORCE` (enforcement AG.7-OFF).
+- Absolute active-window (from/until) AUTHORING: gated on a documented Console-facing HLC<->wall-clock
+  conversion (crdb). The engine bound is an opaque `Hlc(u64)`; authoring a datetime would emit a wrong-scale
+  value (a governance lie), so P5.4 authors schedule/geo/tags only and leaves the absolute window unset.
+- Applied-To picker over enrolled endpoints: gated on an enrollable-endpoint list read. P5.4 authors
+  Applied-To as free-text endpoint CNs.
 - Zone-membership-defaulted Applied-To: crdb `VtzSetMembership` (deferred, TRD-CONSOLE-12).
 - Simulate / dry-run: TRD-CONSOLE-07 (AIOps).
 - EXPLAIN over a composed effective policy: later, once torch-forge compose is wired end to end.

@@ -17,6 +17,7 @@ import { useMemo, useState, type ReactElement } from 'react';
 import {
   AccordionGroup,
   Badge,
+  ConfirmDialog,
   DataTable,
   type BadgeVariant,
   type DataTableColumn,
@@ -27,6 +28,8 @@ import { policyActionLabel, policyLoggingLabel, policyProtocolLabel } from '@for
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { usePolicies } from './usePolicies.js';
 import { useVtzTree } from './useVtzTree.js';
+import { useDeletePolicy } from './usePolicyMutation.js';
+import { PolicyForm } from './PolicyForm.js';
 
 /** The lattice action -> its semantic badge color (permit calm, deny critical, quarantine its own rung). */
 export function actionVariant(action: PolicyAction): BadgeVariant {
@@ -144,8 +147,38 @@ function policyMatches(policy: PolicyRow, needle: string): boolean {
 export function PoliciesSurface(): ReactElement {
   const policies = usePolicies();
   const tree = useVtzTree();
+  const deletePolicy = useDeletePolicy();
   const [search, setSearch] = useState('');
   const [zone, setZone] = useState('');
+  const [form, setForm] = useState<'closed' | 'add' | PolicyRow>('closed');
+  const [confirming, setConfirming] = useState<PolicyRow | null>(null);
+
+  // The row action affordances (Edit / Delete) close over the surface handlers, so they live here rather
+  // than in the module-level display columns.
+  const columns = useMemo<readonly DataTableColumn<PolicyRow>[]>(
+    () => [
+      ...COLUMNS,
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: (p) => (
+          <span className="fcx-policy-actions">
+            <button type="button" className="fcx-btn" onClick={() => setForm(p)}>
+              Edit
+            </button>
+            <button
+              type="button"
+              className="fcx-btn fcx-btn--danger"
+              onClick={() => setConfirming(p)}
+            >
+              Delete
+            </button>
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
 
   // The zone display order + the filter options come from the live VTZ tree when available; the surface
   // never blocks on it (policies drive the content). A policy zone absent from the tree still renders,
@@ -192,13 +225,30 @@ export function PoliciesSurface(): ReactElement {
         <button
           type="button"
           className="fcx-btn fcx-btn--primary"
-          disabled
-          aria-disabled="true"
-          title="Policy authoring lands in the next step"
+          onClick={() => setForm((f) => (f === 'add' ? 'closed' : 'add'))}
         >
           + Create Policy
         </button>
       </div>
+
+      {form !== 'closed' ? (
+        <PolicyForm editing={form === 'add' ? null : form} onDone={() => setForm('closed')} />
+      ) : null}
+
+      <ConfirmDialog
+        open={confirming !== null}
+        title={confirming !== null ? `Delete ${confirming.name}?` : ''}
+        description="Deleting a policy tombstones every version (history is preserved) and removes it from future distribution. Enforcement is unaffected until separately engaged."
+        tone="critical"
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (confirming !== null) {
+            deletePolicy.mutate({ vtz: confirming.vtz, id: confirming.id });
+          }
+          setConfirming(null);
+        }}
+        onCancel={() => setConfirming(null)}
+      />
 
       <div className="fcx-surface__controls">
         <input
@@ -251,7 +301,7 @@ export function PoliciesSurface(): ReactElement {
               >
                 <DataTable
                   caption={`Policies in ${group.vtz}`}
-                  columns={COLUMNS}
+                  columns={columns}
                   rows={group.policies}
                   rowKey={(p) => p.id}
                 />

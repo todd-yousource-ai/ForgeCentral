@@ -121,6 +121,31 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ record: null, versions: [] });
     },
+    policyCreate: (req) => {
+      calls.push(`policyCreate:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ id: 'p-new', version: '1.0.0', lifecycle: 'draft' });
+    },
+    policyEdit: (req) => {
+      calls.push(`policyEdit:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ id: 'p-1', version: '1.1.0', lifecycle: 'draft' });
+    },
+    policyPublish: (req) => {
+      calls.push(`policyPublish:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        id: 'p-1',
+        version: '2.0.0',
+        lifecycle: 'published',
+        breaking: true,
+      });
+    },
+    policyDelete: (req) => {
+      calls.push(`policyDelete:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ id: 'p-1', version: '1.0.0', lifecycle: 'published' });
+    },
     objectCreate: (req) => {
       calls.push(`objectCreate:${String(req.request_id)}`);
       reads.push(req);
@@ -543,6 +568,54 @@ describe('createOperatorEngine', () => {
     }
     expect(recorded.map((d) => d.action)).toEqual(['policyListByZone', 'policyDetail']);
     expect(recorded.every((d) => d.tenant === 'tenant-op')).toBe(true);
+  });
+
+  it('records the delegation + injects the operator on every audited Policies write (P5.4)', async () => {
+    // Each policy command writes an audit entry attributed to THIS operator in THIS tenant, so the
+    // delegation is injected server-side on every mutation and is never client-asserted.
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    const spec = {
+      name: 'p',
+      vtz: 'corp.prod',
+      description: '',
+      logging: 'full',
+      max_classification: 'internal',
+      rules: [],
+    };
+    await engine.policyCreate(admin, { request_id: 31, operator: null, spec });
+    await engine.policyEdit(admin, { request_id: 32, operator: null, id: 'p-1', spec });
+    await engine.policyPublish(admin, {
+      request_id: 33,
+      operator: null,
+      vtz: 'corp.prod',
+      id: 'p-1',
+      version: '1.0.0',
+    });
+    await engine.policyDelete(admin, {
+      request_id: 34,
+      operator: null,
+      vtz: 'corp.prod',
+      id: 'p-1',
+    });
+
+    expect(calls).toEqual([
+      'policyCreate:31',
+      'policyEdit:32',
+      'policyPublish:33',
+      'policyDelete:34',
+    ]);
+    for (const read of reads) {
+      expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
+    }
+    expect(recorded.map((d) => d.action)).toEqual([
+      'policyCreate',
+      'policyEdit',
+      'policyPublish',
+      'policyDelete',
+    ]);
   });
 
   it('records the delegation + injects the operator on every audited VTZ write (V2.3)', async () => {

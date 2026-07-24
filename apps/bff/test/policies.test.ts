@@ -10,10 +10,16 @@ import type { WirePolicyDetail, WirePolicyList, WirePolicyRecord } from '@forge/
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
+import type { PolicyDraft } from '@forge/contracts';
+
 import {
   PoliciesUnavailableError,
+  resolveCreatePolicy,
+  resolveDeletePolicy,
+  resolveEditPolicy,
   resolvePolicyDetail,
   resolvePolicyZones,
+  resolvePublishPolicy,
 } from '../src/engine/policies.js';
 
 const PRINCIPAL: OperatorPrincipal = {
@@ -47,14 +53,57 @@ const policyRecord = (overrides: Partial<WirePolicyRecord> = {}): WirePolicyReco
   ...overrides,
 });
 
-function engineWith(parts: { list?: WirePolicyList; detail?: WirePolicyDetail }): OperatorEngine {
+function engineWith(parts: {
+  list?: WirePolicyList;
+  detail?: WirePolicyDetail;
+  sent?: Array<{ op: string; req: Record<string, unknown> }>;
+}): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
+  const record = (op: string, ack: Record<string, unknown>) => (_p: unknown, req: unknown) => {
+    parts.sent?.push({ op, req: req as Record<string, unknown> });
+    return Promise.resolve(ack);
+  };
   return {
     policyListByZone: () => Promise.resolve(parts.list ?? { zones: [] }),
     policyDetail: () => Promise.resolve(parts.detail ?? { record: null, versions: [] }),
+    policyCreate: record('create', { id: 'p-new', version: '1.0.0', lifecycle: 'draft' }),
+    policyEdit: record('edit', { id: 'p-1', version: '1.1.0', lifecycle: 'draft' }),
+    policyPublish: record('publish', {
+      id: 'p-1',
+      version: '2.0.0',
+      lifecycle: 'published',
+      breaking: true,
+    }),
+    policyDelete: record('delete', { id: 'p-1', version: '1.0.0', lifecycle: 'published' }),
     querySubmit: unused,
   } as unknown as OperatorEngine;
 }
+
+const draft: PolicyDraft = {
+  vtz: 'corp.prod',
+  name: 'contain-egress',
+  description: '',
+  rules: [
+    {
+      source: { kind: 'agent', selectorKind: 'exact', selectorValue: 'demo-agent' },
+      destination: { kind: 'network', selectorKind: 'cidr', selectorValue: '10.8.0.0/16' },
+      action: 'quarantine',
+    },
+  ],
+  network: { protocols: ['https'], ports: '443' },
+  restrictions: {
+    scheduleDays: [],
+    scheduleStartMinute: null,
+    scheduleEndMinute: null,
+    activeFrom: null,
+    activeUntil: null,
+    geo: [],
+    tags: [],
+  },
+  logging: 'full',
+  appliedTo: [],
+  maxClassification: 'confidential',
+};
 
 describe('resolvePolicyZones', () => {
   it('projects the grouped list', async () => {
@@ -107,5 +156,54 @@ describe('resolvePolicyDetail', () => {
     return expect(
       resolvePolicyDetail(engine, PRINCIPAL, 'corp.prod', 'p-1'),
     ).rejects.toBeInstanceOf(PoliciesUnavailableError);
+  });
+});
+
+describe('the P5.4 command resolvers convert the draft + project the ack', () => {
+  it('create sends the wire spec and returns the mutation', async () => {
+    const sent: Array<{ op: string; req: Record<string, unknown> }> = [];
+    const mutation = await resolveCreatePolicy(engineWith({ sent }), PRINCIPAL, draft);
+    expect(mutation).toEqual({
+      id: 'p-new',
+      version: '1.0.0',
+      lifecycle: 'draft',
+      breaking: false,
+    });
+    // The draft was converted to a wire spec (snake_case, flattened network).
+    const spec = sent[0]?.req['spec'] as Record<string, unknown>;
+    expect(spec['name']).toBe('contain-egress');
+    expect(spec['max_classification']).toBe('confidential');
+    expect(spec['protocols']).toEqual(['https']);
+  });
+
+  it('edit names the id and returns the new draft version', async () => {
+    const sent: Array<{ op: string; req: Record<string, unknown> }> = [];
+    const mutation = await resolveEditPolicy(engineWith({ sent }), PRINCIPAL, 'p-1', draft);
+    expect(mutation.version).toBe('1.1.0');
+    expect(sent[0]?.req['id']).toBe('p-1');
+  });
+
+  it('publish returns the published mutation with the breaking flag', async () => {
+    const sent: Array<{ op: string; req: Record<string, unknown> }> = [];
+    const mutation = await resolvePublishPolicy(
+      engineWith({ sent }),
+      PRINCIPAL,
+      'corp.prod',
+      'p-1',
+      '2.0.0',
+    );
+    expect(mutation).toEqual({
+      id: 'p-1',
+      version: '2.0.0',
+      lifecycle: 'published',
+      breaking: true,
+    });
+    expect(sent[0]?.req).toMatchObject({ vtz: 'corp.prod', id: 'p-1', version: '2.0.0' });
+  });
+
+  it('delete names vtz+id and returns the ack', async () => {
+    const sent: Array<{ op: string; req: Record<string, unknown> }> = [];
+    await resolveDeletePolicy(engineWith({ sent }), PRINCIPAL, 'corp.prod', 'p-1');
+    expect(sent[0]?.req).toMatchObject({ vtz: 'corp.prod', id: 'p-1' });
   });
 });

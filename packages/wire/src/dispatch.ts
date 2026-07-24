@@ -73,6 +73,12 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // routes them in the same read allowlist as VtzTree/ObjectList.
       'PolicyListByZone' in request ||
       'PolicyDetail' in request ||
+      // The Policies-surface commands (POLICY_CREATE/EDIT/PUBLISH/DELETE, crdb PS.6) ride the QuerySubmit
+      // opcode like the other data-plane writes; the engine routes them to the write path by their tag.
+      'PolicyCreate' in request ||
+      'PolicyEdit' in request ||
+      'PolicyPublish' in request ||
+      'PolicyDelete' in request ||
       // The External IDAM connector read (IDAM_CONNECTORS) + the sync command (IDAM_SYNC, crdb IA.8)
       // ride the QuerySubmit opcode too; the engine discriminates them by their CBOR enum tag.
       'IdamConnectors' in request ||

@@ -1,13 +1,14 @@
-// apps/console/src/test/policies-surface.test.tsx -- IP-CONSOLE-05 P5.3 the grouped read-only surface.
+// apps/console/src/test/policies-surface.test.tsx -- IP-CONSOLE-05 P5.3/P5.4 the Policies surface.
 //
 // Proves the surface half of INV-CONSOLE-POLICIES-REAL: the tenant's policies render grouped by VTZ in
 // collapsible accordions the operator expands to a real table (the 07-*.png columns); every cell derives
 // from the engine record (action badges are exactly the four-action lattice, logging exactly the three
-// levels); the honest states (loading / engine error / no match) render instead of a fabricated grid; the
-// Create control is present-but-disabled (authoring is P5.4); and an empty tenant renders honest empties.
+// levels); the honest states (loading / engine error / no match) render instead of a fabricated grid;
+// Create opens the authoring form and Save-as-Draft posts the built ruleset; Delete is behind a critical
+// confirm; and an empty tenant renders honest empties.
 
 import type { PolicyRow, PolicyZoneGroup } from '@forge/contracts';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -16,6 +17,7 @@ import {
   restrictionsSummary,
   scopeSummary,
 } from '../surfaces/PoliciesSurface.js';
+import { portsValid } from '../surfaces/PolicyForm.js';
 import { renderWithProviders } from './render.js';
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -90,19 +92,82 @@ const zones: readonly PolicyZoneGroup[] = [
   },
 ];
 
-const emptyTree = { zones: [], truncated: false };
+const tree = {
+  zones: [
+    {
+      id: 'YouSource.Corp',
+      name: 'YouSource.Corp',
+      parent: 'YouSource',
+      zoneType: 'standard',
+      lifecycle: 'published',
+      microSegmentation: true,
+      telemetry: 'full',
+      reauthIntervalHours: 8,
+      ownPostures: [],
+      effectivePostures: [],
+      subZoneCount: 0,
+    },
+  ],
+  truncated: false,
+};
 
-function stubFetch(opts: { policiesStatus?: number; policiesBody?: unknown } = {}): void {
-  const fetchMock = vi.fn((input: string) => {
+const catalog = [
+  {
+    name: 'demo-agent',
+    kind: 'agent',
+    selectorKind: 'exact',
+    selectorValue: 'demo-agent',
+    attributes: [],
+    description: '',
+    tags: [],
+    lifecycle: 'published',
+  },
+  {
+    name: 'corp-subnet',
+    kind: 'network',
+    selectorKind: 'cidr',
+    selectorValue: '10.8.0.0/16',
+    attributes: [],
+    description: '',
+    tags: [],
+    lifecycle: 'published',
+  },
+];
+
+interface StubOpts {
+  policiesStatus?: number;
+  policiesBody?: unknown;
+  commandStatus?: number;
+}
+
+function stubFetch(opts: StubOpts = {}): { commands: Array<{ url: string; body: unknown }> } {
+  const commands: Array<{ url: string; body: unknown }> = [];
+  const fetchMock = vi.fn((input: string, init?: RequestInit) => {
     if (input.startsWith('/api/policies')) {
+      if (init?.method === 'POST') {
+        const raw = typeof init.body === 'string' ? init.body : '';
+        commands.push({ url: input, body: JSON.parse(raw) });
+        return Promise.resolve(
+          jsonResponse(opts.commandStatus ?? 200, {
+            id: 'p-new',
+            version: '1.0.0',
+            lifecycle: 'draft',
+            breaking: false,
+          }),
+        );
+      }
       return Promise.resolve(jsonResponse(opts.policiesStatus ?? 200, opts.policiesBody ?? zones));
     }
     if (input.startsWith('/api/vtz/tree')) {
-      return Promise.resolve(jsonResponse(200, emptyTree));
+      return Promise.resolve(jsonResponse(200, tree));
+    }
+    if (input.startsWith('/api/objects')) {
+      return Promise.resolve(jsonResponse(200, catalog));
     }
     throw new Error(`unexpected fetch ${input}`);
   });
   vi.stubGlobal('fetch', fetchMock);
+  return { commands };
 }
 
 afterEach(() => {
@@ -173,12 +238,77 @@ describe('the Policies surface (P5.3) groups the real policies by VTZ', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders the Create control present but disabled (authoring is the next step)', async () => {
+  it('opens the authoring form with the closed-enum controls when Create is clicked (P5.4)', async () => {
     stubFetch();
     renderWithProviders(<PoliciesSurface />, { route: '/policies' });
     await screen.findByRole('button', { name: 'YouSource.Corp, 1 policy' });
-    const create = screen.getByRole('button', { name: '+ Create Policy' });
-    expect(create).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '+ Create Policy' }));
+    const form = await screen.findByRole('form', { name: 'Create a policy' });
+    expect(form).toBeInTheDocument();
+    // The Action control offers exactly the four lattice actions; Logging exactly the three levels.
+    const actions = [...screen.getByLabelText('Action').querySelectorAll('option')].map(
+      (o) => o.textContent,
+    );
+    expect(actions).toEqual(['Permit', 'Monitor', 'Quarantine', 'Deny']);
+    const levels = [...screen.getByLabelText('Logging Level').querySelectorAll('option')].map(
+      (o) => o.textContent,
+    );
+    expect(levels).toEqual(['Full', 'Sampled', 'Off']);
+    // Incomplete (no subjects/targets): Save as Draft is disabled.
+    expect(screen.getByRole('button', { name: 'Save as Draft' })).toBeDisabled();
+  });
+
+  it('authors a draft through the audited route with the built cross-product ruleset', async () => {
+    const bff = stubFetch();
+    renderWithProviders(<PoliciesSurface />, { route: '/policies' });
+    await screen.findByRole('button', { name: 'YouSource.Corp, 1 policy' });
+    fireEvent.click(screen.getByRole('button', { name: '+ Create Policy' }));
+    const form = await screen.findByRole('form', { name: 'Create a policy' });
+    const f = within(form);
+
+    fireEvent.change(f.getByLabelText('Policy Name'), { target: { value: 'new-policy' } });
+    fireEvent.change(f.getByLabelText('Zone'), { target: { value: 'YouSource.Corp' } });
+    // Select a subject + a target from the real object catalog.
+    const pick = (label: string, value: string): void => {
+      const select = f.getByLabelText<HTMLSelectElement>(label);
+      for (const opt of select.options) opt.selected = opt.value === value;
+      fireEvent.change(select);
+    };
+    pick('Subjects', 'demo-agent');
+    pick('Targets', '10.8.0.0/16');
+    fireEvent.change(f.getByLabelText('Action'), { target: { value: 'quarantine' } });
+
+    fireEvent.click(f.getByRole('button', { name: 'Save as Draft' }));
+    await waitFor(() => expect(bff.commands).toHaveLength(1));
+    const body = bff.commands[0]?.body as {
+      name: string;
+      vtz: string;
+      rules: {
+        source: { selectorValue: string };
+        destination: { selectorValue: string };
+        action: string;
+      }[];
+    };
+    expect(bff.commands[0]?.url).toBe('/api/policies');
+    expect(body.name).toBe('new-policy');
+    expect(body.rules).toHaveLength(1);
+    expect(body.rules[0]?.source.selectorValue).toBe('demo-agent');
+    expect(body.rules[0]?.destination.selectorValue).toBe('10.8.0.0/16');
+    expect(body.rules[0]?.action).toBe('quarantine');
+  });
+
+  it('deletes a policy behind a critical confirm gate', async () => {
+    const bff = stubFetch();
+    renderWithProviders(<PoliciesSurface />, { route: '/policies' });
+    const corp = await screen.findByRole('button', { name: 'YouSource.Corp, 1 policy' });
+    fireEvent.click(corp);
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    // A confirm gate opens; only the explicit confirm commits the delete.
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await waitFor(() =>
+      expect(bff.commands.some((c) => c.url === '/api/policies/delete')).toBe(true),
+    );
   });
 
   it('an empty tenant renders an honest empty state, never a fabricated policy', async () => {
@@ -234,5 +364,20 @@ describe('the cell summaries derive from the record (pure projections)', () => {
     expect(restrictionsSummary(policy())).toContain('expires');
     expect(restrictionsSummary(policy())).toContain('scheduled');
     expect(restrictionsSummary(policy())).toContain('PHI');
+  });
+});
+
+describe('portsValid enforces the canonical port form', () => {
+  it('accepts empty (unrestricted), single ports, and start-end ranges', () => {
+    expect(portsValid('')).toBe(true);
+    expect(portsValid('443')).toBe(true);
+    expect(portsValid('80, 443, 8080-8090')).toBe(true);
+  });
+
+  it('rejects out-of-range ports, inverted ranges, and non-numeric entries', () => {
+    expect(portsValid('0')).toBe(false);
+    expect(portsValid('70000')).toBe(false);
+    expect(portsValid('9000-8000')).toBe(false);
+    expect(portsValid('http')).toBe(false);
   });
 });
