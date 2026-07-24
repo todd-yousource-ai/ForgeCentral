@@ -105,7 +105,7 @@ the implementing TRD:
 - **Live deltas:** a small streaming store (SSE/WebSocket -> Zustand or equivalent) that applies
   decision/graph/log deltas into React state in place, so "Live" surfaces update without re-fetching
   (Section 7).
-- **Scale:** list/feed virtualization (e.g. TanStack Virtual) so large tables and the Logs/AIOps feeds
+- **Scale:** list/feed virtualization (e.g. TanStack Virtual) so large tables and the Logs/Network Ops feeds
   render only what is visible.
 - **Visualization:** for the connectivity graph specifically, a **canvas/WebGL renderer under React** --
   React owns the surrounding UI, selection, and the drawer, while the flow's many edges render on a
@@ -163,11 +163,11 @@ map is normative -- surfaces use the right-hand column, and the left-hand terms 
 
 | Mock term | Console term | Grounded in |
 |-----------|--------------|-------------|
-| TrustOps | **AIOps** | the AI-operations command center (per the product owner) |
+| TrustOps | **Network Ops** (renamed from AIOps, operator IA revision 2026-07-24) | the AI-operations command center (per the product owner) |
 | Trust Overview (home) | **Overview** (the live connectivity graph) | the LOG-driven connectivity graph (`TRD-CONSOLE-01`) |
 | Trust Reflex | **Reflex** | Torch/Crucible detection -> automated response (the DecisionObject -> action) |
 | Trust Score | **Trust Score** (retained) | the engine's confidence/risk score per entity (a real, computed value) |
-| TrustFlow | **TrustFlow** (retained) | the real `torch-trustflow` brokered-egress/inference plane |
+| TrustFlow | **Agent Ops** (rail name, operator IA revision 2026-07-24; the underlying plane keeps the `torch-trustflow` component name) | the real `torch-trustflow` brokered-egress/inference plane |
 | TrustLock (rotations) | **KeyLock** | the TRD-04 key hierarchy + rotation (SignatureEnvelope) |
 | Trust Replay / Rewind | **Rewind** (retained) | Crucible time-travel, `AS OF` (TRD-02 Section 5) |
 | Virtual Trust Zones (VTZ) | **Virtual Trust Zones (VTZ)** (retained) | the real Forge TRD-32 v2 hierarchical VTZ model |
@@ -175,7 +175,7 @@ map is normative -- surfaces use the right-hand column, and the left-hand terms 
 | Reflex actions (Auto Isolate, Re Auth, Block, Limit Scope, Allow With Monitor) | same, mapped to the **TRD-32 v2 action lattice** | Permit < Monitor < Quarantine < Deny + attested re-auth |
 
 "Trust" is retained ONLY where it names a real computed quantity (Trust Score) or a real component
-(TrustFlow, VTZ). Everywhere it was branding for the product category, it becomes the AI-native term.
+(the torch-trustflow plane, VTZ). Everywhere it was branding for the product category, it becomes the AI-native term.
 
 ---
 
@@ -253,10 +253,13 @@ above) is to extend CrucibleQL, not to add a one-off BFF endpoint.
 
 ### 5.1 Primary navigation (left rail, persistent)
 
-Eleven destinations, matching the mock, retermed per Section 3:
+Eleven destinations, retermed per Section 3. **Order + names amended by the operator IA revision
+(2026-07-24):** the governance surfaces lead (the noun-then-contract sequence the Phase-3 build
+established), then the three ops centers under their product names -- `SOC Ops` (was `Dashboards`),
+`Agent Ops` (was `TrustFlow`), `Network Ops` (was `AIOps`):
 
-`Overview` (home, the live graph) · `Virtual Trust Zones` · `Dashboards` · `Users` · `Policies` ·
-`TrustFlow` · `AIOps` · `Reports` · `Logs` · `Objects` · `Settings`. A persistent account menu
+`Overview` (home, the live graph) · `Virtual Trust Zones` · `Users` · `Objects` · `Policies` ·
+`SOC Ops` · `Agent Ops` · `Network Ops` · `Reports` · `Logs` · `Settings`. A persistent account menu
 (bottom) and the YouSource mark + environment badge (top).
 
 ### 5.2 The three-click rule (INV-CONSOLE-3-CLICKS)
@@ -268,8 +271,8 @@ owned + tested by a per-surface TRD):
 |------|---------------|
 | Inspect an entity + its live connections | Overview -> click entity node (1) -> drawer opens (data already there) |
 | Isolate a misbehaving agent | Overview -> click entity (1) -> "Isolate from network" (2) -> confirm (3) |
-| See why a decision was made | AIOps or Logs -> click decision (1) -> "Rationale/EXPLAIN" (2) |
-| Replay the last hour of decisions | AIOps (1) -> Rewind tab (2) -> scrub timeline (interaction) |
+| See why a decision was made | Network Ops or Logs -> click decision (1) -> "Rationale/EXPLAIN" (2) |
+| Replay the last hour of decisions | Network Ops (1) -> Rewind tab (2) -> scrub timeline (interaction) |
 | Publish a policy edit | Policies (1) -> edit a policy (2) -> Publish (3) |
 | Re-scope a VTZ | Virtual Trust Zones (1) -> a zone (2) -> edit boundary + save (3) |
 
@@ -344,7 +347,7 @@ implementing TRD attaches the profile):
 
 - **Stream, don't poll.** The BFF subscribes once to Crucible's decision/audit stream and pushes deltas
   to the browser over a single channel (Server-Sent Events default; WebSocket where bidirectional). The
-  graph and Logs/AIOps feeds apply deltas; they never full-refetch on a tick. A "Live" badge means
+  graph and Logs/Network Ops feeds apply deltas; they never full-refetch on a tick. A "Live" badge means
   streamed, and a staleness indicator appears if the stream lags.
 - **Server-shaped, server-paged.** Tables and the graph are paginated/aggregated engine-side; the
   browser never loads an unbounded set (all `FIND` results are `LIMIT`/cursor-paged, TRD-04 interface
@@ -477,7 +480,7 @@ the platform's CNSA 2.0 / FIPS posture.
   green).
 - Login yields a Principal + tier; a read/command exceeding the tier is refused engine-side and renders
   the sanitized error.
-- The Overview graph and the AIOps/Logs feeds update within 2 s of an engine commit over the stream.
+- The Overview graph and the Network Ops/Logs feeds update within 2 s of an engine commit over the stream.
 - Each canonical task in Section 5.2 completes within its click budget (interaction test).
 - No surface issues an unbounded query; every table is server-paged.
 
@@ -516,11 +519,11 @@ bindings (real data source) and command bindings (real actions), its <= 3-click 
 |-----|---------|--------------------------|------------------|
 | CONSOLE-01 | **Overview** (live connectivity graph) | the Crucible connectivity LOG (LEG/LOG decisions -> aggregated nodes/edges) | trace entity, open drawer, filter by type |
 | CONSOLE-02 | **Virtual Trust Zones** | Forge VTZ model (TRD-32 v2 hierarchy) | create/edit zone, set boundary + default posture, view members |
-| CONSOLE-03 | **Dashboards** | engine aggregates (decisions, sessions, VTZ, enforcement, anomalies) | switch dashboard, set time range, drill to entity |
+| CONSOLE-03 | **SOC Ops** (was Dashboards, IA revision 2026-07-24) | engine aggregates (decisions, sessions, VTZ, enforcement, anomalies) | switch dashboard, set time range, drill to entity |
 | CONSOLE-04 | **Users** (principals) | Crucible Principal registry + External IDAM connectors | add/edit principal, manage groups, sync IdP, set override |
 | CONSOLE-05 | **Policies** | Crucible policy engine (TRD-04), per VTZ | create/edit/publish policy, view version, EXPLAIN |
-| CONSOLE-06 | **TrustFlow** | `torch-trustflow` brokered egress/inference plane | inspect flows, model/MCP routing, egress posture |
-| CONSOLE-07 | **AIOps** (command center) | DecisionObject stream, govern/obs, containment, Rewind (AS OF) | replay, contain/isolate, oversight, run simulation |
+| CONSOLE-06 | **Agent Ops** (was TrustFlow, IA revision 2026-07-24) | `torch-trustflow` brokered egress/inference plane | inspect flows, model/MCP routing, egress posture |
+| CONSOLE-07 | **Network Ops** (command center; was AIOps, IA revision 2026-07-24) | DecisionObject stream, govern/obs, containment, Rewind (AS OF) | replay, contain/isolate, oversight, run simulation |
 | CONSOLE-08 | **Reports** | engine aggregates + EXPLAIN | run report, view rationale, export/share |
 | CONSOLE-09 | **Logs** (decision/audit stream) | Crucible audit chain + DecisionObjects (the LOG) | search/filter, open decision, EXPLAIN, export |
 | CONSOLE-10 | **Objects** (protected resources) | Crucible resource/object registry (TRD-32 object taxonomy) | create/edit object, view governing policies |
@@ -533,7 +536,7 @@ bindings (real data source) and command bindings (real actions), its <= 3-click 
 
 Build order: this platform TRD -> the design system + BFF skeleton + the binding registry + auth (the
 foundation that makes "no stub" and "3 clicks" enforceable) -> `CONSOLE-01` (Overview, the flagship and
-the LOG-streaming proof) -> `CONSOLE-09` (Logs) + `CONSOLE-07` (AIOps), which share the decision/stream
+the LOG-streaming proof) -> `CONSOLE-09` (Logs) + `CONSOLE-07` (Network Ops), which share the decision/stream
 plumbing -> the remaining CRUD-and-detail surfaces (`04/05/10/02`) -> `Dashboards/Reports` (aggregate
 read surfaces) -> `Settings` (admin) -> `TrustFlow`. The entity drawer (`CONSOLE-12`) lands with
 `CONSOLE-01` since every surface reuses it. No surface ships until its bindings resolve to real engine

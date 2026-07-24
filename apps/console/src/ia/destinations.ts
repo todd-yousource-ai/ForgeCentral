@@ -20,17 +20,23 @@ export interface Destination {
 /** The home destination (the live-graph Overview). */
 export const HOME: Destination = { id: 'overview', label: 'Overview', path: '/', short: 'Ov' };
 
+// The order + names below are the 2026-07-24 operator IA revision (TRD-CONSOLE-00 Section 5.1, amended):
+// the governance surfaces lead (VTZ -> Users -> Objects -> Policies, the noun-then-contract sequence the
+// Phase-3 build established), then the three ops centers under their product names -- SOC Ops (was
+// Dashboards), Agent Ops (was TrustFlow), Network Ops (was AIOps) -- then Reports, Logs, Settings. The
+// three renamed surfaces are still placeholders (not in REAL_SURFACES), so id + path + label rename
+// together; nothing real bound to the old ids.
 export const DESTINATIONS: readonly Destination[] = [
   HOME,
   { id: 'vtz', label: 'Virtual Trust Zones', path: '/vtz', short: 'Vz' },
-  { id: 'dashboards', label: 'Dashboards', path: '/dashboards', short: 'Da' },
   { id: 'users', label: 'Users', path: '/users', short: 'Us' },
+  { id: 'objects', label: 'Objects', path: '/objects', short: 'Ob' },
   { id: 'policies', label: 'Policies', path: '/policies', short: 'Po' },
-  { id: 'trustflow', label: 'TrustFlow', path: '/trustflow', short: 'Tf' },
-  { id: 'aiops', label: 'AIOps', path: '/aiops', short: 'Ai' },
+  { id: 'soc-ops', label: 'SOC Ops', path: '/soc-ops', short: 'So' },
+  { id: 'agent-ops', label: 'Agent Ops', path: '/agent-ops', short: 'Ag' },
+  { id: 'network-ops', label: 'Network Ops', path: '/network-ops', short: 'Nw' },
   { id: 'reports', label: 'Reports', path: '/reports', short: 'Re' },
   { id: 'logs', label: 'Logs', path: '/logs', short: 'Lo' },
-  { id: 'objects', label: 'Objects', path: '/objects', short: 'Ob' },
   { id: 'settings', label: 'Settings', path: '/settings', short: 'St' },
 ];
 

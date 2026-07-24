@@ -1,6 +1,6 @@
 // packages/design/src/components/TabStrip.tsx -- the secondary-navigation tab strip (F0.2b).
 //
-// The horizontal tab strip under a page title (AIOps tabs, Reports tabs, Settings tabs). Implements the
+// The horizontal tab strip under a page title (Network Ops tabs, Reports tabs, Settings tabs). Implements the
 // ARIA tablist pattern: `role=tablist`/`tab`, `aria-selected`, roving `tabindex`, and Left/Right/Home/End
 // keyboard navigation (WCAG 2.1.1). Controlled: the parent owns `activeId` and is told of a change.
 
@@ -15,7 +15,7 @@ export interface TabStripProps {
   readonly tabs: readonly TabItem[];
   readonly activeId: string;
   readonly onChange: (id: string) => void;
-  /** Names the tablist for assistive tech (e.g. "AIOps sections"). */
+  /** Names the tablist for assistive tech (e.g. "Network Ops sections"). */
   readonly ariaLabel: string;
 }
 
