@@ -66,10 +66,11 @@ test('authenticated: the shell, the IA, empty states, and the drawer frame', asy
   await expect(page.getByText('No connectivity observed')).toBeVisible();
   await expect(page.locator('.fcx-topbar').getByText('Live')).toBeVisible();
 
-  // One-click navigation to another destination, still an honest empty placeholder. The Overview unmounts,
-  // so it stops driving freshness and the shell indicator returns to the honest deferred "Not live".
-  await rail.getByRole('link', { name: 'Policies' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Policies' })).toBeVisible();
-  await expect(page.getByText('No Policies data yet')).toBeVisible();
+  // One-click navigation to a still-placeholder destination (Dashboards), an honest empty placeholder. The
+  // Overview unmounts, so it stops driving freshness and the shell indicator returns to the deferred "Not
+  // live". (Policies is now a real surface, P5.3; Dashboards remains a placeholder until its phase lands.)
+  await rail.getByRole('link', { name: 'Dashboards' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboards' })).toBeVisible();
+  await expect(page.getByText('No Dashboards data yet')).toBeVisible();
   await expect(page.getByText('Not live')).toBeVisible();
 });

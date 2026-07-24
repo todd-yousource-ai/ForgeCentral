@@ -6,15 +6,19 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-24): P5.1 + P5.2 LANDED (contract + read path). NEXT = P5.3 (the grouped read-only
-  surface), UNBLOCKED.**
-  The design PR merged `e0f02bd`. P5.1 code `22c5cf5`: contract (view models + fail-closed closed-enum
-  projections + `policies.*` bindings). P5.2 code `d8cc202`: the BFF read path -- `PolicyListByZone`/
-  `PolicyDetail` ride the QuerySubmit opcode; `CrucibleClient`/`WireCrucibleClient` + `replyToPolicyList`/
-  `replyToPolicyDetail`; `OperatorEngine.policyListByZone`/`policyDetail` inject operator+tenant server-side
-  (delegation recorded); `engine/policies.ts` resolvers fail-closed to `PoliciesUnavailableError`;
-  `GET /api/policies` + `/api/policies/detail?vtz=&id=` (401/503/400/503-fail-closed) with a tenant-scoped
-  short-TTL cache (`policies-v1`, prefix `policies:<tenant>:`). Resolver + route + delegation tests green.
+- **State (2026-07-24): P5.1 + P5.2 + P5.3 LANDED (contract + read path + grouped read-only surface).
+  NEXT = P5.4 (Create/Edit + publish/delete), UNBLOCKED.**
+  The design PR merged `e0f02bd`. P5.1 code `22c5cf5`: contract. P5.2 code `d8cc202`: the BFF read path.
+  P5.3 code `ce7f3f3`: the grouped read-only surface -- net-new `AccordionGroup` primitive in
+  `packages/design` (first collapsible-group, `.fc-accordion*`); `usePolicies` (TanStack Query over
+  `GET /api/policies`) + `PoliciesSurface` (header + search + zone filter + a present-but-DISABLED Create
+  control; policies grouped by VTZ into accordions ordered by the live `vtz.tree`, each expanding to a
+  `DataTable` with the `07-*.png` columns; closed-enum action/logging cells; pure cell summaries; honest
+  loading/empty/error); `policies` route replaces its placeholder + added to no-stub `REAL_SURFACES`;
+  read-only e2e journey. Full gate + 29 Playwright green.
+  **A supply-chain CI fix landed alongside (merge `8bbf870`): postcss override to `^8.5.18` +
+  a fail-closed audit-waiver for the RSC-only react-router advisory (GHSA-qwww-vcr4-c8h2, expires
+  2026-10-24; the v7->v8 migration is the real fix).**
 - **Cross-repo prerequisite SATISFIED:** the crdb substrate (`crdb IP-CONSOLE-POLICY-SUBSTRATE`) is
   COMPLETE IN CODE -- PS.1..PS.N all landed 2026-07-24 (PS.N capstone merge crdb `69b0057a`; full gate +
   ueba suite green; PS.3..PS.N awaiting operator review). The policy DTOs regen into
@@ -27,13 +31,19 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
   with P5.5. `FC_SIGNER_PORT` must be in the running BFF env.
 - **Reused live surfaces:** `vtz.tree` (grouping axis + VTZ dropdown), `objects.list` (subject/target
   pickers). Both COMPLETE. `policies.ts` reuses `ObjectKind`/`SelectorKind` from the Objects contract.
-- **Next action:** P5.3 -- the grouped read-only surface (`PoliciesSurface.tsx`): header + search + filter
-  + Create button; the net-new accordion group component (a VTZ card w/ policy-count badge + updated date,
-  the first collapsible-group primitive in `packages/design`, grounded on `06-*.png`); each expanded zone
-  renders the policy `DataTable` (`07-*.png` columns: Name+version chip, Scope, Protocol/Ports, Action
-  Badge, Restrictions summary, Logging, Status). Reads `policies.byZone` (`GET /api/policies`) grouped by
-  the live `vtz.tree`; honest loading/empty/error states; the `policies` nav destination replaces its
-  placeholder. Reads-only (no author yet). Surface + accordion design tests. UNBLOCKED.
+- **Next action:** P5.4 -- Create/Edit + publish/delete. Wire codecs (`PolicyCreate/Edit/Publish/Delete`)
+  + delegated actions + resolvers + the POST route family w/ typed refusal mapping (409/400/403) +
+  fail-closed draft parse. The Create Policy modal (`08-*.png`): name; VTZ dropdown; Subjects + Targets
+  multi-selects over `objects.list` + principals; Protocol chips + Ports; Action (the four); Logging (the
+  three); the Restrictions collapsible (days + hours + active-window + geo + tags); the Advanced collapsible
+  (Applied-To + description); Save-as-Draft vs Save-&-Publish (confirm-gated, breaking flagged); per-row
+  Edit; Delete behind a critical ConfirmDialog; client validation; the <=3-click paths. **Enable + wire the
+  P5.3 Create control** (present-but-disabled today) and add the per-row view/edit affordances (deferred
+  from P5.3 to avoid a dead control). UNBLOCKED (PS.6 commands landed).
+- **P5.3 deviations (honest):** (1) the Create control is present-but-disabled (a dead action would be a
+  stub affordance); P5.4 enables it. (2) per-row view/edit affordances fold into P5.4 (they need the
+  modal). (3) the mock's per-group "updated date" is omitted -- the wire record carries no updated
+  timestamp, so it would be fabricated; the count badge stands in.
 - Enforcement stays AG.7-OFF: a published + distributed bundle realizes nothing until enforcement is engaged.
 - **Note:** the repo GitHub remote is `origin` (URL uses the `github-forgecentral` SSH host alias), not a
   remote literally named `github-forgecentral` (CLAUDE.md's naming is loose). Push `git push origin main`.
@@ -57,7 +67,7 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 |------|-----------|--------|--------|------|
 | P5.1 | `INV-CONSOLE-POLICIES-CONTRACT` | LANDED | `22c5cf5` | schema re-vendor (PS.5 DTOs, +683) + `policies.ts` view models (`PolicyRow`/`PolicyDetailView`/`PolicyDraft`) + fail-closed closed-enum projections (four actions, three logging levels, + protocol/selector/kind/lifecycle/day/classification); `policies.*` bindings registered (byZone/detail + create/edit/publish/delete LIVE over PS.5/PS.6; enforcement-runtime PENDING -> torch). Reuses `ObjectKind`/`SelectorKind` from Objects |
 | P5.2 | `INV-CONSOLE-POLICIES-BROKERED` | LANDED | `d8cc202` | dispatch `PolicyListByZone`/`PolicyDetail` on QuerySubmit; `CrucibleClient`+`WireCrucibleClient` methods + `replyToPolicyList`/`replyToPolicyDetail`; `OperatorEngine` delegated reads (operator+tenant injected, delegation recorded); `engine/policies.ts` fail-closed -> `PoliciesUnavailableError`; `GET /api/policies`(+`/detail?vtz=&id=`) 401/503/400/503; tenant-scoped `policies-v1` cache; resolver+route+delegation tests |
-| P5.3 | `INV-CONSOLE-POLICIES-GROUPED` | PLANNED | -- | `PoliciesSurface.tsx`: net-new accordion group component (VTZ card + count badge, `06-*.png`) + per-zone policy `DataTable` (`07-*.png` columns); reads-only; `policies` destination replaces placeholder |
+| P5.3 | `INV-CONSOLE-POLICIES-GROUPED` | LANDED | `ce7f3f3` | net-new `AccordionGroup` primitive (`packages/design`, `.fc-accordion*`) + `usePolicies` + `PoliciesSurface`: header/search/zone-filter/disabled-Create; per-VTZ accordions (count badge, ordered by live `vtz.tree`) -> `DataTable` w/ the 07 columns (closed-enum action/logging cells, pure summaries); honest states; `policies` route replaces placeholder + no-stub `REAL_SURFACES`; read-only e2e |
 | P5.4 | `INV-CONSOLE-POLICIES-AUTHOR` | PLANNED | -- | command codecs + POST routes (typed 409/400/403); the Create Policy modal (`08-*.png`): name/VTZ/subjects/targets/protocol chips/ports/action(4)/logging(3) + Restrictions collapsible (days+hours+active-window+geo+tags) + Advanced collapsible (Applied-To+description); Save-Draft vs Save-&-Publish; per-row edit/delete; client validation; 3-click paths |
 | P5.5 | `INV-CONSOLE-POLICIES-DISTRIBUTED` | PLANNED | -- | re-home FD.7c: land `packages/wire` BundleCommit/Convergence codecs; mount `DistributionPanel` here (Distribute confirm-gated over Applied-To; compose `effective_published_policies`(PS.7) -> sidecar sign -> crdb carrier); 3-state convergence ledger; NO distribute control on VTZ surface (structural); signing key never in TS (hygiene) |
 | P5.6 | `INV-CONSOLE-POLICIES-GROUNDED` | PLANNED | -- | land `06/07/08-*.png` + README rows; residual TRD grounding; cross-ref FORGE-DISTRIBUTION FD.7c re-home; docs-only |
