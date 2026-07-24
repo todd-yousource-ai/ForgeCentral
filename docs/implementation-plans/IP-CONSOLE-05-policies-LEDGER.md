@@ -6,12 +6,24 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-24): P5.1..P5.6 LANDED; P5.N TEST HALF LANDED. ONLY REMAINING = the box redeploy
-  LIVE LEG** (rebuild+redeploy the FC BFF/SPA + sidecar; bump the torch pinned crdb revs so torchd
-  verifies the v2 rules-carrying preimage, rebuild+redeploy torchd/torch-placed; drive the whole surface
-  over the live node: author -> publish -> distribute -> torchd pull -> convergence; enforcement OFF;
-  `FC_SIGNER_PORT` in the running BFF env; the standing live-proof rule applies: any stitching done for
-  the live drive lands in installer/production code, never manual scratchpad state).
+- **State (2026-07-24): P5.1..P5.6 LANDED; P5.N TEST HALF LANDED; the LIVE LEG is IN PROGRESS on the box
+  and surfaced a real defect (now fixed) before any policy read/write worked live.**
+  **LIVE-LEG DEFECT (fix PR `fix/wire-policy-encode`): `@forge/wire`'s `encodeWireRequest` had NO arm
+  for any of the 7 policy verbs** (PolicyListByZone/Detail/Effective + Create/Edit/Publish/Delete) --
+  it threw "this WireRequest variant is not yet supported" before the request ever hit the wire. The
+  whole policy epic (P5.1..P5.N) had been wired only to MOCKS: the BFF tests use a fake engine, the e2e
+  mocks fetch, so the real CBOR encode seam was never exercised. This is precisely the class of gap the
+  live leg exists to catch (INV-CONSOLE-NO-STUB at the wire seam). Fix: the 7 encode arms +
+  `policySpecToCbor` (mirroring the Rust field order + `skip_serializing_if`) + a payload seam test that
+  drives the REAL encode/round-trip for every policy verb (the regression guard the mocks could not
+  give). **Every other surface already had its encode arm; only policy was missing.**
+  Remaining after the fix redeploys: finish the drive (author -> publish -> distribute -> torchd pull
+  -> convergence; enforcement OFF; `FC_SIGNER_PORT` in the running BFF env; live-proof stitching lands
+  in installer/production code, never scratchpad).
+  Box state so far: crdb rebuilt from main `5be841b3` + swapped (hash-verified running); torch revs
+  bumped to `5be841b3` (torch merge `ffe0d3c`) + torchd/torch-placed rebuilt/redeployed/re-enrolled;
+  FC BFF/SPA/sidecar/contracts/wire redeployed (`.bak-p55-20260724`); operator re-logged-in; the
+  cargo-deny box gap (2026-07-08) is now CLOSED (installed; torch step 7 green).
   The P5.N test half: the remaining capstone journeys (Save-&-Publish confirm e2e w/ the BREAKING flag
   surfaced -- incl. fixing the P5.4 defect where the form closed unconditionally and hid the flag;
   engine-refusal 400 read-back; edit-mints-a-version-chip; Logging exact-three structural; the vtz.spec
