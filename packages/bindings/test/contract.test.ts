@@ -284,17 +284,33 @@ describe('IP-CONSOLE-04 ID.1: the External IDAM (idam.*) bindings', () => {
 describe('IP-CONSOLE-05 P5.1: the Policies (policies.*) authoring bindings', () => {
   const policyBindings = Object.values(bindings).filter((b) => b.id.startsWith('policies.'));
 
-  it('registers the grouped/detail reads, the four authoring commands, and the enforcement deferral', () => {
+  it('registers the reads, the authoring commands, the distribution pair, and the enforcement deferral', () => {
     const ids = policyBindings.map((b) => b.id).sort();
     expect(ids).toEqual([
       'policies.byZone',
+      'policies.convergence',
       'policies.create',
       'policies.delete',
       'policies.detail',
+      'policies.distribute',
       'policies.edit',
       'policies.enforcement',
       'policies.publish',
     ]);
+  });
+
+  it('binds the P5.5 distribution pair LIVE: convergence over BUNDLE_CONVERGENCE, distribute audited', () => {
+    const convergence = bindings['policies.convergence'];
+    expect(convergence?.kind).toBe('read');
+    expect(convergence?.op).toBe('bundle_convergence_v1');
+    expect(convergence?.status.kind).toBe('live');
+    const distribute = bindings['policies.distribute'];
+    expect(distribute?.kind).toBe('command');
+    expect(distribute?.op).toBe('bundle_commit_v1');
+    expect(distribute?.status.kind).toBe('live');
+    if (distribute?.kind === 'command') {
+      expect(distribute.audited).toBe(true);
+    }
   });
 
   it('binds the grouped list + detail reads LIVE to the crdb policy store (PS.5)', () => {

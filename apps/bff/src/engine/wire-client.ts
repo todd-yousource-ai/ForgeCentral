@@ -31,6 +31,7 @@ import type {
   WireObjectDetail,
   WireObjectMutated,
   WirePolicyDetail,
+  WirePolicyEffective,
   WirePolicyList,
   WirePolicyMutated,
   WirePrincipalList,
@@ -170,6 +171,14 @@ export function replyToPolicyDetail(reply: WireReply): WirePolicyDetail {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a policy-detail read');
+}
+
+/** Map an engine `WireReply` to `WirePolicyEffective` (POLICY_EFFECTIVE, crdb P5.5). */
+export function replyToPolicyEffective(reply: WireReply): WirePolicyEffective {
+  if (typeof reply === 'object' && 'PolicyEffective' in reply) return reply.PolicyEffective;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a policy-effective read');
 }
 
 /** Map an engine `WireReply` to `WirePolicyMutated` (a PS.6 policy command ack). */
@@ -640,6 +649,17 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToPolicyDetail(await dispatch(transport, { PolicyDetail: request })),
+      opts,
+    );
+  }
+
+  async policyEffective(
+    request: Parameters<CrucibleClient['policyEffective']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyEffective> {
+    return this.call(
+      async (transport) =>
+        replyToPolicyEffective(await dispatch(transport, { PolicyEffective: request })),
       opts,
     );
   }

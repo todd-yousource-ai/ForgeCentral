@@ -44,6 +44,7 @@ function engineWith(parts: {
     cursorClose: unused,
     policyListByZone: unused,
     policyDetail: unused,
+    policyEffective: unused,
     policyCreate: unused,
     policyEdit: unused,
     policyPublish: unused,

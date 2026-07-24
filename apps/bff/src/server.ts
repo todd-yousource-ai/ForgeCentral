@@ -87,7 +87,11 @@ import {
   resolveUsersList,
   UsersUnavailableError,
 } from './engine/users.js';
-import { DistributeZoneUnknownError, resolveDistribute } from './engine/distribute.js';
+import {
+  DistributeCompositionError,
+  DistributeZoneUnknownError,
+  resolveDistribute,
+} from './engine/distribute.js';
 import { SigningRefusedError, SigningUnavailableError } from './engine/sign-client.js';
 import type { ReverseDnsResolver } from './engine/reverse-dns.js';
 import { principalFromSession } from './engine/principal.js';
@@ -946,6 +950,10 @@ async function handleVtzDistribute(
   } catch (err) {
     if (err instanceof DistributeZoneUnknownError) {
       sendJson(res, 404, { error: 'unknown_zone' });
+    } else if (err instanceof DistributeCompositionError) {
+      // P5.5 fail-closed: an effective policy the contract cannot narrow (or an unparseable version)
+      // refuses the WHOLE distribute before anything reaches the signer or the carrier.
+      sendJson(res, 503, { error: 'unavailable' });
     } else if (err instanceof SigningRefusedError) {
       sendJson(res, 422, { error: 'signing_refused' });
     } else if (err instanceof SigningUnavailableError) {

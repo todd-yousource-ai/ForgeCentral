@@ -557,6 +557,16 @@ export interface WirePolicyEdit {
   spec: WirePolicySpec;
 }
 
+export interface WirePolicyEffective {
+  policies: Array<WirePolicyRecord>;
+}
+
+export interface WirePolicyEffectiveQuery {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+  vtz: string;
+}
+
 export interface WirePolicyList {
   zones: Array<WirePolicyZone>;
 }
@@ -749,6 +759,7 @@ export type WireReply =
   | { VtzMutated: WireVtzMutation; }
   | { PolicyList: WirePolicyList; }
   | { PolicyDetail: WirePolicyDetail; }
+  | { PolicyEffective: WirePolicyEffective; }
   | { PolicyMutated: WirePolicyMutated; };
 
 export type WireRequest =
@@ -797,6 +808,7 @@ export type WireRequest =
   | { VtzDelete: WireVtzDelete; }
   | { PolicyListByZone: WirePolicyListQuery; }
   | { PolicyDetail: WirePolicyDetailQuery; }
+  | { PolicyEffective: WirePolicyEffectiveQuery; }
   | { PolicyCreate: WirePolicyCreate; }
   | { PolicyEdit: WirePolicyEdit; }
   | { PolicyPublish: WirePolicyPublish; }

@@ -73,6 +73,9 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // routes them in the same read allowlist as VtzTree/ObjectList.
       'PolicyListByZone' in request ||
       'PolicyDetail' in request ||
+      // The distribution producer's read (POLICY_EFFECTIVE, the crdb PS.7 composer seam over the wire,
+      // P5.5) rides the QuerySubmit opcode too; same read allowlist as the other policy reads.
+      'PolicyEffective' in request ||
       // The Policies-surface commands (POLICY_CREATE/EDIT/PUBLISH/DELETE, crdb PS.6) ride the QuerySubmit
       // opcode like the other data-plane writes; the engine routes them to the write path by their tag.
       'PolicyCreate' in request ||

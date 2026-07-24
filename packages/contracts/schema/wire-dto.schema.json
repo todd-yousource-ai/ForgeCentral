@@ -2377,6 +2377,47 @@
       ],
       "type": "object"
     },
+    "WirePolicyEffective": {
+      "additionalProperties": false,
+      "properties": {
+        "policies": {
+          "items": {
+            "$ref": "#/$defs/WirePolicyRecord"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "policies"
+      ],
+      "type": "object"
+    },
+    "WirePolicyEffectiveQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "vtz": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "vtz"
+      ],
+      "type": "object"
+    },
     "WirePolicyList": {
       "additionalProperties": false,
       "properties": {
@@ -3725,6 +3766,18 @@
         {
           "additionalProperties": false,
           "properties": {
+            "PolicyEffective": {
+              "$ref": "#/$defs/WirePolicyEffective"
+            }
+          },
+          "required": [
+            "PolicyEffective"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "PolicyMutated": {
               "$ref": "#/$defs/WirePolicyMutated"
             }
@@ -4430,6 +4483,18 @@
           },
           "required": [
             "PolicyDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "PolicyEffective": {
+              "$ref": "#/$defs/WirePolicyEffectiveQuery"
+            }
+          },
+          "required": [
+            "PolicyEffective"
           ],
           "type": "object"
         },

@@ -4,7 +4,7 @@
 // convergence the BFF returned (applied / rejected-with-reason / silent), a zone with no bundle shows
 // the honest empty state, and the re-distribute button re-pushes to exactly the current scope.
 
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DistributionPanel } from '../surfaces/DistributionPanel.js';
@@ -75,6 +75,12 @@ describe('DistributionPanel (FD.7c)', () => {
       name: /Commit & re-distribute to 3 endpoints/,
     });
     fireEvent.click(button);
+
+    // P5.5: the distribute is confirm-gated and the dialog names the target endpoint set; only the
+    // explicit confirm commits.
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('a.box, b.box, c.box');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Distribute' }));
 
     await waitFor(() => {
       const distributeCall = fetchMock.mock.calls.find(
