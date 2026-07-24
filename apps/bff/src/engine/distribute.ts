@@ -17,7 +17,6 @@ import {
   toVtzDetail,
 } from '@forge/contracts';
 import type { ComposedBundleRules, VtzZone } from '@forge/contracts';
-import { encode as encodeCbor } from '@forge/wire';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -149,12 +148,14 @@ export async function resolveDistribute(
     Date.now(),
   );
   const signed = await signBundle(signer.host, signer.port, draft, signer.timeoutMs);
-  // The carrier stores these bytes verbatim and the endpoint re-derives the signed preimage from the
-  // DECODED bundle, so this encoding only has to decode correctly -- key order is not signature-bearing.
-  const bytes = Array.from(encodeCbor(signed));
+  // Forward the sidecar's CANONICAL ciborium bytes verbatim: they are exactly what the engine's bundle
+  // store parses and stores. Re-encoding the JSON bundle here is LOSSY -- the contributor PolicyId is a
+  // uuid (serde-human-readable), a string in JSON but 16 bytes in the engine's CBOR -- so a re-derived
+  // bundle fails the engine's parse (BundleStoreError::Malformed). The signer already produced the right
+  // bytes; the producer must not second-guess them.
   const ack = await engine.bundleCommit(
     principal,
-    { request_id: 0, bundle: bytes, operator: null },
+    { request_id: 0, bundle: [...signed.cbor], operator: null },
     opts,
   );
   return {

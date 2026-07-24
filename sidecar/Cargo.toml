@@ -32,6 +32,12 @@ rustls-pki-types = { version = "1", features = ["std"] }
 cdb-mtls = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "5be841b38156645b884f68942d11088ae4a8c32b" }
 # NOTE: keep this rev aligned with the [dev-dependencies] crdb edges below. Two revs of one repo are two
 # distinct cargo sources, so a mismatch builds two copies of cdb-types into one process.
+# The canonical bundle encoder: the sidecar returns the exact `ciborium::into_writer` bytes the engine's
+# bundle store parses + stores verbatim, so the producer never re-derives them from JSON. That re-derive
+# is LOSSY -- `uuid` (the contributor PolicyId) is serde-human-readable, so serde_json emits a string
+# while ciborium emits 16 bytes; a JSON round-trip then fails the engine's parse. cdb-artifact pulls
+# ciborium already, so naming it direct does not add a package to the graph.
+ciborium = "0.2"
 
 # The Forge bundle signer (FD.2). cdb-artifact carries `bundle_preimage_bytes` -- the one implementation
 # the endpoint also verifies with, so producer and verifier agree structurally rather than by fixture --

@@ -152,6 +152,7 @@ dependencies = [
  "cdb-artifact",
  "cdb-mtls",
  "cdb-types",
+ "ciborium",
  "rcgen",
  "rustls-pki-types",
  "serde",

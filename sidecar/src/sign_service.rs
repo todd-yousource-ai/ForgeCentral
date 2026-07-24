@@ -49,8 +49,18 @@ const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SignResponse {
-    /// The assembled, signed bundle.
-    Signed(Box<cdb_types::SignedPolicyBundle>),
+    /// The assembled, signed bundle. `cbor` is the CANONICAL `ciborium` encoding of `bundle` -- the
+    /// exact bytes the engine's bundle store parses and stores verbatim. The producer forwards `cbor`
+    /// to `BUNDLE_COMMIT` and MUST NOT re-derive the bytes from `bundle`: a JSON round-trip is lossy
+    /// (the contributor `PolicyId` wraps a `uuid`, serde-human-readable, so serde_json emits a string
+    /// while ciborium emits 16 bytes), which the engine then rejects as a malformed bundle. `bundle`
+    /// remains for the typed contract + the seam test; the bytes are the source of truth.
+    Signed {
+        /// The typed bundle (for inspection + the contract seam).
+        bundle: Box<cdb_types::SignedPolicyBundle>,
+        /// The canonical `ciborium::into_writer(bundle)` bytes the carrier stores verbatim.
+        cbor: Vec<u8>,
+    },
     /// The request was refused, with the reason. Carries no key material and no internal paths.
     Refused { reason: String },
 }
@@ -142,7 +152,15 @@ async fn serve_connection(
             // The signer owns the key id and algorithm, so what comes back is signed under the key
             // this process actually holds, whatever the caller asked for.
             Ok(draft) => match signer.sign_bundle(draft) {
-                Ok(bundle) => SignResponse::Signed(Box::new(bundle)),
+                Ok(bundle) => match encode_bundle(&bundle) {
+                    Ok(cbor) => SignResponse::Signed {
+                        bundle: Box::new(bundle),
+                        cbor,
+                    },
+                    // Encoding a well-formed bundle cannot fail in practice; refuse rather than ship a
+                    // response the producer would have to re-derive (and get wrong).
+                    Err(reason) => SignResponse::Refused { reason },
+                },
                 Err(err) => SignResponse::Refused {
                     reason: err.to_string(),
                 },
@@ -207,6 +225,15 @@ async fn read_request_line(
     }
 }
 
+/// The canonical `ciborium` bytes of a signed bundle: exactly what the engine's bundle store parses
+/// and stores. Returned in the sign response so the producer forwards them verbatim (never re-derives
+/// them from JSON, which is lossy for the human-readable `uuid` contributor id).
+fn encode_bundle(bundle: &cdb_types::SignedPolicyBundle) -> Result<Vec<u8>, String> {
+    let mut cbor = Vec::new();
+    ciborium::into_writer(bundle, &mut cbor).map_err(|e| format!("bundle encode failed: {e}"))?;
+    Ok(cbor)
+}
+
 /// Encode and write one response line.
 async fn write_response(
     writer: &mut tokio::net::tcp::OwnedWriteHalf,
@@ -230,7 +257,8 @@ mod tests {
     use cdb_artifact::{bundle_preimage_bytes, sha512, MlDsa87Verifier, Signature, Verifier};
     use cdb_types::{
         BundleVersion, Classification, EndpointPolicy, ExecDisposition, FreshnessLease, Hlc,
-        IdentityScope, ModelMcpDestSet, ResourceBound, SignatureAlgorithm, VtzId,
+        IdentityScope, ModelMcpDestSet, PolicyId, PolicyVersionRef, ResourceBound,
+        SignatureAlgorithm, Version, VtzId,
     };
 
     fn test_signer(name: &str) -> Arc<BundleSigner> {
@@ -264,6 +292,19 @@ mod tests {
             scope: IdentityScope::new(VtzId::new("YouSource.Corp"), []),
             lease: FreshnessLease::new(Hlc(100), Hlc(200)),
         }
+    }
+
+    /// A draft carrying a CONTRIBUTOR -- its `PolicyId` wraps a `uuid`, the one field that exposed the
+    /// JSON-re-encode defect: serde_json emits the uuid as a string, ciborium as 16 bytes, so a bundle
+    /// re-derived from JSON fails the engine's ciborium parse. A live distribute of any published policy
+    /// carries at least one contributor, so this is the ordinary case, not an edge case.
+    fn draft_with_contributor() -> BundleDraft {
+        let mut draft = draft();
+        draft.contributors = vec![PolicyVersionRef::new(
+            PolicyId::from_uuid(uuid::Uuid::from_u128(3)),
+            Version::new(1, 0, 0),
+        )];
+        draft
     }
 
     /// Send one raw line and read one response line.
@@ -305,7 +346,7 @@ mod tests {
     async fn a_draft_comes_back_signed_and_verifiable() {
         let (addr, signer) = serving("signed").await;
         let request = serde_json::to_string(&draft()).unwrap();
-        let SignResponse::Signed(bundle) = round_trip(addr, &request).await else {
+        let SignResponse::Signed { bundle, .. } = round_trip(addr, &request).await else {
             panic!("expected a signed bundle");
         };
 
@@ -323,6 +364,35 @@ mod tests {
                 bundle.signature_algorithm,
             )
             .expect("a bundle returned by the service verifies");
+    }
+
+    #[tokio::test]
+    async fn the_returned_cbor_is_the_canonical_bytes_the_engine_parses() {
+        // The regression guard for the P5.N live-leg defect: the sign response's `cbor` MUST be the
+        // exact ciborium bytes the engine's bundle store deserializes -- NOT something the producer
+        // re-derives from the JSON `bundle`. Proven with a contributor present (the uuid path): the
+        // returned bytes ciborium-parse back to the same bundle, and they equal a fresh canonical
+        // encode. A JSON re-encode of the same bundle, by contrast, is NOT parseable (string-vs-bytes
+        // uuid) -- which is why the producer must forward `cbor`, never re-encode.
+        let (addr, _signer) = serving("cbor").await;
+        let request = serde_json::to_string(&draft_with_contributor()).unwrap();
+        let SignResponse::Signed { bundle, cbor } = round_trip(addr, &request).await else {
+            panic!("expected a signed bundle");
+        };
+        assert!(
+            !bundle.contributors.is_empty(),
+            "the fixture carries a contributor"
+        );
+
+        // The bytes ciborium-parse back to the SAME bundle: exactly what commit_store_bundle does.
+        let parsed: cdb_types::SignedPolicyBundle = ciborium::from_reader(&cbor[..])
+            .expect("the returned cbor is a valid SignedPolicyBundle");
+        assert_eq!(parsed, *bundle, "cbor round-trips to the signed bundle");
+
+        // And they ARE the canonical encoding (byte-identical to a fresh encode of the bundle).
+        let mut fresh = Vec::new();
+        ciborium::into_writer(&*bundle, &mut fresh).unwrap();
+        assert_eq!(cbor, fresh, "cbor is the canonical ciborium encoding");
     }
 
     #[tokio::test]
@@ -344,7 +414,7 @@ mod tests {
         value["signing_key_id"] = serde_json::json!("attacker-chosen");
         value["signature_algorithm"] = serde_json::json!("BatchAnchoredSha512");
 
-        let SignResponse::Signed(bundle) = round_trip(addr, &value.to_string()).await else {
+        let SignResponse::Signed { bundle, .. } = round_trip(addr, &value.to_string()).await else {
             panic!("expected a signed bundle");
         };
         assert_eq!(&bundle.signing_key_id, signer.key_id());
@@ -365,7 +435,7 @@ mod tests {
         for _ in 0..3 {
             let line = lines.next_line().await.unwrap().expect("a response line");
             let response: SignResponse = serde_json::from_str(&line).unwrap();
-            assert!(matches!(response, SignResponse::Signed(_)));
+            assert!(matches!(response, SignResponse::Signed { .. }));
         }
     }
 
@@ -418,7 +488,7 @@ mod tests {
             writer.write_all(b"\n").await.unwrap();
             let line = lines.next_line().await.unwrap().expect("a response line");
             let response: SignResponse = serde_json::from_str(&line).unwrap();
-            assert!(matches!(response, SignResponse::Signed(_)));
+            assert!(matches!(response, SignResponse::Signed { .. }));
         }
     }
 }
