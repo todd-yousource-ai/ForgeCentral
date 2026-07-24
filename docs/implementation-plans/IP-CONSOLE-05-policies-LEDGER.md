@@ -76,16 +76,8 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
   with P5.5. `FC_SIGNER_PORT` must be in the running BFF env.
 - **Reused live surfaces:** `vtz.tree` (grouping axis + VTZ dropdown), `objects.list` (subject/target
   pickers). Both COMPLETE. `policies.ts` reuses `ObjectKind`/`SelectorKind` from the Objects contract.
-- **Next action:** P5.N -- the capstone. Much of the planned `policies.spec.ts` journey coverage already
-  landed incrementally (grouped accordion + expand-to-table, Create w/ closed-enum controls + audited
-  draft, delete confirm, distribute confirm + 3-state ledger, honest empty tenant); the REMAINING work:
-  (1) the missing journey pieces -- Save-&-Publish confirm-gated end to end, a malformed-port 400 read
-  back on the form, edit-of-published minting a new version chip; (2) the structural sweeps as named
-  capstone assertions (four actions + three logging levels on the CONTROLS, no distribute on VTZ --
-  partly present, consolidate); (3) fill the acceptance-sweep table below against `TRD-CONSOLE-05 §7`;
-  (4) the box redeploy LIVE leg (the crdb node serves the whole surface + compose->sign->torchd-pull
-  convergence, enforcement OFF; includes the torchd rev bump for the v2 rules-carrying preimage;
-  `FC_SIGNER_PORT` must be in the running BFF env). `REAL_SURFACES` already carries `policies`.
+- **Next action:** the P5.N LIVE LEG (the last item of the epic) -- see the State line above for the
+  full sequence (FC redeploy; torch rev bump + redeploy; the end-to-end live drive; enforcement OFF).
 - **P5.5 scope note (honest):** the distribute targets the CONVERGENCE members (the endpoints holding
   the prior bundle) as FD.7c always did -- an Applied-To-derived first-distribution target picker needs
   an enrolled-endpoint list read (the same deferral as the P5.4 Applied-To picker). The COMPOSED CONTENT
