@@ -757,3 +757,20 @@ body {
   color: var(--fc-color-status-critical);
   font-size: 0.85rem;
 }
+
+/* Policies surface (P5.3): the per-VTZ accordion stack + the inline chips in the table cells. */
+.fcx-policies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-md);
+}
+.fcx-policy-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fc-space-xs);
+}
+.fcx-policy-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--fc-space-xs);
+}

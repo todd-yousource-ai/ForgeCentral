@@ -10,5 +10,6 @@ export * from './Sparkline.js';
 export * from './EntityDrawer.js';
 export * from './ContainerMembersView.js';
 export * from './DataTable.js';
+export * from './AccordionGroup.js';
 export * from './OverviewSankeyFlow.js';
 export * from './VtzZoneCard.js';
