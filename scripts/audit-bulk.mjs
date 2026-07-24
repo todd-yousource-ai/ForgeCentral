@@ -41,6 +41,17 @@ const WAIVERS = {
       'migration (react-router-dom is removed in v8); revisit at that upgrade.',
     expires: '2026-10-24',
   },
+  'GHSA-mh99-v99m-4gvg': {
+    package: 'brace-expansion',
+    reason:
+      'brace-expansion ReDoS/DoS via unbounded expansion. Two conditions make it not-applicable here: ' +
+      '(1) the installed versions (1.1.16 and 5.0.7) are already at or above the advisory patched ' +
+      'versions, and (2) `pnpm why brace-expansion --prod` is empty -- it is a DEV-TOOLING-ONLY ' +
+      'transitive dep (minimatch/glob for build-time file globbing over trusted, developer-authored ' +
+      'repo paths), never in the shipped BFF/SPA bundle and never fed attacker-controlled patterns. ' +
+      'Revisit if a production dependency ever pulls it. [short expiry: re-confirm at the next audit]',
+    expires: '2026-09-24',
+  },
 };
 
 // ---- lockfile -> { name: [versions] } -------------------------------------------------------------

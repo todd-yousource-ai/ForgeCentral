@@ -24,6 +24,17 @@ import type {
   WireObjectEdit,
   WireObjectList,
   WireObjectSpec,
+  WirePolicyCreate,
+  WirePolicyDelete,
+  WirePolicyDetailQuery,
+  WirePolicyEdit,
+  WirePolicyEffectiveQuery,
+  WirePolicyListQuery,
+  WirePolicyPublish,
+  WirePolicyRule,
+  WirePolicySpec,
+  WireScopeMember,
+  WireDomainPosture,
   WirePrincipalCreate,
   WirePrincipalEdit,
   WirePrincipalSetStatus,
@@ -478,6 +489,138 @@ function vtzDeleteToCbor(request: WireVtzDelete): unknown {
   return out;
 }
 
+/** `POLICY_LIST_BY_ZONE` (PS.5). Rust struct order: request_id, operator?. */
+function policyListToCbor(request: WirePolicyListQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `POLICY_DETAIL` (PS.5). Rust struct order: request_id, vtz, id, operator?. */
+function policyDetailToCbor(request: WirePolicyDetailQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    vtz: request.vtz,
+    id: request.id,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `POLICY_EFFECTIVE` (P5.5, the PS.7 composer seam). Rust struct order: request_id, vtz, operator?. */
+function policyEffectiveToCbor(request: WirePolicyEffectiveQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    vtz: request.vtz,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** One authored rule (flat wire idiom). Rust `WirePolicyRule` field order. */
+function policyRuleToCbor(rule: WirePolicyRule): unknown {
+  return {
+    source_kind: rule.source_kind,
+    source_selector_kind: rule.source_selector_kind,
+    source_selector_value: rule.source_selector_value,
+    destination_kind: rule.destination_kind,
+    destination_selector_kind: rule.destination_selector_kind,
+    destination_selector_value: rule.destination_selector_value,
+    action: rule.action,
+  };
+}
+
+/** One Applied-To scope member. Rust `WireScopeMember`: endpoint_cn, then the optional agent. */
+function scopeMemberToCbor(member: WireScopeMember): unknown {
+  const out: Record<string, unknown> = { endpoint_cn: member.endpoint_cn };
+  if (member.agent !== undefined && member.agent !== null) out['agent'] = member.agent;
+  return out;
+}
+
+/** One per-domain default posture. Rust `WireDomainPosture` field order. */
+function domainPostureToCbor(posture: WireDomainPosture): unknown {
+  return { domain: posture.domain, posture: posture.posture, floor: posture.floor };
+}
+
+/**
+ * `WirePolicySpec` (PS.6). Mirrors the Rust field order and its `skip_serializing_if` exactly: the
+ * required fields always emit; the optional collections are omitted when empty and the optional
+ * scalars when absent, so the CBOR matches what the engine's serde would produce.
+ */
+function policySpecToCbor(spec: WirePolicySpec): unknown {
+  const out: Record<string, unknown> = {
+    vtz: spec.vtz,
+    name: spec.name,
+    description: spec.description,
+    rules: (spec.rules ?? []).map(policyRuleToCbor),
+  };
+  if (spec.protocols !== undefined && spec.protocols.length > 0) out['protocols'] = spec.protocols;
+  if (spec.ports !== undefined && spec.ports.length > 0) out['ports'] = spec.ports;
+  if (spec.schedule_days !== undefined && spec.schedule_days.length > 0)
+    out['schedule_days'] = spec.schedule_days;
+  if (spec.schedule_start_minute !== undefined && spec.schedule_start_minute !== null)
+    out['schedule_start_minute'] = spec.schedule_start_minute;
+  if (spec.schedule_end_minute !== undefined && spec.schedule_end_minute !== null)
+    out['schedule_end_minute'] = spec.schedule_end_minute;
+  if (spec.active_from !== undefined && spec.active_from !== null)
+    out['active_from'] = spec.active_from;
+  if (spec.active_until !== undefined && spec.active_until !== null)
+    out['active_until'] = spec.active_until;
+  if (spec.geo !== undefined && spec.geo.length > 0) out['geo'] = spec.geo;
+  if (spec.restriction_tags !== undefined && spec.restriction_tags.length > 0)
+    out['restriction_tags'] = spec.restriction_tags;
+  out['logging'] = spec.logging;
+  if (spec.applied_to !== undefined && spec.applied_to.length > 0)
+    out['applied_to'] = spec.applied_to.map(scopeMemberToCbor);
+  out['max_classification'] = spec.max_classification;
+  if (spec.default_postures !== undefined && spec.default_postures.length > 0)
+    out['default_postures'] = spec.default_postures.map(domainPostureToCbor);
+  return out;
+}
+
+/** `POLICY_CREATE` / `POLICY_EDIT` (PS.6). Rust struct order: request_id, [id,] spec, operator?. */
+function policyCreateToCbor(request: WirePolicyCreate): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    spec: policySpecToCbor(request.spec),
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+function policyEditToCbor(request: WirePolicyEdit): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    id: request.id,
+    spec: policySpecToCbor(request.spec),
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `POLICY_PUBLISH` (PS.6). Rust struct order: request_id, vtz, id, version, operator?. */
+function policyPublishToCbor(request: WirePolicyPublish): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    vtz: request.vtz,
+    id: request.id,
+    version: request.version,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `POLICY_DELETE` (PS.6). Rust struct order: request_id, vtz, id, operator?. */
+function policyDeleteToCbor(request: WirePolicyDelete): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    vtz: request.vtz,
+    id: request.id,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /**
  * Encode a WireRequest to its CBOR frame payload. The read + cursor variants (what the Console's reads
  * need) are supported; the write-path variants throw a clear error rather than emit a wrong shape.
@@ -553,6 +696,25 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('BundleCommit' in request) {
     return encode({ BundleCommit: bundleCommitToCbor(request.BundleCommit) });
+  }
+  if ('PolicyListByZone' in request) {
+    return encode({ PolicyListByZone: policyListToCbor(request.PolicyListByZone) });
+  }
+  if ('PolicyDetail' in request) {
+    return encode({ PolicyDetail: policyDetailToCbor(request.PolicyDetail) });
+  }
+  if ('PolicyEffective' in request) {
+    return encode({ PolicyEffective: policyEffectiveToCbor(request.PolicyEffective) });
+  }
+  if ('PolicyCreate' in request) {
+    return encode({ PolicyCreate: policyCreateToCbor(request.PolicyCreate) });
+  }
+  if ('PolicyEdit' in request) return encode({ PolicyEdit: policyEditToCbor(request.PolicyEdit) });
+  if ('PolicyPublish' in request) {
+    return encode({ PolicyPublish: policyPublishToCbor(request.PolicyPublish) });
+  }
+  if ('PolicyDelete' in request) {
+    return encode({ PolicyDelete: policyDeleteToCbor(request.PolicyDelete) });
   }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });
