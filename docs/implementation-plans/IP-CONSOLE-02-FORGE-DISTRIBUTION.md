@@ -230,6 +230,34 @@ signs the disjoint v2 domain). `resolveDistribute` now reads POLICY_EFFECTIVE, c
 `rules`+`contributors` fail-closed into the signed draft, and reports `carriedRules`/`carriedPolicies`.
 See `IP-CONSOLE-05-policies-LEDGER.md` (P5.5) for the full record, incl. the torchd rev-bump compat note.
 
+> **REQUIRED FOR FULL FORGE POLICY PREVENTION (operator directive, 2026-07-24).** Completing THIS IP is
+> a NAMED PREREQUISITE of the full Forge policy-prevention chain (author -> compose -> sign -> carry ->
+> fetch -> verify -> apply -> report -> converge -> ENFORCE). The P5.N live drive (2026-07-24) proved
+> the producer half end to end on the box -- author + publish + distribute committed a real v2
+> rules-carrying bundle (`carriedRules:1`) to the carrier -- and surfaced exactly what remains open
+> here before prevention can ever be engaged:
+>
+> 1. **crdb: `BUNDLE_CONVERGENCE` is not operator-delegated (the FD.7c observation gap, proven live).**
+>    `BUNDLE_COMMIT` is delegated (the bundle stores under the OPERATOR's tenant), but
+>    `WireBundleConvergenceQuery` carries no `operator` field and the handler reads under the raw peer
+>    `session.tenant` (the sidecar device) -- so the operator observes `hasBundle:false` for the very
+>    bundle they just committed. Fix in crdb: add the operator to the query + route through
+>    `effective_delegated_session` in `bundle_convergence`, regen `wire-dto.schema.json`, then re-vendor
+>    + regen the FC contract. Without it the convergence ledger (FD.7c) cannot light for the operator.
+> 2. **torchd: the policy-refresh lane (FD.4b) is OFF on the box -- `TORCH_POLICY_ANCHOR` is not
+>    provisioned.** The lane fail-closes without the trusted distribution anchor (FC's bundle-signing
+>    public key), so no BUNDLE_FETCH, no on-device verify/apply, no apply report, no `applied` member.
+>    Provisioning the anchor is a torch deployment/installer step (the live-stitching rule applies:
+>    it lands in installer/production config, never scratchpad), plus the daily ZTP re-enrollment note.
+> 3. **FD.N (the live capstone row below) is then the proof:** distribute from the Policy tab ->
+>    torchd pulls over the real seam -> verifies the v2 rules-carrying preimage (torch revs already
+>    bumped to `5be841b3`, merge `ffe0d3c`) -> applies -> reports -> the Console convergence ledger
+>    reads `applied`.
+>
+> Only after FD.N is green does enforcement engagement (`AG.7` ON + `torch IP-TORCH-POLICY-ENFORCE`
+> PE.* realizing the rule dimensions on-host) turn the applied policy into PREVENTION. Enforcement
+> stays OFF throughout this IP.
+
 **CORRECTION (2026-07-20).** The original single FD.7 row claimed "the numerator already exists as durable fact: torch FG1.10 emits a GCI-attributed `ForgeAudit::Apply` fact ... onto the TRD-21 advisory path." That is FALSE in the way that matters, verified end to end: (1) no crdb store persists an apply outcome (the keyspace stops at `PolicyBundle = 0x26`); (2) every `AuditSink` impl in torch is a TEST sink (`CountingSink`/`RecordingSink`) -- the FD.4b policy lane wires `CountingSink`, so nothing ships to crdb; (3) no `report_apply`/`BUNDLE_REPORT` wire verb exists (FD.4 built only `bundle_fetch`; the lane's `report_apply` is inert). The FG1.10 fact is real but emitted to a LOCAL sink and never lands queryably in crdb. The note conflated "torch emits a fact" with "the fact is durable and queryable in crdb". The denominator (`IdentityScope` of stored bundles) IS durable today; only the numerator was missing, so FD.7 splits into the substrate (7a), the shipper (7b), and the surface (7c). The other half of the original operator ask -- "durable retry until the update goes through" -- needs nothing new: in the pull model the endpoint's refresh loop plus the fail-closed freshness lease IS convergence (see Out of scope).
 | FD.N | `INV-CONSOLE-FORGE-LIVE` | Live capstone on the node: author a zone in the Console -> compose -> sign -> torchd pulls over the real seam -> verifies -> applies -> reports the outcome -> the Console shows it. Enforcement stays OFF, so the proof is that the *policy plane* is real end to end, not that anything is enforced. Requires a fresh ZTP enrollment (the leaf expires daily). |
 
