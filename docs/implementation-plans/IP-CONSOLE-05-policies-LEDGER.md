@@ -6,9 +6,16 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-24): P5.1..P5.6 LANDED. NEXT = P5.N (the capstone: the Playwright acceptance sweep
-  against TRD-CONSOLE-05 Section 7 + the box redeploy live leg, enforcement OFF, incl. the torchd
-  rev-bump note below).**
+- **State (2026-07-24): P5.1..P5.6 LANDED; P5.N TEST HALF LANDED. ONLY REMAINING = the box redeploy
+  LIVE LEG** (rebuild+redeploy the FC BFF/SPA + sidecar; bump the torch pinned crdb revs so torchd
+  verifies the v2 rules-carrying preimage, rebuild+redeploy torchd/torch-placed; drive the whole surface
+  over the live node: author -> publish -> distribute -> torchd pull -> convergence; enforcement OFF;
+  `FC_SIGNER_PORT` in the running BFF env; the standing live-proof rule applies: any stitching done for
+  the live drive lands in installer/production code, never manual scratchpad state).
+  The P5.N test half: the remaining capstone journeys (Save-&-Publish confirm e2e w/ the BREAKING flag
+  surfaced -- incl. fixing the P5.4 defect where the form closed unconditionally and hid the flag;
+  engine-refusal 400 read-back; edit-mints-a-version-chip; Logging exact-three structural; the vtz.spec
+  no-distribute sweep) + the acceptance-sweep table below FILLED against `TRD-CONSOLE-05 §7`.
   P5.6 (docs-only) was a grounding CORRECTION rather than a landing: `06`/`07-*.png` were already in the
   original 2026-07-05 set (their README rows now carry the substrate reconciliation), and the Create
   Policy modal mock never reached disk -- the design-session attachment was reviewed but not landed, and
@@ -114,21 +121,25 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 | P5.4 | `INV-CONSOLE-POLICIES-AUTHOR` | LANDED | `f00f650` | BFF command path (dispatch + `CrucibleClient`/`WireCrucibleClient` + `OperatorEngine` 4 delegated cmds + `engine/policies.ts` resolvers + `POST /api/policies[/edit|/publish|/delete]` before the 405 gate, 409/400/403 mapping, cache-drop; `@forge/contracts toPolicyDraftInput` fail-closed parser); SPA `usePolicyMutation` (`useSavePolicy` create/edit-then-publish + `useDeletePolicy`) + `PolicyForm` (08 modal: name/zone/subjects/targets cross-product/protocol chips+validated ports/action(4)/logging(3) + Restrictions[days+hours+geo+tags] + Advanced[Applied-To+classification+description]; Save-Draft vs Save-&-Publish confirm-gated) + surface Create/Edit/Delete. **Deferred: absolute active-window authoring (opaque HLC); Applied-To = endpoint CNs.** |
 | P5.5 | `INV-CONSOLE-POLICIES-DISTRIBUTED` | LANDED | `28bbfc4` | the FD.7c re-home + the REAL policy carriage: schemas re-vendored + regen (`WirePolicyEffective*`, `BundleRule`, `rules` in `FORGE_FIELD_ORDER`); sidecar revs bumped to crdb `5be841b3` + `BundleDraft.rules` passthrough (the shared `bundle_preimage_bytes` signs v2 when rules carried; seam tests green); BFF `policyEffective` read (dispatch/client/wire-client/operator-engine); `contracts composeBundleRules` (fail-closed; contributors from SemVer); `resolveDistribute` composes POLICY_EFFECTIVE -> rules+contributors into the signed draft (`DistributeCompositionError` -> 503; nothing half-composed reaches the signer); `DistributionPanel` gains the P5.5 confirm gate (names the endpoint set) and mounts per-zone on `PoliciesSurface`; `policies.convergence`+`policies.distribute` bindings LIVE; VTZ structural no-distribute assert; distribute e2e journey |
 | P5.6 | `INV-CONSOLE-POLICIES-GROUNDED` | LANDED | `16614e2` | grounding CORRECTED, not landed-anew: `06`/`07` were already in the 2026-07-05 set (README rows now carry the substrate reconciliation: logging 3-not-mock's, action 4-not-3, no updated-date, distribution lives here); the Create Policy modal mock NEVER landed (design-session attachment; the cited `08-*.png` collides with TrustOps Rewind) -- TRD Section 0/3 fixed to name Section 3 as the modal's grounding; FORGE-DISTRIBUTION FD.7c status closed w/ the P5.5 re-home record |
-| P5.N | `INV-CONSOLE-POLICIES-COMPLETE` | PLANNED | -- | Playwright capstone (grouped accordion; Create w/ Network+CIDR target + ports/HTTPS + Quarantine + Full + 7-day window + Applied-To devices; publish confirm; malformed-port 400; version chip on edit; distribute + convergence 3 states; no-distribute-on-VTZ + four-action + three-logging structural sweeps; empty tenant honest); `REAL_SURFACES` allowlist; acceptance sweep; box redeploy live leg (enforcement OFF) |
+| P5.N | `INV-CONSOLE-POLICIES-COMPLETE` | TEST HALF LANDED (live leg pending) | `6e6b309` | the remaining capstone journeys: Save-&-Publish confirm-gated e2e w/ the BREAKING flag surfaced (fixed a P5.4 defect: the form closed unconditionally on success, making the breaking note unreachable -- it now stays open on a breaking ack); engine-refusal 400 read back as the typed failure line; edit mints a new version chip (stateful mock, the row is the engine record); Logging control exact-three structural (Action exact-four was already asserted); vtz.spec e2e no-distribute sweep; acceptance-sweep table FILLED against `TRD-CONSOLE-05 §7`. **Pending: the box redeploy live leg** (node serves the surface; compose->sign->torchd-pull w/ the v2 rules bundle; needs the torchd rev bump; enforcement OFF) |
 
-## Acceptance sweep (TRD-CONSOLE-05 Section 7) -- filled at P5.N
+## Acceptance sweep (TRD-CONSOLE-05 Section 7) -- FILLED at P5.N (test half)
 
 | Acceptance row | Proven by |
 |---|---|
-| Every policy row/field is a real engine record; no fabricated policy | (P5.1 fail-closed projections + P5.2 resolver tests + P5.N empty-tenant) |
-| Grouping is by real `Policy.vtz` over live `vtz.tree` | (P5.3/P5.N) |
-| Action control = exactly four; logging = exactly three; no unstorable value | (P5.1 closed enums + P5.N structural sweep) |
-| Source/destination real `ObjectRef`; IP/subnet = `Selector::Cidr`; ports/protocol typed; malformed 400 | (P5.4/P5.N) |
-| Applied-To authors a real `IdentityScope`; distribute targets only the named endpoints | (P5.5/P5.N) |
-| Draft never mutates published; publish atomic+audited+confirm-gated; breaking flagged | (P5.4) |
-| Active-window `until` past excludes from composed bundle (producer expiry) | (P5.5 over PS.7 + P5.N) |
-| Compose->sign->push signs in the sidecar; convergence shows 3 states; no VTZ distribute control | (P5.5/P5.N) |
-| Section 5 three-click tasks within budget | (P5.N) |
+| Every policy row/field is a real engine record; no fabricated policy | contracts `policies.test.ts` (fail-closed projections; one malformed record collapses the list) + bff `policies.test.ts` (`PoliciesUnavailableError`) + e2e "an empty tenant renders the honest empty state" |
+| Grouping is by real `Policy.vtz` over live `vtz.tree` | surface test "renders one collapsible group per zone" (tree-ordered groups) + e2e "VTZ-grouped accordions expand to the real policy table" |
+| Action control = exactly four; logging = exactly three; no unstorable value | contracts closed enums (`POLICY_ACTIONS`/`POLICY_LOGGING` + fail-closed narrowers + `toPolicyDraftInput` refusals) + e2e structural asserts on BOTH controls (`allTextContents` exact) |
+| Source/destination real `ObjectRef`; IP/subnet = `Selector::Cidr`; ports/protocol typed; malformed reads back typed | Subjects/Targets options are the real `objects.list` catalog (surface test "authors a draft ... cross-product"); `portsValid` unit tests + `toPolicyDraftInput` network refusals; e2e "an engine refusal on the draft reads back as the typed failure line" (Framing -> 400) |
+| Applied-To authors a real `IdentityScope`; distribute targets only the named endpoints | contracts `toWirePolicySpec` (applied_to -> `WireScopeMember[]`, empty omitted = distributes nowhere) + panel test "re-distributes to exactly the current scope" + e2e distribute dialog names the endpoint set |
+| Draft never mutates published; publish atomic+audited+confirm-gated; breaking flagged | store-side: crdb PS.4 (edit never touches a Published key); FC: `useSavePolicy` publishes the MINTED version; e2e "Save & Publish is confirm-gated ... BREAKING publish is flagged" + surface test "a BREAKING publish keeps the form open" |
+| Active-window `until` past excludes from composed bundle (producer expiry) | crdb `policy_effective_serves_only_published_and_active_policies` (INV-WIRE-POLICY-EFFECTIVE; expiry at the server clock) + bff distribute test (composition is exactly the POLICY_EFFECTIVE result) |
+| Compose->sign->push signs in the sidecar; convergence shows 3 states; no VTZ distribute control | sidecar seam tests (key never in TS; shared preimage signs v2 for carried rules) + e2e "Distribute lives on the Policy tab" (3 states + confirm) + vtz.spec "P5.N structural sweep" + vtz-surface unit structural assert |
+| Section 5 three-click tasks within budget | e2e journeys: view a zone's policies = 2 clicks (nav -> expand); author = 3 (Create -> fill -> Save); distribute = 3 (expand -> Distribute -> confirm) |
+
+**LIVE LEG (pending -- the box redeploy):** the crdb node serving the whole surface over :7878 +
+compose->sign->torchd-pull convergence with the v2 rules-carrying bundle (requires the torchd rev bump;
+enforcement OFF; `FC_SIGNER_PORT` in the running BFF env).
 
 ## Named deferrals (honest, gating work named)
 
