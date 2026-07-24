@@ -363,5 +363,19 @@ test('a new zone nests under the chosen parent and commits on confirm', async ({
 
 // The FD.7c distribution-ledger e2e was REMOVED with the panel (surface-placement ruling
 // 2026-07-21: policy composes/pushes from the Policy tab, never the VTZ surface -- see
-// IP-CONSOLE-02-FORGE-DISTRIBUTION.md). The spec re-lands with the Policy-tab PR that re-homes
-// the panel; version control preserves the original test.
+// IP-CONSOLE-02-FORGE-DISTRIBUTION.md). It RE-LANDED on the Policy tab with P5.5
+// (policies.spec.ts, "Distribute lives on the Policy tab"); the sweep below is the P5.N
+// structural half -- this surface must never regrow the control.
+
+test('P5.N structural sweep: NO policy-distribution control exists on the VTZ surface', async ({
+  page,
+}) => {
+  await mockBff(page);
+  await page.goto('/vtz');
+  await expect(
+    page.getByRole('button', { name: 'Trust zone YouSource.Corp', exact: true }),
+  ).toBeVisible();
+  // Policy is composed + pushed from the POLICY tab (the 2026-07-21 rule).
+  await expect(page.getByRole('button', { name: /distribute/i })).toHaveCount(0);
+  await expect(page.getByText('Policy distribution')).toHaveCount(0);
+});

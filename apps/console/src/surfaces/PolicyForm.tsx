@@ -197,7 +197,16 @@ export function PolicyForm({
         draft: buildDraft(),
         publish,
       },
-      { onSuccess: () => onDone() },
+      {
+        // A BREAKING publish (the engine revoked previously granted access) keeps the form open so
+        // the operator SEES the flag (the acceptance row "a breaking publish is flagged"); closing
+        // unconditionally would render the notice unreachable. Cancel then dismisses.
+        onSuccess: (result) => {
+          if (!result.breaking) {
+            onDone();
+          }
+        },
+      },
     );
   };
 

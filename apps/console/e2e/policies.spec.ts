@@ -1,12 +1,15 @@
 import { expect, test } from '@playwright/test';
 import type { Page, Route } from '@playwright/test';
 
-// IP-CONSOLE-05 P5.3: the read-only Policies surface journey in a real browser, the BFF mocked at the
-// network boundary (never a live engine; the live leg + the authoring/distribute journey fold into the
-// P5.N capstone). Proves the grouped-by-VTZ accordion over the real engine shape: expand a zone to its
-// policy table with the 07-*.png columns; the action cell is the four-action lattice + logging the three
-// levels; search narrows a complete dataset; the Create control is present-but-disabled (authoring is
-// P5.4); the empty tenant is honest.
+// IP-CONSOLE-05 P5.3-P5.N: the Policies surface capstone journeys in a real browser, the BFF mocked at
+// the network boundary (never a live engine; the live leg is the box redeploy). Proves TRD-CONSOLE-05
+// Section 7 end to end: the grouped-by-VTZ accordion -> the policy table with the 07-*.png columns;
+// Create authors the cross-product ruleset through the audited route and the row that appears is the
+// engine's record; the Action control is exactly the four-action lattice and Logging exactly the three
+// levels (structural); Save-&-Publish is confirm-gated and a BREAKING publish is flagged; an engine
+// refusal reads back as the typed failure line; editing mints a new version chip; Distribute lives on
+// THIS tab (confirm-gated over the endpoint set, the 3-state convergence ledger); the empty tenant is
+// honest. The no-distribute-on-VTZ structural half lives in vtz.spec.ts.
 
 const OPERATOR = { subject: 'auth0|op-e2e', email: 'operator@example.gov', tier: 'Admin' } as const;
 
@@ -167,12 +170,32 @@ async function mockBff(
       unexpressedFields: [],
     });
   });
-  await page.route(/\/api\/policies\/(edit|publish|delete)$/, (route) => {
-    commands.push({
-      url: new URL(route.request().url()).pathname,
-      body: route.request().postDataJSON(),
+  await page.route(/\/api\/policies\/(publish|delete)$/, (route) => {
+    const path = new URL(route.request().url()).pathname;
+    commands.push({ url: path, body: route.request().postDataJSON() });
+    // A publish reports the engine's breaking flag: this fixture publish REVOKES prior access.
+    const breaking = path.endsWith('/publish');
+    return json(route, { id: 'p-new', version: '2.0.0', lifecycle: 'published', breaking });
+  });
+  await page.route(/\/api\/policies\/edit$/, (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    commands.push({ url: '/api/policies/edit', body });
+    // The store mints the next Draft version over the published base; reflect it into the state so
+    // the refetched row is the ENGINE's record with the new version chip.
+    for (const zoneGroup of state.zones as Array<{ policies: Record<string, unknown>[] }>) {
+      for (const row of zoneGroup.policies) {
+        if (row['id'] === body['id']) {
+          row['version'] = '1.3.0';
+          row['lifecycle'] = 'draft';
+        }
+      }
+    }
+    return json(route, {
+      id: String(body['id']),
+      version: '1.3.0',
+      lifecycle: 'draft',
+      breaking: false,
     });
-    return json(route, { id: 'p-1', version: '2.0.0', lifecycle: 'published', breaking: false });
   });
   await page.route(/\/api\/policies$/, (route) => {
     if (route.request().method() === 'POST') {
@@ -262,6 +285,13 @@ test('Create authors a policy through the audited route and it appears as the en
     'Quarantine',
     'Deny',
   ]);
+  // ... and the Logging control offers exactly the three engine levels (the P5.N structural sweep:
+  // neither control can author a value the engine cannot store).
+  expect(await form.getByLabel('Logging Level').locator('option').allTextContents()).toEqual([
+    'Full',
+    'Sampled',
+    'Off',
+  ]);
 
   await form.getByRole('button', { name: 'Save as Draft' }).click();
 
@@ -321,4 +351,90 @@ test('Distribute lives on the Policy tab: confirm-gated over the endpoint set, w
   await expect(dialog).toContainText('box-1.crucible, box-2.crucible, box-3.crucible');
   await dialog.getByRole('button', { name: 'Distribute' }).click();
   await expect.poll(() => bff.commands.some((c) => c.url.endsWith('/distribute'))).toBe(true);
+});
+
+test('Save & Publish is confirm-gated end to end, and a BREAKING publish is flagged (P5.N)', async ({
+  page,
+}) => {
+  const bff = await mockBff(page, []);
+  await page.goto('/policies');
+
+  await page.getByRole('button', { name: '+ Create Policy' }).click();
+  const form = page.getByRole('form', { name: 'Create a policy' });
+  await form.getByLabel('Policy Name').fill('lockdown');
+  await form.getByLabel('Zone').selectOption('YouSource.Corp');
+  await form.getByLabel('Subjects').selectOption('demo-agent');
+  await form.getByLabel('Targets').selectOption('10.8.0.0/16');
+  await form.getByLabel('Action').selectOption('deny');
+
+  // Save & Publish opens the confirm gate; only the explicit confirm authors-then-publishes.
+  await form.getByRole('button', { name: 'Save & Publish' }).click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Publish' }).click();
+
+  // Two audited commands, in order: the authoring create, then the publish of the MINTED version.
+  await expect
+    .poll(() => bff.commands.map((c) => c.url))
+    .toEqual(['/api/policies', '/api/policies/publish']);
+  const publish = bff.commands[1]?.body as { id: string; version: string; vtz: string };
+  expect(publish).toMatchObject({ id: 'p-new', version: '1.0.0', vtz: 'YouSource.Corp' });
+
+  // The engine flagged this publish BREAKING: the form stays open and says so (never silently closed).
+  await expect(form.getByText(/breaking/)).toBeVisible();
+});
+
+test('an engine refusal on the draft reads back as the typed failure line (P5.N)', async ({
+  page,
+}) => {
+  await mockBff(page, []);
+  // Override the create route: the engine refuses the draft (Framing -> 400). LIFO: this handler wins
+  // for POST and falls back to the stateful mock for reads.
+  await page.route(/\/api\/policies$/, (route) => {
+    if (route.request().method() === 'POST') {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'refused', class: 'Framing' }),
+      });
+    }
+    return route.fallback();
+  });
+  await page.goto('/policies');
+
+  await page.getByRole('button', { name: '+ Create Policy' }).click();
+  const form = page.getByRole('form', { name: 'Create a policy' });
+  await form.getByLabel('Policy Name').fill('bad-draft');
+  await form.getByLabel('Zone').selectOption('YouSource.Corp');
+  await form.getByLabel('Subjects').selectOption('demo-agent');
+  await form.getByLabel('Targets').selectOption('10.8.0.0/16');
+  await form.getByRole('button', { name: 'Save as Draft' }).click();
+
+  // The 400 reads back as the typed failure line on the form; nothing is silently accepted.
+  await expect(
+    form.getByText('The policy is incomplete or a field does not fit the engine contract.'),
+  ).toBeVisible();
+});
+
+test('editing a policy mints a new version and the row shows the new chip (P5.N)', async ({
+  page,
+}) => {
+  await mockBff(page);
+  await page.goto('/policies');
+
+  // Expand the zone, open the row editor, and save: the store mints the next Draft version.
+  await page.getByRole('button', { name: 'YouSource.Corp, 1 policy' }).click();
+  await expect(page.getByText('v1.2.0')).toBeVisible();
+  await page
+    .getByRole('row', { name: /contain-egress/ })
+    .getByRole('button', { name: 'Edit' })
+    .click();
+  const form = page.getByRole('form', { name: 'Edit contain-egress' });
+  await expect(form).toBeVisible();
+  await form.getByRole('button', { name: 'Save as Draft' }).click();
+
+  // The zone stayed expanded; the refetched row is the ENGINE's record: the new version chip, draft.
+  await expect(page.getByText('v1.3.0')).toBeVisible();
+  await expect(page.getByText('draft')).toBeVisible();
+  await expect(page.getByText('v1.2.0')).toHaveCount(0);
 });

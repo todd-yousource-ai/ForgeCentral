@@ -1,4 +1,4 @@
-// apps/console/src/test/policies-surface.test.tsx -- IP-CONSOLE-05 P5.3/P5.4 the Policies surface.
+// apps/console/src/test/policies-surface.test.tsx -- IP-CONSOLE-05 P5.3-P5.N the Policies surface.
 //
 // Proves the surface half of INV-CONSOLE-POLICIES-REAL: the tenant's policies render grouped by VTZ in
 // collapsible accordions the operator expands to a real table (the 07-*.png columns); every cell derives
@@ -138,6 +138,8 @@ interface StubOpts {
   policiesStatus?: number;
   policiesBody?: unknown;
   commandStatus?: number;
+  /** The publish ack's breaking flag (the engine revoked prior access). */
+  publishBreaking?: boolean;
 }
 
 function stubFetch(opts: StubOpts = {}): { commands: Array<{ url: string; body: unknown }> } {
@@ -147,12 +149,13 @@ function stubFetch(opts: StubOpts = {}): { commands: Array<{ url: string; body: 
       if (init?.method === 'POST') {
         const raw = typeof init.body === 'string' ? init.body : '';
         commands.push({ url: input, body: JSON.parse(raw) });
+        const publishing = input.endsWith('/publish');
         return Promise.resolve(
           jsonResponse(opts.commandStatus ?? 200, {
             id: 'p-new',
-            version: '1.0.0',
-            lifecycle: 'draft',
-            breaking: false,
+            version: publishing ? '2.0.0' : '1.0.0',
+            lifecycle: publishing ? 'published' : 'draft',
+            breaking: publishing && (opts.publishBreaking ?? false),
           }),
         );
       }
@@ -383,5 +386,61 @@ describe('portsValid enforces the canonical port form', () => {
     expect(portsValid('70000')).toBe(false);
     expect(portsValid('9000-8000')).toBe(false);
     expect(portsValid('http')).toBe(false);
+  });
+});
+
+describe('Save & Publish (P5.N)', () => {
+  it('a BREAKING publish keeps the form open and flags it; the operator dismisses explicitly', async () => {
+    const bff = stubFetch({ publishBreaking: true });
+    renderWithProviders(<PoliciesSurface />, { route: '/policies' });
+    await screen.findByRole('button', { name: 'YouSource.Corp, 1 policy' });
+    fireEvent.click(screen.getByRole('button', { name: '+ Create Policy' }));
+    const form = await screen.findByRole('form', { name: 'Create a policy' });
+    const f = within(form);
+
+    fireEvent.change(f.getByLabelText('Policy Name'), { target: { value: 'lockdown' } });
+    fireEvent.change(f.getByLabelText('Zone'), { target: { value: 'YouSource.Corp' } });
+    const pick = (label: string, value: string): void => {
+      const select = f.getByLabelText<HTMLSelectElement>(label);
+      for (const opt of select.options) opt.selected = opt.value === value;
+      fireEvent.change(select);
+    };
+    pick('Subjects', 'demo-agent');
+    pick('Targets', '10.8.0.0/16');
+
+    fireEvent.click(f.getByRole('button', { name: 'Save & Publish' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Publish' }));
+
+    // Create then publish fired; the engine flagged the publish breaking.
+    await waitFor(() =>
+      expect(bff.commands.map((c) => c.url)).toEqual(['/api/policies', '/api/policies/publish']),
+    );
+    // The form STAYS OPEN and says so -- a silently closed breaking publish would hide the flag.
+    expect(await screen.findByText(/breaking/)).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Create a policy' })).toBeInTheDocument();
+  });
+
+  it('a non-breaking save closes the form (the row is the engine record)', async () => {
+    const bff = stubFetch();
+    renderWithProviders(<PoliciesSurface />, { route: '/policies' });
+    await screen.findByRole('button', { name: 'YouSource.Corp, 1 policy' });
+    fireEvent.click(screen.getByRole('button', { name: '+ Create Policy' }));
+    const form = await screen.findByRole('form', { name: 'Create a policy' });
+    const f = within(form);
+    fireEvent.change(f.getByLabelText('Policy Name'), { target: { value: 'quiet' } });
+    fireEvent.change(f.getByLabelText('Zone'), { target: { value: 'YouSource.Corp' } });
+    const pick = (label: string, value: string): void => {
+      const select = f.getByLabelText<HTMLSelectElement>(label);
+      for (const opt of select.options) opt.selected = opt.value === value;
+      fireEvent.change(select);
+    };
+    pick('Subjects', 'demo-agent');
+    pick('Targets', '10.8.0.0/16');
+    fireEvent.click(f.getByRole('button', { name: 'Save as Draft' }));
+    await waitFor(() => expect(bff.commands).toHaveLength(1));
+    await waitFor(() =>
+      expect(screen.queryByRole('form', { name: 'Create a policy' })).not.toBeInTheDocument(),
+    );
   });
 });
