@@ -5,9 +5,12 @@ surface is the operator's authoring plane for **Forge policy** (Crucible **TRD-3
 Control), organized by Virtual Trust Zone. It is where 1Source (the Console) authors the source-to-destination
 rules that govern a subject's access to an object, composes them into a signed bundle, distributes that bundle
 to the endpoints that must enforce it, and watches it converge. Mock target: the `/policies` prototype
-(`docs/ui-examples/06-*.png` collapsed list, `07-*.png` expanded table) + the Create Policy modal
-(`docs/ui-examples/08-*.png`, landed with this revision). Layout guidance only; where a pixel and this TRD or
-`TRD-CONSOLE-00 §6` disagree, the TRD wins.
+(`docs/ui-examples/06-*.png` collapsed list, `07-*.png` expanded table). The Create Policy modal mock was
+reviewed as a design-session attachment but was NEVER landed on disk, and the filename this revision cited
+for it (`08-*.png`) collides with the existing `08` (TrustOps Command -> Rewind) -- corrected in P5.6: the
+modal's normative grounding is Section 3 of this TRD (which enumerates every field), and the built form
+(P5.4) realizes it. Layout guidance only; where a pixel and this TRD or `TRD-CONSOLE-00 §6` disagree, the
+TRD wins.
 
 ---
 
@@ -90,7 +93,8 @@ provenance}`) while matching the mock's single Subjects/Targets/Protocol/Ports/A
 
 ## 3. The authored policy (the fields the Create/Edit modal collects)
 
-The modal is `08-*.png`: Policy Name, Virtual Trust Zone, Subjects (Who), Targets (What), Protocol, Ports,
+The modal collects (this section IS its grounding -- see the Section 0 mock-target note; no landed image
+mocks it): Policy Name, Virtual Trust Zone, Subjects (Who), Targets (What), Protocol, Ports,
 Action, Logging Level, a **Restrictions (Optional)** collapsible, and an **Advanced Settings** collapsible,
 with a Cancel / Save as Draft / Save & Publish footer. Every field binds to a real engine value; the two
 collapsibles hold the fields the mock does not expand, specified here.

@@ -14,8 +14,12 @@ DTOs this binds to), `TRD-32 v2` (the policy model: per-VTZ rulesets, the `Permi
 lattice, most-restrictive-wins composition), `IP-CONSOLE-02-FORGE-DISTRIBUTION` (the compose/sign/carry/fetch/
 apply/report plane already built -- this IP hosts its trigger + ledger on the correct surface), `IP-CONSOLE-
 02-VTZ` (the zone reads reused for the grouping axis + the VTZ dropdown), `IP-CONSOLE-10-objects` (the noun
-catalog the subject/target pickers read), and the policy mockups `docs/ui-examples/06,07,08-*.png` (grounding
-only; the TRD wins on conflict).
+catalog the subject/target pickers read), and the policy mockups `docs/ui-examples/06,07-*.png` (grounding
+only; the TRD wins on conflict). **GROUNDING CORRECTION (P5.6):** `06`/`07` were already landed + cataloged
+in the original 2026-07-05 set; the Create Policy modal mock was a design-session attachment that never
+landed on disk, and the `08-*.png` name this plan cited for it collides with the existing `08` (TrustOps
+Rewind). The modal's grounding is `TRD-CONSOLE-05` Section 3 (which enumerates every field); P5.4 built to
+it. Roster references to "grounded on `08-*.png`" read accordingly.
 
 **Named invariant:** **INV-CONSOLE-POLICIES-REAL** -- every policy, rule, action, restriction, and control on
 the Policies surface binds to the live crdb policy store over the mTLS seam; nothing is fabricated; the action

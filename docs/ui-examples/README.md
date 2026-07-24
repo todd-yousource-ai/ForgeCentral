@@ -36,6 +36,23 @@ the Virtual Trust Zones surface (`IP-CONSOLE-02` V2.6).
 | 13 | **Trust Overview** (hover-focus) | The graph with one path emphasized and the rest dimmed, plus a hover tooltip (`Inventory-Bot - 1 connections - Trust: 78`). Shows the focus/dim interaction. |
 | 14 | **Trust Overview** (entity drawer) | The right **slide-over drawer** for a focused entity: score-ring header + sparkline, Entity Information (Trust State, Risk Score, Region, Last Seen, Tags), Connected VTZs, Capabilities, Effective Policies, Recent Events (Denied/Success/Pass chips), and **Quick Actions** (View Remediation, Isolate from network, Modify VTZ assignment, Open full report). This is how the `<= 3-click` rule is met: select in the graph -> act in the drawer. |
 
+### Policies (06-07) -- the substrate reconciliation (IP-CONSOLE-05, 2026-07-24)
+
+The Policies surface was built (P5.1-P5.5) against the revised `TRD-CONSOLE-05`, which reconciled these
+mocks to the real engine vocabulary. Where a pixel here disagrees with the built surface, the TRD won:
+
+- **Logging** in `07` reads Sampled/Triggered/Verbose; the engine `TelemetryMode` is **Full / Sampled /
+  Off** (Triggered/Verbose do not exist and would be stubs). The built control offers exactly the three.
+- **Action** chips: the visible rows show three; the model and the built control carry the full
+  four-action lattice **Permit / Monitor / Quarantine / Deny** (TRD-32 v2 R-FRG-93/94).
+- The per-group **updated date** in `06` is omitted from the built surface: the wire record carries no
+  updated timestamp, so rendering one would be fabricated. The policy-count badge stands in.
+- The **Create Policy modal** has no landed mock: it was reviewed as a design-session attachment that
+  never reached this directory (and the `08-*.png` name once cited for it collides with the TrustOps
+  Rewind capture below). Its grounding is `TRD-CONSOLE-05` Section 3, which enumerates every field.
+- Distribution (compose -> sign -> push + the convergence ledger) lives on this surface per the
+  2026-07-21 placement rule -- it is deliberately absent from the VTZ screens' scope.
+
 ### Virtual Trust Zones (15-20, captured 2026-07-19)
 
 The VTZ surface mockups. **Read the divergence note below before building against them:** the crdb VTZ
