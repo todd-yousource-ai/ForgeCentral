@@ -30,6 +30,8 @@ import type {
   WireObjectCatalog,
   WireObjectDetail,
   WireObjectMutated,
+  WirePolicyDetail,
+  WirePolicyList,
   WirePrincipalList,
   WireConnectionList,
   WireConnectivityGraph,
@@ -151,6 +153,22 @@ export function replyToObjectDetail(reply: WireReply): WireObjectDetail {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for an object-detail read');
+}
+
+/** Map an engine `WireReply` to `WirePolicyList` (POLICY_LIST_BY_ZONE, crdb PS.5). */
+export function replyToPolicyList(reply: WireReply): WirePolicyList {
+  if (typeof reply === 'object' && 'PolicyList' in reply) return reply.PolicyList;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a policy-list read');
+}
+
+/** Map an engine `WireReply` to `WirePolicyDetail` (POLICY_DETAIL, crdb PS.5). */
+export function replyToPolicyDetail(reply: WireReply): WirePolicyDetail {
+  if (typeof reply === 'object' && 'PolicyDetail' in reply) return reply.PolicyDetail;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a policy-detail read');
 }
 
 /** Map an engine `WireReply` to `WireDecisionList` (ENTITY_DECISIONS), throwing a typed error on a refusal. */
@@ -591,6 +609,28 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToObjectMutated(await dispatch(transport, { ObjectDelete: request })),
+      opts,
+    );
+  }
+
+  async policyListByZone(
+    request: Parameters<CrucibleClient['policyListByZone']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyList> {
+    return this.call(
+      async (transport) =>
+        replyToPolicyList(await dispatch(transport, { PolicyListByZone: request })),
+      opts,
+    );
+  }
+
+  async policyDetail(
+    request: Parameters<CrucibleClient['policyDetail']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyDetail> {
+    return this.call(
+      async (transport) =>
+        replyToPolicyDetail(await dispatch(transport, { PolicyDetail: request })),
       opts,
     );
   }

@@ -89,6 +89,8 @@ function engineWith(replies: {
   const details: WireVtzDetailQuery[] = [];
   const engine: OperatorEngine = {
     querySubmit: unused,
+    policyListByZone: unused,
+    policyDetail: unused,
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: unused,
@@ -275,6 +277,8 @@ function mutatingEngine(reply: WireVtzMutation | Error): {
   const settle = () => (reply instanceof Error ? Promise.reject(reply) : Promise.resolve(reply));
   const engine: OperatorEngine = {
     querySubmit: unused,
+    policyListByZone: unused,
+    policyDetail: unused,
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: unused,

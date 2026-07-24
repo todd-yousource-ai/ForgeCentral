@@ -6,14 +6,15 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-24): P5.1 LANDED (the contract). NEXT = P5.2 (the read path), UNBLOCKED.**
-  The design PR (plan + ledger + the TRD-CONSOLE-05 revision + roadmap resequence) merged `e0f02bd`.
-  P5.1 code landed `22c5cf5` (no-ff merge on `main`): the crdb `wire-dto.schema.json` re-vendored (the PS.5 export, +683) and
-  `src/generated/wire-dto.ts` regenerated (the `WirePolicy*` DTOs now project); `packages/contracts/
-  src/policies.ts` lands the `PolicyRow`/`PolicyDetailView`/`PolicyDraft` view models with fail-closed
-  closed-enum projections (four-action lattice + three logging levels + protocol/selector/kind/lifecycle/
-  day/classification, all CLOSED); the `policies.*` bindings are registered (byZone/detail + create/edit/
-  publish/delete LIVE over PS.5/PS.6; host enforcement PENDING -> torch IP-TORCH-POLICY-ENFORCE).
+- **State (2026-07-24): P5.1 + P5.2 LANDED (contract + read path). NEXT = P5.3 (the grouped read-only
+  surface), UNBLOCKED.**
+  The design PR merged `e0f02bd`. P5.1 code `22c5cf5`: contract (view models + fail-closed closed-enum
+  projections + `policies.*` bindings). P5.2 code `d8cc202`: the BFF read path -- `PolicyListByZone`/
+  `PolicyDetail` ride the QuerySubmit opcode; `CrucibleClient`/`WireCrucibleClient` + `replyToPolicyList`/
+  `replyToPolicyDetail`; `OperatorEngine.policyListByZone`/`policyDetail` inject operator+tenant server-side
+  (delegation recorded); `engine/policies.ts` resolvers fail-closed to `PoliciesUnavailableError`;
+  `GET /api/policies` + `/api/policies/detail?vtz=&id=` (401/503/400/503-fail-closed) with a tenant-scoped
+  short-TTL cache (`policies-v1`, prefix `policies:<tenant>:`). Resolver + route + delegation tests green.
 - **Cross-repo prerequisite SATISFIED:** the crdb substrate (`crdb IP-CONSOLE-POLICY-SUBSTRATE`) is
   COMPLETE IN CODE -- PS.1..PS.N all landed 2026-07-24 (PS.N capstone merge crdb `69b0057a`; full gate +
   ueba suite green; PS.3..PS.N awaiting operator review). The policy DTOs regen into
@@ -26,11 +27,13 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
   with P5.5. `FC_SIGNER_PORT` must be in the running BFF env.
 - **Reused live surfaces:** `vtz.tree` (grouping axis + VTZ dropdown), `objects.list` (subject/target
   pickers). Both COMPLETE. `policies.ts` reuses `ObjectKind`/`SelectorKind` from the Objects contract.
-- **Next action:** P5.2 -- the read path: wire codecs (`PolicyListByZone`/`PolicyDetail` over the
-  QuerySubmit opcode) + reply parsers + client methods + delegated `OperatorEngine` actions; BFF
-  `engine/policies.ts` resolvers (whole-list fail-closed collapse -> `PoliciesUnavailableError` -> 503;
-  honest-empty zone) + `GET /api/policies`(+`/detail`); tenant-scoped short-TTL cache; route tests. No
-  surface yet. Binds `policies.byZone`/`policies.detail` (LIVE, PS.5). UNBLOCKED.
+- **Next action:** P5.3 -- the grouped read-only surface (`PoliciesSurface.tsx`): header + search + filter
+  + Create button; the net-new accordion group component (a VTZ card w/ policy-count badge + updated date,
+  the first collapsible-group primitive in `packages/design`, grounded on `06-*.png`); each expanded zone
+  renders the policy `DataTable` (`07-*.png` columns: Name+version chip, Scope, Protocol/Ports, Action
+  Badge, Restrictions summary, Logging, Status). Reads `policies.byZone` (`GET /api/policies`) grouped by
+  the live `vtz.tree`; honest loading/empty/error states; the `policies` nav destination replaces its
+  placeholder. Reads-only (no author yet). Surface + accordion design tests. UNBLOCKED.
 - Enforcement stays AG.7-OFF: a published + distributed bundle realizes nothing until enforcement is engaged.
 - **Note:** the repo GitHub remote is `origin` (URL uses the `github-forgecentral` SSH host alias), not a
   remote literally named `github-forgecentral` (CLAUDE.md's naming is loose). Push `git push origin main`.
@@ -53,7 +56,7 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 | Step | Invariant | Status | Commit | Note |
 |------|-----------|--------|--------|------|
 | P5.1 | `INV-CONSOLE-POLICIES-CONTRACT` | LANDED | `22c5cf5` | schema re-vendor (PS.5 DTOs, +683) + `policies.ts` view models (`PolicyRow`/`PolicyDetailView`/`PolicyDraft`) + fail-closed closed-enum projections (four actions, three logging levels, + protocol/selector/kind/lifecycle/day/classification); `policies.*` bindings registered (byZone/detail + create/edit/publish/delete LIVE over PS.5/PS.6; enforcement-runtime PENDING -> torch). Reuses `ObjectKind`/`SelectorKind` from Objects |
-| P5.2 | `INV-CONSOLE-POLICIES-BROKERED` | PLANNED | -- | wire codecs (`PolicyListByZone`/`PolicyDetail`) + delegated actions; `engine/policies.ts` (fail-closed collapse -> 503; honest-empty) + `GET /api/policies`(+`/detail`); tenant-scoped cache; route tests |
+| P5.2 | `INV-CONSOLE-POLICIES-BROKERED` | LANDED | `d8cc202` | dispatch `PolicyListByZone`/`PolicyDetail` on QuerySubmit; `CrucibleClient`+`WireCrucibleClient` methods + `replyToPolicyList`/`replyToPolicyDetail`; `OperatorEngine` delegated reads (operator+tenant injected, delegation recorded); `engine/policies.ts` fail-closed -> `PoliciesUnavailableError`; `GET /api/policies`(+`/detail?vtz=&id=`) 401/503/400/503; tenant-scoped `policies-v1` cache; resolver+route+delegation tests |
 | P5.3 | `INV-CONSOLE-POLICIES-GROUPED` | PLANNED | -- | `PoliciesSurface.tsx`: net-new accordion group component (VTZ card + count badge, `06-*.png`) + per-zone policy `DataTable` (`07-*.png` columns); reads-only; `policies` destination replaces placeholder |
 | P5.4 | `INV-CONSOLE-POLICIES-AUTHOR` | PLANNED | -- | command codecs + POST routes (typed 409/400/403); the Create Policy modal (`08-*.png`): name/VTZ/subjects/targets/protocol chips/ports/action(4)/logging(3) + Restrictions collapsible (days+hours+active-window+geo+tags) + Advanced collapsible (Applied-To+description); Save-Draft vs Save-&-Publish; per-row edit/delete; client validation; 3-click paths |
 | P5.5 | `INV-CONSOLE-POLICIES-DISTRIBUTED` | PLANNED | -- | re-home FD.7c: land `packages/wire` BundleCommit/Convergence codecs; mount `DistributionPanel` here (Distribute confirm-gated over Applied-To; compose `effective_published_policies`(PS.7) -> sidecar sign -> crdb carrier); 3-state convergence ledger; NO distribute control on VTZ surface (structural); signing key never in TS (hygiene) |

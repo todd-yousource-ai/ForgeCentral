@@ -61,6 +61,11 @@ import {
   ObjectsUnavailableError,
 } from './engine/objects.js';
 import {
+  PoliciesUnavailableError,
+  resolvePolicyDetail,
+  resolvePolicyZones,
+} from './engine/policies.js';
+import {
   resolveIdamConfigure,
   resolveIdamConnect,
   resolveIdamConnectors,
@@ -1355,6 +1360,86 @@ async function handleObjects(
   return true;
 }
 
+// The Policies read cache generation. Same discipline as the VTZ/Overview reads: a tenant-scoped,
+// short-TTL projection cache over a stateless BFF (INV-CONSOLE-NO-2ND-DB -- the crdb policy store remains
+// the system of record; this is a bounded-staleness projection, never a second copy of the truth). Bump
+// the generation whenever the view-model shape or semantics change, so no pre-upgrade projection is served.
+const POLICIES_CACHE_VERSION = 'policies-v1';
+
+/**
+ * The cache-key prefix for every Policies projection of one tenant, so an audited write (P5.4) can drop
+ * exactly that tenant's stale policy views and nothing else -- a write must never evict another tenant's
+ * cache, and the operator must never be shown a pre-write list that makes their own edit look lost.
+ */
+function policiesCachePrefix(tenant: string | undefined): string {
+  return `policies:${tenant ?? ''}:`;
+}
+
+/**
+ * The Policies-surface reads (IP-CONSOLE-05 P5.2): GET /api/policies (the tenant's policies grouped by
+ * VTZ) and GET /api/policies/detail?vtz=<zone>&id=<policy> (one policy + its version history). Session-
+ * gated (401), engine-gated (503), operator-delegated; the engine bounds and refuses rather than
+ * truncating, so the Console holds the COMPLETE list or an error. Fails CLOSED: a record carrying an enum
+ * tag the Console cannot narrow is a 503 (never a defaulted disposition on a governance surface), a
+ * query-gate refusal a sanitized 403, any other engine error a 502. Returns true iff it claimed the request.
+ */
+async function handlePolicies(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/policies' && path !== '/api/policies/detail') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+  // The detail read needs its zone id + policy id up front, so a malformed request never reaches the engine.
+  const vtz = params.get('vtz')?.trim();
+  const id = params.get('id')?.trim();
+  if (path === '/api/policies/detail' && (!vtz || !id)) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  // Tenant-scoped key: a warm projection is never served across tenants (INV-CONSOLE-ENGINE-AUTHZ).
+  const cacheKey =
+    path === '/api/policies'
+      ? `${policiesCachePrefix(principal.tenant)}byZone`
+      : `${policiesCachePrefix(principal.tenant)}detail:${vtz ?? ''}:${id ?? ''}`;
+  const cached = deps.cache.get(cacheKey, POLICIES_CACHE_VERSION);
+  if (cached !== undefined) {
+    sendJson(res, 200, cached);
+    return true;
+  }
+  const engine = deps.operatorEngine;
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    const view =
+      path === '/api/policies'
+        ? await resolvePolicyZones(engine, principal, opts)
+        : await resolvePolicyDetail(engine, principal, vtz ?? '', id ?? '', opts);
+    deps.cache.set(cacheKey, view, POLICIES_CACHE_VERSION);
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof PoliciesUnavailableError) {
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'policies read failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 /**
  * The path the on-node crypto-sidecar writes the Auth0 client secret to, and the engine reads it from
  * (crdb `client_secret_ref`). The secret VALUE never reaches this tier; the BFF only ever names the
@@ -1695,6 +1780,9 @@ async function route(
     return;
   }
   if (await handleObjects(deps, req, path, res)) {
+    return;
+  }
+  if (await handlePolicies(deps, req, path, res)) {
     return;
   }
   if (await handleIdam(deps, req, path, res)) {

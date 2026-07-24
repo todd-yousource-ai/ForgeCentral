@@ -36,6 +36,8 @@ function engineWith(graph: WireConnectivityGraph): {
   const seen: WireConnectivityQuery[] = [];
   const engine: OperatorEngine = {
     querySubmit: unused,
+    policyListByZone: unused,
+    policyDetail: unused,
     cursorFetch: unused,
     cursorClose: unused,
     listAgents: unused,
@@ -211,6 +213,8 @@ describe('resolveEntityConnections (O1.6a)', () => {
     const seen: WireEntityConnections[] = [];
     const engine: OperatorEngine = {
       querySubmit: unused,
+      policyListByZone: unused,
+      policyDetail: unused,
       cursorFetch: unused,
       cursorClose: unused,
       listAgents: unused,
@@ -295,6 +299,8 @@ describe('resolveClassMembers (O1.6b)', () => {
     const seen: WireConnectivityMembers[] = [];
     const engine: OperatorEngine = {
       querySubmit: unused,
+      policyListByZone: unused,
+      policyDetail: unused,
       cursorFetch: unused,
       cursorClose: unused,
       listAgents: unused,

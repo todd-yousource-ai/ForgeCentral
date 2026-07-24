@@ -38,6 +38,10 @@ import type {
   WireObjectEdit,
   WireObjectList,
   WireObjectMutated,
+  WirePolicyDetail,
+  WirePolicyDetailQuery,
+  WirePolicyList,
+  WirePolicyListQuery,
   WireLugProvisioned,
   WirePrincipalCreate,
   WirePrincipalEdit,
@@ -124,6 +128,12 @@ export interface CrucibleClient {
   idamConfigure(request: WireIdamConfigure, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
   /** Read one named object + its resolved members (OBJECT_DETAIL, crdb OB.3). */
   objectDetail(request: WireObjectDetailQuery, opts?: EngineCallOptions): Promise<WireObjectDetail>;
+  /** Read the tenant's authored policies grouped by zone (POLICY_LIST_BY_ZONE, crdb PS.5): draft +
+   * published, each at its newest version, bounded and tenant-private. */
+  policyListByZone(request: WirePolicyListQuery, opts?: EngineCallOptions): Promise<WirePolicyList>;
+  /** Read one policy's full definition + version history (POLICY_DETAIL, crdb PS.5). An unknown id
+   * returns an empty detail (no record, no versions), never an error. */
+  policyDetail(request: WirePolicyDetailQuery, opts?: EngineCallOptions): Promise<WirePolicyDetail>;
   /** Register a named object (OBJECT_CREATE, crdb OB.4), audited. */
   objectCreate(request: WireObjectCreate, opts?: EngineCallOptions): Promise<WireObjectMutated>;
   /** Edit a named object's definition (OBJECT_EDIT, crdb OB.4), audited. */

@@ -41,6 +41,8 @@ const silentLog: ServerLogger = { info: () => {}, warn: () => {}, error: () => {
 const unusedClient: CrucibleClient = {
   ping: () => Promise.resolve(),
   querySubmit: () => Promise.reject(new Error('unused')),
+  policyListByZone: () => Promise.reject(new Error('unused')),
+  policyDetail: () => Promise.reject(new Error('unused')),
   listAgents: () => Promise.reject(new Error('unused')),
   listPrincipals: () => Promise.reject(new Error('unused')),
   groupCreate: () => Promise.reject(new Error('unused')),
