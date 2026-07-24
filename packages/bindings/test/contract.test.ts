@@ -281,6 +281,63 @@ describe('IP-CONSOLE-04 ID.1: the External IDAM (idam.*) bindings', () => {
   });
 });
 
+describe('IP-CONSOLE-05 P5.1: the Policies (policies.*) authoring bindings', () => {
+  const policyBindings = Object.values(bindings).filter((b) => b.id.startsWith('policies.'));
+
+  it('registers the grouped/detail reads, the four authoring commands, and the enforcement deferral', () => {
+    const ids = policyBindings.map((b) => b.id).sort();
+    expect(ids).toEqual([
+      'policies.byZone',
+      'policies.create',
+      'policies.delete',
+      'policies.detail',
+      'policies.edit',
+      'policies.enforcement',
+      'policies.publish',
+    ]);
+  });
+
+  it('binds the grouped list + detail reads LIVE to the crdb policy store (PS.5)', () => {
+    const byZone = bindings['policies.byZone'];
+    expect(byZone?.kind).toBe('read');
+    expect(byZone?.surface).toBe('cruciblql');
+    expect(byZone?.op).toBe('policy_list_by_zone_v1');
+    expect(byZone?.status.kind).toBe('live');
+    const detail = bindings['policies.detail'];
+    expect(detail?.op).toBe('policy_detail_v1');
+    expect(detail?.status.kind).toBe('live');
+  });
+
+  it('exposes create/edit/publish/delete as real audited LIVE commands (PS.6)', () => {
+    for (const [id, op] of [
+      ['policies.create', 'policy_create_v1'],
+      ['policies.edit', 'policy_edit_v1'],
+      ['policies.publish', 'policy_publish_v1'],
+      ['policies.delete', 'policy_delete_v1'],
+    ] as const) {
+      const command = bindings[id];
+      expect(command?.kind).toBe('command');
+      expect(command?.op).toBe(op);
+      expect(command?.status.kind).toBe('live');
+      if (command?.kind === 'command') {
+        expect(command.audited).toBe(true);
+        expect(command.authz).toBe('operator:policies.author');
+      }
+    }
+  });
+
+  it('defers only host enforcement to torch, naming its gating task (never a fabricated realization)', () => {
+    const pending = policyBindings.filter((b) => b.status.kind === 'pending').map((b) => b.id);
+    expect(pending).toEqual(['policies.enforcement']);
+    const enforcement = bindings['policies.enforcement'];
+    expect(enforcement?.surface).toBe('torch');
+    if (enforcement?.status.kind === 'pending') {
+      expect(enforcement.status.owningRepo).toBe('torch');
+      expect(enforcement.status.gatingTask).toContain('IP-TORCH-POLICY-ENFORCE');
+    }
+  });
+});
+
 describe('INV-CONSOLE-NO-STUB: the enforcement rules', () => {
   it('accepts a well-formed live read binding', () => {
     const manifest: BindingManifest = { [liveRead.id]: liveRead };
