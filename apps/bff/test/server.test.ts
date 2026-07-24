@@ -62,6 +62,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     objectDetail: unused,
     policyListByZone: unused,
     policyDetail: unused,
+    policyEffective: unused,
     policyCreate: unused,
     policyEdit: unused,
     policyPublish: unused,
@@ -130,6 +131,7 @@ function operatorEngineWith(): OperatorEngine {
         record: wirePolicyRecord(),
         versions: [{ version: '1.0.0', lifecycle: 'published' }],
       }),
+    policyEffective: () => Promise.resolve({ policies: [wirePolicyRecord()] }),
     policyCreate: () => Promise.resolve({ id: 'p-new', version: '1.0.0', lifecycle: 'draft' }),
     policyEdit: () => Promise.resolve({ id: 'p-1', version: '1.1.0', lifecycle: 'draft' }),
     policyPublish: () =>

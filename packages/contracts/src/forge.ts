@@ -48,6 +48,7 @@ export {
   FORGE_FIELD_ORDER,
   type ApplyError,
   type ApplyOutcome,
+  type BundleRule,
   type BundleVersion,
   type CertIdentity,
   type Classification,
@@ -56,6 +57,7 @@ export {
   type FreshnessLease,
   type IdentityScope,
   type ModelMcpDestSet,
+  type PolicyVersionRef,
   type ResourceBound,
   type ScopeMember,
   type SignatureAlgorithm,
@@ -177,6 +179,67 @@ export function composeEndpointPolicy(zone: VtzZone): ComposedEndpointPolicy {
     unexpressedDomains,
     unexpressedFields: UNEXPRESSIBLE_ZONE_FIELDS,
   };
+}
+
+// -- P5.5: the authored-ruleset carriage (policies -> BundleRule[] + contributors) --------------------
+
+import type { BundleRule, PolicyVersionRef, Version } from './generated/forge-dto.js';
+import type { PolicyRow } from './policies.js';
+
+/** Parse a store-minted SemVer string (`major.minor.patch`) into the typed `Version`, or null. */
+function parseSemver(version: string): Version | null {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  if (!m) return null;
+  return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) };
+}
+
+/** A composed authored-ruleset carriage: the flat rules plus the contributor audit trail. */
+export interface ComposedBundleRules {
+  /** The flat rules the bundle carries, in policy order then rule order. */
+  readonly rules: readonly BundleRule[];
+  /** The authored policy versions the rules came from (the bundle's contributor list, R-FRG-84). */
+  readonly contributors: readonly PolicyVersionRef[];
+}
+
+/**
+ * Compose the bundle's authored-ruleset carriage from the zone's EFFECTIVE published policies
+ * (`POLICY_EFFECTIVE`, the PS.7 producer read: newest published per policy, producer-expiry-admitted
+ * engine-side). Pure and fail-closed: a policy whose version string the contract cannot parse collapses
+ * the WHOLE composition to `null` -- a bundle silently missing a contributor is the lie the no-stub rule
+ * forbids on the signing path. Each rule denormalizes its policy's network qualifier + logging level and
+ * names its policy version, so the carried ruleset audits against `contributors`.
+ *
+ * The recurring schedule / geo / tags are NOT carried (their host realization is the deferred
+ * enforcement epic); the absolute active-window needs no carriage at all -- the producer already
+ * excluded expired policies engine-side.
+ */
+export function composeBundleRules(policies: readonly PolicyRow[]): ComposedBundleRules | null {
+  const rules: BundleRule[] = [];
+  const contributors: PolicyVersionRef[] = [];
+  for (const policy of policies) {
+    const version = parseSemver(policy.version);
+    if (version === null) {
+      return null;
+    }
+    contributors.push({ policy: policy.id, version });
+    for (const rule of policy.rules) {
+      rules.push({
+        policy_id: policy.id,
+        policy_version: policy.version,
+        source_kind: rule.source.kind,
+        source_selector_kind: rule.source.selectorKind,
+        source_selector_value: rule.source.selectorValue,
+        destination_kind: rule.destination.kind,
+        destination_selector_kind: rule.destination.selectorKind,
+        destination_selector_value: rule.destination.selectorValue,
+        action: rule.action,
+        protocols: [...policy.network.protocols],
+        ports: policy.network.ports,
+        logging: policy.logging,
+      });
+    }
+  }
+  return { rules, contributors };
 }
 
 // -- FD.7c: the distribution convergence ledger (a projection over BUNDLE_CONVERGENCE) ----------------

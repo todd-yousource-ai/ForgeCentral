@@ -30,6 +30,7 @@ import { usePolicies } from './usePolicies.js';
 import { useVtzTree } from './useVtzTree.js';
 import { useDeletePolicy } from './usePolicyMutation.js';
 import { PolicyForm } from './PolicyForm.js';
+import { DistributionPanel } from './DistributionPanel.js';
 
 /** The lattice action -> its semantic badge color (permit calm, deny critical, quarantine its own rung). */
 export function actionVariant(action: PolicyAction): BadgeVariant {
@@ -305,6 +306,9 @@ export function PoliciesSurface(): ReactElement {
                   rows={group.policies}
                   rowKey={(p) => p.id}
                 />
+                {/* P5.5: compose -> sign -> push + the convergence ledger live HERE (the policy tab),
+                    never on the VTZ surface (the 2026-07-21 surface-placement rule). */}
+                <DistributionPanel zoneId={group.vtz} />
               </AccordionGroup>
             );
           })}

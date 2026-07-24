@@ -9,6 +9,7 @@
 // endpoint refuses. That test pins the order against FORGE_FIELD_ORDER, which is generated from crdb's
 // emitted contract -- so a reorder upstream fails here rather than in the field.
 
+import type { PolicyRow } from '../src/index.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,7 @@ import {
   type VtzObjectDomain,
   type VtzPosture,
   type VtzZone,
+  composeBundleRules,
 } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -213,5 +215,72 @@ describe('FD.7c toBundleConvergence', () => {
         members: [member('x', 'applied', 'oops')],
       }),
     ).toBeNull();
+  });
+});
+
+describe('P5.5 composeBundleRules (the authored-ruleset carriage)', () => {
+  const policy = (over: Partial<PolicyRow> = {}): PolicyRow => ({
+    id: '11111111-1111-1111-1111-111111111111',
+    vtz: 'corp.prod',
+    name: 'contain-egress',
+    version: '1.2.0',
+    lifecycle: 'published',
+    description: '',
+    rules: [
+      {
+        source: { kind: 'agent', selectorKind: 'exact', selectorValue: 'demo-agent' },
+        destination: { kind: 'network', selectorKind: 'cidr', selectorValue: '10.8.0.0/16' },
+        action: 'quarantine',
+      },
+    ],
+    network: { protocols: ['https'], ports: '443' },
+    restrictions: {
+      scheduleDays: [],
+      scheduleStartMinute: null,
+      scheduleEndMinute: null,
+      activeFrom: null,
+      activeUntil: null,
+      geo: [],
+      tags: [],
+    },
+    logging: 'full',
+    appliedTo: [],
+    maxClassification: 'confidential',
+    ...over,
+  });
+
+  it('flattens each policy rule with its provenance + network qualifier + logging', () => {
+    const composed = composeBundleRules([policy()]);
+    expect(composed).not.toBeNull();
+    expect(composed?.rules).toEqual([
+      {
+        policy_id: '11111111-1111-1111-1111-111111111111',
+        policy_version: '1.2.0',
+        source_kind: 'agent',
+        source_selector_kind: 'exact',
+        source_selector_value: 'demo-agent',
+        destination_kind: 'network',
+        destination_selector_kind: 'cidr',
+        destination_selector_value: '10.8.0.0/16',
+        action: 'quarantine',
+        protocols: ['https'],
+        ports: '443',
+        logging: 'full',
+      },
+    ]);
+    expect(composed?.contributors).toEqual([
+      {
+        policy: '11111111-1111-1111-1111-111111111111',
+        version: { major: 1, minor: 2, patch: 0 },
+      },
+    ]);
+  });
+
+  it('an empty effective set composes empty carriage (the v1-preimage bundle)', () => {
+    expect(composeBundleRules([])).toEqual({ rules: [], contributors: [] });
+  });
+
+  it('fail-closes the WHOLE composition on an unparseable version (never a dropped contributor)', () => {
+    expect(composeBundleRules([policy(), policy({ id: 'p2', version: 'not-semver' })])).toBeNull();
   });
 });

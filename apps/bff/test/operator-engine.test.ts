@@ -121,6 +121,11 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ record: null, versions: [] });
     },
+    policyEffective: (req) => {
+      calls.push(`policyEffective:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ policies: [] });
+    },
     policyCreate: (req) => {
       calls.push(`policyCreate:${String(req.request_id)}`);
       reads.push(req);

@@ -1,13 +1,22 @@
-// apps/bff/src/engine/distribute.ts -- the FD.2 producer orchestration.
+// apps/bff/src/engine/distribute.ts -- the FD.2 producer orchestration (P5.5: the Policy-tab producer).
 //
 // The one place a policy bundle is born: read the zone from the system of record, compose the flat
-// EndpointPolicy from its EFFECTIVE postures (FD.1), assemble the draft, have the sidecar sign it
-// (the key never enters this tier), and commit the signed bytes to the crdb carrier (FD.3) under the
-// operator's delegation. The response carries the version AND the composition record -- what the
-// operator authored that the v1 bundle could not express -- so the gap is visible, never dropped.
+// EndpointPolicy from its EFFECTIVE postures (FD.1), read the zone's EFFECTIVE PUBLISHED POLICIES
+// (POLICY_EFFECTIVE -- the crdb PS.7 composer seam: newest published per policy, producer-expiry
+// admitted ENGINE-side with the server clock), compose the authored-ruleset carriage (`rules` +
+// `contributors`), assemble the draft, have the sidecar sign it (the key never enters this tier; a
+// rules-carrying bundle signs in the v2 preimage domain), and commit the signed bytes to the crdb
+// carrier (FD.3) under the operator's delegation. The response carries the version AND the composition
+// record -- what the operator authored that the flat v1 policy could not express -- so the gap is
+// visible, never dropped.
 
-import { composeEndpointPolicy, toVtzDetail } from '@forge/contracts';
-import type { VtzZone } from '@forge/contracts';
+import {
+  composeBundleRules,
+  composeEndpointPolicy,
+  toPolicyRow,
+  toVtzDetail,
+} from '@forge/contracts';
+import type { ComposedBundleRules, VtzZone } from '@forge/contracts';
 import { encode as encodeCbor } from '@forge/wire';
 
 import type { EngineCallOptions } from './client.js';
@@ -35,6 +44,10 @@ export interface DistributeRequest {
 export interface DistributeResult {
   readonly version: number;
   readonly commitVersion: number;
+  /** How many authored rules the bundle carries (P5.5); 0 = a zone with nothing published. */
+  readonly carriedRules: number;
+  /** How many published policy versions contributed them (the contributor list length). */
+  readonly carriedPolicies: number;
   readonly unexpressedDomains: ReturnType<typeof composeEndpointPolicy>['unexpressedDomains'];
   readonly unexpressedFields: ReturnType<typeof composeEndpointPolicy>['unexpressedFields'];
 }
@@ -47,11 +60,20 @@ export class DistributeZoneUnknownError extends Error {
   }
 }
 
+/** The effective policies could not be composed honestly (an unknown tag or unparseable version). */
+export class DistributeCompositionError extends Error {
+  constructor(what: string) {
+    super(`bundle composition failed closed: ${what}`);
+    this.name = 'DistributeCompositionError';
+  }
+}
+
 /** Compose the draft the sidecar signs. Exported for the tier-1 tests; pure. */
 export function draftForZone(
   zone: VtzZone,
   commitVersion: number,
   members: readonly string[],
+  composed: ComposedBundleRules,
   nowMs: number,
 ): { draft: BundleDraft; record: ReturnType<typeof composeEndpointPolicy> } {
   const record = composeEndpointPolicy(zone);
@@ -60,9 +82,11 @@ export function draftForZone(
     // re-reads to an equal version, a zone edit strictly advances it.
     version: commitVersion,
     policy: record.policy,
-    // Empty until TRD-CONSOLE-05 authors policy versions; the unexpressed record travels in the
-    // RESPONSE (and the engine audit), because PolicyVersionRef has no free-text carrier.
-    contributors: [],
+    // The authored-ruleset carriage (P5.5): the zone's effective published policies, flattened.
+    // Empty when the zone has none published -- the bundle then signs the unchanged v1 preimage.
+    rules: [...composed.rules],
+    // The authored policy versions the rules came from (the R-FRG-84 audit trail).
+    contributors: [...composed.contributors],
     scope: {
       vtz: zone.id,
       // FC is 1Source: the operator CHOSE these endpoints; the carrier re-gates each fetch against
@@ -96,10 +120,32 @@ export async function resolveDistribute(
   if (detail === null || detail.zone === null) {
     throw new DistributeZoneUnknownError(request.zoneId);
   }
+  // The authored half: the zone's effective published policies (POLICY_EFFECTIVE; drafts and
+  // producer-expired policies were already excluded engine-side). Fail-closed end to end: a record
+  // the contract cannot narrow, or a version it cannot parse, refuses the WHOLE distribute -- a
+  // bundle silently missing an authored rule is a lie on the signing path.
+  const effective = await engine.policyEffective(
+    principal,
+    { request_id: 0, vtz: request.zoneId },
+    opts,
+  );
+  const policies = [];
+  for (const record of effective.policies) {
+    const row = toPolicyRow(record);
+    if (row === null) {
+      throw new DistributeCompositionError('an effective policy carries an unknown engine tag');
+    }
+    policies.push(row);
+  }
+  const composed = composeBundleRules(policies);
+  if (composed === null) {
+    throw new DistributeCompositionError('an effective policy version is unparseable');
+  }
   const { draft, record } = draftForZone(
     detail.zone,
     detail.commitVersion,
     request.members,
+    composed,
     Date.now(),
   );
   const signed = await signBundle(signer.host, signer.port, draft, signer.timeoutMs);
@@ -114,6 +160,8 @@ export async function resolveDistribute(
   return {
     version: ack.version,
     commitVersion: ack.commit_version,
+    carriedRules: composed.rules.length,
+    carriedPolicies: composed.contributors.length,
     unexpressedDomains: record.unexpressedDomains,
     unexpressedFields: record.unexpressedFields,
   };

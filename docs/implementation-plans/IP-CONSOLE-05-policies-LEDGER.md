@@ -6,8 +6,25 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-24): P5.1..P5.4 LANDED (contract + read path + grouped surface + authoring).
-  NEXT = P5.5 (compose -> sign -> push + the convergence ledger, the FD.7c re-home), UNBLOCKED.**
+- **State (2026-07-24): P5.1..P5.5 LANDED. NEXT = P5.6 (mockups + TRD grounding, docs-only), then P5.N
+  (the capstone incl. the deferred live drive).**
+  P5.5 shipped as THREE PRs -- two crdb prerequisites and the FC half:
+  (a) crdb `501ab1ea`: the `POLICY_EFFECTIVE` wire read (the PS.7 seam; producer expiry engine-side).
+  (b) crdb `5be841b3` (operator decision: EXTEND THE BUNDLE): `BundleRule` + `SignedPolicyBundle.rules`;
+  the preimage VERSIONED -- empty rules = the frozen byte-identical v1 (golden vector preserved, every
+  stored bundle verifies unchanged), rules-carrying = the disjoint `POLICY_BUNDLE_PREIMAGE_DOMAIN_V2`
+  with the rules signature-bound (strip/inject both fail).
+  (c) FC (this PR): schemas re-vendored+regen; sidecar revs -> `5be841b3` w/ `BundleDraft.rules`
+  passthrough (the SHARED `bundle_preimage_bytes` signs v2; seam tests green); BFF `policyEffective`
+  read; `composeBundleRules` (fail-closed); `resolveDistribute` composes the zone's effective published
+  policies into the signed draft + reports `carriedRules`/`carriedPolicies`; the `DistributionPanel`
+  gains the confirm gate (names the endpoint set) and mounts per-zone on the POLICY surface;
+  `policies.convergence` + `policies.distribute` bindings LIVE; the VTZ surface structurally asserts NO
+  distribute control; a distribute e2e journey.
+  **TORCH COMPAT NOTE (named): a deployed torchd pinned to an older rev decodes a rules-carrying bundle,
+  drops the unknown field, derives the v1 preimage, and REJECTS it as SignatureInvalid -- fail-closed and
+  visible as `rejected` in the convergence ledger until the torch rev bump (fold into
+  IP-TORCH-POLICY-ENFORCE / the P5.N live leg).**
   P5.4 code `f00f650`: the authoring plane -- BFF command path (dispatch PolicyCreate/Edit/Publish/Delete;
   `CrucibleClient`/`WireCrucibleClient` + `replyToPolicyMutated`; `OperatorEngine` 4 delegated commands;
   `engine/policies.ts` resolvers; `POST /api/policies[/edit|/publish|/delete]` mounted before the 405 gate,
@@ -45,14 +62,16 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
   with P5.5. `FC_SIGNER_PORT` must be in the running BFF env.
 - **Reused live surfaces:** `vtz.tree` (grouping axis + VTZ dropdown), `objects.list` (subject/target
   pickers). Both COMPLETE. `policies.ts` reuses `ObjectKind`/`SelectorKind` from the Objects contract.
-- **Next action:** P5.5 -- compose -> sign -> push + the convergence ledger, **re-homed here** (the FD.7c
-  follow-up). Land the `packages/wire` `BundleCommit`/`BundleConvergence` CBOR codecs (fixed 2026-07-21);
-  mount the FD.7c `DistributionPanel` on the Policy surface (per-zone Distribute confirm-gated over the
-  zone's policies' Applied-To, composing `effective_published_policies` (PS.7) -> sidecar `signBundle` ->
-  crdb carrier); the three-state convergence ledger (applied / rejected-with-reason / silent) over
-  `policies.convergence`. NO distribute/commit control on the VTZ surface (structural assert). The signing
-  key never enters the TS tier (hygiene test). `FC_SIGNER_PORT` must be in the running BFF env. Surface +
-  projection tests; the live leg folds into P5.N.
+- **Next action:** P5.6 -- land the policy mockups into `docs/ui-examples/06,07,08-*.png` + the README
+  table rows (grounding, not truth); amend `TRD-CONSOLE-05` at any residual pixel-vs-substrate sites;
+  cross-reference `IP-CONSOLE-02-FORGE-DISTRIBUTION` so its FD.7c re-home points here. Docs-only PR.
+  Then P5.N: the Playwright capstone + acceptance sweep + the box redeploy live leg (enforcement OFF;
+  includes the torchd rev-bump note above). `FC_SIGNER_PORT` must be in the running BFF env for the
+  live leg.
+- **P5.5 scope note (honest):** the distribute targets the CONVERGENCE members (the endpoints holding
+  the prior bundle) as FD.7c always did -- an Applied-To-derived first-distribution target picker needs
+  an enrolled-endpoint list read (the same deferral as the P5.4 Applied-To picker). The COMPOSED CONTENT
+  is now the real authored policies; the target-set UX upgrade folds into that deferral.
 - **P5.3 deviations (honest):** the mock's per-group "updated date" is omitted -- the wire record carries no
   updated timestamp (fabrication); the count badge stands in.
 - Enforcement stays AG.7-OFF: a published + distributed bundle realizes nothing until enforcement is engaged.
@@ -71,6 +90,8 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 | PS.6 | `POLICY_CREATE/EDIT/PUBLISH/DELETE` audited commands + typed refusals + publish-only breaking flag | LANDED | crdb `88b54ba8` (merge `8b5ee9b4`) |
 | PS.7 | `effective_published_policies` (composer seam; producer expiry) | LANDED | crdb `c41c5697` (merge `38f7060f`) |
 | PS.N | live-node capstone (`policy_capstone.rs`); live :7878 drive deferred to P5.N | LANDED | crdb `975a0c32` (merge `69b0057a`) |
+| P5.5-crdb-a | `POLICY_EFFECTIVE` wire read (the PS.7 composer seam over the wire: `WirePolicyEffectiveQuery`/`WirePolicyEffective` + handler w/ engine-side producer expiry at `Hlc(now_ms())`; INV-WIRE-POLICY-EFFECTIVE) | LANDED | crdb `4496fd63` (merge `501ab1ea`) |
+| P5.5-crdb-b | the signed bundle carries the authored rulesets (operator decision): `BundleRule` + `SignedPolicyBundle.rules` (serde-default; stored bundles decode unchanged); VERSIONED preimage -- empty rules = frozen byte-identical v1 (golden vector preserved), non-empty = disjoint `POLICY_BUNDLE_PREIMAGE_DOMAIN_V2` w/ rules signature-bound (strip/inject both fail); forge-dto schema + x-fieldOrder regen | LANDED | crdb `698efee6` (merge `5be841b3`) |
 
 ## Roster (Console PRs)
 
@@ -80,7 +101,7 @@ and the Resume-here section is rewritten at every merge.** A stale ledger is a d
 | P5.2 | `INV-CONSOLE-POLICIES-BROKERED` | LANDED | `d8cc202` | dispatch `PolicyListByZone`/`PolicyDetail` on QuerySubmit; `CrucibleClient`+`WireCrucibleClient` methods + `replyToPolicyList`/`replyToPolicyDetail`; `OperatorEngine` delegated reads (operator+tenant injected, delegation recorded); `engine/policies.ts` fail-closed -> `PoliciesUnavailableError`; `GET /api/policies`(+`/detail?vtz=&id=`) 401/503/400/503; tenant-scoped `policies-v1` cache; resolver+route+delegation tests |
 | P5.3 | `INV-CONSOLE-POLICIES-GROUPED` | LANDED | `ce7f3f3` | net-new `AccordionGroup` primitive (`packages/design`, `.fc-accordion*`) + `usePolicies` + `PoliciesSurface`: header/search/zone-filter/disabled-Create; per-VTZ accordions (count badge, ordered by live `vtz.tree`) -> `DataTable` w/ the 07 columns (closed-enum action/logging cells, pure summaries); honest states; `policies` route replaces placeholder + no-stub `REAL_SURFACES`; read-only e2e |
 | P5.4 | `INV-CONSOLE-POLICIES-AUTHOR` | LANDED | `f00f650` | BFF command path (dispatch + `CrucibleClient`/`WireCrucibleClient` + `OperatorEngine` 4 delegated cmds + `engine/policies.ts` resolvers + `POST /api/policies[/edit|/publish|/delete]` before the 405 gate, 409/400/403 mapping, cache-drop; `@forge/contracts toPolicyDraftInput` fail-closed parser); SPA `usePolicyMutation` (`useSavePolicy` create/edit-then-publish + `useDeletePolicy`) + `PolicyForm` (08 modal: name/zone/subjects/targets cross-product/protocol chips+validated ports/action(4)/logging(3) + Restrictions[days+hours+geo+tags] + Advanced[Applied-To+classification+description]; Save-Draft vs Save-&-Publish confirm-gated) + surface Create/Edit/Delete. **Deferred: absolute active-window authoring (opaque HLC); Applied-To = endpoint CNs.** |
-| P5.5 | `INV-CONSOLE-POLICIES-DISTRIBUTED` | PLANNED | -- | re-home FD.7c: land `packages/wire` BundleCommit/Convergence codecs; mount `DistributionPanel` here (Distribute confirm-gated over Applied-To; compose `effective_published_policies`(PS.7) -> sidecar sign -> crdb carrier); 3-state convergence ledger; NO distribute control on VTZ surface (structural); signing key never in TS (hygiene) |
+| P5.5 | `INV-CONSOLE-POLICIES-DISTRIBUTED` | LANDED | `28bbfc4` | the FD.7c re-home + the REAL policy carriage: schemas re-vendored + regen (`WirePolicyEffective*`, `BundleRule`, `rules` in `FORGE_FIELD_ORDER`); sidecar revs bumped to crdb `5be841b3` + `BundleDraft.rules` passthrough (the shared `bundle_preimage_bytes` signs v2 when rules carried; seam tests green); BFF `policyEffective` read (dispatch/client/wire-client/operator-engine); `contracts composeBundleRules` (fail-closed; contributors from SemVer); `resolveDistribute` composes POLICY_EFFECTIVE -> rules+contributors into the signed draft (`DistributeCompositionError` -> 503; nothing half-composed reaches the signer); `DistributionPanel` gains the P5.5 confirm gate (names the endpoint set) and mounts per-zone on `PoliciesSurface`; `policies.convergence`+`policies.distribute` bindings LIVE; VTZ structural no-distribute assert; distribute e2e journey |
 | P5.6 | `INV-CONSOLE-POLICIES-GROUNDED` | PLANNED | -- | land `06/07/08-*.png` + README rows; residual TRD grounding; cross-ref FORGE-DISTRIBUTION FD.7c re-home; docs-only |
 | P5.N | `INV-CONSOLE-POLICIES-COMPLETE` | PLANNED | -- | Playwright capstone (grouped accordion; Create w/ Network+CIDR target + ports/HTTPS + Quarantine + Full + 7-day window + Applied-To devices; publish confirm; malformed-port 400; version chip on edit; distribute + convergence 3 states; no-distribute-on-VTZ + four-action + three-logging structural sweeps; empty tenant honest); `REAL_SURFACES` allowlist; acceptance sweep; box redeploy live leg (enforcement OFF) |
 

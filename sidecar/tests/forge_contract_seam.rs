@@ -115,6 +115,7 @@ fn sample_bundle() -> SignedPolicyBundle {
     SignedPolicyBundle {
         version: BundleVersion(7),
         policy: sample_policy(),
+        rules: Vec::new(),
         contributors: vec![PolicyVersionRef::new(
             PolicyId(uuid::Uuid::nil()),
             Version::new(1, 0, 0),

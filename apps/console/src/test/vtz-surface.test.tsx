@@ -636,3 +636,19 @@ describe('the empty-tenant bootstrap', () => {
     expect(spec.ownPostures).toEqual([]);
   });
 });
+
+describe('P5.5 surface placement (the 2026-07-21 rule)', () => {
+  it('offers NO policy-distribution control anywhere on the VTZ surface (structural)', async () => {
+    stubFetch({});
+    renderWithProviders(<VtzSurface />, { route: '/vtz' });
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Trust zone YouSource.Corp.Finance' }),
+      ).toBeInTheDocument();
+    });
+    // Policy is composed + pushed from the POLICY tab; the VTZ surface never offers it. (The zone
+    // editor's own "Commit" is zone AUTHORING, not policy distribution, and is out of scope here.)
+    expect(screen.queryByRole('button', { name: /distribute/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Policy distribution/i)).not.toBeInTheDocument();
+  });
+});

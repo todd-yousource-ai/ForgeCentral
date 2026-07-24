@@ -52,6 +52,79 @@
         }
       ]
     },
+    "BundleRule": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "destination_kind": {
+          "type": "string"
+        },
+        "destination_selector_kind": {
+          "type": "string"
+        },
+        "destination_selector_value": {
+          "type": "string"
+        },
+        "logging": {
+          "type": "string"
+        },
+        "policy_id": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "ports": {
+          "type": "string"
+        },
+        "protocols": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source_kind": {
+          "type": "string"
+        },
+        "source_selector_kind": {
+          "type": "string"
+        },
+        "source_selector_value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy_id",
+        "policy_version",
+        "source_kind",
+        "source_selector_kind",
+        "source_selector_value",
+        "destination_kind",
+        "destination_selector_kind",
+        "destination_selector_value",
+        "action",
+        "protocols",
+        "ports",
+        "logging"
+      ],
+      "type": "object",
+      "x-fieldOrder": [
+        "policy_id",
+        "policy_version",
+        "source_kind",
+        "source_selector_kind",
+        "source_selector_value",
+        "destination_kind",
+        "destination_selector_kind",
+        "destination_selector_value",
+        "action",
+        "protocols",
+        "ports",
+        "logging"
+      ]
+    },
     "BundleVersion": {
       "type": "integer"
     },
@@ -321,6 +394,12 @@
         "policy": {
           "$ref": "#/$defs/EndpointPolicy"
         },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/BundleRule"
+          },
+          "type": "array"
+        },
         "scope": {
           "$ref": "#/$defs/IdentityScope"
         },
@@ -343,6 +422,7 @@
       "required": [
         "version",
         "policy",
+        "rules",
         "contributors",
         "scope",
         "lease",
@@ -354,6 +434,7 @@
       "x-fieldOrder": [
         "version",
         "policy",
+        "rules",
         "contributors",
         "scope",
         "lease",

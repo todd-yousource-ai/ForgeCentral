@@ -259,6 +259,7 @@ mod tests {
                     rate_per_sec: 0,
                 },
             },
+            rules: Vec::new(),
             contributors: Vec::new(),
             scope: IdentityScope::new(VtzId::new("YouSource.Corp"), []),
             lease: FreshnessLease::new(Hlc(100), Hlc(200)),

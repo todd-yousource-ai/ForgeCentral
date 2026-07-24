@@ -14,6 +14,21 @@ export type ApplyOutcome =
   | { Applied: BundleVersion; }
   | { Rejected: [BundleVersion, ApplyError]; };
 
+export interface BundleRule {
+  action: string;
+  destination_kind: string;
+  destination_selector_kind: string;
+  destination_selector_value: string;
+  logging: string;
+  policy_id: string;
+  policy_version: string;
+  ports: string;
+  protocols: Array<string>;
+  source_kind: string;
+  source_selector_kind: string;
+  source_selector_value: string;
+}
+
 export type BundleVersion = number;
 
 export interface CertIdentity {
@@ -82,6 +97,7 @@ export interface SignedPolicyBundle {
   contributors: Array<PolicyVersionRef>;
   lease: FreshnessLease;
   policy: EndpointPolicy;
+  rules: Array<BundleRule>;
   scope: IdentityScope;
   signature: Array<number>;
   signature_algorithm: SignatureAlgorithm;
@@ -105,6 +121,7 @@ export type VtzId = string;
  * any other order produces a signature the endpoint refuses.
  */
 export const FORGE_FIELD_ORDER = {
+  BundleRule: ['policy_id', 'policy_version', 'source_kind', 'source_selector_kind', 'source_selector_value', 'destination_kind', 'destination_selector_kind', 'destination_selector_value', 'action', 'protocols', 'ports', 'logging'],
   CertIdentity: ['cn', 'sans'],
   EndpointPolicy: ['max_classification', 'brokered', 'restricted', 'allow_ordinary_internet', 'exec', 'resource_bound'],
   FreshnessLease: ['issued_at', 'not_after'],
@@ -113,6 +130,6 @@ export const FORGE_FIELD_ORDER = {
   PolicyVersionRef: ['policy', 'version'],
   ResourceBound: ['cpu_millicores', 'memory_bytes', 'pids', 'io_bytes_per_sec', 'cost_micros', 'storage_bytes', 'rate_per_sec'],
   ScopeMember: ['endpoint', 'agent'],
-  SignedPolicyBundle: ['version', 'policy', 'contributors', 'scope', 'lease', 'signing_key_id', 'signature_algorithm', 'signature'],
+  SignedPolicyBundle: ['version', 'policy', 'rules', 'contributors', 'scope', 'lease', 'signing_key_id', 'signature_algorithm', 'signature'],
   Version: ['major', 'minor', 'patch'],
 } as const;

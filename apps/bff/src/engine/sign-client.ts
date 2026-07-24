@@ -17,6 +17,8 @@ import type { SignedPolicyBundle } from '@forge/contracts';
 export interface BundleDraft {
   readonly version: number;
   readonly policy: SignedPolicyBundle['policy'];
+  /** The authored-ruleset carriage (P5.5). Empty signs the unchanged v1 preimage; non-empty signs v2. */
+  readonly rules: SignedPolicyBundle['rules'];
   readonly contributors: SignedPolicyBundle['contributors'];
   readonly scope: SignedPolicyBundle['scope'];
   readonly lease: SignedPolicyBundle['lease'];

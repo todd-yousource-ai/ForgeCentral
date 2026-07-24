@@ -29,7 +29,7 @@ rustls-pki-types = { version = "1", features = ["std"] }
 # client-auth) so the sidecar's :7878 handshake is byte-identical to the engine's. Pinned rev, git-fetched
 # via the `github-crucible` insteadOf (same pattern as torch-core). Leaf crate: rustls + aws-lc-rs, no
 # engine deps -- it does not pull the database.
-cdb-mtls = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d7c110b56f8859fd84c876877c1e12db6102c08c" }
+cdb-mtls = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "5be841b38156645b884f68942d11088ae4a8c32b" }
 # NOTE: keep this rev aligned with the [dev-dependencies] crdb edges below. Two revs of one repo are two
 # distinct cargo sources, so a mismatch builds two copies of cdb-types into one process.
 
@@ -45,8 +45,8 @@ cdb-mtls = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d
 #
 # Keep every crdb rev here identical: two revs of one repo are two distinct cargo sources, so a mismatch
 # builds two copies of cdb-types into one process.
-cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d7c110b56f8859fd84c876877c1e12db6102c08c" }
-cdb-artifact = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "d7c110b56f8859fd84c876877c1e12db6102c08c" }
+cdb-types = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "5be841b38156645b884f68942d11088ae4a8c32b" }
+cdb-artifact = { git = "https://github.com/todd-yousource-ai/Crucible.git", rev = "5be841b38156645b884f68942d11088ae4a8c32b" }
 # The CSPRNG for seed generation, and the same FIPS-track provider cdb-artifact signs with. Already
 # resolved transitively via cdb-artifact, so naming it direct does not add a package to the graph.
 aws-lc-rs = "1.17"

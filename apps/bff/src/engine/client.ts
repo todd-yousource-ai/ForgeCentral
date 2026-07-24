@@ -43,6 +43,8 @@ import type {
   WirePolicyDetail,
   WirePolicyDetailQuery,
   WirePolicyEdit,
+  WirePolicyEffective,
+  WirePolicyEffectiveQuery,
   WirePolicyList,
   WirePolicyListQuery,
   WirePolicyMutated,
@@ -139,6 +141,13 @@ export interface CrucibleClient {
   /** Read one policy's full definition + version history (POLICY_DETAIL, crdb PS.5). An unknown id
    * returns an empty detail (no record, no versions), never an error. */
   policyDetail(request: WirePolicyDetailQuery, opts?: EngineCallOptions): Promise<WirePolicyDetail>;
+  /** Read the zone's effective published policies (POLICY_EFFECTIVE, crdb P5.5 = the PS.7 composer
+   * seam): newest published per policy, producer-expiry-admitted engine-side. The distribution
+   * producer's read. */
+  policyEffective(
+    request: WirePolicyEffectiveQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyEffective>;
   /** Author a new policy (POLICY_CREATE, crdb PS.6): the store mints v1.0.0 as a Draft. Audited. */
   policyCreate(request: WirePolicyCreate, opts?: EngineCallOptions): Promise<WirePolicyMutated>;
   /** Edit a policy into a new Draft version without mutating a published one (POLICY_EDIT, PS.6). Audited. */

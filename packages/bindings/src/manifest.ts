@@ -654,6 +654,17 @@ const policyReads: readonly ReadBinding[] = [
     status: { kind: 'live' },
   },
   {
+    // The three-state convergence ledger for a zone's distributed bundle (applied / rejected-with-reason
+    // / silent), LIVE over the crdb BUNDLE_CONVERGENCE read (FD.7a, proven live 2026-07-21); re-homed
+    // onto the Policy surface with P5.5.
+    id: bindingId('policies.convergence'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'bundle_convergence_v1',
+    viewModel: 'BundleConvergenceView',
+    status: { kind: 'live' },
+  },
+  {
     // Whether the host REALIZES a policy's schedule/geo/port dimensions at runtime. No enforcement plane
     // ships yet -- PENDING behind torch IP-TORCH-POLICY-ENFORCE (enforcement toggle AG.7-OFF). Authoring +
     // distribution + audit are real without it; this binding is the honest host-realization deferral.
@@ -707,6 +718,20 @@ const policyCommands: readonly CommandBinding[] = [
     kind: 'command',
     surface: 'cruciblql',
     op: 'policy_delete_v1',
+    authz: 'operator:policies.author',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Compose -> sign -> push (P5.5): compose the zone's effective published policies
+    // (POLICY_EFFECTIVE, the crdb PS.7 seam) + the FD.1 posture policy, sign in the crypto sidecar
+    // (the key never enters the TS tier; a rules-carrying bundle signs the v2 preimage domain), and
+    // commit to the crdb carrier (BUNDLE_COMMIT, FD.2). Audited engine-side. Lives on the POLICY tab,
+    // never the VTZ surface (the 2026-07-21 rule).
+    id: bindingId('policies.distribute'),
+    kind: 'command',
+    surface: 'forge',
+    op: 'bundle_commit_v1',
     authz: 'operator:policies.author',
     audited: true,
     status: { kind: 'live' },

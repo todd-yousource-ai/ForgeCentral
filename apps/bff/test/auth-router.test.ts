@@ -43,6 +43,7 @@ const unusedClient: CrucibleClient = {
   querySubmit: () => Promise.reject(new Error('unused')),
   policyListByZone: () => Promise.reject(new Error('unused')),
   policyDetail: () => Promise.reject(new Error('unused')),
+  policyEffective: () => Promise.reject(new Error('unused')),
   policyCreate: () => Promise.reject(new Error('unused')),
   policyEdit: () => Promise.reject(new Error('unused')),
   policyPublish: () => Promise.reject(new Error('unused')),

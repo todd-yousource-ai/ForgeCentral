@@ -161,6 +161,10 @@ function stubFetch(opts: StubOpts = {}): { commands: Array<{ url: string; body: 
     if (input.startsWith('/api/vtz/tree')) {
       return Promise.resolve(jsonResponse(200, tree));
     }
+    if (input.startsWith('/api/vtz/convergence')) {
+      // The P5.5 distribution panel inside each expanded zone reads this; honest "no bundle yet".
+      return Promise.resolve(jsonResponse(200, { hasBundle: false, version: 0, members: [] }));
+    }
     if (input.startsWith('/api/objects')) {
       return Promise.resolve(jsonResponse(200, catalog));
     }

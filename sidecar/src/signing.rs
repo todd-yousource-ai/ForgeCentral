@@ -91,6 +91,11 @@ pub struct BundleDraft {
     pub version: BundleVersion,
     /// The flat effective policy composed from the zone.
     pub policy: EndpointPolicy,
+    /// The zone's effective published rules (P5.5): the authored-ruleset carriage the producer
+    /// composed from POLICY_EFFECTIVE. Absent/empty on a zone-posture-only draft (`serde(default)`),
+    /// which signs the unchanged v1 preimage; a non-empty ruleset signs in the v2 domain.
+    #[serde(default)]
+    pub rules: Vec<cdb_types::BundleRule>,
     /// The authored policy versions the policy was composed from.
     pub contributors: Vec<PolicyVersionRef>,
     /// The endpoints this bundle binds to.
@@ -236,6 +241,7 @@ impl BundleSigner {
         let mut bundle = SignedPolicyBundle {
             version: draft.version,
             policy: draft.policy,
+            rules: draft.rules,
             contributors: draft.contributors,
             scope: draft.scope,
             lease: draft.lease,
@@ -304,6 +310,7 @@ mod tests {
                     rate_per_sec: 0,
                 },
             },
+            rules: Vec::new(),
             contributors: Vec::new(),
             scope: IdentityScope::new(VtzId::new("YouSource.Corp"), []),
             lease: FreshnessLease::new(Hlc(100), Hlc(200)),

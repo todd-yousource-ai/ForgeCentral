@@ -47,6 +47,8 @@ import type {
   WirePolicyDetail,
   WirePolicyDetailQuery,
   WirePolicyEdit,
+  WirePolicyEffective,
+  WirePolicyEffectiveQuery,
   WirePolicyList,
   WirePolicyListQuery,
   WirePolicyMutated,
@@ -94,6 +96,7 @@ export type EngineAction =
   | 'objectDetail'
   | 'policyListByZone'
   | 'policyDetail'
+  | 'policyEffective'
   | 'policyCreate'
   | 'policyEdit'
   | 'policyPublish'
@@ -240,6 +243,12 @@ export interface OperatorEngine {
     request: WirePolicyDetailQuery,
     opts?: EngineCallOptions,
   ): Promise<WirePolicyDetail>;
+  /** Read the zone's effective published policies (POLICY_EFFECTIVE, P5.5) on behalf of `principal`. */
+  policyEffective(
+    principal: OperatorPrincipal,
+    request: WirePolicyEffectiveQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyEffective>;
   /** Author a new policy draft (POLICY_CREATE, PS.6) on behalf of `principal`, audited. */
   policyCreate(
     principal: OperatorPrincipal,
@@ -514,6 +523,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'policyDetail', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.policyDetail({ ...request, operator }, opts);
+    },
+    policyEffective: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'policyEffective', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.policyEffective({ ...request, operator }, opts);
     },
     // The four audited policy commands. The operator delegation is injected from the authenticated
     // principal (never client-asserted): the engine attributes the audit entry to THIS operator, in THIS

@@ -141,6 +141,32 @@ async function mockBff(
   await page.route('**/auth/me', (route) => json(route, { operator: OPERATOR }));
   await page.route(/\/api\/vtz\/tree/, (route) => json(route, vtzTree));
   await page.route(/\/api\/objects$/, (route) => json(route, objectCatalog));
+  // The P5.5 distribution panel inside each expanded zone: one converged member set for Corp.
+  await page.route(/\/api\/vtz\/convergence/, (route) =>
+    json(route, {
+      hasBundle: true,
+      version: 7,
+      members: [
+        { endpointCn: 'box-1.crucible', state: 'applied', reason: null },
+        { endpointCn: 'box-2.crucible', state: 'rejected', reason: 'SignatureInvalid' },
+        { endpointCn: 'box-3.crucible', state: 'silent', reason: null },
+      ],
+    }),
+  );
+  await page.route(/\/api\/vtz\/[^/]+\/distribute$/, (route) => {
+    commands.push({
+      url: new URL(route.request().url()).pathname,
+      body: route.request().postDataJSON(),
+    });
+    return json(route, {
+      version: 8,
+      commitVersion: 42,
+      carriedRules: 1,
+      carriedPolicies: 1,
+      unexpressedDomains: [],
+      unexpressedFields: [],
+    });
+  });
   await page.route(/\/api\/policies\/(edit|publish|delete)$/, (route) => {
     commands.push({
       url: new URL(route.request().url()).pathname,
@@ -270,4 +296,29 @@ test('an empty tenant renders the honest empty state, never a fabricated policy'
   await page.goto('/policies');
   await expect(page.getByText('No policies match')).toBeVisible();
   await expect(page.getByText('No policies have been authored yet.')).toBeVisible();
+});
+
+test('Distribute lives on the Policy tab: confirm-gated over the endpoint set, with the 3-state ledger', async ({
+  page,
+}) => {
+  const bff = await mockBff(page);
+  await page.goto('/policies');
+
+  // Expand the zone: the distribution panel renders INSIDE the policy tab's zone group.
+  await page.getByRole('button', { name: 'YouSource.Corp, 1 policy' }).click();
+  const panel = page.getByRole('region', { name: 'Policy distribution' });
+  await expect(panel).toBeVisible();
+
+  // The three convergence states, honestly distinct (rejected carries its typed reason).
+  await expect(panel.getByText('Applied')).toBeVisible();
+  await expect(panel.getByText('Rejected: SignatureInvalid')).toBeVisible();
+  await expect(panel.getByText('No confirmation')).toBeVisible();
+
+  // Distribute is confirm-gated and the dialog names the target endpoint set.
+  await panel.getByRole('button', { name: /Commit & re-distribute to 3 endpoints/ }).click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('box-1.crucible, box-2.crucible, box-3.crucible');
+  await dialog.getByRole('button', { name: 'Distribute' }).click();
+  await expect.poll(() => bff.commands.some((c) => c.url.endsWith('/distribute'))).toBe(true);
 });

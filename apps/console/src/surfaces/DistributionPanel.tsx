@@ -5,7 +5,8 @@
 // composed policy to those same endpoints. Every value binds to a real engine read/command
 // (INV-CONSOLE-NO-STUB); an unconfirmed box never reads as a delivered one.
 
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
+import { ConfirmDialog } from '@forge/design';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { useBundleConvergence, useDistribute } from './useDistribution.js';
@@ -36,6 +37,7 @@ export function DistributionPanel({
 }): ReactElement | null {
   const convergence = useBundleConvergence(zoneId);
   const distribute = useDistribute(zoneId);
+  const [confirming, setConfirming] = useState(false);
 
   const scope = useMemo(
     () => convergence.data?.members?.map((m) => m.endpointCn) ?? [],
@@ -95,12 +97,24 @@ export function DistributionPanel({
             type="button"
             className="fcx-btn"
             disabled={distribute.isPending || scope.length === 0}
-            onClick={() => distribute.mutate(scope)}
+            onClick={() => setConfirming(true)}
           >
             {distribute.isPending
               ? 'Re-distributing…'
               : `Commit & re-distribute to ${String(scope.length)} endpoint${scope.length === 1 ? '' : 's'}`}
           </button>
+
+          <ConfirmDialog
+            open={confirming}
+            title={`Distribute to ${String(scope.length)} endpoint${scope.length === 1 ? '' : 's'}?`}
+            description={`The zone's effective published policies are composed, signed in the crypto sidecar, and committed for these endpoints to fetch: ${scope.join(', ')}. Enforcement stays off until separately engaged.`}
+            confirmLabel="Distribute"
+            onConfirm={() => {
+              setConfirming(false);
+              distribute.mutate(scope);
+            }}
+            onCancel={() => setConfirming(false)}
+          />
         </>
       )}
     </section>
