@@ -111,6 +111,16 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ members: [] });
     },
+    policyListByZone: (req) => {
+      calls.push(`policyListByZone:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ zones: [] });
+    },
+    policyDetail: (req) => {
+      calls.push(`policyDetail:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ record: null, versions: [] });
+    },
     objectCreate: (req) => {
       calls.push(`objectCreate:${String(req.request_id)}`);
       reads.push(req);
@@ -515,6 +525,24 @@ describe('createOperatorEngine', () => {
       expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
     }
     expect(recorded.map((d) => d.action)).toEqual(['vtzTree', 'vtzDetail']);
+  });
+
+  it('records the delegation + injects the operator on the Policies reads (P5.2)', async () => {
+    // The policy store is tenant-scoped governance data: the engine must narrow every policy read to the
+    // acting operator's tenant, so the delegation is injected server-side and never client-asserted.
+    const { client, calls, reads } = recordingClient();
+    const { sink, recorded } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+
+    await engine.policyListByZone(admin, { request_id: 21 });
+    await engine.policyDetail(admin, { request_id: 22, vtz: 'YouSource.Corp', id: 'p-1' });
+
+    expect(calls).toEqual(['policyListByZone:21', 'policyDetail:22']);
+    for (const read of reads) {
+      expect(read.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
+    }
+    expect(recorded.map((d) => d.action)).toEqual(['policyListByZone', 'policyDetail']);
+    expect(recorded.every((d) => d.tenant === 'tenant-op')).toBe(true);
   });
 
   it('records the delegation + injects the operator on every audited VTZ write (V2.3)', async () => {

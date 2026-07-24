@@ -60,6 +60,8 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     objectEdit: unused,
     objectDelete: unused,
     objectDetail: unused,
+    policyListByZone: unused,
+    policyDetail: unused,
     entityDecisions: unused,
     entityConnections: unused,
     connectivityGraph: unused,
@@ -118,6 +120,12 @@ function operatorEngineWith(): OperatorEngine {
     objectEdit: unused,
     objectDelete: unused,
     objectDetail: unused,
+    policyListByZone: () => Promise.resolve({ zones: [wirePolicyZone()] }),
+    policyDetail: () =>
+      Promise.resolve({
+        record: wirePolicyRecord(),
+        versions: [{ version: '1.0.0', lifecycle: 'published' }],
+      }),
     querySubmit: () =>
       Promise.resolve({
         rows: [
@@ -259,6 +267,38 @@ function wireZone(overrides: Partial<WireVtzTreeNode> = {}): WireVtzTreeNode {
     sub_zone_count: 1,
     ...overrides,
   };
+}
+
+/** One engine policy record: an agent -> corp-subnet quarantine on 443, published at v1.0.0. */
+function wirePolicyRecord(): import('@forge/contracts').WirePolicyRecord {
+  return {
+    id: '11111111-1111-1111-1111-111111111111',
+    vtz: 'YouSource.Corp',
+    name: 'contain-egress',
+    version: '1.0.0',
+    lifecycle: 'published',
+    description: 'quarantine agent egress',
+    rules: [
+      {
+        source_kind: 'agent',
+        source_selector_kind: 'exact',
+        source_selector_value: 'demo-agent',
+        destination_kind: 'network',
+        destination_selector_kind: 'cidr',
+        destination_selector_value: '10.8.0.0/16',
+        action: 'quarantine',
+      },
+    ],
+    protocols: ['https'],
+    ports: '443',
+    logging: 'full',
+    max_classification: 'confidential',
+  };
+}
+
+/** One zone group of the grouped policy list. */
+function wirePolicyZone(): import('@forge/contracts').WirePolicyZone {
+  return { vtz: 'YouSource.Corp', policies: [wirePolicyRecord()] };
 }
 
 /** A well-formed authoring payload as the SPA would POST it. */
@@ -601,6 +641,79 @@ describe('BFF HTTP surface', () => {
     const res = await fetch(`${base}/api/vtz/detail?id=No.Such.Zone`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ zone: null, ancestors: [], commitVersion: 7 });
+  });
+
+  it('GET /api/policies projects the tenant policies grouped by zone (P5.2)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    const res = await fetch(`${base}/api/policies`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      vtz: string;
+      policies: { name: string; version: string; logging: string; rules: { action: string }[] }[];
+    }[];
+    expect(body).toHaveLength(1);
+    expect(body[0]?.vtz).toBe('YouSource.Corp');
+    expect(body[0]?.policies[0]?.name).toBe('contain-egress');
+    expect(body[0]?.policies[0]?.logging).toBe('full');
+    expect(body[0]?.policies[0]?.rules[0]?.action).toBe('quarantine');
+  });
+
+  it('GET /api/policies is 401 without a session and 503 without an engine (fail-closed)', async () => {
+    const noSession = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+    expect((await fetch(`${noSession}/api/policies`)).status).toBe(401);
+    const noEngine = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+      },
+    );
+    expect((await fetch(`${noEngine}/api/policies`)).status).toBe(503);
+  });
+
+  it('GET /api/policies/detail returns the policy + version history, and 400 without vtz+id', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+    const res = await fetch(`${base}/api/policies/detail?vtz=YouSource.Corp&id=p-1`);
+    expect(res.status).toBe(200);
+    const detail = (await res.json()) as {
+      policy: { name: string } | null;
+      versions: { version: string }[];
+    };
+    expect(detail.policy?.name).toBe('contain-egress');
+    expect(detail.versions.map((v) => v.version)).toEqual(['1.0.0']);
+    // A detail read missing either the zone or the policy id never reaches the engine.
+    expect((await fetch(`${base}/api/policies/detail?vtz=YouSource.Corp`)).status).toBe(400);
+    expect((await fetch(`${base}/api/policies/detail?id=p-1`)).status).toBe(400);
+  });
+
+  it('GET /api/policies is 503 when a record carries an enum tag the Console cannot narrow', async () => {
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      // A logging level the contract does not know collapses the whole list (fail-closed), never a
+      // defaulted disposition on a governance surface.
+      policyListByZone: () =>
+        Promise.resolve({
+          zones: [
+            {
+              vtz: 'YouSource.Corp',
+              policies: [{ ...wirePolicyRecord(), logging: 'verbose' }],
+            },
+          ],
+        }),
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    expect((await fetch(`${base}/api/policies`)).status).toBe(503);
   });
 
   it('GET /api/vtz/convergence projects the three endpoint states, and 400 without an id', async () => {

@@ -42,6 +42,8 @@ function engineWith(parts: {
           : Promise.resolve(parts.capabilities ?? noRows),
     cursorFetch: unused,
     cursorClose: unused,
+    policyListByZone: unused,
+    policyDetail: unused,
     // UY.5: the LUG principal directory joined the drawer fan-out; an empty resolve models
     // "reachable, entity not there" (a rejection would honestly degrade header/info to error).
     listPrincipals: () => Promise.resolve({ principals: [] }),

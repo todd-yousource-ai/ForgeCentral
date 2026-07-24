@@ -68,6 +68,11 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // opcode; the engine discriminates them by their CBOR enum tag.
       'ObjectList' in request ||
       'ObjectDetail' in request ||
+      // The Policies-surface reads (POLICY_LIST_BY_ZONE / POLICY_DETAIL, crdb IP-CONSOLE-POLICY-SUBSTRATE
+      // PS.5) ride the QuerySubmit opcode too; the engine discriminates them by their CBOR enum tag and
+      // routes them in the same read allowlist as VtzTree/ObjectList.
+      'PolicyListByZone' in request ||
+      'PolicyDetail' in request ||
       // The External IDAM connector read (IDAM_CONNECTORS) + the sync command (IDAM_SYNC, crdb IA.8)
       // ride the QuerySubmit opcode too; the engine discriminates them by their CBOR enum tag.
       'IdamConnectors' in request ||

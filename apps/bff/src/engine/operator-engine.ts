@@ -42,6 +42,10 @@ import type {
   WireObjectEdit,
   WireObjectList,
   WireObjectMutated,
+  WirePolicyDetail,
+  WirePolicyDetailQuery,
+  WirePolicyList,
+  WirePolicyListQuery,
   WireListGroups,
   WireListPrincipals,
   WireLugProvisioned,
@@ -83,6 +87,8 @@ export type EngineAction =
   | 'listGroups'
   | 'objectList'
   | 'objectDetail'
+  | 'policyListByZone'
+  | 'policyDetail'
   | 'idamConnectors'
   | 'idamSync'
   | 'idamConnect'
@@ -213,6 +219,18 @@ export interface OperatorEngine {
     request: WireObjectDetailQuery,
     opts?: EngineCallOptions,
   ): Promise<WireObjectDetail>;
+  /** Read the tenant's policies grouped by zone (POLICY_LIST_BY_ZONE, PS.5) on behalf of `principal`. */
+  policyListByZone(
+    principal: OperatorPrincipal,
+    request: WirePolicyListQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyList>;
+  /** Read one policy's definition + version history (POLICY_DETAIL, PS.5) on behalf of `principal`. */
+  policyDetail(
+    principal: OperatorPrincipal,
+    request: WirePolicyDetailQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WirePolicyDetail>;
   /** Register a named object (OBJECT_CREATE) on behalf of `principal`, audited. */
   objectCreate(
     principal: OperatorPrincipal,
@@ -453,6 +471,16 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'objectDetail', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.objectDetail({ ...request, operator }, opts);
+    },
+    policyListByZone: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'policyListByZone', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.policyListByZone({ ...request, operator }, opts);
+    },
+    policyDetail: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'policyDetail', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.policyDetail({ ...request, operator }, opts);
     },
     objectCreate: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'objectCreate', request.request_id));
