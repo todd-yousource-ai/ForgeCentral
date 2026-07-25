@@ -263,10 +263,12 @@ plausible number.
    missing one.
 3. **The response plan as a record** -- "Coordinated response" and `Approve Full Response` need a
    durable, audited plan object. Gating owner: `IP-CONTAIN-COMMAND` Workstream B + a plan record.
-4. **Governed Gemma 4 serving** -- the model is resident (ollama, `127.0.0.1:11434`) but the node's
-   `served_models` registry is **empty**, so no reservation can be issued and TRD-08 refuses the call.
-   Prerequisite: register it (`cdb-actl model-register`) with capability, ceiling, and region, then
-   bind the SOC narrative capability to it.
+4. **Governed Gemma 4 serving** -- CORRECTED after checking the live node: the inference plane is
+   already `enabled`, pointed at ollama (`127.0.0.1:11434`) at clearance `Secret`, and
+   `gemma4:26b-a4b-it-qat` is already an approved egress destination at ceiling `Secret`. What is
+   missing is narrower than first written: the `served_models` registry is **empty**, so no model is
+   registered for the narrative capability. Prerequisite: `cdb-actl model-register` with capability,
+   ceiling, and region. Owner: `IP-SOC-VERDICT-NARRATIVE` VN.1.
 5. **`SIMULATE CONTAINMENT`** -- a dry-run of the response plan. No simulation surface exists.
 6. **Events-analyzed counter** -- needs a bounded per-window ingest count.
 7. **Multi-model consensus** -- see Section 5.3; deferred rather than faked.
