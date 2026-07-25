@@ -58,6 +58,32 @@ export const elevation = {
   card: '0 1px 2px rgba(0, 0, 0, 0.4)',
   drawer: '0 8px 24px rgba(0, 0, 0, 0.5)',
   popover: '0 4px 12px rgba(0, 0, 0, 0.45)',
+  // The floating-glass shadow: a soft, distant drop that reads as a panel hovering above the ambient
+  // backdrop (the SOC Ops visual-language proof). Deeper than drawer, never harsh.
+  glass: '0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35)',
+} as const;
+
+/**
+ * The floating-glass material scale (the SOC Ops visual-language proof, TRD-CONSOLE-03 direction).
+ *
+ * The material itself: how much backdrop is blurred/saturated through a panel, how opaque the panel
+ * tint is, and how strong the specular edge-light and grain read. Colors are NEVER defined here --
+ * the glass derives every hue from the surface/brand color tokens via `color-mix()` in the component
+ * stylesheet, so the material recolors with the theme (INV-CONSOLE-DESIGN-SEMANTIC-COLOR).
+ *
+ * TUNE: blur radii chosen on a 2560-wide dark canvas -- raised reads as etched, floating as hovering;
+ * past ~32px text under the panel ghosts. Tint percentages keep body text at AA contrast on the
+ * ambient backdrop (verified by the contrast test against the darkest token). Grain above 0.05 reads
+ * as dirt on a dark theme.
+ */
+export const glass = {
+  blur: '18px',
+  blurHeavy: '28px',
+  saturate: '140%',
+  tint: '72%',
+  tintHeavy: '84%',
+  edge: '22%',
+  grain: '0.04',
 } as const;
 
 /** Motion: subtle, purposeful durations + easing (Section 6.3/6.4; reduced-motion is honored by consumers). */
@@ -96,4 +122,5 @@ export const scaleTokens: ReadonlyArray<{ readonly name: string; readonly value:
   ...flattenScale('font', typography),
   ...flattenScale('elevation', elevation),
   ...flattenScale('motion', motion),
+  ...flattenScale('glass', glass),
 ];
