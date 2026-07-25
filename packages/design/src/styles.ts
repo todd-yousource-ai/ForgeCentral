@@ -414,5 +414,103 @@ export function componentStyles(): string {
 .fc-ov__skeleton { fill: var(--fc-color-surface-border); animation: fc-skeleton-pulse var(--fc-motion-duration-base) var(--fc-motion-easing-standard) infinite alternate; }
 .fc-ov__corona { transform-box: fill-box; transform-origin: center; animation: fc-ov-spin 120s linear infinite; }
 @keyframes fc-ov-spin { to { transform: rotate(360deg); } }
+
+/* ---- The floating-glass material (SOC Ops visual-language proof, TRD-CONSOLE-03 direction) ----
+ * One light source for the whole Console: the specular edge-light enters top-left, shadows fall
+ * bottom-right. Every hue is a color-mix over the surface/brand tokens -- the material has no colors
+ * of its own (INV-CONSOLE-DESIGN-SEMANTIC-COLOR). The grain is a monochrome SVG turbulence texture
+ * (structural, not a color); its strength is the --fc-glass-grain token. */
+.fc-glass {
+  position: relative;
+  border-radius: var(--fc-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--fc-color-text-primary) 10%, transparent);
+  background: color-mix(in srgb, var(--fc-color-surface-card) var(--fc-glass-tint), transparent);
+  -webkit-backdrop-filter: blur(var(--fc-glass-blur)) saturate(var(--fc-glass-saturate));
+  backdrop-filter: blur(var(--fc-glass-blur)) saturate(var(--fc-glass-saturate));
+  box-shadow: var(--fc-elevation-card);
+  overflow: hidden;
+  isolation: isolate;
+}
+.fc-glass--floating {
+  background: color-mix(in srgb, var(--fc-color-surface-card) var(--fc-glass-tintHeavy), transparent);
+  -webkit-backdrop-filter: blur(var(--fc-glass-blurHeavy)) saturate(var(--fc-glass-saturate));
+  backdrop-filter: blur(var(--fc-glass-blurHeavy)) saturate(var(--fc-glass-saturate));
+  box-shadow: var(--fc-elevation-glass);
+}
+/* The specular edge: a top-left light catch that fades out by the panel's midline. */
+.fc-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--fc-color-text-primary) var(--fc-glass-edge), transparent) 0%,
+      transparent 38%
+    );
+  opacity: 0.35;
+}
+/* The grain: monochrome turbulence, one whisper above invisible. */
+.fc-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--fc-glass-grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.fc-glass__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fc-space-md);
+  padding: var(--fc-space-md) var(--fc-space-lg);
+  border-bottom: 1px solid color-mix(in srgb, var(--fc-color-text-primary) 7%, transparent);
+  font-family: var(--fc-font-fontFamily-sans);
+  font-size: var(--fc-font-size-sm);
+  font-weight: var(--fc-font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fc-color-text-muted);
+}
+.fc-glass__body { padding: var(--fc-space-lg); }
+/* Accessibility + capability fallbacks: the same DOM on the solid card surface. */
+@media (prefers-reduced-transparency: reduce) {
+  .fc-glass, .fc-glass--floating {
+    background: var(--fc-color-surface-card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .fc-glass::after { content: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .fc-glass, .fc-glass--floating { background: var(--fc-color-surface-card); }
+}
+
+/* The ambient glow layer the glass floats over. A TRANSLUCENT light pass over the honeycomb app
+ * backdrop (the brand identity layer, which this must never obscure). Decoration only: inert. */
+.fc-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* The no-WebGL / jsdom fallback: the same light as a static translucent token gradient -- the
+ * honeycomb still reads through. */
+.fc-ambient--static {
+  background: radial-gradient(
+    120% 90% at 40% 30%,
+    color-mix(in srgb, var(--fc-color-brand-deep) 30%, transparent) 0%,
+    transparent 65%
+  );
+}
+/* Content above the ambient: the hosting surface sets position:relative and lifts its children. */
+.fc-ambient-host { position: relative; }
+.fc-ambient-host > :not(.fc-ambient) { position: relative; z-index: 1; }
 `;
 }

@@ -817,3 +817,49 @@ body {
   color: var(--fc-color-text-muted);
   font-size: var(--fc-font-size-sm);
 }
+
+/* SOC Ops visual-language proof (TRD-CONSOLE-03 direction): the six-zone glass skeleton over the
+ * ambient glow + honeycomb. Layout only -- the material lives in the design package. */
+.fcx-socops__zones {
+  display: grid;
+  gap: var(--fc-space-lg);
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 2.6fr) minmax(180px, 1fr);
+  grid-template-areas:
+    'z0 z0 z0'
+    'z1 z1 z1'
+    'z3 z2 z4'
+    'z5 z5 z5';
+  margin-top: var(--fc-space-lg);
+}
+.fcx-socops__zone0 {
+  grid-area: z0;
+}
+.fcx-socops__zone1 {
+  grid-area: z1;
+}
+.fcx-socops__zone2 {
+  grid-area: z2;
+  min-height: 320px;
+}
+.fcx-socops__zone3 {
+  grid-area: z3;
+}
+.fcx-socops__zone4 {
+  grid-area: z4;
+}
+.fcx-socops__zone5 {
+  grid-area: z5;
+}
+.fcx-socops__note {
+  margin: 0;
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-sm);
+  line-height: var(--fc-font-lineHeight-normal);
+  max-width: 72ch;
+}
+@media (max-width: 1100px) {
+  .fcx-socops__zones {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'z0' 'z1' 'z2' 'z3' 'z4' 'z5';
+  }
+}

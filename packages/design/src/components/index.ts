@@ -13,3 +13,5 @@ export * from './DataTable.js';
 export * from './AccordionGroup.js';
 export * from './OverviewSankeyFlow.js';
 export * from './VtzZoneCard.js';
+export * from './GlassPanel.js';
+export * from './AmbientBackdrop.js';

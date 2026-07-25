@@ -8,10 +8,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  AmbientBackdrop,
   Badge,
   ConfirmDialog,
   DataTable,
   Drawer,
+  GlassPanel,
   KpiCard,
   ScoreRing,
   TabStrip,
@@ -271,5 +273,48 @@ describe('DataTable', () => {
   it('a non-interactive row has no tabindex (rows are inert without onRowActivate)', () => {
     render(<DataTable caption="Decisions" columns={columns} rows={rows} rowKey={(r) => r.id} />);
     expect(screen.getByText('LR-EX-001').closest('tr')).not.toHaveAttribute('tabindex');
+  });
+});
+
+describe('GlassPanel (the SOC Ops visual-language proof)', () => {
+  it('renders children unchanged inside the material, with the elevation variant class', () => {
+    const { container } = render(
+      <GlassPanel elevation="floating" header="Commander Briefing" ariaLabel="Zone 0">
+        <p>the body</p>
+      </GlassPanel>,
+    );
+    // The material is a surface, never a data treatment: the child renders verbatim.
+    expect(screen.getByText('the body')).toBeInTheDocument();
+    expect(screen.getByText('Commander Briefing')).toBeInTheDocument();
+    // A labeled panel is a real region; the variant class carries the elevation.
+    const region = screen.getByRole('region', { name: 'Zone 0' });
+    expect(region.className).toContain('fc-glass--floating');
+    expect(container.querySelector('.fc-glass__header')).not.toBeNull();
+  });
+
+  it('defaults to the raised variant as an unlabeled div (no phantom landmark)', () => {
+    const { container } = render(
+      <GlassPanel>
+        <span>tile</span>
+      </GlassPanel>,
+    );
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    const panel = container.querySelector('.fc-glass');
+    expect(panel).not.toBeNull();
+    expect(panel?.className).toContain('fc-glass--raised');
+  });
+});
+
+describe('AmbientBackdrop (the ambient nebula layer)', () => {
+  it('falls back to the static token-gradient when WebGL is unavailable, hidden from AT', () => {
+    // jsdom has no WebGL: getContext('webgl') returns null, so the component MUST render the static
+    // fallback -- the exact behavior a hardened browser or remote desktop gets.
+    const { container } = render(<AmbientBackdrop />);
+    const staticLayer = container.querySelector('[data-ambient="static"]');
+    expect(staticLayer).not.toBeNull();
+    expect(staticLayer?.getAttribute('aria-hidden')).toBe('true');
+    expect(staticLayer?.className).toContain('fc-ambient--static');
+    // Never a canvas AND a fallback: exactly one ambient layer exists.
+    expect(container.querySelector('canvas')).toBeNull();
   });
 });
