@@ -1,6 +1,10 @@
 # TRD-CONSOLE-03 -- Dashboards
 
-**Status:** DRAFT (authored 2026-07-07). Inherits `TRD-CONSOLE-00`. Dashboards are the operator's
+**Status:** SUPERSEDED (2026-07-25) by `TRD-CONSOLE-03-soc-ops.md`. The 2026-07-24 operator IA
+revision renamed this destination `SOC Ops`, and the operator-supplied command prototype replaced the
+dashboard-selector model with a decision surface. Retained for history; do not build from it.
+
+**Original status:** DRAFT (authored 2026-07-07). Inherits `TRD-CONSOLE-00`. Dashboards are the operator's
 at-a-glance operational summaries -- KPI cards and charts over engine aggregates, selectable by focus
 area. Mock target: `shot-02`.
 

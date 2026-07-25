@@ -22,7 +22,7 @@ which also names the cross-surface Crucible/Torch/Forge work (`INV-CROSS`) each 
 | CONSOLE-00 | Platform and Architecture (foundation: BFF-over-Crucible, design system, IA, data contract, auth, performance, invariants) | DRAFT |
 | CONSOLE-01 | Overview -- the live connectivity graph (home) | DRAFT |
 | CONSOLE-02 | Virtual Trust Zones | DRAFT |
-| CONSOLE-03 | Dashboards | DRAFT |
+| CONSOLE-03 | SOC Operations | DRAFT |
 | CONSOLE-04 | Users and Identity (principals + External IDAM) | DRAFT |
 | CONSOLE-05 | Policies | DRAFT |
 | CONSOLE-06 | TrustFlow (brokered egress / inference plane) | DRAFT |
