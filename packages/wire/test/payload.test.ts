@@ -240,6 +240,49 @@ describe('encodeWireRequest: the policy verbs (IP-CONSOLE-05)', () => {
     expect(typeof inner['request_id']).toBe('number');
   });
 
+  it('the SOC plan COMMANDS encode over the real CBOR path (S3.8)', () => {
+    // Same seam check as the reads: a command wired only to mocks passes every BFF and e2e test with
+    // no encode arm at all, then fails on the first real socket.
+    expect(
+      asMap({ SocPlanApprove: { request_id: 1, incident: 'ep-soc-1', at_revision: 2 } }),
+    ).toEqual({ SocPlanApprove: { request_id: 1, incident: 'ep-soc-1', at_revision: 2 } });
+
+    expect(
+      asMap({
+        SocPlanModify: {
+          request_id: 2,
+          incident: 'ep-soc-1',
+          steps: [
+            { title: 'Quarantine codex-helper', action: 'quarantine' },
+            { title: 'Inspect adjacent workspaces', action: '' },
+          ],
+        },
+      }),
+    ).toEqual({
+      SocPlanModify: {
+        request_id: 2,
+        incident: 'ep-soc-1',
+        steps: [
+          { title: 'Quarantine codex-helper', action: 'quarantine' },
+          { title: 'Inspect adjacent workspaces', action: '' },
+        ],
+      },
+    });
+  });
+
+  it('a submitted step carries only what it DOES, never its state or authority', () => {
+    // Accepting those from a client would let one hand the engine a step claiming to be executed.
+    const map = asMap({
+      SocPlanModify: {
+        request_id: 3,
+        incident: 'ep-soc-1',
+        steps: [{ title: 'Quarantine codex-helper', action: 'quarantine' }],
+      },
+    });
+    const steps = (map['SocPlanModify'] as { steps: Record<string, unknown>[] }).steps;
+    expect(Object.keys(steps[0] ?? {}).sort()).toEqual(['action', 'title']);
+  });
+
   it('POLICY_LIST_BY_ZONE encodes with request_id (+ delegated operator)', () => {
     const map = asMap({ PolicyListByZone: { request_id: 7 } });
     expect(map).toEqual({ PolicyListByZone: { request_id: 7 } });

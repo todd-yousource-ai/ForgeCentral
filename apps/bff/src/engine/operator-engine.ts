@@ -59,6 +59,9 @@ import type {
   WireSocIncidentListQuery,
   WireSocNarrative,
   WireSocNarrativeQuery,
+  WireSocPlanApprove,
+  WireSocPlanEffect,
+  WireSocPlanModify,
   WirePolicyMutated,
   WirePolicyPublish,
   WireListGroups,
@@ -106,6 +109,8 @@ export type EngineAction =
   | 'socIncidentList'
   | 'socIncidentDetail'
   | 'socNarrative'
+  | 'socPlanApprove'
+  | 'socPlanModify'
   | 'policyListByZone'
   | 'policyDetail'
   | 'policyEffective'
@@ -267,6 +272,18 @@ export interface OperatorEngine {
     request: WireSocNarrativeQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSocNarrative>;
+  /** Approve an incident's response plan (SOC_PLAN_APPROVE, SS.5) on behalf of `principal`. */
+  socPlanApprove(
+    principal: OperatorPrincipal,
+    request: WireSocPlanApprove,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocPlanEffect>;
+  /** Replace an unapproved plan's steps (SOC_PLAN_MODIFY, SS.5) on behalf of `principal`. */
+  socPlanModify(
+    principal: OperatorPrincipal,
+    request: WireSocPlanModify,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocPlanEffect>;
   /** Read the tenant's policies grouped by zone (POLICY_LIST_BY_ZONE, PS.5) on behalf of `principal`. */
   policyListByZone(
     principal: OperatorPrincipal,
@@ -569,6 +586,16 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'socNarrative', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.socNarrative({ ...request, operator }, opts);
+    },
+    socPlanApprove: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socPlanApprove', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socPlanApprove({ ...request, operator }, opts);
+    },
+    socPlanModify: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socPlanModify', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socPlanModify({ ...request, operator }, opts);
     },
     policyListByZone: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'policyListByZone', request.request_id));

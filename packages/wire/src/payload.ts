@@ -31,6 +31,8 @@ import type {
   WireSocIncidentDetailQuery,
   WireSocIncidentListQuery,
   WireSocNarrativeQuery,
+  WireSocPlanApprove,
+  WireSocPlanModify,
   WirePolicyEdit,
   WirePolicyEffectiveQuery,
   WirePolicyListQuery,
@@ -531,6 +533,30 @@ function socIncidentDetailToCbor(request: WireSocIncidentDetailQuery): unknown {
   return out;
 }
 
+/** `SOC_PLAN_APPROVE` (crdb SS.5). Rust struct order: request_id, incident, at_revision, operator?. */
+function socPlanApproveToCbor(request: WireSocPlanApprove): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+    at_revision: request.at_revision,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_PLAN_MODIFY` (crdb SS.5). Rust struct order: request_id, incident, steps, operator?. */
+function socPlanModifyToCbor(request: WireSocPlanModify): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+    // Title + action ONLY. `authority` and `state` are the engine's to assign; submitting them would
+    // let a client hand over a step claiming to be already executed.
+    steps: request.steps.map((step) => ({ title: step.title, action: step.action ?? '' })),
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SOC_NARRATIVE` (crdb VN.7b). Rust struct order: request_id, incident, operator?. */
 function socNarrativeToCbor(request: WireSocNarrativeQuery): unknown {
   const out: Record<string, unknown> = {
@@ -771,6 +797,12 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocNarrative' in request) {
     return encode({ SocNarrative: socNarrativeToCbor(request.SocNarrative) });
+  }
+  if ('SocPlanApprove' in request) {
+    return encode({ SocPlanApprove: socPlanApproveToCbor(request.SocPlanApprove) });
+  }
+  if ('SocPlanModify' in request) {
+    return encode({ SocPlanModify: socPlanModifyToCbor(request.SocPlanModify) });
   }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });

@@ -19,8 +19,8 @@
 //     needs an asset-value plane that does not exist, and a plausible dollar figure on a security
 //     surface is worse than a missing one.
 
-import type { ReactElement } from 'react';
-import { Badge } from '@forge/design';
+import { useState, type ReactElement } from 'react';
+import { Badge, ConfirmDialog } from '@forge/design';
 import type { SocIncidentDetail, SocKpis, VerdictNarrative, WithheldClaim } from '@forge/contracts';
 import {
   authorityLabel,
@@ -31,6 +31,7 @@ import {
 
 import { ErrorState, LoadingState } from '../states/States.js';
 import { authorityVariant } from './SocDecisionQueue.js';
+import { PlanCommandError, useApprovePlan } from './usePlanCommand.js';
 import { useSocNarrative } from './useSoc.js';
 
 /** One stat card. `unavailable` is a first-class render, never an empty box. */
@@ -214,6 +215,8 @@ export interface SocVerdictPanelProps {
 
 export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelProps): ReactElement {
   const narrative = useSocNarrative(incidentId);
+  const [confirming, setConfirming] = useState(false);
+  const approve = useApprovePlan();
   const executed = detail.plan.filter((step) => step.state === 'executed');
 
   return (
@@ -292,18 +295,64 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
       )}
 
       <div className="fcx-socv__controls">
-        {/* Present but disabled: the commands land in S3.8. A control that looked live and did
-            nothing is the dead action the no-stub rule forbids. */}
-        <button type="button" disabled className="fcx-socv__control">
+        {/* Enabled only when there is a plan to act on. With none proposed, approving would send a
+            command the engine must refuse -- a control that exists to produce an error is worse than
+            one that says why it is unavailable. */}
+        <button
+          type="button"
+          className="fcx-socv__control"
+          disabled={detail.plan.length === 0 || detail.planApproved || approve.isPending}
+          onClick={() => {
+            setConfirming(true);
+          }}
+        >
           Approve full response
         </button>
         <button type="button" disabled className="fcx-socv__control">
           Modify plan
         </button>
         <span className="fcx-socv__controls-note">
-          Approval lands in a later step, and needs a proposed plan to act on.
+          {detail.plan.length === 0
+            ? 'Nothing to approve: no plan has been proposed.'
+            : detail.planApproved
+              ? 'This plan is already approved. A second approval is refused, not re-recorded.'
+              : 'Approval is audited under your principal, and authorizes only the steps listed above.'}
         </span>
       </div>
+
+      {approve.isError ? (
+        <p className="fcx-socv__refusal" role="alert" data-testid="soc-approve-refusal">
+          The approval was refused.{' '}
+          {approve.error instanceof PlanCommandError
+            ? approve.error.reason
+            : 'The command did not reach the engine.'}
+        </p>
+      ) : null}
+
+      {approve.data ? (
+        <p className="fcx-socv__outcome" data-testid="soc-approve-outcome">
+          {/* NEVER "contained". The engine reports whether anything was carried out, and on this
+              deployment nothing was: the authorization is real, the containment did not happen. */}
+          {approve.data.enforcementActive
+            ? 'Approved, and the response was carried out.'
+            : 'Approved and recorded. Nothing was carried out: enforcement is off on this deployment, so each containment step is recorded refused with its reason.'}
+        </p>
+      ) : null}
+
+      <ConfirmDialog
+        open={confirming}
+        title="Approve the full response?"
+        description={`This authorizes ${String(detail.plan.length)} step(s) under your principal and is audited. Enforcement is off on this deployment, so no containment will actually be carried out.`}
+        confirmLabel="Approve"
+        tone="critical"
+        onConfirm={() => {
+          setConfirming(false);
+          approve.mutate({ incidentId, atRevision: detail.planRevision });
+        }}
+        onCancel={() => {
+          setConfirming(false);
+        }}
+      />
     </section>
   );
 }

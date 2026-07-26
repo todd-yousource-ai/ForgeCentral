@@ -65,6 +65,8 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     policyEffective: unused,
     socIncidentList: unused,
     detectSummary: unused,
+    socPlanApprove: unused,
+    socPlanModify: unused,
     socIncidentDetail: unused,
     socNarrative: unused,
     policyCreate: unused,
@@ -138,6 +140,8 @@ function operatorEngineWith(soc: Partial<OperatorEngine> = {}): OperatorEngine {
     policyEffective: () => Promise.resolve({ policies: [wirePolicyRecord()] }),
     socIncidentList: unused,
     detectSummary: unused,
+    socPlanApprove: unused,
+    socPlanModify: unused,
     socIncidentDetail: unused,
     socNarrative: unused,
     policyCreate: () => Promise.resolve({ id: 'p-new', version: '1.0.0', lifecycle: 'draft' }),
@@ -809,6 +813,125 @@ describe('BFF HTTP surface', () => {
     expect(body.found).toBe(true);
     expect(body.published).toBe(false);
     expect(body.refusal).toContain('did not support');
+  });
+
+  it('POST /api/soc/plan/approve reaches the engine and returns the effect intact (S3.8)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socPlanApprove: () =>
+            Promise.resolve({
+              incident: 'ep-soc-1',
+              revision: 2,
+              approved: true,
+              steps: [
+                {
+                  ordinal: 0,
+                  title: 'Quarantine codex-helper',
+                  action: 'Quarantine',
+                  authority: 'approval_required',
+                  state: 'refused',
+                  explanation: 'enforcement is off on this deployment',
+                },
+              ],
+              enforcement_active: false,
+            }),
+        }),
+      },
+    );
+
+    const res = await fetch(`${base}/api/soc/plan/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ incident: 'ep-soc-1', atRevision: 1 }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      approved: boolean;
+      enforcementActive: boolean;
+      steps: { state: string }[];
+    };
+    expect(body.approved).toBe(true);
+    // The flag survives the whole chain: without it the surface could render an authorization as a
+    // containment.
+    expect(body.enforcementActive).toBe(false);
+    expect(body.steps[0]?.state).toBe('refused');
+  });
+
+  it('the SOC commands are mounted ABOVE the read-only 405 gate (the P5.4 regression)', async () => {
+    // The Policy epic shipped six command handlers BELOW this gate: every POST was dead in
+    // production while reads worked fine, and no handler test or mocked e2e could see it because
+    // both bypass dispatch. An unauthenticated POST must reach auth (401), never the gate (405).
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+
+    for (const path of ['/api/soc/plan/approve', '/api/soc/plan/modify']) {
+      const res = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ incident: 'ep-1', atRevision: 0, steps: [] }),
+      });
+      expect(res.status, `${path} must not be swallowed by the read-only gate`).toBe(401);
+    }
+  });
+
+  it('maps a Conflict refusal to 409 and a missing revision to 400', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socPlanApprove: () =>
+            Promise.reject(
+              new EngineRefusedError({
+                class: 'Conflict',
+                code: 0,
+                retry: 'Never',
+                correlation_id: 0,
+              }),
+            ),
+        }),
+      },
+    );
+
+    const conflict = await fetch(`${base}/api/soc/plan/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ incident: 'ep-soc-1', atRevision: 1 }),
+    });
+    expect(conflict.status).toBe(409);
+
+    // A missing revision is REFUSED, not defaulted to 0: defaulting would turn a stale approval into
+    // an accidental one, which is the guard's whole purpose.
+    const noRevision = await fetch(`${base}/api/soc/plan/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ incident: 'ep-soc-1' }),
+    });
+    expect(noRevision.status).toBe(400);
+  });
+
+  it('refuses a modify whose step carries an action the engine does not accept', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: operatorEngineWith() },
+    );
+
+    const res = await fetch(`${base}/api/soc/plan/modify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        incident: 'ep-soc-1',
+        steps: [{ title: 'Obliterate it', action: 'obliterate' }],
+      }),
+    });
+
+    expect(res.status).toBe(400);
   });
 
   it('GET /api/policies projects the tenant policies grouped by zone (P5.2)', async () => {

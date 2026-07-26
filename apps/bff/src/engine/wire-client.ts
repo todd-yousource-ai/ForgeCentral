@@ -38,6 +38,7 @@ import type {
   WireSocIncidentDetail,
   WireSocIncidentList,
   WireSocNarrative,
+  WireSocPlanEffect,
   WirePrincipalList,
   WireConnectionList,
   WireConnectivityGraph,
@@ -191,6 +192,14 @@ export function replyToSocNarrative(reply: WireReply): WireSocNarrative {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a SOC narrative read');
+}
+
+/** Map an engine `WireReply` to `WireSocPlanEffect` (SOC_PLAN_APPROVE / MODIFY, crdb SS.5). */
+export function replyToSocPlanEffect(reply: WireReply): WireSocPlanEffect {
+  if (typeof reply === 'object' && 'SocPlanMutated' in reply) return reply.SocPlanMutated;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC plan command');
 }
 
 /** Map an engine `WireReply` to `WirePolicyList` (POLICY_LIST_BY_ZONE, crdb PS.5). */
@@ -707,6 +716,28 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToSocNarrative(await dispatch(transport, { SocNarrative: request })),
+      opts,
+    );
+  }
+
+  async socPlanApprove(
+    request: Parameters<CrucibleClient['socPlanApprove']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocPlanEffect> {
+    return this.call(
+      async (transport) =>
+        replyToSocPlanEffect(await dispatch(transport, { SocPlanApprove: request })),
+      opts,
+    );
+  }
+
+  async socPlanModify(
+    request: Parameters<CrucibleClient['socPlanModify']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocPlanEffect> {
+    return this.call(
+      async (transport) =>
+        replyToSocPlanEffect(await dispatch(transport, { SocPlanModify: request })),
       opts,
     );
   }

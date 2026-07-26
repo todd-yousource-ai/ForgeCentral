@@ -703,6 +703,46 @@ export function suppressingInputsFor(kpis: SocKpis, anchor: string): SocSuppress
   );
 }
 
+/**
+ * Parse an untrusted request body's `steps` into response-step drafts, FAIL-CLOSED (S3.8).
+ *
+ * `null` on anything malformed, so a bad authoring payload never reaches the engine. Only `title`
+ * and `action` are read: a client cannot submit `state` or `authority`, which are the engine's to
+ * assign -- accepting them would let one hand over a step claiming to be already `executed`.
+ *
+ * An empty steps array is VALID: clearing a plan's steps is a real operator act.
+ */
+export function toResponseStepDrafts(raw: unknown): readonly ResponseStepDraft[] | null {
+  if (!Array.isArray(raw)) {
+    return null;
+  }
+  const out: ResponseStepDraft[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) {
+      return null;
+    }
+    const row = entry as Record<string, unknown>;
+    const title = typeof row['title'] === 'string' ? row['title'].trim() : '';
+    if (title === '') {
+      return null;
+    }
+    const rawAction = row['action'];
+    if (rawAction === undefined || rawAction === null || rawAction === '') {
+      out.push({ title, action: null });
+      continue;
+    }
+    if (typeof rawAction !== 'string') {
+      return null;
+    }
+    const action = rawAction.toLowerCase();
+    if (!(RESPONSE_ACTIONS as readonly string[]).includes(action)) {
+      return null;
+    }
+    out.push({ title, action: action as ResponseAction });
+  }
+  return out;
+}
+
 /** Whether this authority state is blocking a person (the `Decision Waiting` KPI's predicate). */
 export function isWaitingOnAHuman(authority: AuthorityState): boolean {
   return authority === 'approval_required' || authority === 'review_required';

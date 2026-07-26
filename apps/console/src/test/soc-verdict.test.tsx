@@ -11,7 +11,7 @@
 //     on, never as zeros.
 
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type { SocIncidentDetail, SocKpis, VerdictNarrative } from '@forge/contracts';
 
 import { SocVerdictPanel } from '../surfaces/SocVerdictPanel.js';
@@ -275,5 +275,135 @@ describe('the FORGE VERDICT panel (S3.6)', () => {
     });
     expect(screen.getByText('refused')).toBeInTheDocument();
     expect(screen.queryByTestId('soc-response-empty')).not.toBeInTheDocument();
+  });
+});
+
+describe('the plan commands (S3.8)', () => {
+  const PLANNED: SocIncidentDetail = {
+    ...DETAIL,
+    planRevision: 2,
+    plan: [
+      {
+        ordinal: 0,
+        title: 'Quarantine codex-helper',
+        action: 'quarantine',
+        authority: 'approval_required',
+        state: 'proposed',
+        explanation: '',
+      },
+    ],
+  };
+
+  function mockCommand(status: number, effect?: unknown): ReturnType<typeof vi.fn> {
+    const spy = vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return Promise.resolve({
+          ok: status === 200,
+          status,
+          json: () => Promise.resolve(effect ?? { error: 'refused' }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(NARRATIVE),
+      } as Response);
+    });
+    vi.stubGlobal('fetch', spy);
+    return spy;
+  }
+
+  it('disables approval when there is no plan to act on', async () => {
+    // A control that exists only to produce an engine refusal is worse than one that says why it is
+    // unavailable.
+    mockNarrative(NARRATIVE);
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={DETAIL} kpis={KPIS} />);
+
+    expect(await screen.findByRole('button', { name: 'Approve full response' })).toBeDisabled();
+    expect(screen.getByText(/Nothing to approve/i)).toBeInTheDocument();
+  });
+
+  it('sends the revision the operator was shown, behind a confirm gate', async () => {
+    // The stale-approval guard only works if the revision on screen is the one submitted.
+    const spy = mockCommand(200, {
+      incidentId: 'ep-soc-1',
+      revision: 3,
+      approved: true,
+      steps: [],
+      enforcementActive: false,
+    });
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={PLANNED} kpis={KPIS} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve full response' }));
+    // Nothing is sent until the operator confirms.
+    expect(
+      spy.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST'),
+    ).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('soc-approve-outcome')).toBeInTheDocument();
+    });
+    const post = spy.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(JSON.parse((post?.[1] as RequestInit).body as string)).toEqual({
+      incident: 'ep-soc-1',
+      atRevision: 2,
+    });
+  });
+
+  it('reports an approval as an AUTHORIZATION, never as a containment', async () => {
+    // The single most dangerous thing this surface could say is that the agent was stopped while it
+    // is still running.
+    mockCommand(200, {
+      incidentId: 'ep-soc-1',
+      revision: 3,
+      approved: true,
+      steps: [],
+      enforcementActive: false,
+    });
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={PLANNED} kpis={KPIS} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve full response' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+    const outcome = await screen.findByTestId('soc-approve-outcome');
+    expect(outcome).toHaveTextContent(/Approved and recorded/i);
+    expect(outcome).toHaveTextContent(/Nothing was carried out/i);
+    expect(outcome.textContent).not.toMatch(/contained\b/i);
+  });
+
+  it('surfaces a typed refusal rather than failing silently', async () => {
+    // 409 is the engine saying the operator's view is out of date -- a stale revision, a second
+    // approval, or no plan at all. A silent no-op would leave them believing it worked.
+    mockCommand(409);
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={PLANNED} kpis={KPIS} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve full response' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+    const refusal = await screen.findByTestId('soc-approve-refusal');
+    expect(refusal).toHaveTextContent(/refused/i);
+    expect(refusal).toHaveTextContent(/changed, was already approved, or does not exist yet/i);
+    expect(screen.queryByTestId('soc-approve-outcome')).not.toBeInTheDocument();
+  });
+
+  it('refuses to offer a second approval on an already-approved plan', async () => {
+    mockNarrative(NARRATIVE);
+
+    renderWithProviders(
+      <SocVerdictPanel
+        incidentId="ep-soc-1"
+        detail={{ ...PLANNED, planApproved: true }}
+        kpis={KPIS}
+      />,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Approve full response' })).toBeDisabled();
+    expect(screen.getByText(/already approved/i)).toBeInTheDocument();
   });
 });

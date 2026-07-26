@@ -1440,3 +1440,17 @@ body {
   letter-spacing: 0.1em;
   color: var(--fc-color-text-muted);
 }
+
+.fcx-socv__refusal {
+  margin: 0;
+  font-size: var(--fc-font-size-sm);
+  color: var(--fc-color-status-critical);
+  max-width: 72ch;
+}
+
+.fcx-socv__outcome {
+  margin: 0;
+  font-size: var(--fc-font-size-sm);
+  color: var(--fc-color-text-muted);
+  max-width: 72ch;
+}
