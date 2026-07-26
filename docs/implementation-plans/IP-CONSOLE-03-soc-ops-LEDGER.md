@@ -6,17 +6,20 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-26): S3.1 -> S3.6 LANDED. Next action = S3.7**, the investigation dock:
-  `Evidence` (default) / `Timeline` / `Model Reasoning` / `Raw Telemetry` / `Audit Trail`, plus the
-  current-graph-scope pane. **`Model Reasoning` is already fully sourced** -- the narrative carries
-  `citedEvidence` (what the model was given) and `withheld` (what the skeptic threw out, with rulings
-  and citations), and the verdict panel already renders the withheld half; the dock shows both.
-- **The dock must respect the node scope the graph sets.** `soc-scope` already tracks it; the dock's
-  panes narrow to the scoped node when one is selected, over the SAME payload (no refetch).
-- **Check each dock tab's binding before building it.** `Evidence` rides the detail's cited legs and
-  can follow them to `LOG_EXPLAIN` (live, IP-CONSOLE-LOG-QUERY). `Raw Telemetry` and `Audit Trail`
-  may have no per-incident read -- if so they render an honest not-available naming the gap, exactly
-  as Business impact does in S3.6, rather than a mock pane.
+- **State (2026-07-26): S3.1 -> S3.7 LANDED. Next action = S3.8**, the commands: `Approve Full
+  Response` / `Modify Plan` over crdb SS.5, mounted ABOVE the read-only 405 gate (the P5.4 gotcha),
+  confirm-gated, with 409/400/403 mapping and a cache drop. The controls already exist on the verdict
+  panel, present and DISABLED with their reason -- S3.8 wires them.
+- **S3.8 must render `enforcement_active: false`, never success-as-containment.** The reply carries
+  it and each approved containment step comes back `refused` with its reason. A button that flashed
+  "contained" on a 200 would tell an analyst the agent was stopped while it is still running.
+- **S3.8 cannot be live-proven end to end until crdb ships a plan PROPOSER.** There is no plan to
+  approve on a live box, so the commands will 409 (`Conflict`, "no plan"). Build and unit/e2e-test the
+  path; expect the S3.N live drive to show the refusal until the proposer lands. That is honest, and
+  the empty-response copy in S3.6 already says so on screen.
+- **Two dock panes are PENDING bindings** (`soc.telemetry.raw`, `soc.audit.trail`). The contract test
+  fails a RELEASE build that references a pending binding -- they are referenced only as
+  not-available renders, which is the intended use, but keep that in mind at release.
 - **All five KPI bindings are LIVE**, and `TRD-CONSOLE-03` Section 7 has been corrected accordingly --
   its table was written before crdb SS.1/SS.3/SS.3a and marked three of them PENDING/PARTIAL.
 - **The whole read path is seam-proven**, so S3.4 onward is pure surface work against real routes.
@@ -70,7 +73,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | S3.4 | A3, A12 | LANDED | `2b84d8a` | ranked cards (authority chip + finding + entity path + posture/confidence/legs + id), the ENGINE's order rendered as returned with a test that bites (a contained-but-higher-posture row stays second), **no score anywhere** (the roster line said "score" but the engine records none), authority chip colored by what it costs to leave the incident alone, honest empty vs error states, and selection lifted to the surface so S3.5-S3.7 add panels not plumbing. 8 tests |
 | S3.5 | A3, A4 | LANDED | `7278250` | three lanes laid out by causal depth, **NO graph library** (DEPENDENCY-POLICY: bounded 64-node DAG in fixed lanes = one BFS + arithmetic; React Flow + ELK would also be untestable in jsdom), four edge states distinct by STROKE not just color + all four named in the legend incl. the unreachable `verified`, NOT the prototype's six-column chain (test asserts those names appear nowhere), 3-level disclosure that adds genuinely different things, and **neither disclosure nor node scoping refetches** (2 tests assert the fetch count). Node scope drops when the incident changes. 10 tests |
 | S3.6 | A5-A9, A2 | LANDED | `a082599` | three narrative states rendered DISTINCTLY (absent / refused-with-reason / published), prose always labelled Generated + artifact-linked, **no model-consensus percentage** (test asserts no `%` and no "models agree"), CONTRADICTIONS technique-scoped and says so, **Unavailable != 0** for an unread summary, Business impact an explicit absence naming the missing asset-value plane, unproposed response explains WHY it is empty, controls present + disabled. Contract gained `SocSuppressingInputs` on the KPI payload (no extra read; lookup tolerates a payload without it). 11 tests |
-| S3.7 | A3 | PLANNED | -- | the investigation dock; `Model Reasoning` shows the grounding set + skeptic adjudications |
+| S3.7 | A3 | LANDED | `71b92e0` | 5 panes + the scope line, all over ONE payload (tab switches cost no read; the narrative shares the verdict's query key). **Bindings checked first: 2 of 5 have no per-incident read** -- Raw Telemetry (nothing maps legs to records; LOG_EXPLAIN keys on a decision id) and Audit Trail (entries are live-stream only), both explicit not-availables + PENDING bindings. Audit copy states acts ARE audited engine-side so an empty pane cannot read as unaudited. Timeline shows the 2 real instants and refuses to interpolate. Evidence narrows to the scoped node and shows NOTHING when the scope matches no leg. 10 tests |
 | S3.8 | A11 | PLANNED | -- | approve/modify over crdb SS.5 (`SOC_PLAN_APPROVE`/`SOC_PLAN_MODIFY`), above the 405 gate, confirm-gated. Must render `enforcement_active: false` + the per-step `refused` reason, never success-as-containment. Renders empty until a crdb plan PROPOSER lands |
 | S3.N | A1-A12 | PLANNED | -- | Playwright journeys + the live drive on the box (real incident, real gemma4 narrative) |
 
