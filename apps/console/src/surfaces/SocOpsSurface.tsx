@@ -24,6 +24,7 @@ import type { SocKpis } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { SocDecisionQueue } from './SocDecisionQueue.js';
+import { SocInvestigationDock } from './SocInvestigationDock.js';
 import { SocVerdictPanel } from './SocVerdictPanel.js';
 import {
   DISCLOSURE_LEVELS,
@@ -229,6 +230,8 @@ function IncidentDetailRegion({
       />
 
       <SocVerdictPanel incidentId={incidentId} detail={detail.data} kpis={kpis} />
+
+      <SocInvestigationDock incidentId={incidentId} detail={detail.data} scopedNode={scopedNode} />
 
       <p className="fcx-socops__scope" data-testid="soc-scope">
         {scopedNode === null

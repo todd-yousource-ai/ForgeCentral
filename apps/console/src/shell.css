@@ -1334,3 +1334,109 @@ body {
   font-size: var(--fc-font-size-xs);
   color: var(--fc-color-text-muted);
 }
+
+/* -- SOC investigation dock (S3.7) ------------------------------------------------------------- */
+
+.fcx-socd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+  margin-top: var(--fc-space-lg);
+  padding-top: var(--fc-space-md);
+  border-top: 1px solid var(--fc-color-surface-border);
+}
+
+.fcx-socd__scope,
+.fcx-socd__note {
+  margin: 0;
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+  line-height: 1.4;
+}
+
+.fcx-socd__pane {
+  min-height: 6rem;
+}
+
+.fcx-socd__absent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--fc-space-md);
+  border: 1px dashed var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-md);
+}
+
+.fcx-socd__absent-title {
+  margin: 0;
+  font-weight: var(--fc-font-weight-medium);
+}
+
+.fcx-socd__absent-why {
+  margin: 0;
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+  line-height: 1.45;
+  max-width: 72ch;
+}
+
+.fcx-socd__legs,
+.fcx-socd__adjudications {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fcx-socd__leg {
+  font-family: var(--fc-font-fontFamily-mono);
+  font-size: var(--fc-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.fcx-socd__adjudications li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--fc-space-sm);
+  border-left: 2px solid var(--fc-color-status-caution);
+}
+
+.fcx-socd__ruling {
+  font-size: var(--fc-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fc-color-status-caution);
+}
+
+.fcx-socd__timeline {
+  list-style: none;
+  margin: 0 0 var(--fc-space-sm);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fc-font-size-sm);
+}
+
+.fcx-socd__timeline li {
+  display: flex;
+  gap: var(--fc-space-md);
+}
+
+.fcx-socd__when {
+  font-family: var(--fc-font-fontFamily-mono);
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+  min-width: 15rem;
+}
+
+.fcx-socd__sub {
+  margin: var(--fc-space-md) 0 4px;
+  font-size: var(--fc-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fc-color-text-muted);
+}

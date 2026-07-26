@@ -796,6 +796,37 @@ const socReads: readonly ReadBinding[] = [
       gatingTask: 'IP-SOC-SUBSTRATE (a production plan proposer; propose_plan has no caller)',
     },
   },
+  {
+    // The dock's Raw Telemetry pane. Nothing maps an incident's evidence legs back to the records
+    // behind them: LOG_EXPLAIN keys on a decision id, which an episode's legs are not. The pane
+    // renders an explicit not-available naming this, rather than a mock.
+    id: bindingId('soc.telemetry.raw'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_incident_raw_telemetry_v1',
+    viewModel: 'EvidenceRow',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask:
+        'a leg-to-raw-record read scoped to one incident (LOG_EXPLAIN keys on a decision id)',
+    },
+  },
+  {
+    // The dock's Audit Trail pane. Audit entries reach the Console on the live stream
+    // (WireStreamDelta), not as a query scoped to one incident. Operator acts ARE audited
+    // engine-side; nothing can list them per incident yet.
+    id: bindingId('soc.audit.trail'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_incident_audit_v1',
+    viewModel: 'WireAuditEntry',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'a per-incident audit query (entries exist only on the live stream today)',
+    },
+  },
 ];
 
 const socCommands: readonly CommandBinding[] = [
