@@ -31,7 +31,8 @@ import {
 
 import { ErrorState, LoadingState } from '../states/States.js';
 import { authorityVariant } from './SocDecisionQueue.js';
-import { PlanCommandError, useApprovePlan } from './usePlanCommand.js';
+import { SocPlanEditor } from './SocPlanEditor.js';
+import { PlanCommandError, useApprovePlan, useModifyPlan } from './usePlanCommand.js';
 import { useSocNarrative } from './useSoc.js';
 
 /** One stat card. `unavailable` is a first-class render, never an empty box. */
@@ -216,7 +217,9 @@ export interface SocVerdictPanelProps {
 export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelProps): ReactElement {
   const narrative = useSocNarrative(incidentId);
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
   const approve = useApprovePlan();
+  const modify = useModifyPlan();
   const executed = detail.plan.filter((step) => step.state === 'executed');
 
   return (
@@ -308,17 +311,57 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
         >
           Approve full response
         </button>
-        <button type="button" disabled className="fcx-socv__control">
+        <button
+          type="button"
+          className="fcx-socv__control"
+          // Editing is refused once approved -- an edit under a recorded authorization would make
+          // the audit trail say an operator approved steps they never saw.
+          disabled={detail.plan.length === 0 || detail.planApproved || editing}
+          onClick={() => {
+            setEditing(true);
+          }}
+        >
           Modify plan
         </button>
         <span className="fcx-socv__controls-note">
           {detail.plan.length === 0
-            ? 'Nothing to approve: no plan has been proposed.'
+            ? 'Nothing to act on: no plan has been proposed.'
             : detail.planApproved
               ? 'This plan is already approved. A second approval is refused, not re-recorded.'
               : 'Approval is audited under your principal, and authorizes only the steps listed above.'}
         </span>
       </div>
+
+      {editing ? (
+        <SocPlanEditor
+          steps={detail.plan}
+          saving={modify.isPending}
+          onSave={(steps) => {
+            modify.mutate(
+              { incidentId, steps },
+              // Only close on success: a refusal must leave the operator's edits on screen rather
+              // than discarding work and showing them the old plan.
+              {
+                onSuccess: () => {
+                  setEditing(false);
+                },
+              },
+            );
+          }}
+          onCancel={() => {
+            setEditing(false);
+          }}
+        />
+      ) : null}
+
+      {modify.isError ? (
+        <p className="fcx-socv__refusal" role="alert" data-testid="soc-modify-refusal">
+          The plan was not changed.{' '}
+          {modify.error instanceof PlanCommandError
+            ? modify.error.reason
+            : 'The command did not reach the engine.'}
+        </p>
+      ) : null}
 
       {approve.isError ? (
         <p className="fcx-socv__refusal" role="alert" data-testid="soc-approve-refusal">
