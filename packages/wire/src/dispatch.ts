@@ -107,7 +107,11 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'DetectSummary' in request ||
       'SocIncidentList' in request ||
       'SocIncidentDetail' in request ||
-      'SocNarrative' in request)
+      'SocNarrative' in request ||
+      // The SOC plan COMMANDS (SOC_PLAN_APPROVE / SOC_PLAN_MODIFY, crdb SS.5) ride the QuerySubmit
+      // opcode like the other data-plane writes; the engine routes them to the write path by tag.
+      'SocPlanApprove' in request ||
+      'SocPlanModify' in request)
   ) {
     return FrameType.QuerySubmit;
   }

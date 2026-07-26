@@ -14,7 +14,14 @@ import {
   type ServerResponse,
 } from 'node:http';
 
-import { objectId, principalId, toPolicyDraftInput, toVtzSpecInput, vtzId } from '@forge/contracts';
+import {
+  objectId,
+  principalId,
+  toPolicyDraftInput,
+  toResponseStepDrafts,
+  toVtzSpecInput,
+  vtzId,
+} from '@forge/contracts';
 import type {
   EntityRef,
   IsolateRequest,
@@ -74,6 +81,8 @@ import {
   resolveIncidentDetail,
   resolveIncidentQueue,
   resolveNarrative,
+  resolveApprovePlan,
+  resolveModifyPlan,
   resolveSocKpis,
 } from './engine/soc.js';
 import {
@@ -1383,6 +1392,88 @@ async function handleObjects(
 // short-TTL projection cache over a stateless BFF (INV-CONSOLE-NO-2ND-DB -- the crdb policy store remains
 // the system of record; this is a bounded-staleness projection, never a second copy of the truth). Bump
 // the generation whenever the view-model shape or semantics change, so no pre-upgrade projection is served.
+/**
+ * The SOC plan COMMANDS (IP-CONSOLE-03 S3.8): POST /api/soc/plan/approve and /api/soc/plan/modify,
+ * over crdb SS.5. Mounted ABOVE the read-only 405 gate -- the P5.4 gotcha, where six command handlers
+ * sat below it and every POST was dead in production while reads worked fine.
+ *
+ * Status mapping: 409 on Conflict (a stale revision, a second approval, an edit after approval, or
+ * NO PLAN TO ACT ON), 400 on Framing (a step the engine will not accept), 403 otherwise, 503 when the
+ * effect cannot be rendered honestly.
+ *
+ * A successful approval DROPS the tenant's warm SOC projection, so the operator's own act is never
+ * masked by a stale read. The effect is returned intact including `enforcementActive` -- the surface
+ * needs it to avoid rendering an authorization as a containment.
+ */
+async function handleSocCommand(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const paths = new Set(['/api/soc/plan/approve', '/api/soc/plan/modify']);
+  if (!paths.has(path) || method !== 'POST') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(req, MAX_COMMAND_BODY_BYTES)) as Record<string, unknown>;
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const incident = typeof body['incident'] === 'string' ? body['incident'].trim() : '';
+  if (incident === '') {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const engine = deps.operatorEngine;
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    let effect;
+    if (path === '/api/soc/plan/approve') {
+      // The revision the operator was SHOWN. Required, not defaulted: defaulting it to 0 would turn
+      // a stale approval into an accidental one, which is the guard's whole purpose.
+      const atRevision = body['atRevision'];
+      if (typeof atRevision !== 'number' || !Number.isInteger(atRevision) || atRevision < 0) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      effect = await resolveApprovePlan(engine, principal, incident, atRevision, opts);
+    } else {
+      const steps = toResponseStepDrafts(body['steps']);
+      if (steps === null) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      effect = await resolveModifyPlan(engine, principal, incident, steps, opts);
+    }
+    deps.cache.deletePrefix(socCachePrefix(principal.tenant));
+    sendJson(res, 200, effect);
+  } catch (err) {
+    if (err instanceof SocUnavailableError) {
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      const cls = err.wireError.class;
+      const httpStatus = cls === 'Conflict' ? 409 : cls === 'Framing' ? 400 : 403;
+      sendJson(res, httpStatus, { error: 'refused', class: cls });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'soc command failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 const SOC_CACHE_VERSION = 'soc-v1';
 
 /** Tenant-scoped cache prefix for the SOC reads (a warm projection never crosses tenants). */
@@ -1967,6 +2058,10 @@ async function route(
     return;
   }
   if (await handleIdamConfigure(deps, req, method, path, res)) {
+    return;
+  }
+  // ABOVE the read-only 405 gate below -- see handleSocCommand's docs (the P5.4 gotcha).
+  if (await handleSocCommand(deps, req, method, path, res)) {
     return;
   }
   if (method !== 'GET') {

@@ -24,16 +24,27 @@
 //     surface renders distinctly, so the resolver returns all three intact.
 
 import type {
+  ResponseStepDraft,
   SocIncidentDetail,
   SocIncidentRow,
   SocKpis,
+  SocPlanEffect,
   VerdictNarrative,
   WireDetectSummaryQuery,
   WireSocIncidentDetailQuery,
   WireSocIncidentListQuery,
   WireSocNarrativeQuery,
+  WireSocPlanApprove,
+  WireSocPlanModify,
 } from '@forge/contracts';
-import { toIncidentDetail, toIncidentQueue, toSocKpis, toVerdictNarrative } from '@forge/contracts';
+import {
+  toIncidentDetail,
+  toIncidentQueue,
+  toPlanEffect,
+  toSocKpis,
+  toVerdictNarrative,
+  toWirePlanSteps,
+} from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -165,4 +176,60 @@ export async function resolveSocKpis(
     throw new SocUnavailableError('the engine refused the detection summary');
   }
   return kpis;
+}
+
+/**
+ * Approve an incident's response plan on the operator's behalf (crdb SS.5).
+ *
+ * `atRevision` must echo the revision the operator was SHOWN. The engine refuses a stale one rather
+ * than applying an authorization to steps they never read, and that refusal reaches the route as an
+ * `EngineRefusedError` carrying `Conflict`.
+ *
+ * The effect is returned intact, INCLUDING `enforcementActive: false`. A resolver that dropped that
+ * flag on a successful approval would let the surface render containment that did not happen.
+ */
+export async function resolveApprovePlan(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  atRevision: number,
+  opts?: EngineCallOptions,
+): Promise<SocPlanEffect> {
+  const request: WireSocPlanApprove = {
+    request_id: requestId(),
+    incident,
+    at_revision: atRevision,
+  };
+  const effect = await engine.socPlanApprove(principal, request, opts);
+  const view = toPlanEffect(effect);
+  if (view === null) {
+    throw new SocUnavailableError('the approved plan carries a step the Console cannot narrow');
+  }
+  return view;
+}
+
+/**
+ * Replace an unapproved plan's steps on the operator's behalf (crdb SS.5).
+ *
+ * Steps carry title + action ONLY; the engine assigns authority and state. Refused once the plan is
+ * approved, so the audit trail can never say an operator approved steps they never saw.
+ */
+export async function resolveModifyPlan(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  steps: readonly ResponseStepDraft[],
+  opts?: EngineCallOptions,
+): Promise<SocPlanEffect> {
+  const request: WireSocPlanModify = {
+    request_id: requestId(),
+    incident,
+    steps: [...toWirePlanSteps(steps)],
+  };
+  const effect = await engine.socPlanModify(principal, request, opts);
+  const view = toPlanEffect(effect);
+  if (view === null) {
+    throw new SocUnavailableError('the modified plan carries a step the Console cannot narrow');
+  }
+  return view;
 }

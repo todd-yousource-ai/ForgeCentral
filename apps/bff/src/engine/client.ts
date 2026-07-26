@@ -50,6 +50,9 @@ import type {
   WireSocIncidentListQuery,
   WireSocNarrative,
   WireSocNarrativeQuery,
+  WireSocPlanApprove,
+  WireSocPlanEffect,
+  WireSocPlanModify,
   WirePolicyEdit,
   WirePolicyEffective,
   WirePolicyEffectiveQuery,
@@ -165,6 +168,13 @@ export interface CrucibleClient {
   /** Read one incident's recorded verdict narrative (SOC_NARRATIVE, crdb VN.7b). A READ, never a
    * trigger: opening an incident must not cause generation. */
   socNarrative(request: WireSocNarrativeQuery, opts?: EngineCallOptions): Promise<WireSocNarrative>;
+  /** Approve an incident's response plan (SOC_PLAN_APPROVE, crdb SS.5). Audited under the operator.
+   * The effect carries `enforcement_active`, which is FALSE on this deployment: the authorization is
+   * real and each containment step comes back `refused` with its reason. */
+  socPlanApprove(request: WireSocPlanApprove, opts?: EngineCallOptions): Promise<WireSocPlanEffect>;
+  /** Replace an unapproved plan's steps (SOC_PLAN_MODIFY, crdb SS.5). Refused once approved; a
+   * successful modify bumps the revision so a stale approval refuses rather than applying. */
+  socPlanModify(request: WireSocPlanModify, opts?: EngineCallOptions): Promise<WireSocPlanEffect>;
   /** Read the tenant's authored policies grouped by zone (POLICY_LIST_BY_ZONE, crdb PS.5): draft +
    * published, each at its newest version, bounded and tenant-private. */
   policyListByZone(request: WirePolicyListQuery, opts?: EngineCallOptions): Promise<WirePolicyList>;

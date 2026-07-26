@@ -142,6 +142,28 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         observed_in_window: 0,
       });
     },
+    socPlanApprove: (req) => {
+      calls.push(`socPlanApprove:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        incident: 'ep-1',
+        revision: 1,
+        approved: true,
+        steps: [],
+        enforcement_active: false,
+      });
+    },
+    socPlanModify: (req) => {
+      calls.push(`socPlanModify:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        incident: 'ep-1',
+        revision: 1,
+        approved: false,
+        steps: [],
+        enforcement_active: false,
+      });
+    },
     socIncidentList: (req) => {
       calls.push(`socIncidentList:${String(req.request_id)}`);
       reads.push(req);
