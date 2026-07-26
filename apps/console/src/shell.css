@@ -982,3 +982,176 @@ body {
   font-family: var(--fc-font-fontFamily-mono);
   overflow-wrap: anywhere;
 }
+
+/* -- SOC lineage graph (S3.5) ------------------------------------------------------------------ */
+
+.fcx-socops__disclosure {
+  display: flex;
+  gap: var(--fc-space-sm);
+  margin-bottom: var(--fc-space-md);
+  flex-wrap: wrap;
+}
+
+.fcx-socops__disclosure-btn {
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: var(--fc-radius-pill);
+  border: 1px solid var(--fc-color-surface-border);
+  background: transparent;
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-sm);
+}
+
+.fcx-socops__disclosure-btn--on {
+  color: var(--fc-color-text-primary);
+  border-color: var(--fc-color-brand-primary);
+}
+
+.fcx-socg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-md);
+}
+
+.fcx-socg__canvas {
+  position: relative;
+  overflow-x: auto;
+  min-height: 120px;
+}
+
+.fcx-socg__edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The four edge states, each visually distinct by STROKE PATTERN as well as color -- color alone is
+ * not a distinction an analyst can rely on, and the legend names every one in text. */
+.fcx-socg__edge {
+  stroke-width: 2;
+  fill: none;
+}
+.fcx-socg__edge--observed {
+  stroke: var(--fc-color-status-good);
+}
+.fcx-socg__edge--inferred {
+  stroke: var(--fc-color-status-caution);
+  stroke-dasharray: 8 5;
+}
+.fcx-socg__edge--verified {
+  stroke: var(--fc-color-brand-primary);
+  stroke-width: 3;
+}
+.fcx-socg__edge--pending {
+  stroke: var(--fc-color-text-muted);
+  stroke-dasharray: 2 4;
+}
+
+.fcx-socg__nodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fcx-socg__node-slot {
+  position: absolute;
+}
+
+.fcx-socg__node {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 220px;
+  height: 104px;
+  text-align: left;
+  cursor: pointer;
+  padding: var(--fc-space-sm);
+  border-radius: var(--fc-radius-md);
+  border: 1px solid var(--fc-color-surface-border);
+  background: var(--fc-color-surface-card);
+  color: var(--fc-color-text-primary);
+  overflow: hidden;
+}
+
+.fcx-socg__node--scoped {
+  border-color: var(--fc-color-brand-primary);
+  box-shadow: 0 0 0 1px var(--fc-color-brand-primary);
+}
+
+.fcx-socg__kind {
+  font-size: var(--fc-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-socg__label {
+  font-size: var(--fc-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.fcx-socg__sublabel {
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.fcx-socg__lane {
+  position: absolute;
+  left: 0;
+  width: 124px;
+  font-size: var(--fc-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fc-color-text-muted);
+  line-height: 1.3;
+}
+
+.fcx-socg__legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--fc-space-sm) var(--fc-space-md);
+  margin: 0;
+  font-size: var(--fc-font-size-xs);
+}
+
+.fcx-socg__legend-item dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: var(--fc-font-weight-medium);
+}
+
+.fcx-socg__legend-item dd {
+  margin: 0;
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-socg__swatch {
+  display: inline-block;
+  width: 22px;
+  height: 0;
+  border-top-width: 2px;
+  border-top-style: solid;
+}
+.fcx-socg__swatch--observed {
+  border-top-color: var(--fc-color-status-good);
+}
+.fcx-socg__swatch--inferred {
+  border-top-style: dashed;
+  border-top-color: var(--fc-color-status-caution);
+}
+.fcx-socg__swatch--verified {
+  border-top-width: 3px;
+  border-top-color: var(--fc-color-brand-primary);
+}
+.fcx-socg__swatch--pending {
+  border-top-style: dotted;
+  border-top-color: var(--fc-color-text-muted);
+}
+
+.fcx-socops__scope {
+  margin: 0;
+  font-size: var(--fc-font-size-sm);
+  color: var(--fc-color-text-muted);
+}

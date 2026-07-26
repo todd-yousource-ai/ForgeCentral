@@ -24,7 +24,13 @@ import type { SocKpis } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { SocDecisionQueue } from './SocDecisionQueue.js';
-import { useSocKpis } from './useSoc.js';
+import {
+  DISCLOSURE_LEVELS,
+  SocLineageGraph,
+  disclosureLabel,
+  type DisclosureLevel,
+} from './SocLineageGraph.js';
+import { useSocIncident, useSocKpis } from './useSoc.js';
 
 /** The focus tabs. `incidents` is this IP's scope; the rest are named honestly as not yet built. */
 const FOCUS_TABS = [
@@ -134,10 +140,105 @@ function CommandHeader({ kpis }: { readonly kpis: SocKpis | undefined }): ReactE
   );
 }
 
+interface DetailRegionProps {
+  readonly incidentId: string | null;
+  readonly level: DisclosureLevel;
+  readonly onLevel: (level: DisclosureLevel) => void;
+  readonly scopedNode: string | null;
+  readonly onScopeNode: (nodeId: string | null) => void;
+}
+
+/**
+ * The selected incident, from ONE read (INV-SOC-ONE-PAYLOAD).
+ *
+ * The lineage graph renders from this payload and the verdict + dock will too (S3.6/S3.7). Changing
+ * the disclosure level or scoping to a node filters what is already here; neither refetches.
+ */
+function IncidentDetailRegion({
+  incidentId,
+  level,
+  onLevel,
+  scopedNode,
+  onScopeNode,
+}: DetailRegionProps): ReactElement {
+  const detail = useSocIncident(incidentId);
+
+  if (incidentId === null) {
+    return (
+      <EmptyState
+        title="Select an incident"
+        hint="The queue is ordered by what each incident needs from a human. Work it top-down."
+      />
+    );
+  }
+  if (detail.isPending) {
+    return <LoadingState label="Loading the incident" />;
+  }
+  if (detail.isError) {
+    return (
+      <ErrorState
+        title="This incident cannot be shown"
+        code={detail.error instanceof Error ? detail.error.message : 'unknown'}
+        onRetry={() => void detail.refetch()}
+      />
+    );
+  }
+  if (detail.data === null || detail.data === undefined) {
+    // Unknown, another tenant's, or above this operator's clearance -- one indistinguishable answer
+    // by design, so the surface says exactly that and no more.
+    return (
+      <EmptyState
+        title="Incident not available"
+        hint="It does not exist, or it is outside what this operator may see. The engine does not distinguish the two, and neither does this screen."
+      />
+    );
+  }
+
+  return (
+    <div className="fcx-socops__lineage">
+      <div className="fcx-socops__disclosure" role="group" aria-label="Lineage detail level">
+        {DISCLOSURE_LEVELS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={
+              option === level
+                ? 'fcx-socops__disclosure-btn fcx-socops__disclosure-btn--on'
+                : 'fcx-socops__disclosure-btn'
+            }
+            aria-pressed={option === level}
+            onClick={() => {
+              onLevel(option);
+            }}
+          >
+            {disclosureLabel(option)}
+          </button>
+        ))}
+      </div>
+
+      <SocLineageGraph
+        nodes={detail.data.nodes}
+        edges={detail.data.edges}
+        level={level}
+        scopedNode={scopedNode}
+        onScopeNode={onScopeNode}
+      />
+
+      <p className="fcx-socops__scope" data-testid="soc-scope">
+        {scopedNode === null
+          ? `Whole incident: ${String(detail.data.evidence.length)} cited legs, ${String(detail.data.plan.length)} response steps.`
+          : `Scoped to ${scopedNode}. The verdict and dock narrow to this node when they land.`}
+      </p>
+    </div>
+  );
+}
+
 export function SocOpsSurface(): ReactElement {
   const [focus, setFocus] = useState<string>('incidents');
   // Lifted here because the queue's selection scopes every other panel on the surface.
   const [selected, setSelected] = useState<string | null>(null);
+  const [level, setLevel] = useState<DisclosureLevel>('material');
+  const [scopedNode, setScopedNode] = useState<string | null>(null);
   const kpis = useSocKpis();
 
   return (
@@ -185,7 +286,15 @@ export function SocOpsSurface(): ReactElement {
               header={<span>Decision Queue</span>}
               className="fcx-socops__queue"
             >
-              <SocDecisionQueue selected={selected} onSelect={setSelected} />
+              <SocDecisionQueue
+                selected={selected}
+                onSelect={(id) => {
+                  setSelected(id);
+                  // A node scope belongs to the incident it was taken in. Carrying it across would
+                  // point the verdict and dock at a node the new incident does not contain.
+                  setScopedNode(null);
+                }}
+              />
             </GlassPanel>
 
             <GlassPanel
@@ -193,15 +302,12 @@ export function SocOpsSurface(): ReactElement {
               header={<span>{selected === null ? 'Incident' : selected}</span>}
               className="fcx-socops__detail"
             >
-              {/* Selection is live and drives this region; the panels that fill it (lineage graph,
-                  verdict, dock) ship in S3.5-S3.7 against the detail read that already exists. */}
-              <EmptyState
-                title={selected === null ? 'Select an incident' : 'The detail panels land next'}
-                hint={
-                  selected === null
-                    ? 'The queue is ordered by what each incident needs from a human. Work it top-down.'
-                    : 'The lineage graph, the verdict panel and the investigation dock each ship in their own step, all from the single detail read this surface already talks to.'
-                }
+              <IncidentDetailRegion
+                incidentId={selected}
+                level={level}
+                onLevel={setLevel}
+                scopedNode={scopedNode}
+                onScopeNode={setScopedNode}
               />
             </GlassPanel>
           </div>

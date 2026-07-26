@@ -6,19 +6,21 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-26): S3.1 -> S3.4 LANDED. Next action = S3.5**, the lineage graph: three lanes
-  (`ATTACK PATH` / `EVIDENCE` / `FORGE DECISION + RESPONSE`), typed node cards with state chips, the
-  four visually distinct edge states + legend, and Material Path / Show Evidence / Full Story
-  progressive disclosure. **Node selection must re-scope the verdict + dock WITHOUT a second fetch**
-  (`INV-SOC-ONE-PAYLOAD`) -- the detail read already returns nodes, edges, evidence and plan in one
-  payload, so this is a client-side scope change over data already in hand.
-- **Two things S3.5 must NOT do:** upgrade an edge state (`INV-SOC-EDGE-STATE-HONEST` -- and note
-  nothing is ever `verified` on this deployment, so the legend must still explain that state), and
-  draw the prototype's six-column chain. The engine derives a subject, its cited legs, a decision and
-  the proposed response; the missing stages would render as certain as the real ones.
-- **Library choice is S3.5's call against `DEPENDENCY-POLICY.md`.** The prototype's React Flow + ELK
-  is a reference, not a requirement, and the graph is small (bounded at 64 nodes by crdb
-  `MAX_LINEAGE_NODES`) -- a hand-laid three-lane grid may well beat a dependency.
+- **State (2026-07-26): S3.1 -> S3.5 LANDED. Next action = S3.6**, the FORGE VERDICT panel: the
+  generated headline + narrative (labelled generated, artifact-linked), the three stat cards grounded
+  per `TRD-CONSOLE-03` Section 5.3, Already-enforced, Business impact, Coordinated response, and the
+  two controls. `GET /api/soc/narrative?id=` is live; the `VerdictNarrative` contract already carries
+  all three states.
+- **S3.6's hardest requirement is the REFUSAL render.** The three narrative states are distinct and
+  must stay that way on screen: `found: false` = nobody has looked; `found: true, published: false` =
+  the pipeline looked and would NOT stand behind it, with its reason; `published: true` = the write-up
+  stands. Never a stale narrative, never a templated sentence, never blank space.
+- **The CONSENSUS card has no engine source.** The prototype's "5/5 models agree" does not exist;
+  Section 5.3 re-grounds those three cards on real confidence + corroboration + authority. Do not
+  fabricate a model-consensus percentage.
+- **Business impact and Coordinated response will render EMPTY or absent.** Exposure/blast radius are
+  deliberately not built (crdb has no asset-value plane), and no crdb proposer fills the plan. Both
+  render as honest absences, not as zeros or placeholders.
 - **All five KPI bindings are LIVE**, and `TRD-CONSOLE-03` Section 7 has been corrected accordingly --
   its table was written before crdb SS.1/SS.3/SS.3a and marked three of them PENDING/PARTIAL.
 - **The whole read path is seam-proven**, so S3.4 onward is pure surface work against real routes.
@@ -70,7 +72,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | S3.2 | A1, A2 | LANDED | `ff382d6` | encode arms + QuerySubmit dispatch for all 3 verbs, proven on the REAL encoder (incl. a request_id-is-a-number assertion, the S3.1 defect caught from this side); `replyToSoc*`; `CrucibleClient` + `WireCrucibleClient` + `OperatorEngine` delegated reads; `engine/soc.ts` fail-closed to `SocUnavailableError`; `GET /api/soc/{incidents,incident,narrative}` with 200/400/401/404/503, tenant-scoped cache, and the 404 deliberately NOT cached. **Refused queue -> 503, never []**; unknown/foreign/over-clearance -> ONE 404; cannot-see vs cannot-draw kept distinct. 18 tests |
 | S3.3 | A10, A12 | LANDED | `f2cf1c6` | command header + posture pills + focus tabs + the five KPI tiles, all LIVE. **Added the DETECT_SUMMARY read path** (it had no BFF plumbing; the plan's "already live" meant the engine read) + `GET /api/soc/kpis`. `SocOpsPreview` deleted, its CSS with it. **Auto-Contained renders 0 as a FACT with its reason, never unavailable**; **Noise Collapsed states its denominator** (share of FIRINGS, not of events analyzed) and says "no firings in the window" rather than claiming 100% for 0/0. Decision Waiting derives from the queue's authority field so the two cannot disagree. 8 surface tests + e2e |
 | S3.4 | A3, A12 | LANDED | `2b84d8a` | ranked cards (authority chip + finding + entity path + posture/confidence/legs + id), the ENGINE's order rendered as returned with a test that bites (a contained-but-higher-posture row stays second), **no score anywhere** (the roster line said "score" but the engine records none), authority chip colored by what it costs to leave the incident alone, honest empty vs error states, and selection lifted to the surface so S3.5-S3.7 add panels not plumbing. 8 tests |
-| S3.5 | A3, A4 | PLANNED | -- | the three-lane lineage graph + four distinct edge states + progressive disclosure |
+| S3.5 | A3, A4 | LANDED | `7278250` | three lanes laid out by causal depth, **NO graph library** (DEPENDENCY-POLICY: bounded 64-node DAG in fixed lanes = one BFS + arithmetic; React Flow + ELK would also be untestable in jsdom), four edge states distinct by STROKE not just color + all four named in the legend incl. the unreachable `verified`, NOT the prototype's six-column chain (test asserts those names appear nowhere), 3-level disclosure that adds genuinely different things, and **neither disclosure nor node scoping refetches** (2 tests assert the fetch count). Node scope drops when the incident changes. 10 tests |
 | S3.6 | A5-A9, A2 | PLANNED | -- | the FORGE VERDICT panel incl. the labelled narrative and its refusal state |
 | S3.7 | A3 | PLANNED | -- | the investigation dock; `Model Reasoning` shows the grounding set + skeptic adjudications |
 | S3.8 | A11 | PLANNED | -- | approve/modify over crdb SS.5 (`SOC_PLAN_APPROVE`/`SOC_PLAN_MODIFY`), above the 405 gate, confirm-gated. Must render `enforcement_active: false` + the per-step `refused` reason, never success-as-containment. Renders empty until a crdb plan PROPOSER lands |

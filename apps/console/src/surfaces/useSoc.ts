@@ -11,7 +11,7 @@
 // which is the whole point of the fail-closed chain behind it.
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { SocIncidentRow, SocKpis } from '@forge/contracts';
+import type { SocIncidentDetail, SocIncidentRow, SocKpis } from '@forge/contracts';
 
 /** Fetch the five KPI tiles. Throws on a non-2xx so the strip shows a load error, never blanks. */
 export async function fetchSocKpis(): Promise<SocKpis> {
@@ -39,4 +39,42 @@ export function useSocKpis(): UseQueryResult<SocKpis> {
 /** The ranked decision queue. Rendered in the ENGINE's order; the surface never re-sorts. */
 export function useSocIncidents(): UseQueryResult<readonly SocIncidentRow[]> {
   return useQuery({ queryKey: ['soc', 'incidents'], queryFn: fetchSocIncidents });
+}
+
+/**
+ * Fetch ONE incident assembled: lineage, evidence, plan and the narrative reference together.
+ *
+ * A 404 is a real answer -- the incident does not exist, is another tenant's, or is above the
+ * caller's clearance, all indistinguishable by design -- so it resolves to `null` rather than
+ * throwing. Any other non-2xx throws, because a 503 means the engine answered and the Console will
+ * not render it honestly.
+ */
+export async function fetchSocIncident(incidentId: string): Promise<SocIncidentDetail | null> {
+  const res = await fetch(`/api/soc/incident?id=${encodeURIComponent(incidentId)}`, {
+    credentials: 'include',
+  });
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`soc incident failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as SocIncidentDetail;
+}
+
+/**
+ * One incident, in ONE read (INV-SOC-ONE-PAYLOAD).
+ *
+ * The lineage graph, verdict panel and dock all render from this single result. Scoping to a node is
+ * a filter over what this returned, never another request, so no two panels can show an operator
+ * different moments in time.
+ */
+export function useSocIncident(
+  incidentId: string | null,
+): UseQueryResult<SocIncidentDetail | null> {
+  return useQuery({
+    queryKey: ['soc', 'incident', incidentId],
+    queryFn: () => fetchSocIncident(incidentId as string),
+    enabled: incidentId !== null,
+  });
 }

@@ -134,8 +134,21 @@ describe('the SOC Ops shell (S3.3)', () => {
   });
 
   it('drives the detail region from the queue selection', async () => {
-    // Selection is the surface's spine: one incident scopes the lineage graph, the verdict and the
-    // dock (S3.5-S3.7) from a single payload. Wiring it now means those steps add panels, not plumbing.
+    // Selection is the surface's spine: one incident scopes the lineage graph and (S3.6/S3.7) the
+    // verdict and dock, all from a single payload.
+    const queueRow = {
+      incidentId: 'ep-soc-7',
+      ruleId: 'LR-C2-001',
+      anchor: 'T1071',
+      subject: 'codex-helper',
+      finding: 'Repeated outbound contact',
+      authority: 'review_required',
+      posture: 'candidate',
+      confidence: 'HIGH',
+      openedAt: 1,
+      lastSeen: 2,
+      evidenceCount: 1,
+    };
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) =>
@@ -146,21 +159,26 @@ describe('the SOC Ops shell (S3.3)', () => {
             Promise.resolve(
               url.includes('/kpis')
                 ? KPIS
-                : [
-                    {
-                      incidentId: 'ep-soc-7',
-                      ruleId: 'LR-C2-001',
-                      anchor: 'T1071',
-                      subject: 'codex-helper',
-                      finding: 'Repeated outbound contact',
-                      authority: 'review_required',
-                      posture: 'candidate',
-                      confidence: 'HIGH',
-                      openedAt: 1,
-                      lastSeen: 2,
-                      evidenceCount: 2,
-                    },
-                  ],
+                : url.includes('/incident?')
+                  ? {
+                      row: queueRow,
+                      nodes: [
+                        {
+                          id: 'subject',
+                          lane: 'attack_path',
+                          kind: 'subject',
+                          label: 'codex-helper',
+                          sublabel: 'T1071',
+                        },
+                      ],
+                      edges: [],
+                      evidence: [],
+                      plan: [],
+                      planRevision: 0,
+                      planApproved: false,
+                      narrativeRef: null,
+                    }
+                  : [queueRow],
             ),
         } as Response),
       ),
@@ -172,7 +190,7 @@ describe('the SOC Ops shell (S3.3)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /ep-soc-7/ }));
 
     await waitFor(() => {
-      expect(screen.getByText('The detail panels land next')).toBeInTheDocument();
+      expect(screen.getByTestId('soc-lineage-graph')).toBeInTheDocument();
     });
   });
 
