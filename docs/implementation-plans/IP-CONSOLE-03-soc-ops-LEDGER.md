@@ -6,7 +6,20 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-26): UNBLOCKED. The crdb engine half is COMPLETE** -- `IP-SOC-SUBSTRATE` closed at
+- **State (2026-07-26): S3.1 LANDED. Next action = S3.2** (the read path): `SOC_INCIDENT_LIST`/`DETAIL`
+  + `SOC_NARRATIVE` over QuerySubmit, the `OperatorEngine` delegated reads, `engine/soc.ts` resolvers
+  failing closed to a typed `SocUnavailableError`, and `GET /api/soc/incidents` (+`/detail`,
+  `/narrative`). **Do the encode-arm check first** -- add the verbs to `@forge/wire`'s
+  `encodeWireRequest` and prove it with a payload seam test; the P5.N live leg showed mocks cannot
+  catch a missing encode arm, and S3.1 already found two defects of exactly that family on the engine
+  side.
+- **Building the contract found two engine defects**, both fixed in crdb before any view model was
+  written against them: `request_id` was declared `string` on four DTOs (it is a transparent `u128`),
+  and the SOC payload emitted Debug renderings so `AttackPath` crossed as `attackpath`. The second
+  would have been invisible until the live drive -- the fail-closed lane narrowing would have refused
+  every attack-path node and blanked the lineage graph, correctly but mysteriously. **Re-vendoring the
+  schema and reading the emitted tokens is worth doing before each contract step, not after.**
+- **Superseded state: the crdb engine half is COMPLETE** -- `IP-SOC-SUBSTRATE` closed at
   SS.N (`761bc542`, capstone-proven in process) and `IP-SOC-VERDICT-NARRATIVE` VN.7/VN.8 landed and
   live-proven. **Next action = S3.1**, the contract: re-vendor `wire-dto.schema.json` and regenerate
   `wire-dto.ts`. Engine-first, the Objects/Policies precedent.
@@ -44,7 +57,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 
 | Step | Acceptance | Status | Commit | Note |
 |------|-----------|--------|--------|------|
-| S3.1 | A1 | READY | -- | the contract; crdb SS.4b + VN.7 schema regen have LANDED, this is the next action |
+| S3.1 | A1 | LANDED | `7add663` | `soc.ts` view models + FAIL-CLOSED narrowers for authority/posture/confidence/lane/kind/edge-state/step-state/withheld-ruling; schema re-vendored + `wire-dto.ts` regenerated; 6 `soc.*` bindings (5 LIVE, `soc.plan.propose` PENDING on crdb). NO score field, and a test keeps it that way. 21 tier-1 tests. **Found 2 engine defects and fixed them in crdb FIRST**: `request_id` declared `string` on 4 DTOs (transparent u128 -- the generated client would have sent an undecodable type) and Debug-rendered SOC tokens (`AttackPath` -> `attackpath`, which this file's lane narrowing would have refused, blanking the graph). Gate green, Playwright 36/36 |
 | S3.2 | A1, A2 | PLANNED | -- | the read path + the `@forge/wire` encode arms w/ a payload seam test |
 | S3.3 | A10, A12 | PLANNED | -- | shell: command header, focus tabs, the five KPI tiles (unavailable state for PENDING bindings) |
 | S3.4 | A3, A12 | PLANNED | -- | the Decision Queue, authority-first ordering as returned (no client re-sort) |
