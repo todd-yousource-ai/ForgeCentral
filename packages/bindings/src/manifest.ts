@@ -782,19 +782,15 @@ const socReads: readonly ReadBinding[] = [
     status: { kind: 'live' },
   },
   {
-    // The engine-authored response plan. The record + commands are live; the PROPOSER that would put
-    // steps in it is not built, so the plan reads empty on a live box. Named honestly rather than
-    // filled client-side.
+    // The engine-authored response plan, proposed at the episode's establishing transition (crdb
+    // SS.6). Rides the incident detail rather than a read of its own; registered so the plan's
+    // provenance is explicit -- the engine authors it, the Console never composes one.
     id: bindingId('soc.plan.propose'),
     kind: 'read',
     surface: 'cruciblql',
-    op: 'soc_plan_propose_v1',
+    op: 'soc_incident_detail_v1',
     viewModel: 'ResponseStep',
-    status: {
-      kind: 'pending',
-      owningRepo: 'crdb',
-      gatingTask: 'IP-SOC-SUBSTRATE (a production plan proposer; propose_plan has no caller)',
-    },
+    status: { kind: 'live' },
   },
   {
     // The dock's Raw Telemetry pane. Nothing maps an incident's evidence legs back to the records
