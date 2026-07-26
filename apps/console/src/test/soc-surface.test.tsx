@@ -29,11 +29,11 @@ const KPIS: SocKpis = {
 function mockKpis(body: unknown, ok = true): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(() =>
+    vi.fn((url: string) =>
       Promise.resolve({
-        ok,
-        status: ok ? 200 : 503,
-        json: () => Promise.resolve(body),
+        ok: url.includes('/kpis') ? ok : true,
+        status: url.includes('/kpis') && !ok ? 503 : 200,
+        json: () => Promise.resolve(url.includes('/kpis') ? body : []),
       } as Response),
     ),
   );
@@ -130,6 +130,49 @@ describe('the SOC Ops shell (S3.3)', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/enforcement off/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('drives the detail region from the queue selection', async () => {
+    // Selection is the surface's spine: one incident scopes the lineage graph, the verdict and the
+    // dock (S3.5-S3.7) from a single payload. Wiring it now means those steps add panels, not plumbing.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve(
+              url.includes('/kpis')
+                ? KPIS
+                : [
+                    {
+                      incidentId: 'ep-soc-7',
+                      ruleId: 'LR-C2-001',
+                      anchor: 'T1071',
+                      subject: 'codex-helper',
+                      finding: 'Repeated outbound contact',
+                      authority: 'review_required',
+                      posture: 'candidate',
+                      confidence: 'HIGH',
+                      openedAt: 1,
+                      lastSeen: 2,
+                      evidenceCount: 2,
+                    },
+                  ],
+            ),
+        } as Response),
+      ),
+    );
+
+    renderWithProviders(<SocOpsSurface />);
+
+    expect(await screen.findByText('Select an incident')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /ep-soc-7/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText('The detail panels land next')).toBeInTheDocument();
     });
   });
 

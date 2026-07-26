@@ -659,3 +659,45 @@ export function toSocKpis(
 export function isWaitingOnAHuman(authority: AuthorityState): boolean {
   return authority === 'approval_required' || authority === 'review_required';
 }
+
+// -- display labels (exhaustive switches, so a new engine tag is a compile error, not a blank) -------
+
+/** The operator-facing label for an authority state. */
+export function authorityLabel(authority: AuthorityState): string {
+  switch (authority) {
+    case 'automatic':
+      return 'Automatic';
+    case 'approval_required':
+      return 'Approval required';
+    case 'review_required':
+      return 'Review required';
+    case 'contained':
+      return 'Contained';
+  }
+}
+
+/** The operator-facing label for a posture. */
+export function postureLabel(posture: IncidentPosture): string {
+  switch (posture) {
+    case 'observe-only':
+      return 'Observe only';
+    case 'candidate':
+      return 'Candidate';
+    case 'escalate':
+      return 'Escalate';
+  }
+}
+
+/** The operator-facing label for a confidence tier (the wire spells these upper-case). */
+export function confidenceLabel(confidence: ConfidenceTier): string {
+  switch (confidence) {
+    case 'HIGH':
+      return 'High';
+    case 'MEDIUM':
+      return 'Medium';
+    case 'LOW':
+      return 'Low';
+    case 'CONTESTED':
+      return 'Contested';
+  }
+}
