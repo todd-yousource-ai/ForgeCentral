@@ -10,15 +10,17 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   journeys for every `TRD-CONSOLE-03` Section 8 task within its click budget, an edge-state
   distinctness assertion, the narrative-unavailable journey, a no-stub sweep, and the LIVE DRIVE on
   the box over the deployed BFF/SPA.
-- **What the live drive will honestly show, and must not be "fixed" into looking better:** an empty
-  Coordinated response and a disabled Approve button (no crdb plan PROPOSER exists), `Auto-Contained`
-  0, `Raw Telemetry` and `Audit Trail` as explicit not-availables, and nothing ever `verified` in the
-  lineage graph. Every one of those is a recorded, deliberate absence -- the drive proves the surface
-  tells the truth about a box in this state.
-- **THE OUTSTANDING CROSS-REPO ITEM is the crdb plan proposer.** `propose_plan` still has no
-  production caller, so `SOC_INCIDENT_DETAIL` returns an empty plan on a live box. It is the one
-  thing that would turn S3.6's empty response list and S3.8's disabled Approve into a working
-  approval path, and `Modify Plan` enables the moment it lands.
+- **THE PROPOSER LANDED (crdb SS.6, `406e2a98`), so the approval path is now real end to end.** A live
+  box proposes a plan at the episode's establishing transition, so S3.6's Coordinated response list
+  renders steps and S3.8's Approve button enables. **`Modify Plan` can now be built** -- it was left
+  disabled only because there was nothing to edit; its route, resolver, encode arm and fail-closed
+  parser are already landed and tested. Do that as part of S3.N or as its own small step.
+- **What a live drive will honestly show, and must not be "fixed" into looking better:** a Candidate
+  incident proposes ONE INVESTIGATIVE step (the gate did not recommend a containment, so the plan
+  does not offer one), an approved containment comes back `refused` because enforcement is OFF,
+  `Auto-Contained` 0, `Raw Telemetry` and `Audit Trail` as explicit not-availables, and nothing ever
+  `verified` in the lineage graph. Every one is a recorded, deliberate absence -- the drive proves the
+  surface tells the truth about a box in this state.
 - **Two dock panes are PENDING bindings** (`soc.telemetry.raw`, `soc.audit.trail`). The contract test
   fails a RELEASE build that references a pending binding -- they are referenced only as
   not-available renders, which is the intended use, but keep that in mind at release.
