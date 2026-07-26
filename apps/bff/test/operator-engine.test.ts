@@ -126,6 +126,54 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ policies: [] });
     },
+    socIncidentList: (req) => {
+      calls.push(`socIncidentList:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ rows: [], refused: false });
+    },
+    socIncidentDetail: (req) => {
+      calls.push(`socIncidentDetail:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        row: {
+          incident_id: '',
+          rule_id: '',
+          anchor: '',
+          subject: '',
+          finding: '',
+          authority: 'review_required',
+          posture: 'candidate',
+          confidence: 'HIGH',
+          opened_at: 0,
+          last_seen: 0,
+          evidence_count: 0,
+        },
+        nodes: [],
+        edges: [],
+        evidence: [],
+        plan: [],
+        plan_revision: 0,
+        plan_approved: false,
+        refused: false,
+      });
+    },
+    socNarrative: (req) => {
+      calls.push(`socNarrative:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        found: false,
+        published: false,
+        headline: '',
+        narrative: [],
+        impact: [],
+        response: [],
+        cited_evidence: [],
+        withheld: [],
+        needs_human_review: false,
+        model_ref: '',
+        input_hash: '',
+      });
+    },
     policyCreate: (req) => {
       calls.push(`policyCreate:${String(req.request_id)}`);
       reads.push(req);

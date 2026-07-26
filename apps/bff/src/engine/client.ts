@@ -42,6 +42,12 @@ import type {
   WirePolicyDelete,
   WirePolicyDetail,
   WirePolicyDetailQuery,
+  WireSocIncidentDetail,
+  WireSocIncidentDetailQuery,
+  WireSocIncidentList,
+  WireSocIncidentListQuery,
+  WireSocNarrative,
+  WireSocNarrativeQuery,
   WirePolicyEdit,
   WirePolicyEffective,
   WirePolicyEffectiveQuery,
@@ -135,6 +141,22 @@ export interface CrucibleClient {
   idamConfigure(request: WireIdamConfigure, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
   /** Read one named object + its resolved members (OBJECT_DETAIL, crdb OB.3). */
   objectDetail(request: WireObjectDetailQuery, opts?: EngineCallOptions): Promise<WireObjectDetail>;
+  /** Read the ranked SOC decision queue (SOC_INCIDENT_LIST, crdb SS.4b): ordered by what an incident
+   * needs from a human, refuse-not-truncate at its ceiling, tenant-private. */
+  socIncidentList(
+    request: WireSocIncidentListQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocIncidentList>;
+  /** Read one incident assembled (SOC_INCIDENT_DETAIL, crdb SS.4b): lineage + evidence + plan +
+   * narrative reference in ONE answer, so no two panels can disagree. An unknown, foreign, or
+   * over-clearance incident returns the SAME refusal flag. */
+  socIncidentDetail(
+    request: WireSocIncidentDetailQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocIncidentDetail>;
+  /** Read one incident's recorded verdict narrative (SOC_NARRATIVE, crdb VN.7b). A READ, never a
+   * trigger: opening an incident must not cause generation. */
+  socNarrative(request: WireSocNarrativeQuery, opts?: EngineCallOptions): Promise<WireSocNarrative>;
   /** Read the tenant's authored policies grouped by zone (POLICY_LIST_BY_ZONE, crdb PS.5): draft +
    * published, each at its newest version, bounded and tenant-private. */
   policyListByZone(request: WirePolicyListQuery, opts?: EngineCallOptions): Promise<WirePolicyList>;

@@ -70,6 +70,12 @@ import {
   resolvePublishPolicy,
 } from './engine/policies.js';
 import {
+  SocUnavailableError,
+  resolveIncidentDetail,
+  resolveIncidentQueue,
+  resolveNarrative,
+} from './engine/soc.js';
+import {
   resolveIdamConfigure,
   resolveIdamConnect,
   resolveIdamConnectors,
@@ -1376,6 +1382,101 @@ async function handleObjects(
 // short-TTL projection cache over a stateless BFF (INV-CONSOLE-NO-2ND-DB -- the crdb policy store remains
 // the system of record; this is a bounded-staleness projection, never a second copy of the truth). Bump
 // the generation whenever the view-model shape or semantics change, so no pre-upgrade projection is served.
+const SOC_CACHE_VERSION = 'soc-v1';
+
+/** Tenant-scoped cache prefix for the SOC reads (a warm projection never crosses tenants). */
+function socCachePrefix(tenant: string | undefined): string {
+  return `soc:${tenant ?? ''}:`;
+}
+
+/**
+ * The SOC Operations reads (IP-CONSOLE-03 S3.2): GET /api/soc/incidents (the ranked decision queue),
+ * GET /api/soc/incident?id=<incident> (one incident assembled), and GET /api/soc/narrative?id=<incident>
+ * (its recorded verdict write-up). Session-gated (401), engine-gated (503), operator-delegated.
+ *
+ * The status mapping is where this surface's honesty lives:
+ *   * 503 when the payload cannot be rendered honestly -- including an over-ceiling queue the engine
+ *     REFUSED. Never an empty queue: "no open incidents" for a queue too large to return is the one
+ *     direction a SOC number must not fail in.
+ *   * 404 for an incident the caller cannot see, whether it does not exist, belongs to another tenant,
+ *     or sits above their clearance. crdb returns ONE indistinguishable refusal for all three and this
+ *     route preserves that -- splitting them would rebuild the existence oracle the engine removed.
+ *   * 403 on a query-gate refusal, 400 on a missing id, 502 on anything else.
+ *
+ * Returns true iff it claimed the request.
+ */
+async function handleSoc(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const reads = new Set(['/api/soc/incidents', '/api/soc/incident', '/api/soc/narrative']);
+  if (!reads.has(path)) return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+  const incident = params.get('id')?.trim();
+  // The per-incident reads need their id up front, so a malformed request never reaches the engine.
+  if (path !== '/api/soc/incidents' && !incident) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const prefix = socCachePrefix(principal.tenant);
+  const cacheKey =
+    path === '/api/soc/incidents'
+      ? `${prefix}incidents`
+      : `${prefix}${path === '/api/soc/incident' ? 'detail' : 'narrative'}:${incident ?? ''}`;
+  const cached = deps.cache.get(cacheKey, SOC_CACHE_VERSION);
+  if (cached !== undefined) {
+    sendJson(res, 200, cached);
+    return true;
+  }
+  const engine = deps.operatorEngine;
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    if (path === '/api/soc/incidents') {
+      const view = await resolveIncidentQueue(engine, principal, opts);
+      deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
+      sendJson(res, 200, view);
+      return true;
+    }
+    if (path === '/api/soc/incident') {
+      const view = await resolveIncidentDetail(engine, principal, incident ?? '', opts);
+      if (view === null) {
+        // Unknown / foreign / over-clearance, indistinguishable by design. NOT cached: a later grant
+        // must not be masked by a warm negative.
+        sendJson(res, 404, { error: 'not_found' });
+        return true;
+      }
+      deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
+      sendJson(res, 200, view);
+      return true;
+    }
+    const view = await resolveNarrative(engine, principal, incident ?? '', opts);
+    deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof SocUnavailableError) {
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'soc read failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 const POLICIES_CACHE_VERSION = 'policies-v1';
 
 /**
@@ -1892,6 +1993,9 @@ async function route(
     return;
   }
   if (await handleObjects(deps, req, path, res)) {
+    return;
+  }
+  if (await handleSoc(deps, req, path, res)) {
     return;
   }
   if (await handlePolicies(deps, req, path, res)) {

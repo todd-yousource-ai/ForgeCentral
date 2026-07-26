@@ -197,6 +197,49 @@ describe('encodeWireRequest: the policy verbs (IP-CONSOLE-05)', () => {
   const asMap = (request: WireRequest): Record<string, unknown> =>
     decode(encodeWireRequest(request)) as Record<string, unknown>;
 
+  it('the SOC Ops reads encode over the real CBOR path (S3.2 encode-arm seam)', () => {
+    // THE check the Policies epic taught: a surface wired only to mocks can pass every BFF and e2e
+    // test with no encode arm at all, then fail on the first real socket. These three verbs are the
+    // whole SOC read path, so they are proven against the real encoder here, not against a mock.
+    expect(asMap({ SocIncidentList: { request_id: 7, limit: 50 } })).toEqual({
+      SocIncidentList: { request_id: 7, limit: 50 },
+    });
+    expect(asMap({ SocIncidentDetail: { request_id: 8, incident: 'ep-soc-1' } })).toEqual({
+      SocIncidentDetail: { request_id: 8, incident: 'ep-soc-1' },
+    });
+    expect(asMap({ SocNarrative: { request_id: 9, incident: 'ep-soc-1' } })).toEqual({
+      SocNarrative: { request_id: 9, incident: 'ep-soc-1' },
+    });
+  });
+
+  it('the SOC reads carry the delegated operator, and omit it when absent', () => {
+    // The BFF reads on the operator's behalf under the peer's Delegation grant. Omission must be
+    // byte-identical to a non-delegating client (the engine's skip_serializing_if), or a plain read
+    // stops matching what the engine expects.
+    const delegated = asMap({
+      SocIncidentList: {
+        request_id: 1,
+        limit: 50,
+        operator: { principal: 'p', tenant: 't' },
+      },
+    });
+    expect(delegated).toEqual({
+      SocIncidentList: { request_id: 1, limit: 50, operator: { principal: 'p', tenant: 't' } },
+    });
+    expect(asMap({ SocIncidentList: { request_id: 1, limit: 50 } })).toEqual({
+      SocIncidentList: { request_id: 1, limit: 50 },
+    });
+  });
+
+  it('encodes request_id as the integer the engine decodes, never a string', () => {
+    // crdb `RequestId` is a transparent u128. The committed schema declared these four DTOs
+    // `string` until it was fixed; a client that sent one would fail at the CBOR seam with nothing
+    // upstream reporting a mismatch, which is precisely what this seam test exists to catch.
+    const map = asMap({ SocIncidentDetail: { request_id: 42, incident: 'ep-1' } });
+    const inner = map['SocIncidentDetail'] as Record<string, unknown>;
+    expect(typeof inner['request_id']).toBe('number');
+  });
+
   it('POLICY_LIST_BY_ZONE encodes with request_id (+ delegated operator)', () => {
     const map = asMap({ PolicyListByZone: { request_id: 7 } });
     expect(map).toEqual({ PolicyListByZone: { request_id: 7 } });

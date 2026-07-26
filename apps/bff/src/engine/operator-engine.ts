@@ -51,6 +51,12 @@ import type {
   WirePolicyEffectiveQuery,
   WirePolicyList,
   WirePolicyListQuery,
+  WireSocIncidentDetail,
+  WireSocIncidentDetailQuery,
+  WireSocIncidentList,
+  WireSocIncidentListQuery,
+  WireSocNarrative,
+  WireSocNarrativeQuery,
   WirePolicyMutated,
   WirePolicyPublish,
   WireListGroups,
@@ -94,6 +100,9 @@ export type EngineAction =
   | 'listGroups'
   | 'objectList'
   | 'objectDetail'
+  | 'socIncidentList'
+  | 'socIncidentDetail'
+  | 'socNarrative'
   | 'policyListByZone'
   | 'policyDetail'
   | 'policyEffective'
@@ -231,6 +240,24 @@ export interface OperatorEngine {
     request: WireObjectDetailQuery,
     opts?: EngineCallOptions,
   ): Promise<WireObjectDetail>;
+  /** Read the ranked SOC decision queue (SOC_INCIDENT_LIST, SS.4b) on behalf of `principal`. */
+  socIncidentList(
+    principal: OperatorPrincipal,
+    request: WireSocIncidentListQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocIncidentList>;
+  /** Read one incident assembled (SOC_INCIDENT_DETAIL, SS.4b) on behalf of `principal`. */
+  socIncidentDetail(
+    principal: OperatorPrincipal,
+    request: WireSocIncidentDetailQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocIncidentDetail>;
+  /** Read one incident's recorded narrative (SOC_NARRATIVE, VN.7b) on behalf of `principal`. */
+  socNarrative(
+    principal: OperatorPrincipal,
+    request: WireSocNarrativeQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocNarrative>;
   /** Read the tenant's policies grouped by zone (POLICY_LIST_BY_ZONE, PS.5) on behalf of `principal`. */
   policyListByZone(
     principal: OperatorPrincipal,
@@ -513,6 +540,21 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'objectDetail', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.objectDetail({ ...request, operator }, opts);
+    },
+    socIncidentList: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socIncidentList', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socIncidentList({ ...request, operator }, opts);
+    },
+    socIncidentDetail: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socIncidentDetail', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socIncidentDetail({ ...request, operator }, opts);
+    },
+    socNarrative: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socNarrative', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socNarrative({ ...request, operator }, opts);
     },
     policyListByZone: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'policyListByZone', request.request_id));

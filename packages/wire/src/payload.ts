@@ -27,6 +27,9 @@ import type {
   WirePolicyCreate,
   WirePolicyDelete,
   WirePolicyDetailQuery,
+  WireSocIncidentDetailQuery,
+  WireSocIncidentListQuery,
+  WireSocNarrativeQuery,
   WirePolicyEdit,
   WirePolicyEffectiveQuery,
   WirePolicyListQuery,
@@ -497,6 +500,39 @@ function policyListToCbor(request: WirePolicyListQuery): unknown {
 }
 
 /** `POLICY_DETAIL` (PS.5). Rust struct order: request_id, vtz, id, operator?. */
+/**
+ * `SOC_INCIDENT_LIST` (crdb SS.4b): the ranked decision queue. Rust struct order: request_id, limit,
+ * operator?.
+ */
+function socIncidentListToCbor(request: WireSocIncidentListQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    limit: request.limit,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_INCIDENT_DETAIL` (crdb SS.4b). Rust struct order: request_id, incident, operator?. */
+function socIncidentDetailToCbor(request: WireSocIncidentDetailQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_NARRATIVE` (crdb VN.7b). Rust struct order: request_id, incident, operator?. */
+function socNarrativeToCbor(request: WireSocNarrativeQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 function policyDetailToCbor(request: WirePolicyDetailQuery): unknown {
   const out: Record<string, unknown> = {
     request_id: request.request_id,
@@ -715,6 +751,15 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('PolicyDelete' in request) {
     return encode({ PolicyDelete: policyDeleteToCbor(request.PolicyDelete) });
+  }
+  if ('SocIncidentList' in request) {
+    return encode({ SocIncidentList: socIncidentListToCbor(request.SocIncidentList) });
+  }
+  if ('SocIncidentDetail' in request) {
+    return encode({ SocIncidentDetail: socIncidentDetailToCbor(request.SocIncidentDetail) });
+  }
+  if ('SocNarrative' in request) {
+    return encode({ SocNarrative: socNarrativeToCbor(request.SocNarrative) });
   }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });

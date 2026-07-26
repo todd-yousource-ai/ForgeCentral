@@ -63,6 +63,9 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     policyListByZone: unused,
     policyDetail: unused,
     policyEffective: unused,
+    socIncidentList: unused,
+    socIncidentDetail: unused,
+    socNarrative: unused,
     policyCreate: unused,
     policyEdit: unused,
     policyPublish: unused,
@@ -105,7 +108,7 @@ function authRouterWith(session: OperatorSession | undefined): AuthRouter {
 }
 
 /** A minimal OperatorEngine: the directory carries one active agent with one capability edge. */
-function operatorEngineWith(): OperatorEngine {
+function operatorEngineWith(soc: Partial<OperatorEngine> = {}): OperatorEngine {
   const unused = () => Promise.reject(new Error('unused'));
   return {
     listPrincipals: unused,
@@ -132,6 +135,9 @@ function operatorEngineWith(): OperatorEngine {
         versions: [{ version: '1.0.0', lifecycle: 'published' }],
       }),
     policyEffective: () => Promise.resolve({ policies: [wirePolicyRecord()] }),
+    socIncidentList: unused,
+    socIncidentDetail: unused,
+    socNarrative: unused,
     policyCreate: () => Promise.resolve({ id: 'p-new', version: '1.0.0', lifecycle: 'draft' }),
     policyEdit: () => Promise.resolve({ id: 'p-1', version: '1.1.0', lifecycle: 'draft' }),
     policyPublish: () =>
@@ -246,6 +252,8 @@ function operatorEngineWith(): OperatorEngine {
     vtzEdit: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: 'published' }),
     vtzRescope: () => Promise.resolve({ id: 'YouSource.Moved', lifecycle: '' }),
     vtzDelete: () => Promise.resolve({ id: 'YouSource.Corp', lifecycle: '' }),
+    // Last, so a test can drive a specific SOC read without restating the whole engine.
+    ...soc,
   };
 }
 
@@ -652,6 +660,153 @@ describe('BFF HTTP surface', () => {
     const res = await fetch(`${base}/api/vtz/detail?id=No.Such.Zone`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ zone: null, ancestors: [], commitVersion: 7 });
+  });
+
+  it('GET /api/soc/incidents projects the queue in the engine order (S3.2)', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socIncidentList: () =>
+            Promise.resolve({
+              rows: [
+                {
+                  incident_id: 'ep-waiting',
+                  rule_id: 'LR-C2-001',
+                  anchor: 'T1071',
+                  subject: 'codex-helper',
+                  finding: 'Repeated outbound contact',
+                  authority: 'approval_required',
+                  posture: 'candidate',
+                  confidence: 'HIGH',
+                  opened_at: 1,
+                  last_seen: 2,
+                  evidence_count: 2,
+                },
+              ],
+              refused: false,
+            }),
+        }),
+      },
+    );
+
+    const res = await fetch(`${base}/api/soc/incidents`);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { incidentId: string; authority: string }[];
+    expect(body[0]?.incidentId).toBe('ep-waiting');
+    expect(body[0]?.authority).toBe('approval_required');
+    // No score, no exposure: the engine records neither and the route must not invent them.
+    expect(body[0]).not.toHaveProperty('score');
+  });
+
+  it('GET /api/soc/incidents is 503 when the engine REFUSED the queue, never an empty list', async () => {
+    // An over-ceiling queue is refused rather than truncated. Serving [] would render "no open
+    // incidents" for a SOC that has more than it can show -- the one direction this must not fail in.
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socIncidentList: () =>
+            Promise.resolve({ rows: [], refused: true, explanation: 'over the ceiling' }),
+        }),
+      },
+    );
+
+    const res = await fetch(`${base}/api/soc/incidents`);
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'unavailable' });
+  });
+
+  it('GET /api/soc/incidents is 401 without a session and 503 without an engine', async () => {
+    const noSession = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: operatorEngineWith() },
+    );
+    expect((await fetch(`${noSession}/api/soc/incidents`)).status).toBe(401);
+    const noEngine = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession) },
+    );
+    expect((await fetch(`${noEngine}/api/soc/incidents`)).status).toBe(503);
+  });
+
+  it('GET /api/soc/incident is 404 for a refused incident and 400 without an id', async () => {
+    // Unknown, another tenant's, and above-clearance all arrive as ONE refusal; the route keeps them
+    // indistinguishable rather than rebuilding an existence oracle.
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socIncidentDetail: () =>
+            Promise.resolve({
+              row: {
+                incident_id: '',
+                rule_id: '',
+                anchor: '',
+                subject: '',
+                finding: '',
+                authority: 'review_required',
+                posture: 'candidate',
+                confidence: 'HIGH',
+                opened_at: 0,
+                last_seen: 0,
+                evidence_count: 0,
+              },
+              nodes: [],
+              edges: [],
+              evidence: [],
+              plan: [],
+              plan_revision: 0,
+              plan_approved: false,
+              refused: true,
+            }),
+        }),
+      },
+    );
+
+    expect((await fetch(`${base}/api/soc/incident?id=ep-nope`)).status).toBe(404);
+    expect((await fetch(`${base}/api/soc/incident`)).status).toBe(400);
+  });
+
+  it('GET /api/soc/narrative renders the refused state rather than an error', async () => {
+    // "The pipeline looked and would not stand behind it" is an ANSWER, not a failure -- the panel
+    // renders it, and an operator can tell it apart from "nobody has looked".
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socNarrative: () =>
+            Promise.resolve({
+              found: true,
+              published: false,
+              refusal: 'the grounding set did not support the headline',
+              headline: '',
+              narrative: [],
+              impact: [],
+              response: [],
+              cited_evidence: [],
+              withheld: [],
+              needs_human_review: true,
+              model_ref: 'gemma4',
+              input_hash: 'sha512:abc',
+            }),
+        }),
+      },
+    );
+
+    const res = await fetch(`${base}/api/soc/narrative?id=ep-soc-1`);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { found: boolean; published: boolean; refusal: string };
+    expect(body.found).toBe(true);
+    expect(body.published).toBe(false);
+    expect(body.refusal).toContain('did not support');
   });
 
   it('GET /api/policies projects the tenant policies grouped by zone (P5.2)', async () => {
