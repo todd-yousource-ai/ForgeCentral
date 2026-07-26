@@ -24,6 +24,7 @@ const KPIS: SocKpis = {
   autoContained: 0,
   decisionWaiting: 2,
   detectionEnabled: true,
+  suppressingInputs: [],
 };
 
 function mockKpis(body: unknown, ok = true): void {

@@ -1,0 +1,309 @@
+// apps/console/src/surfaces/SocVerdictPanel.tsx -- the FORGE VERDICT panel (IP-CONSOLE-03 S3.6).
+//
+// What the engine concluded about the selected incident, and what it will and will not stand behind.
+//
+// HONESTY RULES (INV-SOC-NARRATIVE-LABELLED, INV-SOC-NO-FABRICATED-NUMBER):
+//   * The write-up is ALWAYS labelled generated and always linked to its artifact. An operator must
+//     never be unsure whether a paragraph was written by a model.
+//   * THE THREE NARRATIVE STATES STAY DISTINCT. `found: false` is "nobody has looked".
+//     `published: false` is "the pipeline looked and would NOT stand behind it", with its reason.
+//     Only `published: true` renders prose. Never a stale narrative, never a templated sentence
+//     standing in for one, never blank space.
+//   * NO MODEL CONSENSUS. The prototype's "5/5 models agree, 94.1%" describes a model panel this
+//     platform does not have -- there is one detection gate. `TRD-CONSOLE-03` Section 5.3 re-grounds
+//     the card on the confidence the engine actually computed.
+//   * CONTRADICTIONS is TECHNIQUE-scoped and says so. The engine records mute reasons per anchor over
+//     the window, not per incident; labelling it precisely is the difference between informing an
+//     analyst and letting them read a technique-wide count as this incident's own.
+//   * Business impact renders as an explicit absence naming what it waits on. Exposure in currency
+//     needs an asset-value plane that does not exist, and a plausible dollar figure on a security
+//     surface is worse than a missing one.
+
+import type { ReactElement } from 'react';
+import { Badge } from '@forge/design';
+import type { SocIncidentDetail, SocKpis, VerdictNarrative, WithheldClaim } from '@forge/contracts';
+import {
+  authorityLabel,
+  confidenceLabel,
+  suppressingInputsFor,
+  type SocSuppressingInputs,
+} from '@forge/contracts';
+
+import { ErrorState, LoadingState } from '../states/States.js';
+import { authorityVariant } from './SocDecisionQueue.js';
+import { useSocNarrative } from './useSoc.js';
+
+/** One stat card. `unavailable` is a first-class render, never an empty box. */
+function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  readonly label: string;
+  readonly value: ReactElement | string;
+  readonly detail: string;
+}): ReactElement {
+  return (
+    <section className="fcx-socv__stat" aria-label={label}>
+      <span className="fcx-socv__stat-label">{label}</span>
+      <span className="fcx-socv__stat-value">{value}</span>
+      <span className="fcx-socv__stat-detail">{detail}</span>
+    </section>
+  );
+}
+
+/**
+ * The CONSENSUS card, re-grounded (Section 5.3).
+ *
+ * The confidence the gate computed plus the corroboration behind it -- the number of distinct
+ * telemetry legs the incident cites. Deliberately NOT a percentage: a percentage implies a
+ * denominator, and the only honest one here would be a model panel that does not exist.
+ */
+function ConsensusCard({ detail }: { readonly detail: SocIncidentDetail }): ReactElement {
+  const legs = detail.evidence.length;
+  return (
+    <StatCard
+      label="Consensus"
+      value={confidenceLabel(detail.row.confidence)}
+      detail={
+        legs === 0
+          ? 'One detection gate, no corroborating legs cited.'
+          : `One detection gate, corroborated by ${String(legs)} cited ${legs === 1 ? 'leg' : 'legs'}.`
+      }
+    />
+  );
+}
+
+/** The CONTRADICTIONS card: the gate's suppressing inputs for this TECHNIQUE over the window. */
+function ContradictionsCard({
+  anchor,
+  inputs,
+  known,
+}: {
+  readonly anchor: string;
+  readonly inputs: SocSuppressingInputs | null;
+  readonly known: boolean;
+}): ReactElement {
+  if (!known) {
+    // The summary read has not landed or failed. Unknown is not zero, and the card says so.
+    return (
+      <StatCard
+        label="Contradictions"
+        value="Unavailable"
+        detail="The detection summary this is drawn from could not be read."
+      />
+    );
+  }
+  const total = (inputs?.falsePositiveFeedback ?? 0) + (inputs?.ratifiedBaseline ?? 0);
+  return (
+    <StatCard
+      label="Contradictions"
+      value={String(total)}
+      detail={
+        total === 0
+          ? `Nothing suppressed ${anchor} in this window.`
+          : `${String(inputs?.falsePositiveFeedback ?? 0)} by false-positive feedback, ${String(inputs?.ratifiedBaseline ?? 0)} by ratified baseline -- for ${anchor} across the window, not this incident alone.`
+      }
+    />
+  );
+}
+
+/** The AUTHORITY card: what this incident needs from a human, the same field the queue orders by. */
+function AuthorityCard({ detail }: { readonly detail: SocIncidentDetail }): ReactElement {
+  return (
+    <StatCard
+      label="Authority"
+      value={
+        <Badge variant={authorityVariant(detail.row.authority)}>
+          {authorityLabel(detail.row.authority)}
+        </Badge>
+      }
+      detail="The recorded authority state, not one inferred from severity."
+    />
+  );
+}
+
+/** One withheld claim, with the ruling and the evidence it cited so an analyst can check it. */
+function WithheldRow({ claim }: { readonly claim: WithheldClaim }): ReactElement {
+  return (
+    <li className="fcx-socv__withheld">
+      <span className="fcx-socv__withheld-head">
+        <Badge variant="caution">{claim.ruling}</Badge>
+        <span className="fcx-socv__withheld-section">{claim.section}</span>
+      </span>
+      <q className="fcx-socv__withheld-text">{claim.text}</q>
+      <span className="fcx-socv__withheld-why">{claim.explanation}</span>
+    </li>
+  );
+}
+
+/** The narrative body: one of three distinct states, never collapsed into "unavailable". */
+function NarrativeBody({ narrative }: { readonly narrative: VerdictNarrative }): ReactElement {
+  if (!narrative.found) {
+    return (
+      <div className="fcx-socv__narrative fcx-socv__narrative--absent">
+        <p className="fcx-socv__state">No write-up has been generated for this incident.</p>
+        <p className="fcx-socv__state-detail">
+          Nobody has looked. This is not a failure -- the pipeline runs on its own cadence, and the
+          structured findings above stand on their own.
+        </p>
+      </div>
+    );
+  }
+  if (!narrative.published) {
+    return (
+      <div className="fcx-socv__narrative fcx-socv__narrative--refused">
+        <p className="fcx-socv__state">The pipeline would not stand behind its write-up.</p>
+        <p className="fcx-socv__state-detail">
+          {narrative.refusal ?? 'The run was refused and recorded no reason.'}
+        </p>
+        <p className="fcx-socv__state-detail">
+          The structured findings above are unaffected: they come from the engine, not the model.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="fcx-socv__narrative">
+      <h4 className="fcx-socv__headline">{narrative.headline}</h4>
+      {narrative.narrative.map((paragraph) => (
+        <p key={paragraph} className="fcx-socv__para">
+          {paragraph}
+        </p>
+      ))}
+      {narrative.impact.length > 0 ? (
+        <>
+          <h5 className="fcx-socv__sub">Assessed impact</h5>
+          <ul className="fcx-socv__list">
+            {narrative.impact.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {narrative.response.length > 0 ? (
+        <>
+          <h5 className="fcx-socv__sub">Recommended response</h5>
+          <ul className="fcx-socv__list">
+            {narrative.response.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {narrative.withheld.length > 0 ? (
+        <>
+          <h5 className="fcx-socv__sub">Withheld by the skeptic</h5>
+          <ul className="fcx-socv__list fcx-socv__list--withheld">
+            {narrative.withheld.map((claim) => (
+              <WithheldRow key={`${claim.section}:${claim.text}`} claim={claim} />
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+export interface SocVerdictPanelProps {
+  readonly incidentId: string;
+  readonly detail: SocIncidentDetail;
+  /** The KPI payload, for the technique-scoped suppressing inputs. Undefined while it is unread. */
+  readonly kpis: SocKpis | undefined;
+}
+
+export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelProps): ReactElement {
+  const narrative = useSocNarrative(incidentId);
+  const executed = detail.plan.filter((step) => step.state === 'executed');
+
+  return (
+    <section className="fcx-socv" aria-label="Forge verdict" data-testid="soc-verdict">
+      <div className="fcx-socv__stats">
+        <ConsensusCard detail={detail} />
+        <ContradictionsCard
+          anchor={detail.row.anchor}
+          inputs={kpis === undefined ? null : suppressingInputsFor(kpis, detail.row.anchor)}
+          known={kpis !== undefined}
+        />
+        <AuthorityCard detail={detail} />
+      </div>
+
+      <div className="fcx-socv__generated">
+        <h3 className="fcx-socv__title">Forge verdict</h3>
+        {/* Always labelled, always linked -- an operator must never wonder whether a model wrote a
+            paragraph, or be unable to find the artifact it came from. */}
+        <Badge variant="info">Generated</Badge>
+        {narrative.data?.found === true ? (
+          <span className="fcx-socv__artifact">
+            {narrative.data.modelRef} &middot; {narrative.data.inputHash}
+          </span>
+        ) : null}
+      </div>
+
+      {narrative.isPending ? <LoadingState label="Loading the verdict" /> : null}
+      {narrative.isError ? (
+        <ErrorState
+          title="The verdict cannot be shown"
+          code={narrative.error instanceof Error ? narrative.error.message : 'unknown'}
+          onRetry={() => void narrative.refetch()}
+        />
+      ) : null}
+      {narrative.data ? <NarrativeBody narrative={narrative.data} /> : null}
+      {narrative.data?.needsHumanReview === true ? (
+        <p className="fcx-socv__review">
+          <Badge variant="caution">Flagged for human review</Badge>
+        </p>
+      ) : null}
+
+      <h5 className="fcx-socv__sub">Already enforced</h5>
+      <p className="fcx-socv__state-detail">
+        {executed.length === 0
+          ? 'Nothing. Enforcement is off on this deployment, so no step of any response has been carried out.'
+          : `${String(executed.length)} step(s) carried out.`}
+      </p>
+
+      <h5 className="fcx-socv__sub">Business impact</h5>
+      <p className="fcx-socv__state-detail" data-testid="soc-business-impact">
+        {/* Deliberately absent, with its gating work named. Exposure in currency needs an asset-value
+            plane the platform does not have; a plausible dollar figure here would be worse than a
+            missing one, because an analyst would act on it. */}
+        Not available. Exposure and blast radius need an asset-value plane, which the platform does
+        not have -- so this reports nothing rather than an estimate.
+      </p>
+
+      <h5 className="fcx-socv__sub">Coordinated response</h5>
+      {detail.plan.length === 0 ? (
+        <p className="fcx-socv__state-detail" data-testid="soc-response-empty">
+          No response plan has been proposed. The engine records and audits plans, and both operator
+          commands exist, but nothing proposes one yet -- so there is nothing here to approve.
+        </p>
+      ) : (
+        <ol className="fcx-socv__plan">
+          {detail.plan.map((step) => (
+            <li key={step.ordinal} className="fcx-socv__step">
+              <span className="fcx-socv__step-title">{step.title}</span>
+              <Badge variant={step.state === 'refused' ? 'caution' : 'neutral'}>{step.state}</Badge>
+              {step.explanation === '' ? null : (
+                <span className="fcx-socv__step-why">{step.explanation}</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <div className="fcx-socv__controls">
+        {/* Present but disabled: the commands land in S3.8. A control that looked live and did
+            nothing is the dead action the no-stub rule forbids. */}
+        <button type="button" disabled className="fcx-socv__control">
+          Approve full response
+        </button>
+        <button type="button" disabled className="fcx-socv__control">
+          Modify plan
+        </button>
+        <span className="fcx-socv__controls-note">
+          Approval lands in a later step, and needs a proposed plan to act on.
+        </span>
+      </div>
+    </section>
+  );
+}

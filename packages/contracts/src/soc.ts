@@ -354,6 +354,31 @@ export interface SocKpis {
   readonly decisionWaiting: number;
   /** Whether the engine's detection plane is enabled at all. */
   readonly detectionEnabled: boolean;
+  /**
+   * Per-technique suppressing inputs, for the verdict panel's `CONTRADICTIONS` card.
+   *
+   * Carried on the KPI payload because it comes from the same `DETECT_SUMMARY` read; the verdict
+   * panel looks up the incident's anchor rather than issuing a read of its own.
+   */
+  readonly suppressingInputs: readonly SocSuppressingInputs[];
+}
+
+/**
+ * One technique's suppressing inputs over the window (`WireTechniqueSummary`, crdb FV.3b).
+ *
+ * The `CONTRADICTIONS` card's real source per `TRD-CONSOLE-03` Section 5.3. Scoped to the TECHNIQUE
+ * and the window, NOT to one incident -- the engine records mute reasons per anchor, and the surface
+ * must say so rather than let an analyst read a technique-wide count as this incident's own.
+ */
+export interface SocSuppressingInputs {
+  /** The ATT&CK anchor these counts belong to. */
+  readonly anchor: string;
+  /** Firings muted because tenant false-positive dispositions down-weighted them. */
+  readonly falsePositiveFeedback: number;
+  /** Firings muted because an operator-ratified baseline graduation down-weighted them. */
+  readonly ratifiedBaseline: number;
+  /** Every firing of this technique in the window, the denominator for the two above. */
+  readonly firings: number;
 }
 
 /** A step as the operator composes it for `SOC_PLAN_MODIFY` (title + action only). */
@@ -652,7 +677,30 @@ export function toSocKpis(
     autoContained: summary.auto_contained,
     decisionWaiting: queue.filter((row) => isWaitingOnAHuman(row.authority)).length,
     detectionEnabled: summary.enabled,
+    suppressingInputs: summary.techniques.map((row) => ({
+      anchor: row.anchor,
+      falsePositiveFeedback: row.muted_fp_feedback,
+      ratifiedBaseline: row.muted_ratified,
+      firings: row.fires,
+    })),
   };
+}
+
+/**
+ * The suppressing inputs recorded for one technique, or `null` when the window holds none.
+ *
+ * `null` is "the gate suppressed nothing for this technique in the window", which is a real answer
+ * and different from "we do not know" -- the caller renders them differently.
+ */
+export function suppressingInputsFor(kpis: SocKpis, anchor: string): SocSuppressingInputs | null {
+  // Tolerates a payload without the field rather than throwing: a BFF one deploy behind would
+  // otherwise take down the whole verdict panel over one card, which is a worse failure than the
+  // card reporting that it does not know.
+  return (
+    (kpis.suppressingInputs as readonly SocSuppressingInputs[] | undefined)?.find(
+      (row) => row.anchor === anchor,
+    ) ?? null
+  );
 }
 
 /** Whether this authority state is blocking a person (the `Decision Waiting` KPI's predicate). */

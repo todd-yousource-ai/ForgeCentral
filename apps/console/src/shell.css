@@ -1155,3 +1155,182 @@ body {
   font-size: var(--fc-font-size-sm);
   color: var(--fc-color-text-muted);
 }
+
+/* -- SOC verdict panel (S3.6) ------------------------------------------------------------------ */
+
+.fcx-socv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+  margin-top: var(--fc-space-lg);
+  padding-top: var(--fc-space-md);
+  border-top: 1px solid var(--fc-color-surface-border);
+}
+
+.fcx-socv__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--fc-space-md);
+}
+
+.fcx-socv__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--fc-space-sm);
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-md);
+}
+
+.fcx-socv__stat-label {
+  font-size: var(--fc-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-socv__stat-value {
+  font-size: var(--fc-font-size-lg);
+  font-weight: var(--fc-font-weight-semibold);
+}
+
+.fcx-socv__stat-detail,
+.fcx-socv__state-detail {
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+  line-height: 1.4;
+}
+
+.fcx-socv__generated {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--fc-space-md);
+}
+
+.fcx-socv__title {
+  margin: 0;
+  font-size: var(--fc-font-size-md);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.fcx-socv__artifact {
+  font-family: var(--fc-font-fontFamily-mono);
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.fcx-socv__narrative {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-socv__narrative--refused .fcx-socv__state {
+  color: var(--fc-color-status-caution);
+}
+
+.fcx-socv__state {
+  margin: 0;
+  font-weight: var(--fc-font-weight-medium);
+}
+
+.fcx-socv__headline {
+  margin: 0;
+  font-size: var(--fc-font-size-lg);
+}
+
+.fcx-socv__para {
+  margin: 0;
+  line-height: 1.5;
+  max-width: 72ch;
+}
+
+.fcx-socv__sub {
+  margin: var(--fc-space-md) 0 0;
+  font-size: var(--fc-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-socv__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--fc-font-size-sm);
+  line-height: 1.5;
+}
+
+.fcx-socv__list--withheld {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-socv__withheld {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--fc-space-sm);
+  border-left: 2px solid var(--fc-color-status-caution);
+}
+
+.fcx-socv__withheld-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-socv__withheld-section,
+.fcx-socv__withheld-why,
+.fcx-socv__step-why {
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-socv__plan {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-socv__step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  font-size: var(--fc-font-size-sm);
+}
+
+.fcx-socv__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--fc-space-md);
+}
+
+.fcx-socv__control {
+  padding: 6px 14px;
+  border-radius: var(--fc-radius-md);
+  border: 1px solid var(--fc-color-surface-border);
+  background: transparent;
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-socv__control:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.fcx-socv__controls-note {
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+}

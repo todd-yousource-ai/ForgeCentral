@@ -24,6 +24,7 @@ import type { SocKpis } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { SocDecisionQueue } from './SocDecisionQueue.js';
+import { SocVerdictPanel } from './SocVerdictPanel.js';
 import {
   DISCLOSURE_LEVELS,
   SocLineageGraph,
@@ -142,6 +143,8 @@ function CommandHeader({ kpis }: { readonly kpis: SocKpis | undefined }): ReactE
 
 interface DetailRegionProps {
   readonly incidentId: string | null;
+  /** The KPI payload, passed down so the verdict's CONTRADICTIONS card needs no read of its own. */
+  readonly kpis: SocKpis | undefined;
   readonly level: DisclosureLevel;
   readonly onLevel: (level: DisclosureLevel) => void;
   readonly scopedNode: string | null;
@@ -156,6 +159,7 @@ interface DetailRegionProps {
  */
 function IncidentDetailRegion({
   incidentId,
+  kpis,
   level,
   onLevel,
   scopedNode,
@@ -223,6 +227,8 @@ function IncidentDetailRegion({
         scopedNode={scopedNode}
         onScopeNode={onScopeNode}
       />
+
+      <SocVerdictPanel incidentId={incidentId} detail={detail.data} kpis={kpis} />
 
       <p className="fcx-socops__scope" data-testid="soc-scope">
         {scopedNode === null
@@ -304,6 +310,7 @@ export function SocOpsSurface(): ReactElement {
             >
               <IncidentDetailRegion
                 incidentId={selected}
+                kpis={kpis.data}
                 level={level}
                 onLevel={setLevel}
                 scopedNode={scopedNode}
