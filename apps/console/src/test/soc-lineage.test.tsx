@@ -228,45 +228,61 @@ describe('the lineage graph inside the surface (S3.5)', () => {
                   autoContained: 0,
                   decisionWaiting: 1,
                   detectionEnabled: true,
+                  suppressingInputs: [],
                 }
-              : url.includes('/incident?')
+              : url.includes('/narrative')
                 ? {
-                    row: {
-                      incidentId: 'ep-soc-1',
-                      ruleId: 'LR-C2-001',
-                      anchor: 'T1071',
-                      subject: 'codex-helper',
-                      finding: 'Repeated outbound contact',
-                      authority: 'review_required',
-                      posture: 'candidate',
-                      confidence: 'HIGH',
-                      openedAt: 1,
-                      lastSeen: 2,
-                      evidenceCount: 1,
-                    },
-                    nodes: NODES,
-                    edges: EDGES,
-                    evidence: [{ leg: 'leg:net:198.51.100.7' }],
-                    plan: [],
-                    planRevision: 0,
-                    planApproved: false,
-                    narrativeRef: null,
+                    found: false,
+                    published: false,
+                    refusal: null,
+                    headline: '',
+                    narrative: [],
+                    impact: [],
+                    response: [],
+                    citedEvidence: [],
+                    withheld: [],
+                    needsHumanReview: false,
+                    modelRef: '',
+                    inputHash: '',
                   }
-                : [
-                    {
-                      incidentId: 'ep-soc-1',
-                      ruleId: 'LR-C2-001',
-                      anchor: 'T1071',
-                      subject: 'codex-helper',
-                      finding: 'Repeated outbound contact',
-                      authority: 'review_required',
-                      posture: 'candidate',
-                      confidence: 'HIGH',
-                      openedAt: 1,
-                      lastSeen: 2,
-                      evidenceCount: 1,
-                    },
-                  ],
+                : url.includes('/incident?')
+                  ? {
+                      row: {
+                        incidentId: 'ep-soc-1',
+                        ruleId: 'LR-C2-001',
+                        anchor: 'T1071',
+                        subject: 'codex-helper',
+                        finding: 'Repeated outbound contact',
+                        authority: 'review_required',
+                        posture: 'candidate',
+                        confidence: 'HIGH',
+                        openedAt: 1,
+                        lastSeen: 2,
+                        evidenceCount: 1,
+                      },
+                      nodes: NODES,
+                      edges: EDGES,
+                      evidence: [{ leg: 'leg:net:198.51.100.7' }],
+                      plan: [],
+                      planRevision: 0,
+                      planApproved: false,
+                      narrativeRef: null,
+                    }
+                  : [
+                      {
+                        incidentId: 'ep-soc-1',
+                        ruleId: 'LR-C2-001',
+                        anchor: 'T1071',
+                        subject: 'codex-helper',
+                        finding: 'Repeated outbound contact',
+                        authority: 'review_required',
+                        posture: 'candidate',
+                        confidence: 'HIGH',
+                        openedAt: 1,
+                        lastSeen: 2,
+                        evidenceCount: 1,
+                      },
+                    ],
           ),
       } as Response),
     );
@@ -283,6 +299,13 @@ describe('the lineage graph inside the surface (S3.5)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /ep-soc-1/ }));
     await screen.findByTestId('soc-lineage-graph');
+    // The verdict panel reads the narrative artifact SEPARATELY and deliberately (VN.7b: opening an
+    // incident must never trigger generation). Wait for that to settle before sampling, so the
+    // baseline covers every read the selection legitimately causes.
+    await screen.findByTestId('soc-verdict');
+    await waitFor(() => {
+      expect(screen.getByText(/No write-up has been generated/i)).toBeInTheDocument();
+    });
     const afterLoad = spy.mock.calls.length;
 
     fireEvent.click(screen.getByRole('button', { name: /^decision/ }));
@@ -299,6 +322,10 @@ describe('the lineage graph inside the surface (S3.5)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /ep-soc-1/ }));
     await screen.findByTestId('soc-lineage-graph');
+    await screen.findByTestId('soc-verdict');
+    await waitFor(() => {
+      expect(screen.getByText(/No write-up has been generated/i)).toBeInTheDocument();
+    });
     const afterLoad = spy.mock.calls.length;
 
     // Default is the material path: the evidence-lane mirror is folded away.

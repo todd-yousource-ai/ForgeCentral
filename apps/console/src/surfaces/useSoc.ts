@@ -11,7 +11,12 @@
 // which is the whole point of the fail-closed chain behind it.
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { SocIncidentDetail, SocIncidentRow, SocKpis } from '@forge/contracts';
+import type {
+  SocIncidentDetail,
+  SocIncidentRow,
+  SocKpis,
+  VerdictNarrative,
+} from '@forge/contracts';
 
 /** Fetch the five KPI tiles. Throws on a non-2xx so the strip shows a load error, never blanks. */
 export async function fetchSocKpis(): Promise<SocKpis> {
@@ -75,6 +80,36 @@ export function useSocIncident(
   return useQuery({
     queryKey: ['soc', 'incident', incidentId],
     queryFn: () => fetchSocIncident(incidentId as string),
+    enabled: incidentId !== null,
+  });
+}
+
+/**
+ * Fetch one incident's recorded verdict narrative.
+ *
+ * A READ, never a trigger: opening an incident must not cause generation, so this never runs the
+ * pipeline and two opens cannot pay for two model runs of the same evidence.
+ */
+export async function fetchSocNarrative(incidentId: string): Promise<VerdictNarrative> {
+  const res = await fetch(`/api/soc/narrative?id=${encodeURIComponent(incidentId)}`, {
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(`soc narrative failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as VerdictNarrative;
+}
+
+/**
+ * One incident's verdict narrative.
+ *
+ * All three states (absent / refused / published) arrive as DATA, not as errors -- an operator must
+ * be able to tell "nobody has looked" from "the pipeline looked and would not stand behind it".
+ */
+export function useSocNarrative(incidentId: string | null): UseQueryResult<VerdictNarrative> {
+  return useQuery({
+    queryKey: ['soc', 'narrative', incidentId],
+    queryFn: () => fetchSocNarrative(incidentId as string),
     enabled: incidentId !== null,
   });
 }
