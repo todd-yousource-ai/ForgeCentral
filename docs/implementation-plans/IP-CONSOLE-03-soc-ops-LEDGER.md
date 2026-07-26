@@ -10,11 +10,15 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   journeys for every `TRD-CONSOLE-03` Section 8 task within its click budget, an edge-state
   distinctness assertion, the narrative-unavailable journey, a no-stub sweep, and the LIVE DRIVE on
   the box over the deployed BFF/SPA.
-- **THE PROPOSER LANDED (crdb SS.6, `406e2a98`), so the approval path is now real end to end.** A live
-  box proposes a plan at the episode's establishing transition, so S3.6's Coordinated response list
-  renders steps and S3.8's Approve button enables. **`Modify Plan` can now be built** -- it was left
-  disabled only because there was nothing to edit; its route, resolver, encode arm and fail-closed
-  parser are already landed and tested. Do that as part of S3.N or as its own small step.
+- **State: S3.1 -> S3.8b LANDED. Next and LAST action = S3.N.** The proposer (crdb SS.6) made the
+  approval path real end to end, and S3.8b resolved the `Modify Plan` deferral it unblocked. Both
+  controls are now live.
+- **THE THREE REMAINING DEFERRALS ARE ALL ENGINE WORK, not Console changes**, and each is recorded
+  rather than papered over: `soc.telemetry.raw` needs a crdb leg-to-raw-record read (`LOG_EXPLAIN`
+  keys on a decision id); `soc.audit.trail` needs a per-incident audit query (entries reach the
+  Console on the live stream only); Business impact needs an asset-value plane, which
+  `TRD-CONSOLE-03` Section 9 and the crdb IP both name as its own IP. None is a "quick" fix, and
+  none should be filled with a plausible number to make the surface look finished.
 - **What a live drive will honestly show, and must not be "fixed" into looking better:** a Candidate
   incident proposes ONE INVESTIGATIVE step (the gate did not recommend a containment, so the plan
   does not offer one), an approved containment comes back `refused` because enforcement is OFF,
@@ -79,6 +83,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | S3.6 | A5-A9, A2 | LANDED | `a082599` | three narrative states rendered DISTINCTLY (absent / refused-with-reason / published), prose always labelled Generated + artifact-linked, **no model-consensus percentage** (test asserts no `%` and no "models agree"), CONTRADICTIONS technique-scoped and says so, **Unavailable != 0** for an unread summary, Business impact an explicit absence naming the missing asset-value plane, unproposed response explains WHY it is empty, controls present + disabled. Contract gained `SocSuppressingInputs` on the KPI payload (no extra read; lookup tolerates a payload without it). 11 tests |
 | S3.7 | A3 | LANDED | `71b92e0` | 5 panes + the scope line, all over ONE payload (tab switches cost no read; the narrative shares the verdict's query key). **Bindings checked first: 2 of 5 have no per-incident read** -- Raw Telemetry (nothing maps legs to records; LOG_EXPLAIN keys on a decision id) and Audit Trail (entries are live-stream only), both explicit not-availables + PENDING bindings. Audit copy states acts ARE audited engine-side so an empty pane cannot read as unaudited. Timeline shows the 2 real instants and refuses to interpolate. Evidence narrows to the scoped node and shows NOTHING when the scope matches no leg. 10 tests |
 | S3.8 | A11 | LANDED | `b4d9199` | Approve over SS.5, confirm-gated, audited. **Mounted ABOVE the 405 gate with a dispatch-level regression test** (unauthenticated POST must 401, never 405 -- the P5.4 defect). **`enforcement_active` survives the whole chain and the success copy never says "contained"** (asserted). The shown revision is submitted; a missing one is 400, never defaulted to 0. Approve is disabled with a reason when there is no plan or it is already approved. Typed refusals 409/400/403, cache dropped on success. `toResponseStepDrafts` reads title+action ONLY (seam test asserts the submitted map has exactly those keys). **Modify stays disabled**: its whole path is built + tested, but with no proposer there is nothing to edit. 11 tests |
+| S3.8b | A11 | LANDED | `484eba8` | the `Modify Plan` editor, resolving the S3.8 deferral that crdb SS.6 unblocked. Title + action only (test asserts the posted map has exactly those keys); action is a SELECT over the containment rungs + Investigate, so no free-text action can be mistyped; a blank title disables Save with its reason rather than costing a round trip; **a refusal keeps the operator's edits on screen**; never offered on an approved plan. Synthetic row keys (positional rows with editable titles). 5 tests |
 | S3.N | A1-A12 | PLANNED | -- | Playwright journeys + the live drive on the box (real incident, real gemma4 narrative) |
 
 ## Prerequisites (tracked)
