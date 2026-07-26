@@ -6,13 +6,14 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-26): S3.1 + S3.2 LANDED. Next action = S3.3** (the shell): command header, the
-  focus tab strip, and the five-tile KPI strip bound to `DETECT_SUMMARY` + SS.3. A `PENDING` binding
-  renders its tile in an explicit unavailable state -- and note that **`Auto-Contained` is a LIVE
-  binding whose honest value is 0**, which is a different render from unavailable. Do not conflate
-  them: 0 means the box contained nothing, unavailable means nobody knows.
-- **The read path is complete and seam-proven**, so S3.3 onward is pure surface work against real
-  routes. `GET /api/soc/incidents`, `/api/soc/incident?id=`, `/api/soc/narrative?id=`.
+- **State (2026-07-26): S3.1 + S3.2 + S3.3 LANDED. Next action = S3.4**, the Decision Queue: ranked
+  cards (id + title, entity path, authority chip -- **no score, the engine records none**), the
+  engine's ordering rendered as returned with NO client re-sort, selection driving the rest of the
+  surface, and honest empty/error/loading states. `GET /api/soc/incidents` is live and the
+  `useSocIncidents` hook already exists (S3.3 added it for the Decision Waiting tile).
+- **All five KPI bindings are LIVE**, and `TRD-CONSOLE-03` Section 7 has been corrected accordingly --
+  its table was written before crdb SS.1/SS.3/SS.3a and marked three of them PENDING/PARTIAL.
+- **The whole read path is seam-proven**, so S3.4 onward is pure surface work against real routes.
 - **Building the contract found two engine defects**, both fixed in crdb before any view model was
   written against them: `request_id` was declared `string` on four DTOs (it is a transparent `u128`),
   and the SOC payload emitted Debug renderings so `AttackPath` crossed as `attackpath`. The second
@@ -59,7 +60,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 |------|-----------|--------|--------|------|
 | S3.1 | A1 | LANDED | `7add663` | `soc.ts` view models + FAIL-CLOSED narrowers for authority/posture/confidence/lane/kind/edge-state/step-state/withheld-ruling; schema re-vendored + `wire-dto.ts` regenerated; 6 `soc.*` bindings (5 LIVE, `soc.plan.propose` PENDING on crdb). NO score field, and a test keeps it that way. 21 tier-1 tests. **Found 2 engine defects and fixed them in crdb FIRST**: `request_id` declared `string` on 4 DTOs (transparent u128 -- the generated client would have sent an undecodable type) and Debug-rendered SOC tokens (`AttackPath` -> `attackpath`, which this file's lane narrowing would have refused, blanking the graph). Gate green, Playwright 36/36 |
 | S3.2 | A1, A2 | LANDED | `ff382d6` | encode arms + QuerySubmit dispatch for all 3 verbs, proven on the REAL encoder (incl. a request_id-is-a-number assertion, the S3.1 defect caught from this side); `replyToSoc*`; `CrucibleClient` + `WireCrucibleClient` + `OperatorEngine` delegated reads; `engine/soc.ts` fail-closed to `SocUnavailableError`; `GET /api/soc/{incidents,incident,narrative}` with 200/400/401/404/503, tenant-scoped cache, and the 404 deliberately NOT cached. **Refused queue -> 503, never []**; unknown/foreign/over-clearance -> ONE 404; cannot-see vs cannot-draw kept distinct. 18 tests |
-| S3.3 | A10, A12 | PLANNED | -- | shell: command header, focus tabs, the five KPI tiles (unavailable state for PENDING bindings) |
+| S3.3 | A10, A12 | LANDED | `f2cf1c6` | command header + posture pills + focus tabs + the five KPI tiles, all LIVE. **Added the DETECT_SUMMARY read path** (it had no BFF plumbing; the plan's "already live" meant the engine read) + `GET /api/soc/kpis`. `SocOpsPreview` deleted, its CSS with it. **Auto-Contained renders 0 as a FACT with its reason, never unavailable**; **Noise Collapsed states its denominator** (share of FIRINGS, not of events analyzed) and says "no firings in the window" rather than claiming 100% for 0/0. Decision Waiting derives from the queue's authority field so the two cannot disagree. 8 surface tests + e2e |
 | S3.4 | A3, A12 | PLANNED | -- | the Decision Queue, authority-first ordering as returned (no client re-sort) |
 | S3.5 | A3, A4 | PLANNED | -- | the three-lane lineage graph + four distinct edge states + progressive disclosure |
 | S3.6 | A5-A9, A2 | PLANNED | -- | the FORGE VERDICT panel incl. the labelled narrative and its refusal state |

@@ -218,11 +218,11 @@ Every value binds to a real engine operation or it does not ship.
 
 | Element | Binding | State |
 |---|---|---|
-| KPI: Events Analyzed | ingest/telemetry counters over the window | **PENDING** -- no bounded per-window event count is exposed today |
+| KPI: Events Analyzed | `DETECT_SUMMARY.events_analyzed` (crdb SS.3 + the SS.3a ingest-admission producer) | **LIVE** (2026-07-26) |
 | KPI: Noise Collapsed | `DETECT_SUMMARY.muted_total` + `techniques_lit` (FV.5/FV.6) | **LIVE** |
 | KPI: Material Incidents | `DETECT_SUMMARY.active_alerts` (FV.4) | **LIVE** |
-| KPI: Auto-Contained | containment records (`IP-CONTAIN-COMMAND`) | **PARTIAL** -- `entity.isolate` exists; a per-window count does not |
-| KPI: Decision Waiting | open episodes at `review-required` | **PENDING** -- authority state is not yet an episode field (Section 9) |
+| KPI: Auto-Contained | `DETECT_SUMMARY.auto_contained` (crdb SS.3) | **LIVE** (2026-07-26). Counts EXECUTION, so it reads **0** while enforcement is OFF -- a fact, rendered as a value with its reason, never as an unavailable tile |
+| KPI: Decision Waiting | the queue's `AuthorityState` (crdb SS.1), counted Console-side | **LIVE** (2026-07-26). Derived from the SAME field the queue orders by, so the tile and the queue cannot disagree |
 | Decision Queue | `LOG_QUERY` episode working set (SQ.8a), newest-first, bounded | **LIVE** |
 | Queue score | the episode's confidence + posture rank | **LIVE** |
 | Queue exposure / blast radius | business-context enrichment | **PENDING** (Section 9) |
