@@ -321,7 +321,9 @@ describe('the plan commands (S3.8)', () => {
     renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={DETAIL} kpis={KPIS} />);
 
     expect(await screen.findByRole('button', { name: 'Approve full response' })).toBeDisabled();
-    expect(screen.getByText(/Nothing to approve/i)).toBeInTheDocument();
+    // Both controls are live now, so the copy covers both rather than naming approval alone.
+    expect(screen.getByRole('button', { name: 'Modify plan' })).toBeDisabled();
+    expect(screen.getByText(/Nothing to act on/i)).toBeInTheDocument();
   });
 
   it('sends the revision the operator was shown, behind a confirm gate', async () => {
@@ -405,5 +407,129 @@ describe('the plan commands (S3.8)', () => {
 
     expect(await screen.findByRole('button', { name: 'Approve full response' })).toBeDisabled();
     expect(screen.getByText(/already approved/i)).toBeInTheDocument();
+  });
+});
+
+describe('the plan editor (S3.8b, the Modify deferral resolved)', () => {
+  const PLANNED: SocIncidentDetail = {
+    ...DETAIL,
+    planRevision: 2,
+    plan: [
+      {
+        ordinal: 0,
+        title: 'Inspect codex-helper and its recent activity',
+        action: null,
+        authority: 'review_required',
+        state: 'proposed',
+        explanation: '',
+      },
+    ],
+  };
+
+  function mockCommand(status: number, effect?: unknown): ReturnType<typeof vi.fn> {
+    const spy = vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return Promise.resolve({
+          ok: status === 200,
+          status,
+          json: () => Promise.resolve(effect ?? { error: 'refused' }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(NARRATIVE),
+      } as Response);
+    });
+    vi.stubGlobal('fetch', spy);
+    return spy;
+  }
+
+  it('opens the editor on the engine-proposed steps', async () => {
+    mockNarrative(NARRATIVE);
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={PLANNED} kpis={KPIS} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Modify plan' }));
+
+    expect(screen.getByTestId('soc-plan-editor')).toBeInTheDocument();
+    expect(screen.getByLabelText('Step 1 title')).toHaveValue(
+      'Inspect codex-helper and its recent activity',
+    );
+    // Investigative is the selected action, not a missing value.
+    expect(screen.getByLabelText('Step 1 action')).toHaveValue('');
+  });
+
+  it('submits only title and action, never state or authority', async () => {
+    // Those are the engine's to assign. A client that could submit them could hand over a step
+    // claiming to be already executed.
+    const spy = mockCommand(200, {
+      incidentId: 'ep-soc-1',
+      revision: 3,
+      approved: false,
+      steps: [],
+      enforcementActive: false,
+    });
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={PLANNED} kpis={KPIS} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Modify plan' }));
+    fireEvent.change(screen.getByLabelText('Step 1 action'), { target: { value: 'quarantine' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save plan' }));
+
+    await waitFor(() => {
+      expect(
+        spy.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'POST'),
+      ).toBe(true);
+    });
+    const post = spy.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === 'POST',
+    );
+    const body = JSON.parse((post?.[1] as RequestInit).body as string) as {
+      steps: Record<string, unknown>[];
+    };
+    expect(Object.keys(body.steps[0] ?? {}).sort()).toEqual(['action', 'title']);
+    expect(body.steps[0]?.['action']).toBe('quarantine');
+  });
+
+  it('refuses to save a blank step rather than letting the engine reject it', async () => {
+    mockNarrative(NARRATIVE);
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={PLANNED} kpis={KPIS} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Modify plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
+
+    expect(screen.getByRole('button', { name: 'Save plan' })).toBeDisabled();
+    expect(screen.getByText(/Every step needs a title/i)).toBeInTheDocument();
+  });
+
+  it('keeps the operator edits on screen when the engine refuses', async () => {
+    // Discarding their work and showing them the old plan would be the surface punishing them for
+    // a refusal they did not cause.
+    mockCommand(409);
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={PLANNED} kpis={KPIS} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Modify plan' }));
+    fireEvent.change(screen.getByLabelText('Step 1 title'), { target: { value: 'Edited step' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save plan' }));
+
+    const refusal = await screen.findByTestId('soc-modify-refusal');
+    expect(refusal).toHaveTextContent(/not changed/i);
+    expect(screen.getByTestId('soc-plan-editor')).toBeInTheDocument();
+    expect(screen.getByLabelText('Step 1 title')).toHaveValue('Edited step');
+  });
+
+  it('never offers an edit on an approved plan', async () => {
+    // An edit under a recorded authorization would make the audit trail say an operator approved
+    // steps they never saw.
+    mockNarrative(NARRATIVE);
+
+    renderWithProviders(
+      <SocVerdictPanel
+        incidentId="ep-soc-1"
+        detail={{ ...PLANNED, planApproved: true }}
+        kpis={KPIS}
+      />,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Modify plan' })).toBeDisabled();
   });
 });

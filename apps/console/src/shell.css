@@ -1454,3 +1454,69 @@ body {
   color: var(--fc-color-text-muted);
   max-width: 72ch;
 }
+
+/* -- SOC plan editor (S3.8b) -------------------------------------------------------------------- */
+
+.fcx-socp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+  margin-top: var(--fc-space-sm);
+  padding: var(--fc-space-md);
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-md);
+}
+
+.fcx-socp__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-socp__row {
+  display: flex;
+  gap: var(--fc-space-sm);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.fcx-socp__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 14rem;
+}
+
+.fcx-socp__label {
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-socp__input,
+.fcx-socp__select {
+  padding: 5px 8px;
+  border-radius: var(--fc-radius-sm);
+  border: 1px solid var(--fc-color-surface-border);
+  background: var(--fc-color-surface-canvas);
+  color: var(--fc-color-text-primary);
+  font-size: var(--fc-font-size-sm);
+}
+
+.fcx-socp__drop {
+  padding: 5px 10px;
+  border-radius: var(--fc-radius-sm);
+  border: 1px solid var(--fc-color-surface-border);
+  background: transparent;
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-xs);
+}
+
+.fcx-socp__controls {
+  display: flex;
+  gap: var(--fc-space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
