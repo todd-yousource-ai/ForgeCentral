@@ -225,6 +225,24 @@ export interface WireDecisionRow {
   technique: string;
 }
 
+export interface WireDetectSummary {
+  active_alerts: number;
+  auto_contained: number;
+  enabled: boolean;
+  events_analyzed: number;
+  muted_total: number;
+  observed_components: Array<WireObservedComponent>;
+  observed_in_window: number;
+  summary_refused: boolean;
+  techniques: Array<WireTechniqueSummary>;
+  techniques_lit: number;
+}
+
+export interface WireDetectSummaryQuery {
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
 export interface WireDomainPosture {
   domain: string;
   floor: boolean;
@@ -335,6 +353,34 @@ export interface WireIdamSync {
 
 export interface WireIdamSyncStarted {
   provider: string;
+}
+
+export interface WireIncidentRow {
+  anchor: string;
+  authority: string;
+  confidence: string;
+  evidence_count: number;
+  finding: string;
+  incident_id: string;
+  last_seen: number;
+  opened_at: number;
+  posture: string;
+  rule_id: string;
+  subject: string;
+}
+
+export interface WireLineageEdge {
+  from: string;
+  state: string;
+  to: string;
+}
+
+export interface WireLineageNode {
+  id: string;
+  kind: string;
+  label: string;
+  lane: string;
+  sublabel: string;
 }
 
 export interface WireListAgents {
@@ -523,6 +569,27 @@ export interface WireObjectSpec {
   selector_kind: string;
   selector_value: string;
   tags?: Array<string>;
+}
+
+export interface WireObservedComponent {
+  component: string;
+  in_window: boolean;
+  last_observed_secs?: number | null;
+  readable: boolean;
+}
+
+export interface WirePlanStep {
+  action?: string;
+  authority: string;
+  explanation?: string;
+  ordinal: number;
+  state: string;
+  title: string;
+}
+
+export interface WirePlanStepInput {
+  action?: string;
+  title: string;
 }
 
 export interface WirePolicyCreate {
@@ -760,6 +827,11 @@ export type WireReply =
   | { PolicyList: WirePolicyList; }
   | { PolicyDetail: WirePolicyDetail; }
   | { PolicyEffective: WirePolicyEffective; }
+  | { DetectSummary: WireDetectSummary; }
+  | { SocNarrative: WireSocNarrative; }
+  | { SocIncidentList: WireSocIncidentList; }
+  | { SocIncidentDetail: WireSocIncidentDetail; }
+  | { SocPlanMutated: WireSocPlanEffect; }
   | { PolicyMutated: WirePolicyMutated; };
 
 export type WireRequest =
@@ -809,6 +881,12 @@ export type WireRequest =
   | { PolicyListByZone: WirePolicyListQuery; }
   | { PolicyDetail: WirePolicyDetailQuery; }
   | { PolicyEffective: WirePolicyEffectiveQuery; }
+  | { DetectSummary: WireDetectSummaryQuery; }
+  | { SocNarrative: WireSocNarrativeQuery; }
+  | { SocIncidentList: WireSocIncidentListQuery; }
+  | { SocIncidentDetail: WireSocIncidentDetailQuery; }
+  | { SocPlanApprove: WireSocPlanApprove; }
+  | { SocPlanModify: WireSocPlanModify; }
   | { PolicyCreate: WirePolicyCreate; }
   | { PolicyEdit: WirePolicyEdit; }
   | { PolicyPublish: WirePolicyPublish; }
@@ -830,6 +908,79 @@ export interface WireRiskBand {
 export interface WireScopeMember {
   agent?: string | null;
   endpoint_cn: string;
+}
+
+export interface WireSocIncidentDetail {
+  edges: Array<WireLineageEdge>;
+  evidence: Array<string>;
+  narrative_ref?: string;
+  nodes: Array<WireLineageNode>;
+  plan: Array<WirePlanStep>;
+  plan_approved: boolean;
+  plan_revision: number;
+  refused: boolean;
+  row: WireIncidentRow;
+}
+
+export interface WireSocIncidentDetailQuery {
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
+export interface WireSocIncidentList {
+  explanation?: string;
+  refused: boolean;
+  rows: Array<WireIncidentRow>;
+}
+
+export interface WireSocIncidentListQuery {
+  limit: number;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
+export interface WireSocNarrative {
+  cited_evidence: Array<string>;
+  found: boolean;
+  headline: string;
+  impact: Array<string>;
+  input_hash: string;
+  model_ref: string;
+  narrative: Array<string>;
+  needs_human_review: boolean;
+  published: boolean;
+  refusal?: string | null;
+  response: Array<string>;
+  withheld: Array<WireWithheldClaim>;
+}
+
+export interface WireSocNarrativeQuery {
+  incident: string;
+  operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireSocPlanApprove {
+  at_revision: number;
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
+export interface WireSocPlanEffect {
+  approved: boolean;
+  enforcement_active: boolean;
+  incident: string;
+  revision: number;
+  steps: Array<WirePlanStep>;
+}
+
+export interface WireSocPlanModify {
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
+  steps: Array<WirePlanStepInput>;
 }
 
 export interface WireSourceVtzEdge {
@@ -856,6 +1007,19 @@ export interface WireTalkerUsage {
   flows: number;
   host: string;
   octets: number;
+}
+
+export interface WireTechniqueSummary {
+  active_candidate: number;
+  active_escalate: number;
+  anchor: string;
+  fires: number;
+  last_fired_secs: number;
+  muted_below_bar: number;
+  muted_demoted: number;
+  muted_fp_feedback: number;
+  muted_ratified: number;
+  raised: number;
 }
 
 export interface WireUsageOverview {
@@ -975,4 +1139,12 @@ export interface WireVtzTreeQuery {
   limit: number;
   operator?: OperatorDelegation | null;
   request_id: number;
+}
+
+export interface WireWithheldClaim {
+  cited: Array<string>;
+  explanation: string;
+  ruling: string;
+  section: string;
+  text: string;
 }

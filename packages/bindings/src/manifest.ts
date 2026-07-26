@@ -738,6 +738,91 @@ const policyCommands: readonly CommandBinding[] = [
   },
 ];
 
+// -- IP-CONSOLE-03 (SOC Operations, S3.1) the `soc.*` bindings ----------------------------------------
+//
+// The crdb SOC substrate (IP-SOC-SUBSTRATE SS.1-SS.N + SS.5, all landed and capstone-proven 2026-07-26)
+// and the verdict narrative (IP-SOC-VERDICT-NARRATIVE VN.7/VN.8, live-proven): SOC_INCIDENT_LIST /
+// SOC_INCIDENT_DETAIL / SOC_NARRATIVE reads and SOC_PLAN_APPROVE / SOC_PLAN_MODIFY audited commands are
+// all live engine ops, so each registers LIVE (the live :7878 drive folds into S3.N, the Objects/VTZ/
+// Policies precedent). The KPI strip rides DETECT_SUMMARY, already registered by the detection work.
+//
+// `soc.plan.propose` is the honest exception. The response-plan RECORD, its audited commit, and both
+// commands exist -- but crdb has no production PROPOSER (`propose_plan` has no caller outside tests),
+// so on a live box SOC_INCIDENT_DETAIL returns an EMPTY plan and there is nothing for an operator to
+// approve. Registering it PENDING is what keeps S3.6's response list and S3.8's button honest about
+// why they are empty, instead of the Console composing a plan client-side (INV-SOC-PLAN-DURABLE).
+
+const socReads: readonly ReadBinding[] = [
+  {
+    // The ranked decision queue, ordered by what blocks a human; refuse-not-truncate (crdb SS.4b).
+    id: bindingId('soc.incidents'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_incident_list_v1',
+    viewModel: 'SocIncidentRow',
+    status: { kind: 'live' },
+  },
+  {
+    // One incident assembled in ONE read -- lineage, evidence, plan, narrative ref (crdb SS.4b).
+    id: bindingId('soc.incident.detail'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_incident_detail_v1',
+    viewModel: 'SocIncidentDetail',
+    status: { kind: 'live' },
+  },
+  {
+    // The recorded verdict write-up. A READ, never a trigger: opening an incident must not generate
+    // (crdb VN.7b). Absent / refused / published stay distinguishable.
+    id: bindingId('soc.narrative'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_narrative_v1',
+    viewModel: 'VerdictNarrative',
+    status: { kind: 'live' },
+  },
+  {
+    // The engine-authored response plan. The record + commands are live; the PROPOSER that would put
+    // steps in it is not built, so the plan reads empty on a live box. Named honestly rather than
+    // filled client-side.
+    id: bindingId('soc.plan.propose'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_plan_propose_v1',
+    viewModel: 'ResponseStep',
+    status: {
+      kind: 'pending',
+      owningRepo: 'crdb',
+      gatingTask: 'IP-SOC-SUBSTRATE (a production plan proposer; propose_plan has no caller)',
+    },
+  },
+];
+
+const socCommands: readonly CommandBinding[] = [
+  {
+    // The operator authorizes a plan (crdb SS.5), audited under their principal. The effect carries
+    // enforcement_active: false -- an approval is an AUTHORIZATION, never a containment.
+    id: bindingId('soc.plan.approve'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_plan_approve_v1',
+    authz: 'operator:soc.respond',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Replace an unapproved plan's steps (crdb SS.5); refused once approved, bumps the revision so a
+    // stale approval refuses rather than applying to steps the operator never read.
+    id: bindingId('soc.plan.modify'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_plan_modify_v1',
+    authz: 'operator:soc.respond',
+    audited: true,
+    status: { kind: 'live' },
+  },
+];
+
 function register(target: Record<string, Binding>, entries: readonly Binding[]): void {
   for (const entry of entries) {
     target[entry.id] = entry;
@@ -757,6 +842,8 @@ register(registry, objectReads);
 register(registry, objectCommands);
 register(registry, policyReads);
 register(registry, policyCommands);
+register(registry, socReads);
+register(registry, socCommands);
 
 /** The Console binding registry. Keyed by `BindingId`; populated by the surface IPs. */
 export const bindings: BindingManifest = registry;

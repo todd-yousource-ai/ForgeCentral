@@ -25,14 +25,16 @@ const REGISTERED_PREFIXES = [
   'idam.',
   'objects.',
   'policies.',
+  'soc.',
 ];
 
 describe('no-stub contract (F0.8 shell)', () => {
   it('binds no surface data in the shell (the registry holds only registered surface contracts, unconsumed)', () => {
     // The registered contracts so far are the entity-drawer (entity.*), the Logs surface (logs.*), the
-    // Overview (overview.*), the VTZ governance surface (vtz.*), and the Users surface (users.* /
-    // groups.* / idam.*, UY.1); the shell renders none of them yet (each surface consumes its bindings
-    // in its own PR -- the Users table lands in UY.2, not UY.1).
+    // Overview (overview.*), the VTZ governance surface (vtz.*), the Users surface (users.* /
+    // groups.* / idam.*, UY.1), the Objects catalog (objects.*), the Policies authoring plane
+    // (policies.*), and the SOC Ops surface (soc.*, S3.1); the shell renders none of them yet (each
+    // surface consumes its bindings in its own PR -- the SOC queue lands in S3.4, not S3.1).
     const ids = Object.keys(bindings);
     expect(ids.length).toBeGreaterThan(0);
     expect(ids.every((id) => REGISTERED_PREFIXES.some((prefix) => id.startsWith(prefix)))).toBe(
