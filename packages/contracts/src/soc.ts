@@ -38,6 +38,7 @@
 // and a blank panel that says so is strictly better than a confident wrong one.
 
 import type {
+  WireDetectSummary,
   WireIncidentRow,
   WireLineageEdge,
   WireLineageNode,
@@ -305,6 +306,54 @@ export interface SocPlanEffect {
    * did not happen.
    */
   readonly enforcementActive: boolean;
+}
+
+/**
+ * The five KPI tiles (`TRD-CONSOLE-03` Section 4, zone 3), each bound to a real engine number.
+ *
+ * All five are LIVE as of crdb SS.1 + SS.3 + SS.3a. Two carry values that look like absences and are
+ * not, so the surface must render them as FACTS rather than as unavailable states:
+ *
+ *   * `autoContained` is **0** because the counter counts EXECUTION and enforcement is OFF (AG.7).
+ *     Zero means the box contained nothing. Unavailable would mean nobody knows. Rendering the first
+ *     as the second understates what the engine actually knows about itself.
+ *   * `eventsAnalyzed` can legitimately be 0 on a node that has admitted no telemetry in the window.
+ */
+export interface SocKpis {
+  /**
+   * Telemetry records admitted for evaluation in the window (crdb SS.3/SS.3a).
+   *
+   * The denominator: everything the engine looked at, whether or not it decoded, matched, or fired.
+   */
+  readonly eventsAnalyzed: number;
+  /** Rule firings the gate muted in the window (`muted_total`, FV.3b). */
+  readonly noiseCollapsed: number;
+  /**
+   * Total rule firings in the window -- `noiseCollapsed`'s denominator.
+   *
+   * Carried explicitly so the surface can show the ratio WITHOUT the reader having to guess what it
+   * is a ratio of. It is fires, NOT `eventsAnalyzed`: a firing is already a detection, so muting is
+   * measured against firings. Dividing muted by events analyzed would produce a far prettier number
+   * that means nothing.
+   */
+  readonly totalFirings: number;
+  /** Open episodes awaiting an analyst (`active_alerts`, FV.4). */
+  readonly materialIncidents: number;
+  /**
+   * Containments actually CARRIED OUT in the window (crdb SS.3).
+   *
+   * 0 on this deployment, and that is a fact, not a gap. See the interface docs.
+   */
+  readonly autoContained: number;
+  /**
+   * Open incidents blocking a person, derived from the queue's authority field.
+   *
+   * Derived from the SAME field the queue orders by, so the tile and the queue can never disagree
+   * about what is waiting on a human.
+   */
+  readonly decisionWaiting: number;
+  /** Whether the engine's detection plane is enabled at all. */
+  readonly detectionEnabled: boolean;
 }
 
 /** A step as the operator composes it for `SOC_PLAN_MODIFY` (title + action only). */
@@ -575,6 +624,35 @@ export function toWirePlanSteps(steps: readonly ResponseStepDraft[]): readonly W
     title: step.title,
     action: step.action ?? '',
   }));
+}
+
+/**
+ * Assemble the KPI strip from the detection summary and the resolved queue.
+ *
+ * `null` when the engine REFUSED the summary: a partially-computed strip would show some tiles
+ * against a window the others do not describe, and an operator reading five numbers assumes they
+ * share a denominator.
+ *
+ * `decisionWaiting` counts the queue rather than reading a dedicated engine field, because there is
+ * no such field -- and deriving it from the same authority the queue orders by is what makes the two
+ * panels incapable of disagreeing.
+ */
+export function toSocKpis(
+  summary: WireDetectSummary,
+  queue: readonly SocIncidentRow[],
+): SocKpis | null {
+  if (summary.summary_refused) {
+    return null;
+  }
+  return {
+    eventsAnalyzed: summary.events_analyzed,
+    noiseCollapsed: summary.muted_total,
+    totalFirings: summary.techniques.reduce((total, row) => total + row.fires, 0),
+    materialIncidents: summary.active_alerts,
+    autoContained: summary.auto_contained,
+    decisionWaiting: queue.filter((row) => isWaitingOnAHuman(row.authority)).length,
+    detectionEnabled: summary.enabled,
+  };
 }
 
 /** Whether this authority state is blocking a person (the `Decision Waiting` KPI's predicate). */

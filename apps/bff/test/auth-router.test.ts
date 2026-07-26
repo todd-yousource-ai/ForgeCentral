@@ -45,6 +45,7 @@ const unusedClient: CrucibleClient = {
   policyDetail: () => Promise.reject(new Error('unused')),
   policyEffective: () => Promise.reject(new Error('unused')),
   socIncidentList: () => Promise.reject(new Error('unused')),
+  detectSummary: () => Promise.reject(new Error('unused')),
   socIncidentDetail: () => Promise.reject(new Error('unused')),
   socNarrative: () => Promise.reject(new Error('unused')),
   policyCreate: () => Promise.reject(new Error('unused')),

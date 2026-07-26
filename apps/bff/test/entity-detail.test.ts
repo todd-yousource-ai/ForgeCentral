@@ -46,6 +46,7 @@ function engineWith(parts: {
     policyDetail: unused,
     policyEffective: unused,
     socIncidentList: unused,
+    detectSummary: unused,
     socIncidentDetail: unused,
     socNarrative: unused,
     policyCreate: unused,

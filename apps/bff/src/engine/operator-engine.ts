@@ -50,6 +50,8 @@ import type {
   WirePolicyEffective,
   WirePolicyEffectiveQuery,
   WirePolicyList,
+  WireDetectSummary,
+  WireDetectSummaryQuery,
   WirePolicyListQuery,
   WireSocIncidentDetail,
   WireSocIncidentDetailQuery,
@@ -100,6 +102,7 @@ export type EngineAction =
   | 'listGroups'
   | 'objectList'
   | 'objectDetail'
+  | 'detectSummary'
   | 'socIncidentList'
   | 'socIncidentDetail'
   | 'socNarrative'
@@ -240,6 +243,12 @@ export interface OperatorEngine {
     request: WireObjectDetailQuery,
     opts?: EngineCallOptions,
   ): Promise<WireObjectDetail>;
+  /** Read the tenant's detection summary (DETECT_SUMMARY, FV.6) on behalf of `principal`. */
+  detectSummary(
+    principal: OperatorPrincipal,
+    request: WireDetectSummaryQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireDetectSummary>;
   /** Read the ranked SOC decision queue (SOC_INCIDENT_LIST, SS.4b) on behalf of `principal`. */
   socIncidentList(
     principal: OperatorPrincipal,
@@ -540,6 +549,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'objectDetail', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.objectDetail({ ...request, operator }, opts);
+    },
+    detectSummary: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'detectSummary', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.detectSummary({ ...request, operator }, opts);
     },
     socIncidentList: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'socIncidentList', request.request_id));

@@ -104,6 +104,7 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // The SOC Ops reads (SOC_INCIDENT_LIST / SOC_INCIDENT_DETAIL, crdb SS.4b; SOC_NARRATIVE, VN.7b)
       // ride the QuerySubmit opcode too; the engine discriminates them by their CBOR enum tag and
       // routes them in the same read allowlist as the other surface reads.
+      'DetectSummary' in request ||
       'SocIncidentList' in request ||
       'SocIncidentDetail' in request ||
       'SocNarrative' in request)

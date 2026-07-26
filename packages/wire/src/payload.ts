@@ -26,6 +26,7 @@ import type {
   WireObjectSpec,
   WirePolicyCreate,
   WirePolicyDelete,
+  WireDetectSummaryQuery,
   WirePolicyDetailQuery,
   WireSocIncidentDetailQuery,
   WireSocIncidentListQuery,
@@ -500,6 +501,13 @@ function policyListToCbor(request: WirePolicyListQuery): unknown {
 }
 
 /** `POLICY_DETAIL` (PS.5). Rust struct order: request_id, vtz, id, operator?. */
+/** `DETECT_SUMMARY` (crdb FV.6): the SOC detection summary. Rust struct order: request_id, operator?. */
+function detectSummaryToCbor(request: WireDetectSummaryQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /**
  * `SOC_INCIDENT_LIST` (crdb SS.4b): the ranked decision queue. Rust struct order: request_id, limit,
  * operator?.
@@ -751,6 +759,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('PolicyDelete' in request) {
     return encode({ PolicyDelete: policyDeleteToCbor(request.PolicyDelete) });
+  }
+  if ('DetectSummary' in request) {
+    return encode({ DetectSummary: detectSummaryToCbor(request.DetectSummary) });
   }
   if ('SocIncidentList' in request) {
     return encode({ SocIncidentList: socIncidentListToCbor(request.SocIncidentList) });

@@ -74,6 +74,7 @@ import {
   resolveIncidentDetail,
   resolveIncidentQueue,
   resolveNarrative,
+  resolveSocKpis,
 } from './engine/soc.js';
 import {
   resolveIdamConfigure,
@@ -1411,7 +1412,12 @@ async function handleSoc(
   path: string,
   res: ServerResponse,
 ): Promise<boolean> {
-  const reads = new Set(['/api/soc/incidents', '/api/soc/incident', '/api/soc/narrative']);
+  const reads = new Set([
+    '/api/soc/kpis',
+    '/api/soc/incidents',
+    '/api/soc/incident',
+    '/api/soc/narrative',
+  ]);
   if (!reads.has(path)) return false;
   const session = deps.authRouter?.resolveSession(req);
   if (!session) {
@@ -1425,16 +1431,16 @@ async function handleSoc(
   const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
   const incident = params.get('id')?.trim();
   // The per-incident reads need their id up front, so a malformed request never reaches the engine.
-  if (path !== '/api/soc/incidents' && !incident) {
+  if (path !== '/api/soc/incidents' && path !== '/api/soc/kpis' && !incident) {
     sendJson(res, 400, { error: 'bad_request' });
     return true;
   }
   const principal = principalFromSession(session, activeTenantOverride(req));
   const prefix = socCachePrefix(principal.tenant);
-  const cacheKey =
-    path === '/api/soc/incidents'
-      ? `${prefix}incidents`
-      : `${prefix}${path === '/api/soc/incident' ? 'detail' : 'narrative'}:${incident ?? ''}`;
+  const perIncident = path === '/api/soc/incident' || path === '/api/soc/narrative';
+  const cacheKey = perIncident
+    ? `${prefix}${path === '/api/soc/incident' ? 'detail' : 'narrative'}:${incident ?? ''}`
+    : `${prefix}${path === '/api/soc/kpis' ? 'kpis' : 'incidents'}`;
   const cached = deps.cache.get(cacheKey, SOC_CACHE_VERSION);
   if (cached !== undefined) {
     sendJson(res, 200, cached);
@@ -1443,6 +1449,12 @@ async function handleSoc(
   const engine = deps.operatorEngine;
   const opts = { timeoutMs: deps.config.requestTimeoutMs };
   try {
+    if (path === '/api/soc/kpis') {
+      const view = await resolveSocKpis(engine, principal, opts);
+      deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
+      sendJson(res, 200, view);
+      return true;
+    }
     if (path === '/api/soc/incidents') {
       const view = await resolveIncidentQueue(engine, principal, opts);
       deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);

@@ -33,6 +33,7 @@ import type {
   WirePolicyDetail,
   WirePolicyEffective,
   WirePolicyList,
+  WireDetectSummary,
   WirePolicyMutated,
   WireSocIncidentDetail,
   WireSocIncidentList,
@@ -158,6 +159,14 @@ export function replyToObjectDetail(reply: WireReply): WireObjectDetail {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for an object-detail read');
+}
+
+/** Map an engine `WireReply` to `WireDetectSummary` (DETECT_SUMMARY, crdb FV.6). */
+export function replyToDetectSummary(reply: WireReply): WireDetectSummary {
+  if (typeof reply === 'object' && 'DetectSummary' in reply) return reply.DetectSummary;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a detect-summary read');
 }
 
 /** Map an engine `WireReply` to `WireSocIncidentList` (SOC_INCIDENT_LIST, crdb SS.4b). */
@@ -654,6 +663,17 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToObjectMutated(await dispatch(transport, { ObjectDelete: request })),
+      opts,
+    );
+  }
+
+  async detectSummary(
+    request: Parameters<CrucibleClient['detectSummary']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireDetectSummary> {
+    return this.call(
+      async (transport) =>
+        replyToDetectSummary(await dispatch(transport, { DetectSummary: request })),
       opts,
     );
   }

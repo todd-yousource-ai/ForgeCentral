@@ -27,6 +27,23 @@ async function mockBff(page: Page, authed: boolean): Promise<void> {
           body: JSON.stringify({ error: 'unauthenticated' }),
         }),
   );
+  // The SOC Ops shell reads its KPI strip (S3.3). A mocked quiet window: real numbers, none fabricated,
+  // and auto_contained 0 because enforcement is off -- which the surface renders as a FACT, not a gap.
+  await page.route('**/api/soc/kpis', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        eventsAnalyzed: 428_000,
+        noiseCollapsed: 97,
+        totalFirings: 100,
+        materialIncidents: 0,
+        autoContained: 0,
+        decisionWaiting: 0,
+        detectionEnabled: true,
+      }),
+    }),
+  );
   // The home Overview surface reads its connectivity Sankey; a mocked empty tenant renders the honest empty
   // state (never a live engine, never fabricated data).
   await page.route('**/api/overview/sankey*', (route) =>
@@ -66,12 +83,22 @@ test('authenticated: the shell, the IA, empty states, and the drawer frame', asy
   await expect(page.getByText('No connectivity observed')).toBeVisible();
   await expect(page.locator('.fcx-topbar').getByText('Live')).toBeVisible();
 
-  // One-click navigation to a still-placeholder destination (SOC Ops, the renamed Dashboards per the
-  // 2026-07-24 IA revision), an honest empty placeholder. The Overview unmounts, so it stops driving
-  // freshness and the shell indicator returns to the deferred "Not live". (Policies is now a real
-  // surface, P5.3; SOC Ops remains a placeholder until its phase lands.)
+  // One-click navigation to a still-placeholder destination (Agent Ops), an honest empty placeholder.
+  // The Overview unmounts, so it stops driving freshness and the shell indicator returns to the
+  // deferred "Not live". (SOC Ops became a real surface with S3.3; Agent Ops is still awaiting its
+  // phase, so it is the placeholder this assertion uses now.)
+  await rail.getByRole('link', { name: 'Agent Ops' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Agent Ops' })).toBeVisible();
+  await expect(page.getByText('No Agent Ops data yet')).toBeVisible();
+  await expect(page.getByText('Not live')).toBeVisible();
+
+  // SOC Ops now renders its real shell against the live KPI read (S3.3): every tile is an engine
+  // number, and Auto-Contained shows 0 WITH its reason rather than an unavailable state.
   await rail.getByRole('link', { name: 'SOC Ops' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'SOC Ops' })).toBeVisible();
-  await expect(page.getByText('No SOC Ops data yet')).toBeVisible();
-  await expect(page.getByText('Not live')).toBeVisible();
+  await expect(page.getByLabel('Events Analyzed')).toContainText('428,000');
+  const autoContained = page.getByLabel('Auto-Contained');
+  await expect(autoContained).toContainText('0');
+  await expect(autoContained).toContainText(/enforcement off/i);
+  await expect(page.getByLabel('Noise Collapsed')).toContainText('97% of 100 firings');
 });
