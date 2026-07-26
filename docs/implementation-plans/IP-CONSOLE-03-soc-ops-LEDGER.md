@@ -6,17 +6,19 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-07-26): S3.1 -> S3.7 LANDED. Next action = S3.8**, the commands: `Approve Full
-  Response` / `Modify Plan` over crdb SS.5, mounted ABOVE the read-only 405 gate (the P5.4 gotcha),
-  confirm-gated, with 409/400/403 mapping and a cache drop. The controls already exist on the verdict
-  panel, present and DISABLED with their reason -- S3.8 wires them.
-- **S3.8 must render `enforcement_active: false`, never success-as-containment.** The reply carries
-  it and each approved containment step comes back `refused` with its reason. A button that flashed
-  "contained" on a 200 would tell an analyst the agent was stopped while it is still running.
-- **S3.8 cannot be live-proven end to end until crdb ships a plan PROPOSER.** There is no plan to
-  approve on a live box, so the commands will 409 (`Conflict`, "no plan"). Build and unit/e2e-test the
-  path; expect the S3.N live drive to show the refusal until the proposer lands. That is honest, and
-  the empty-response copy in S3.6 already says so on screen.
+- **State (2026-07-26): S3.1 -> S3.8 LANDED. Next and LAST action = S3.N**, the capstone: Playwright
+  journeys for every `TRD-CONSOLE-03` Section 8 task within its click budget, an edge-state
+  distinctness assertion, the narrative-unavailable journey, a no-stub sweep, and the LIVE DRIVE on
+  the box over the deployed BFF/SPA.
+- **What the live drive will honestly show, and must not be "fixed" into looking better:** an empty
+  Coordinated response and a disabled Approve button (no crdb plan PROPOSER exists), `Auto-Contained`
+  0, `Raw Telemetry` and `Audit Trail` as explicit not-availables, and nothing ever `verified` in the
+  lineage graph. Every one of those is a recorded, deliberate absence -- the drive proves the surface
+  tells the truth about a box in this state.
+- **THE OUTSTANDING CROSS-REPO ITEM is the crdb plan proposer.** `propose_plan` still has no
+  production caller, so `SOC_INCIDENT_DETAIL` returns an empty plan on a live box. It is the one
+  thing that would turn S3.6's empty response list and S3.8's disabled Approve into a working
+  approval path, and `Modify Plan` enables the moment it lands.
 - **Two dock panes are PENDING bindings** (`soc.telemetry.raw`, `soc.audit.trail`). The contract test
   fails a RELEASE build that references a pending binding -- they are referenced only as
   not-available renders, which is the intended use, but keep that in mind at release.
@@ -74,7 +76,7 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | S3.5 | A3, A4 | LANDED | `7278250` | three lanes laid out by causal depth, **NO graph library** (DEPENDENCY-POLICY: bounded 64-node DAG in fixed lanes = one BFS + arithmetic; React Flow + ELK would also be untestable in jsdom), four edge states distinct by STROKE not just color + all four named in the legend incl. the unreachable `verified`, NOT the prototype's six-column chain (test asserts those names appear nowhere), 3-level disclosure that adds genuinely different things, and **neither disclosure nor node scoping refetches** (2 tests assert the fetch count). Node scope drops when the incident changes. 10 tests |
 | S3.6 | A5-A9, A2 | LANDED | `a082599` | three narrative states rendered DISTINCTLY (absent / refused-with-reason / published), prose always labelled Generated + artifact-linked, **no model-consensus percentage** (test asserts no `%` and no "models agree"), CONTRADICTIONS technique-scoped and says so, **Unavailable != 0** for an unread summary, Business impact an explicit absence naming the missing asset-value plane, unproposed response explains WHY it is empty, controls present + disabled. Contract gained `SocSuppressingInputs` on the KPI payload (no extra read; lookup tolerates a payload without it). 11 tests |
 | S3.7 | A3 | LANDED | `71b92e0` | 5 panes + the scope line, all over ONE payload (tab switches cost no read; the narrative shares the verdict's query key). **Bindings checked first: 2 of 5 have no per-incident read** -- Raw Telemetry (nothing maps legs to records; LOG_EXPLAIN keys on a decision id) and Audit Trail (entries are live-stream only), both explicit not-availables + PENDING bindings. Audit copy states acts ARE audited engine-side so an empty pane cannot read as unaudited. Timeline shows the 2 real instants and refuses to interpolate. Evidence narrows to the scoped node and shows NOTHING when the scope matches no leg. 10 tests |
-| S3.8 | A11 | PLANNED | -- | approve/modify over crdb SS.5 (`SOC_PLAN_APPROVE`/`SOC_PLAN_MODIFY`), above the 405 gate, confirm-gated. Must render `enforcement_active: false` + the per-step `refused` reason, never success-as-containment. Renders empty until a crdb plan PROPOSER lands |
+| S3.8 | A11 | LANDED | `b4d9199` | Approve over SS.5, confirm-gated, audited. **Mounted ABOVE the 405 gate with a dispatch-level regression test** (unauthenticated POST must 401, never 405 -- the P5.4 defect). **`enforcement_active` survives the whole chain and the success copy never says "contained"** (asserted). The shown revision is submitted; a missing one is 400, never defaulted to 0. Approve is disabled with a reason when there is no plan or it is already approved. Typed refusals 409/400/403, cache dropped on success. `toResponseStepDrafts` reads title+action ONLY (seam test asserts the submitted map has exactly those keys). **Modify stays disabled**: its whole path is built + tested, but with no proposer there is nothing to edit. 11 tests |
 | S3.N | A1-A12 | PLANNED | -- | Playwright journeys + the live drive on the box (real incident, real gemma4 narrative) |
 
 ## Prerequisites (tracked)
