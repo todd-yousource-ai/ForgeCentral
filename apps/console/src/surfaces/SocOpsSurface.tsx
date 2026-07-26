@@ -23,6 +23,7 @@ import { AmbientBackdrop, GlassPanel, KpiCard, TabStrip } from '@forge/design';
 import type { SocKpis } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { SocDecisionQueue } from './SocDecisionQueue.js';
 import { useSocKpis } from './useSoc.js';
 
 /** The focus tabs. `incidents` is this IP's scope; the rest are named honestly as not yet built. */
@@ -135,6 +136,8 @@ function CommandHeader({ kpis }: { readonly kpis: SocKpis | undefined }): ReactE
 
 export function SocOpsSurface(): ReactElement {
   const [focus, setFocus] = useState<string>('incidents');
+  // Lifted here because the queue's selection scopes every other panel on the surface.
+  const [selected, setSelected] = useState<string | null>(null);
   const kpis = useSocKpis();
 
   return (
@@ -176,16 +179,32 @@ export function SocOpsSurface(): ReactElement {
           ) : null}
           {kpis.data ? <KpiStrip kpis={kpis.data} /> : null}
 
-          <GlassPanel
-            ariaLabel="Decision queue"
-            header={<span>Decision Queue</span>}
-            className="fcx-socops__queue"
-          >
-            <EmptyState
-              title="The queue lands in the next step"
-              hint="The ranked incident queue, its lineage graph, the verdict panel and the investigation dock each ship in their own step against the live reads this shell already talks to."
-            />
-          </GlassPanel>
+          <div className="fcx-socops__work">
+            <GlassPanel
+              ariaLabel="Decision queue"
+              header={<span>Decision Queue</span>}
+              className="fcx-socops__queue"
+            >
+              <SocDecisionQueue selected={selected} onSelect={setSelected} />
+            </GlassPanel>
+
+            <GlassPanel
+              ariaLabel="Incident detail"
+              header={<span>{selected === null ? 'Incident' : selected}</span>}
+              className="fcx-socops__detail"
+            >
+              {/* Selection is live and drives this region; the panels that fill it (lineage graph,
+                  verdict, dock) ship in S3.5-S3.7 against the detail read that already exists. */}
+              <EmptyState
+                title={selected === null ? 'Select an incident' : 'The detail panels land next'}
+                hint={
+                  selected === null
+                    ? 'The queue is ordered by what each incident needs from a human. Work it top-down.'
+                    : 'The lineage graph, the verdict panel and the investigation dock each ship in their own step, all from the single detail read this surface already talks to.'
+                }
+              />
+            </GlassPanel>
+          </div>
         </>
       )}
     </section>
