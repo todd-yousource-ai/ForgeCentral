@@ -26,12 +26,14 @@
 import type {
   SocIncidentDetail,
   SocIncidentRow,
+  SocKpis,
   VerdictNarrative,
+  WireDetectSummaryQuery,
   WireSocIncidentDetailQuery,
   WireSocIncidentListQuery,
   WireSocNarrativeQuery,
 } from '@forge/contracts';
-import { toIncidentDetail, toIncidentQueue, toVerdictNarrative } from '@forge/contracts';
+import { toIncidentDetail, toIncidentQueue, toSocKpis, toVerdictNarrative } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -135,4 +137,32 @@ export async function resolveNarrative(
     throw new SocUnavailableError('a withheld claim carries an unknown ruling');
   }
   return narrative;
+}
+
+/**
+ * Resolve the five KPI tiles.
+ *
+ * Reads BOTH the detection summary and the queue, because `Decision Waiting` has no engine field of
+ * its own -- it is derived from the same authority the queue orders by, which is what makes the tile
+ * and the queue incapable of disagreeing.
+ *
+ * A refused summary is `SocUnavailableError`, never a partial strip: five numbers read as sharing a
+ * window, and showing three of them against a window the other two do not describe is the kind of
+ * quiet wrongness this surface exists to avoid.
+ */
+export async function resolveSocKpis(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  opts?: EngineCallOptions,
+): Promise<SocKpis> {
+  const summaryRequest: WireDetectSummaryQuery = { request_id: requestId() };
+  const [summary, queue] = await Promise.all([
+    engine.detectSummary(principal, summaryRequest, opts),
+    resolveIncidentQueue(engine, principal, opts),
+  ]);
+  const kpis = toSocKpis(summary, queue);
+  if (kpis === null) {
+    throw new SocUnavailableError('the engine refused the detection summary');
+  }
+  return kpis;
 }

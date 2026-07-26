@@ -41,6 +41,8 @@ import type {
   WirePolicyCreate,
   WirePolicyDelete,
   WirePolicyDetail,
+  WireDetectSummary,
+  WireDetectSummaryQuery,
   WirePolicyDetailQuery,
   WireSocIncidentDetail,
   WireSocIncidentDetailQuery,
@@ -141,6 +143,12 @@ export interface CrucibleClient {
   idamConfigure(request: WireIdamConfigure, opts?: EngineCallOptions): Promise<WireLugProvisioned>;
   /** Read one named object + its resolved members (OBJECT_DETAIL, crdb OB.3). */
   objectDetail(request: WireObjectDetailQuery, opts?: EngineCallOptions): Promise<WireObjectDetail>;
+  /** Read the tenant's SOC detection summary (DETECT_SUMMARY, crdb FV.6): the KPI totals + the
+   * per-technique ATT&CK breakdown, projected from the same assembly the admin surface serves. */
+  detectSummary(
+    request: WireDetectSummaryQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireDetectSummary>;
   /** Read the ranked SOC decision queue (SOC_INCIDENT_LIST, crdb SS.4b): ordered by what an incident
    * needs from a human, refuse-not-truncate at its ceiling, tenant-private. */
   socIncidentList(

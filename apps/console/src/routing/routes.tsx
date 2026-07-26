@@ -6,7 +6,7 @@ import { EmptyState } from '../states/States.js';
 import { LogsSurface } from '../surfaces/LogsSurface.js';
 import { OverviewSurface } from '../surfaces/OverviewSurface.js';
 import { SurfacePlaceholder } from '../surfaces/SurfacePlaceholder.js';
-import { SocOpsPreview } from '../surfaces/SocOpsPreview.js';
+import { SocOpsSurface } from '../surfaces/SocOpsSurface.js';
 import { VtzSurface } from '../surfaces/VtzSurface.js';
 import { UsersSurface } from '../surfaces/UsersSurface.js';
 import { ObjectsSurface } from '../surfaces/ObjectsSurface.js';
@@ -30,7 +30,7 @@ const SURFACES: Readonly<Record<string, ReactElement>> = {
   // NOT a real surface: the SOC Ops VISUAL-LANGUAGE proof (glass + ambient over the honeycomb). It
   // keeps the full placeholder honesty contract (the canonical empty state, zero fabricated values)
   // and is intentionally absent from REAL_SURFACES until the SOC Ops phase binds real reads.
-  'soc-ops': <SocOpsPreview />,
+  'soc-ops': <SocOpsSurface />,
 };
 
 function NotFound(): ReactElement {

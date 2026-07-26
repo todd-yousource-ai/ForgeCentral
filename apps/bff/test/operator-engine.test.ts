@@ -126,6 +126,22 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ policies: [] });
     },
+    detectSummary: (req) => {
+      calls.push(`detectSummary:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        enabled: true,
+        techniques_lit: 0,
+        muted_total: 0,
+        active_alerts: 0,
+        events_analyzed: 0,
+        auto_contained: 0,
+        summary_refused: false,
+        techniques: [],
+        observed_components: [],
+        observed_in_window: 0,
+      });
+    },
     socIncidentList: (req) => {
       calls.push(`socIncidentList:${String(req.request_id)}`);
       reads.push(req);
