@@ -908,6 +908,82 @@
       ],
       "type": "object"
     },
+    "WireDetectSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "active_alerts": {
+          "type": "integer"
+        },
+        "auto_contained": {
+          "type": "integer"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "events_analyzed": {
+          "type": "integer"
+        },
+        "muted_total": {
+          "type": "integer"
+        },
+        "observed_components": {
+          "items": {
+            "$ref": "#/$defs/WireObservedComponent"
+          },
+          "type": "array"
+        },
+        "observed_in_window": {
+          "type": "integer"
+        },
+        "summary_refused": {
+          "type": "boolean"
+        },
+        "techniques": {
+          "items": {
+            "$ref": "#/$defs/WireTechniqueSummary"
+          },
+          "type": "array"
+        },
+        "techniques_lit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "techniques_lit",
+        "muted_total",
+        "active_alerts",
+        "summary_refused",
+        "techniques",
+        "observed_components",
+        "observed_in_window",
+        "events_analyzed",
+        "auto_contained"
+      ],
+      "type": "object"
+    },
+    "WireDetectSummaryQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
     "WireDomainPosture": {
       "additionalProperties": false,
       "properties": {
@@ -1378,6 +1454,106 @@
       },
       "required": [
         "provider"
+      ],
+      "type": "object"
+    },
+    "WireIncidentRow": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "type": "string"
+        },
+        "authority": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "evidence_count": {
+          "type": "integer"
+        },
+        "finding": {
+          "type": "string"
+        },
+        "incident_id": {
+          "type": "string"
+        },
+        "last_seen": {
+          "type": "integer"
+        },
+        "opened_at": {
+          "type": "integer"
+        },
+        "posture": {
+          "type": "string"
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "rule_id",
+        "anchor",
+        "subject",
+        "finding",
+        "authority",
+        "posture",
+        "confidence",
+        "opened_at",
+        "last_seen",
+        "evidence_count"
+      ],
+      "type": "object"
+    },
+    "WireLineageEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "state"
+      ],
+      "type": "object"
+    },
+    "WireLineageNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "lane": {
+          "type": "string"
+        },
+        "sublabel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "lane",
+        "kind",
+        "label",
+        "sublabel"
       ],
       "type": "object"
     },
@@ -2233,6 +2409,81 @@
         "selector_value",
         "description",
         "lifecycle"
+      ],
+      "type": "object"
+    },
+    "WireObservedComponent": {
+      "additionalProperties": false,
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "in_window": {
+          "type": "boolean"
+        },
+        "last_observed_secs": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "component",
+        "in_window",
+        "readable"
+      ],
+      "type": "object"
+    },
+    "WirePlanStep": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "authority": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "ordinal": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ordinal",
+        "title",
+        "authority",
+        "state"
+      ],
+      "type": "object"
+    },
+    "WirePlanStepInput": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
       ],
       "type": "object"
     },
@@ -3778,6 +4029,66 @@
         {
           "additionalProperties": false,
           "properties": {
+            "DetectSummary": {
+              "$ref": "#/$defs/WireDetectSummary"
+            }
+          },
+          "required": [
+            "DetectSummary"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocNarrative": {
+              "$ref": "#/$defs/WireSocNarrative"
+            }
+          },
+          "required": [
+            "SocNarrative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocIncidentList": {
+              "$ref": "#/$defs/WireSocIncidentList"
+            }
+          },
+          "required": [
+            "SocIncidentList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocIncidentDetail": {
+              "$ref": "#/$defs/WireSocIncidentDetail"
+            }
+          },
+          "required": [
+            "SocIncidentDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocPlanMutated": {
+              "$ref": "#/$defs/WireSocPlanEffect"
+            }
+          },
+          "required": [
+            "SocPlanMutated"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "PolicyMutated": {
               "$ref": "#/$defs/WirePolicyMutated"
             }
@@ -4501,6 +4812,78 @@
         {
           "additionalProperties": false,
           "properties": {
+            "DetectSummary": {
+              "$ref": "#/$defs/WireDetectSummaryQuery"
+            }
+          },
+          "required": [
+            "DetectSummary"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocNarrative": {
+              "$ref": "#/$defs/WireSocNarrativeQuery"
+            }
+          },
+          "required": [
+            "SocNarrative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocIncidentList": {
+              "$ref": "#/$defs/WireSocIncidentListQuery"
+            }
+          },
+          "required": [
+            "SocIncidentList"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocIncidentDetail": {
+              "$ref": "#/$defs/WireSocIncidentDetailQuery"
+            }
+          },
+          "required": [
+            "SocIncidentDetail"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocPlanApprove": {
+              "$ref": "#/$defs/WireSocPlanApprove"
+            }
+          },
+          "required": [
+            "SocPlanApprove"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocPlanModify": {
+              "$ref": "#/$defs/WireSocPlanModify"
+            }
+          },
+          "required": [
+            "SocPlanModify"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "PolicyCreate": {
               "$ref": "#/$defs/WirePolicyCreate"
             }
@@ -4666,6 +5049,304 @@
       ],
       "type": "object"
     },
+    "WireSocIncidentDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/WireLineageEdge"
+          },
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "narrative_ref": {
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/WireLineageNode"
+          },
+          "type": "array"
+        },
+        "plan": {
+          "items": {
+            "$ref": "#/$defs/WirePlanStep"
+          },
+          "type": "array"
+        },
+        "plan_approved": {
+          "type": "boolean"
+        },
+        "plan_revision": {
+          "type": "integer"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "row": {
+          "$ref": "#/$defs/WireIncidentRow"
+        }
+      },
+      "required": [
+        "row",
+        "nodes",
+        "edges",
+        "evidence",
+        "plan",
+        "plan_revision",
+        "plan_approved",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocIncidentDetailQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocIncidentList": {
+      "additionalProperties": false,
+      "properties": {
+        "explanation": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/WireIncidentRow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "rows",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocIncidentListQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "type": "integer"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "WireSocNarrative": {
+      "additionalProperties": false,
+      "properties": {
+        "cited_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "headline": {
+          "type": "string"
+        },
+        "impact": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "input_hash": {
+          "type": "string"
+        },
+        "model_ref": {
+          "type": "string"
+        },
+        "narrative": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "needs_human_review": {
+          "type": "boolean"
+        },
+        "published": {
+          "type": "boolean"
+        },
+        "refusal": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "response": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "withheld": {
+          "items": {
+            "$ref": "#/$defs/WireWithheldClaim"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "found",
+        "published",
+        "headline",
+        "narrative",
+        "impact",
+        "response",
+        "cited_evidence",
+        "withheld",
+        "needs_human_review",
+        "model_ref",
+        "input_hash"
+      ],
+      "type": "object"
+    },
+    "WireSocNarrativeQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OperatorDelegation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocPlanApprove": {
+      "additionalProperties": false,
+      "properties": {
+        "at_revision": {
+          "type": "integer"
+        },
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident",
+        "at_revision"
+      ],
+      "type": "object"
+    },
+    "WireSocPlanEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "approved": {
+          "type": "boolean"
+        },
+        "enforcement_active": {
+          "type": "boolean"
+        },
+        "incident": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/WirePlanStep"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "incident",
+        "revision",
+        "approved",
+        "steps",
+        "enforcement_active"
+      ],
+      "type": "object"
+    },
+    "WireSocPlanModify": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/WirePlanStepInput"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident",
+        "steps"
+      ],
+      "type": "object"
+    },
     "WireSourceVtzEdge": {
       "additionalProperties": false,
       "properties": {
@@ -4773,6 +5454,54 @@
         "host",
         "octets",
         "flows"
+      ],
+      "type": "object"
+    },
+    "WireTechniqueSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "active_candidate": {
+          "type": "integer"
+        },
+        "active_escalate": {
+          "type": "integer"
+        },
+        "anchor": {
+          "type": "string"
+        },
+        "fires": {
+          "type": "integer"
+        },
+        "last_fired_secs": {
+          "type": "integer"
+        },
+        "muted_below_bar": {
+          "type": "integer"
+        },
+        "muted_demoted": {
+          "type": "integer"
+        },
+        "muted_fp_feedback": {
+          "type": "integer"
+        },
+        "muted_ratified": {
+          "type": "integer"
+        },
+        "raised": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "anchor",
+        "fires",
+        "raised",
+        "muted_below_bar",
+        "muted_fp_feedback",
+        "muted_ratified",
+        "muted_demoted",
+        "active_candidate",
+        "active_escalate",
+        "last_fired_secs"
       ],
       "type": "object"
     },
@@ -5332,6 +6061,37 @@
       "required": [
         "request_id",
         "limit"
+      ],
+      "type": "object"
+    },
+    "WireWithheldClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "cited": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "ruling": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "section",
+        "text",
+        "ruling",
+        "explanation",
+        "cited"
       ],
       "type": "object"
     }
