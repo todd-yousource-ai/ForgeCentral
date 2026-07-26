@@ -34,6 +34,9 @@ import type {
   WirePolicyEffective,
   WirePolicyList,
   WirePolicyMutated,
+  WireSocIncidentDetail,
+  WireSocIncidentList,
+  WireSocNarrative,
   WirePrincipalList,
   WireConnectionList,
   WireConnectivityGraph,
@@ -155,6 +158,30 @@ export function replyToObjectDetail(reply: WireReply): WireObjectDetail {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for an object-detail read');
+}
+
+/** Map an engine `WireReply` to `WireSocIncidentList` (SOC_INCIDENT_LIST, crdb SS.4b). */
+export function replyToSocIncidentList(reply: WireReply): WireSocIncidentList {
+  if (typeof reply === 'object' && 'SocIncidentList' in reply) return reply.SocIncidentList;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC incident-list read');
+}
+
+/** Map an engine `WireReply` to `WireSocIncidentDetail` (SOC_INCIDENT_DETAIL, crdb SS.4b). */
+export function replyToSocIncidentDetail(reply: WireReply): WireSocIncidentDetail {
+  if (typeof reply === 'object' && 'SocIncidentDetail' in reply) return reply.SocIncidentDetail;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC incident-detail read');
+}
+
+/** Map an engine `WireReply` to `WireSocNarrative` (SOC_NARRATIVE, crdb VN.7b). */
+export function replyToSocNarrative(reply: WireReply): WireSocNarrative {
+  if (typeof reply === 'object' && 'SocNarrative' in reply) return reply.SocNarrative;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC narrative read');
 }
 
 /** Map an engine `WireReply` to `WirePolicyList` (POLICY_LIST_BY_ZONE, crdb PS.5). */
@@ -627,6 +654,39 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToObjectMutated(await dispatch(transport, { ObjectDelete: request })),
+      opts,
+    );
+  }
+
+  async socIncidentList(
+    request: Parameters<CrucibleClient['socIncidentList']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocIncidentList> {
+    return this.call(
+      async (transport) =>
+        replyToSocIncidentList(await dispatch(transport, { SocIncidentList: request })),
+      opts,
+    );
+  }
+
+  async socIncidentDetail(
+    request: Parameters<CrucibleClient['socIncidentDetail']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocIncidentDetail> {
+    return this.call(
+      async (transport) =>
+        replyToSocIncidentDetail(await dispatch(transport, { SocIncidentDetail: request })),
+      opts,
+    );
+  }
+
+  async socNarrative(
+    request: Parameters<CrucibleClient['socNarrative']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocNarrative> {
+    return this.call(
+      async (transport) =>
+        replyToSocNarrative(await dispatch(transport, { SocNarrative: request })),
       opts,
     );
   }

@@ -100,7 +100,13 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'GroupSetMembers' in request ||
       'PrincipalCreate' in request ||
       'PrincipalEdit' in request ||
-      'PrincipalSetStatus' in request)
+      'PrincipalSetStatus' in request ||
+      // The SOC Ops reads (SOC_INCIDENT_LIST / SOC_INCIDENT_DETAIL, crdb SS.4b; SOC_NARRATIVE, VN.7b)
+      // ride the QuerySubmit opcode too; the engine discriminates them by their CBOR enum tag and
+      // routes them in the same read allowlist as the other surface reads.
+      'SocIncidentList' in request ||
+      'SocIncidentDetail' in request ||
+      'SocNarrative' in request)
   ) {
     return FrameType.QuerySubmit;
   }
