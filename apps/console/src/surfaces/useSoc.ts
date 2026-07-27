@@ -12,6 +12,9 @@
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type {
+  BusinessImpact,
+  IncidentActRow,
+  IncidentTelemetry,
   SocIncidentDetail,
   SocIncidentRow,
   SocKpis,
@@ -110,6 +113,89 @@ export function useSocNarrative(incidentId: string | null): UseQueryResult<Verdi
   return useQuery({
     queryKey: ['soc', 'narrative', incidentId],
     queryFn: () => fetchSocNarrative(incidentId as string),
+    enabled: incidentId !== null,
+  });
+}
+
+/**
+ * Fetch the dock's Raw Telemetry pane (crdb ED.2): the incident's evidence resolved to the records
+ * behind it. A 404 is the engine's one indistinguishable refusal and resolves to `null`.
+ */
+export async function fetchSocTelemetry(incidentId: string): Promise<IncidentTelemetry | null> {
+  const res = await fetch(`/api/soc/telemetry?id=${encodeURIComponent(incidentId)}`, {
+    credentials: 'include',
+  });
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`soc telemetry failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as IncidentTelemetry;
+}
+
+/** The Raw Telemetry pane's read. Fetched only when the pane can render (an incident is open). */
+export function useSocTelemetry(
+  incidentId: string | null,
+): UseQueryResult<IncidentTelemetry | null> {
+  return useQuery({
+    queryKey: ['soc', 'telemetry', incidentId],
+    queryFn: () => fetchSocTelemetry(incidentId as string),
+    enabled: incidentId !== null,
+  });
+}
+
+/** Fetch the incident's audit trail (crdb ED.3): the recorded operator acts, oldest first. */
+export async function fetchSocAuditTrail(
+  incidentId: string,
+): Promise<readonly IncidentActRow[] | null> {
+  const res = await fetch(`/api/soc/audit?id=${encodeURIComponent(incidentId)}`, {
+    credentials: 'include',
+  });
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`soc audit failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as readonly IncidentActRow[];
+}
+
+/** The Audit Trail pane's read: an index into the hash-chained audit record, never a second log. */
+export function useSocAuditTrail(
+  incidentId: string | null,
+): UseQueryResult<readonly IncidentActRow[] | null> {
+  return useQuery({
+    queryKey: ['soc', 'audit', incidentId],
+    queryFn: () => fetchSocAuditTrail(incidentId as string),
+    enabled: incidentId !== null,
+  });
+}
+
+/**
+ * Fetch the Business impact assessment (crdb ED.4 + ED.5).
+ *
+ * A READ, never a trigger: the band is deterministic Rust and always present; the sentence arrives
+ * in its three honest states, and `not_assessed` is rendered, never filled.
+ */
+export async function fetchSocImpact(incidentId: string): Promise<BusinessImpact | null> {
+  const res = await fetch(`/api/soc/impact?id=${encodeURIComponent(incidentId)}`, {
+    credentials: 'include',
+  });
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`soc impact failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as BusinessImpact;
+}
+
+/** The Business impact panel's read. */
+export function useSocImpact(incidentId: string | null): UseQueryResult<BusinessImpact | null> {
+  return useQuery({
+    queryKey: ['soc', 'impact', incidentId],
+    queryFn: () => fetchSocImpact(incidentId as string),
     enabled: incidentId !== null,
   });
 }

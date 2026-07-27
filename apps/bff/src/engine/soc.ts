@@ -24,6 +24,10 @@
 //     surface renders distinctly, so the resolver returns all three intact.
 
 import type {
+  BusinessImpact,
+  CognitionRunState,
+  IncidentActRow,
+  IncidentTelemetry,
   ResponseStepDraft,
   SocIncidentDetail,
   SocIncidentRow,
@@ -33,12 +37,20 @@ import type {
   WireDetectSummaryQuery,
   WireSocIncidentDetailQuery,
   WireSocIncidentListQuery,
+  WireSocAuditQuery,
+  WireSocCognitionRun,
+  WireSocImpactQuery,
   WireSocNarrativeQuery,
   WireSocPlanApprove,
   WireSocPlanModify,
+  WireSocTelemetryQuery,
 } from '@forge/contracts';
 import {
+  toAuditTrail,
+  toBusinessImpact,
+  toCognitionRunState,
   toIncidentDetail,
+  toIncidentTelemetry,
   toIncidentQueue,
   toPlanEffect,
   toSocKpis,
@@ -232,4 +244,101 @@ export async function resolveModifyPlan(
     throw new SocUnavailableError('the modified plan carries a step the Console cannot narrow');
   }
   return view;
+}
+
+/**
+ * Resolve the dock's Raw Telemetry pane (crdb ED.2): the incident's cited evidence and every leg
+ * resolved to the record behind it -- or the honest reason it cannot be (`aged_out`, `restricted`),
+ * reported WITH its reference rather than omitted.
+ *
+ * `null` for the engine's one indistinguishable refusal (unknown / foreign / over-clearance).
+ */
+export async function resolveIncidentTelemetry(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  opts?: EngineCallOptions,
+): Promise<IncidentTelemetry | null> {
+  const request: WireSocTelemetryQuery = { request_id: requestId(), incident };
+  const wire = await engine.socTelemetry(principal, request, opts);
+  if (wire.refused) {
+    return null;
+  }
+  const telemetry = toIncidentTelemetry(wire);
+  if (telemetry === null) {
+    throw new SocUnavailableError('a telemetry row carries an unknown anchor, outcome, or kind');
+  }
+  return telemetry;
+}
+
+/**
+ * Resolve the dock's Audit Trail pane (crdb ED.3): the operator acts recorded against this
+ * incident, an INDEX into the hash-chained audit record -- never a second log, and never assembled
+ * client-side from the live stream.
+ */
+export async function resolveAuditTrail(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  opts?: EngineCallOptions,
+): Promise<readonly IncidentActRow[] | null> {
+  const request: WireSocAuditQuery = { request_id: requestId(), incident };
+  const wire = await engine.socAudit(principal, request, opts);
+  if (wire.refused) {
+    return null;
+  }
+  const trail = toAuditTrail(wire);
+  if (trail === null) {
+    throw new SocUnavailableError('an audit act carries an unknown verb');
+  }
+  return trail;
+}
+
+/**
+ * Resolve the Business impact panel (crdb ED.4 + ED.5).
+ *
+ * The BAND never waits on a model -- it is deterministic Rust recomputed on every read. The
+ * sentence arrives in its three honest states, and `not_assessed` is a state the surface renders,
+ * never a gap it fills. A READ: it must not trigger generation (that is the Generate control's
+ * explicit job), or opening an incident would spend minutes of model time per viewer.
+ */
+export async function resolveBusinessImpact(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  opts?: EngineCallOptions,
+): Promise<BusinessImpact | null> {
+  const request: WireSocImpactQuery = { request_id: requestId(), incident };
+  const wire = await engine.socImpact(principal, request, opts);
+  if (wire.refused) {
+    return null;
+  }
+  const impact = toBusinessImpact(wire);
+  if (impact === null) {
+    throw new SocUnavailableError('the impact carries an unknown band or sentence state');
+  }
+  return impact;
+}
+
+/**
+ * Start a cognition run for one incident (crdb SOC_COGNITION_RUN), on the operator's behalf and
+ * audited under them.
+ *
+ * The reply is what the engine DID with the request -- started / running / recorded / refused --
+ * never the run's result. A narrative is `1 + 2N` model calls on a bounded sidecar; the run is
+ * explicit and deduplicated engine-side, and the Console polls the reads for the outcome.
+ */
+export async function resolveCognitionRun(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  opts?: EngineCallOptions,
+): Promise<CognitionRunState> {
+  const request: WireSocCognitionRun = { request_id: requestId(), incident };
+  const wire = await engine.socCognitionRun(principal, request, opts);
+  const state = toCognitionRunState(wire);
+  if (state === null) {
+    throw new SocUnavailableError('the run state is outside the contract vocabulary');
+  }
+  return state;
 }

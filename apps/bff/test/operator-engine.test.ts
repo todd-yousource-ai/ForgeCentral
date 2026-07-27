@@ -212,6 +212,37 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         input_hash: '',
       });
     },
+    socTelemetry: (req) => {
+      calls.push(`socTelemetry:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        anchor: 'anchored',
+        cited_evidence: [],
+        observations: [],
+        refused: false,
+      });
+    },
+    socAudit: (req) => {
+      calls.push(`socAudit:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ acts: [], refused: false });
+    },
+    socImpact: (req) => {
+      calls.push(`socImpact:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        band: 'Medium',
+        total_milli: 0,
+        factors: [],
+        sentence_state: 'not_assessed',
+        refused: false,
+      });
+    },
+    socCognitionRun: (req) => {
+      calls.push(`socCognitionRun:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ state: 'started', detail: '' });
+    },
     policyCreate: (req) => {
       calls.push(`policyCreate:${String(req.request_id)}`);
       reads.push(req);

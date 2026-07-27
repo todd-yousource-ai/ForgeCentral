@@ -248,3 +248,248 @@ describe('the SOC read resolvers (S3.2)', () => {
     );
   });
 });
+
+// -- the evidence-depth resolvers (S3.8c; crdb ED.2-ED.5 + the runner) -------------------------------
+
+import type {
+  WireSocAudit,
+  WireSocImpact,
+  WireSocRunState,
+  WireSocTelemetry,
+} from '@forge/contracts';
+import {
+  resolveAuditTrail,
+  resolveBusinessImpact,
+  resolveCognitionRun,
+  resolveIncidentTelemetry,
+} from '../src/engine/soc.js';
+
+function depthEngineOf(replies: {
+  telemetry?: WireSocTelemetry;
+  audit?: WireSocAudit;
+  impact?: WireSocImpact;
+  runState?: WireSocRunState;
+  seen?: unknown[];
+}): OperatorEngine {
+  return {
+    socTelemetry: (_principal: OperatorPrincipal, request: unknown) => {
+      replies.seen?.push(request);
+      return Promise.resolve(
+        replies.telemetry ?? {
+          anchor: 'anchored',
+          cited_evidence: [],
+          observations: [],
+          refused: false,
+        },
+      );
+    },
+    socAudit: (_principal: OperatorPrincipal, request: unknown) => {
+      replies.seen?.push(request);
+      return Promise.resolve(replies.audit ?? { acts: [], refused: false });
+    },
+    socImpact: (_principal: OperatorPrincipal, request: unknown) => {
+      replies.seen?.push(request);
+      return Promise.resolve(
+        replies.impact ?? {
+          band: 'Medium',
+          total_milli: 640,
+          factors: [],
+          sentence_state: 'not_assessed',
+          refused: false,
+        },
+      );
+    },
+    socCognitionRun: (_principal: OperatorPrincipal, request: unknown) => {
+      replies.seen?.push(request);
+      return Promise.resolve(replies.runState ?? { state: 'started', detail: '' });
+    },
+  } as unknown as OperatorEngine;
+}
+
+describe('the evidence-depth resolvers (S3.8c)', () => {
+  it('projects resolved, aged-out, and restricted observations with their references', async () => {
+    // The pane's whole value: an absence an analyst can act on. All three outcomes arrive as rows,
+    // never as omissions.
+    const telemetry = await resolveIncidentTelemetry(
+      depthEngineOf({
+        telemetry: {
+          anchor: 'anchored',
+          cited_evidence: [
+            { entry: 'Network Traffic Content', kind: 'data_component' },
+            { entry: 'leg:obs-1', kind: 'leg' },
+          ],
+          observations: [
+            {
+              observation_id: 'obs-1',
+              outcome: 'resolved',
+              observed_at: 1_700_000_000,
+              category: 'network',
+              fields: [['dst', '198.51.100.7']],
+            },
+            { observation_id: 'obs-2', outcome: 'aged_out', observed_at: 0, fields: [] },
+            { observation_id: 'obs-3', outcome: 'restricted', observed_at: 0, fields: [] },
+          ],
+          refused: false,
+        },
+      }),
+      PRINCIPAL,
+      'ep-soc-1',
+    );
+
+    expect(telemetry?.observations.map((row) => row.outcome)).toEqual([
+      'resolved',
+      'aged_out',
+      'restricted',
+    ]);
+    expect(telemetry?.citedEvidence[0]?.kind).toBe('data_component');
+  });
+
+  it('fails closed on a telemetry outcome it cannot narrow', async () => {
+    await expect(
+      resolveIncidentTelemetry(
+        depthEngineOf({
+          telemetry: {
+            anchor: 'anchored',
+            cited_evidence: [],
+            observations: [
+              { observation_id: 'obs-1', outcome: 'vanished', observed_at: 0, fields: [] },
+            ],
+            refused: false,
+          },
+        }),
+        PRINCIPAL,
+        'ep-soc-1',
+      ),
+    ).rejects.toBeInstanceOf(SocUnavailableError);
+  });
+
+  it('returns absent for a refused telemetry read, whatever the reason was', async () => {
+    const telemetry = await resolveIncidentTelemetry(
+      depthEngineOf({
+        telemetry: { anchor: '', cited_evidence: [], observations: [], refused: true },
+      }),
+      PRINCIPAL,
+      'ep-soc-1',
+    );
+    expect(telemetry).toBeNull();
+  });
+
+  it('projects the audit trail and fails closed on an unknown act', async () => {
+    const trail = await resolveAuditTrail(
+      depthEngineOf({
+        audit: {
+          acts: [
+            {
+              act: 'plan_proposed',
+              principal: 'p-1',
+              at_seconds: 1_700_000_100,
+              detail: '2 step(s)',
+            },
+            { act: 'plan_approved', principal: 'p-2', at_seconds: 1_700_000_200 },
+          ],
+          refused: false,
+        },
+      }),
+      PRINCIPAL,
+      'ep-soc-1',
+    );
+    expect(trail?.map((act) => act.act)).toEqual(['plan_proposed', 'plan_approved']);
+
+    await expect(
+      resolveAuditTrail(
+        depthEngineOf({
+          audit: {
+            acts: [{ act: 'obliterated', principal: 'p-1', at_seconds: 0 }],
+            refused: false,
+          },
+        }),
+        PRINCIPAL,
+        'ep-soc-1',
+      ),
+    ).rejects.toBeInstanceOf(SocUnavailableError);
+  });
+
+  it('keeps the three sentence states distinct and never blanks the band', async () => {
+    // ED.5's whole point at this tier: a model that is unavailable costs the panel its SENTENCE and
+    // never its number.
+    const notAssessed = await resolveBusinessImpact(depthEngineOf({}), PRINCIPAL, 'ep-soc-1');
+    expect(notAssessed?.band).toBe('Medium');
+    expect(notAssessed?.sentenceState).toBe('not_assessed');
+    expect(notAssessed?.sentence).toBeNull();
+
+    const published = await resolveBusinessImpact(
+      depthEngineOf({
+        impact: {
+          band: 'Medium',
+          total_milli: 640,
+          factors: [{ factor: 'confidence', weight_milli: 400, basis: 'corroborated' }],
+          sentence_state: 'published',
+          sentence: 'A moderate assessment.',
+          refused: false,
+        },
+      }),
+      PRINCIPAL,
+      'ep-soc-1',
+    );
+    expect(published?.sentenceState).toBe('published');
+    expect(published?.sentence).toBe('A moderate assessment.');
+
+    const refused = await resolveBusinessImpact(
+      depthEngineOf({
+        impact: {
+          band: 'Low',
+          total_milli: 100,
+          factors: [],
+          sentence_state: 'refused',
+          sentence: 'the sentence names `host-9`, which is not a fact of this incident',
+          refused: false,
+        },
+      }),
+      PRINCIPAL,
+      'ep-soc-1',
+    );
+    expect(refused?.sentenceState).toBe('refused');
+    expect(refused?.sentence).toContain('host-9');
+  });
+
+  it('fails closed on a band outside the severity ladder', async () => {
+    await expect(
+      resolveBusinessImpact(
+        depthEngineOf({
+          impact: {
+            band: 'Apocalyptic',
+            total_milli: 9_000,
+            factors: [],
+            sentence_state: 'not_assessed',
+            refused: false,
+          },
+        }),
+        PRINCIPAL,
+        'ep-soc-1',
+      ),
+    ).rejects.toBeInstanceOf(SocUnavailableError);
+  });
+
+  it('carries the run acknowledgement, including an engine refusal with its reason', async () => {
+    const started = await resolveCognitionRun(depthEngineOf({}), PRINCIPAL, 'ep-soc-1');
+    expect(started).toEqual({ state: 'started', detail: null });
+
+    const refused = await resolveCognitionRun(
+      depthEngineOf({
+        runState: { state: 'refused', detail: 'no SOC-narrative model is bound' },
+      }),
+      PRINCIPAL,
+      'ep-soc-1',
+    );
+    expect(refused.state).toBe('refused');
+    expect(refused.detail).toContain('model is bound');
+
+    await expect(
+      resolveCognitionRun(
+        depthEngineOf({ runState: { state: 'exploded', detail: '' } }),
+        PRINCIPAL,
+        'ep-soc-1',
+      ),
+    ).rejects.toBeInstanceOf(SocUnavailableError);
+  });
+});

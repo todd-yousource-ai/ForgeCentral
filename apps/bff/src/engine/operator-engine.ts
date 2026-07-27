@@ -57,8 +57,16 @@ import type {
   WireSocIncidentDetailQuery,
   WireSocIncidentList,
   WireSocIncidentListQuery,
+  WireSocAudit,
+  WireSocAuditQuery,
+  WireSocCognitionRun,
+  WireSocImpact,
+  WireSocImpactQuery,
   WireSocNarrative,
   WireSocNarrativeQuery,
+  WireSocRunState,
+  WireSocTelemetry,
+  WireSocTelemetryQuery,
   WireSocPlanApprove,
   WireSocPlanEffect,
   WireSocPlanModify,
@@ -109,6 +117,10 @@ export type EngineAction =
   | 'socIncidentList'
   | 'socIncidentDetail'
   | 'socNarrative'
+  | 'socTelemetry'
+  | 'socAudit'
+  | 'socImpact'
+  | 'socCognitionRun'
   | 'socPlanApprove'
   | 'socPlanModify'
   | 'policyListByZone'
@@ -272,6 +284,30 @@ export interface OperatorEngine {
     request: WireSocNarrativeQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSocNarrative>;
+  /** Resolve an incident's evidence to raw records (SOC_INCIDENT_TELEMETRY, ED.2) on behalf of `principal`. */
+  socTelemetry(
+    principal: OperatorPrincipal,
+    request: WireSocTelemetryQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocTelemetry>;
+  /** Read one incident's operator acts (SOC_INCIDENT_AUDIT, ED.3) on behalf of `principal`. */
+  socAudit(
+    principal: OperatorPrincipal,
+    request: WireSocAuditQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocAudit>;
+  /** Read one incident's assessed impact (SOC_INCIDENT_IMPACT, ED.4/ED.5) on behalf of `principal`. */
+  socImpact(
+    principal: OperatorPrincipal,
+    request: WireSocImpactQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocImpact>;
+  /** Start a cognition run (SOC_COGNITION_RUN, the ED runner) on behalf of `principal`. */
+  socCognitionRun(
+    principal: OperatorPrincipal,
+    request: WireSocCognitionRun,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocRunState>;
   /** Approve an incident's response plan (SOC_PLAN_APPROVE, SS.5) on behalf of `principal`. */
   socPlanApprove(
     principal: OperatorPrincipal,
@@ -586,6 +622,26 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'socNarrative', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.socNarrative({ ...request, operator }, opts);
+    },
+    socTelemetry: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socTelemetry', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socTelemetry({ ...request, operator }, opts);
+    },
+    socAudit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socAudit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socAudit({ ...request, operator }, opts);
+    },
+    socImpact: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socImpact', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socImpact({ ...request, operator }, opts);
+    },
+    socCognitionRun: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socCognitionRun', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socCognitionRun({ ...request, operator }, opts);
     },
     socPlanApprove: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'socPlanApprove', request.request_id));
