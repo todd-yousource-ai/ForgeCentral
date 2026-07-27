@@ -10,24 +10,24 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
   journeys for every `TRD-CONSOLE-03` Section 8 task within its click budget, an edge-state
   distinctness assertion, the narrative-unavailable journey, a no-stub sweep, and the LIVE DRIVE on
   the box over the deployed BFF/SPA.
-- **State: S3.1 -> S3.8b LANDED. Next and LAST action = S3.N.** The proposer (crdb SS.6) made the
+- **State: S3.1 -> S3.8c LANDED. Next and LAST action = S3.N.** S3.8c flipped every PENDING SOC
+  binding LIVE: crdb IP-SOC-EVIDENCE-DEPTH closed (ED.2-ED.5 + the runner, live-proven against real
+  gemma4 in 218s), so the dock's two absences and Business impact are now real panes, and **Generate
+  verdict** issues `SOC_COGNITION_RUN`. The live drive must now also prove the Generate journey. The proposer (crdb SS.6) made the
   approval path real end to end, and S3.8b resolved the `Modify Plan` deferral it unblocked. Both
   controls are now live.
-- **THE THREE REMAINING DEFERRALS ARE ALL ENGINE WORK, not Console changes**, and each is recorded
-  rather than papered over: `soc.telemetry.raw` needs a crdb leg-to-raw-record read (`LOG_EXPLAIN`
-  keys on a decision id); `soc.audit.trail` needs a per-incident audit query (entries reach the
-  Console on the live stream only); Business impact needs an asset-value plane, which
-  `TRD-CONSOLE-03` Section 9 and the crdb IP both name as its own IP. None is a "quick" fix, and
-  none should be filled with a plausible number to make the surface look finished.
+- **The three deferrals are CLOSED (S3.8c)** -- crdb built exactly what each PENDING binding named:
+  ED.2 the leg-to-record read, ED.3 the per-incident audit index, ED.4/ED.5 the impact assessment.
+  The one still-true absence is exposure in CURRENCY (no asset-value plane); the impact panel
+  renders band + factors + sentence and deliberately no dollar figure.
 - **What a live drive will honestly show, and must not be "fixed" into looking better:** a Candidate
   incident proposes ONE INVESTIGATIVE step (the gate did not recommend a containment, so the plan
   does not offer one), an approved containment comes back `refused` because enforcement is OFF,
   `Auto-Contained` 0, `Raw Telemetry` and `Audit Trail` as explicit not-availables, and nothing ever
   `verified` in the lineage graph. Every one is a recorded, deliberate absence -- the drive proves the
   surface tells the truth about a box in this state.
-- **Two dock panes are PENDING bindings** (`soc.telemetry.raw`, `soc.audit.trail`). The contract test
-  fails a RELEASE build that references a pending binding -- they are referenced only as
-  not-available renders, which is the intended use, but keep that in mind at release.
+- **No SOC binding is PENDING anymore.** The release gate's pending-binding check has nothing to
+  flag on this surface.
 - **All five KPI bindings are LIVE**, and `TRD-CONSOLE-03` Section 7 has been corrected accordingly --
   its table was written before crdb SS.1/SS.3/SS.3a and marked three of them PENDING/PARTIAL.
 - **The whole read path is seam-proven**, so S3.4 onward is pure surface work against real routes.
@@ -84,7 +84,8 @@ PR merges, and the Resume-here section is rewritten at every merge.** A stale le
 | S3.7 | A3 | LANDED | `71b92e0` | 5 panes + the scope line, all over ONE payload (tab switches cost no read; the narrative shares the verdict's query key). **Bindings checked first: 2 of 5 have no per-incident read** -- Raw Telemetry (nothing maps legs to records; LOG_EXPLAIN keys on a decision id) and Audit Trail (entries are live-stream only), both explicit not-availables + PENDING bindings. Audit copy states acts ARE audited engine-side so an empty pane cannot read as unaudited. Timeline shows the 2 real instants and refuses to interpolate. Evidence narrows to the scoped node and shows NOTHING when the scope matches no leg. 10 tests |
 | S3.8 | A11 | LANDED | `b4d9199` | Approve over SS.5, confirm-gated, audited. **Mounted ABOVE the 405 gate with a dispatch-level regression test** (unauthenticated POST must 401, never 405 -- the P5.4 defect). **`enforcement_active` survives the whole chain and the success copy never says "contained"** (asserted). The shown revision is submitted; a missing one is 400, never defaulted to 0. Approve is disabled with a reason when there is no plan or it is already approved. Typed refusals 409/400/403, cache dropped on success. `toResponseStepDrafts` reads title+action ONLY (seam test asserts the submitted map has exactly those keys). **Modify stays disabled**: its whole path is built + tested, but with no proposer there is nothing to edit. 11 tests |
 | S3.8b | A11 | LANDED | `484eba8` | the `Modify Plan` editor, resolving the S3.8 deferral that crdb SS.6 unblocked. Title + action only (test asserts the posted map has exactly those keys); action is a SELECT over the containment rungs + Investigate, so no free-text action can be mistyped; a blank title disables Save with its reason rather than costing a round trip; **a refusal keeps the operator's edits on screen**; never offered on an approved plan. Synthetic row keys (positional rows with editable titles). 5 tests |
-| S3.N | A1-A12 | PLANNED | -- | Playwright journeys + the live drive on the box (real incident, real gemma4 narrative) |
+| S3.8c | A5, A3 | LANDED | -- | the evidence-depth flip, unblocked by crdb IP-SOC-EVIDENCE-DEPTH closing + the runner landing. Contract re-vendored (SOC_INCIDENT_TELEMETRY / SOC_INCIDENT_AUDIT / SOC_INCIDENT_IMPACT / SOC_COGNITION_RUN); all four wired client -> operator-engine -> resolver -> route. **The three honest absences became live panes**: Raw Telemetry (aged_out/restricted reported WITH references), Audit Trail (the ED.3 index, never stream-assembled), Business impact (band + checkable factors + the sentence in its 3 states; still NO currency figure). `soc.telemetry.raw` + `soc.audit.trail` flipped LIVE; `soc.impact` read + `soc.cognition.run` command registered LIVE -- the command's `audited: true` is TRUE because crdb `INV-SOC-RUN-AUDITED` landed first. **Generate verdict** is the one control that spends model time; its note says what a run costs, and its reply is what the engine DID. Narrowers fail closed (a `published` sentence with no words is refused). Contract + resolver + surface tests |
+| S3.N | A1-A12 | PLANNED | -- | Playwright journeys + the live drive on the box (real incident, real gemma4 narrative, now incl. Generate -> recorded -> served) |
 
 ## Prerequisites (tracked)
 
