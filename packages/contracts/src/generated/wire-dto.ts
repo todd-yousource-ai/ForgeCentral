@@ -98,6 +98,11 @@ export interface WireBundleReported {
   commit_version: number;
 }
 
+export interface WireCitedEvidence {
+  entry: string;
+  kind: string;
+}
+
 export interface WireClassUsage {
   class: string;
   octets: number;
@@ -355,6 +360,19 @@ export interface WireIdamSyncStarted {
   provider: string;
 }
 
+export interface WireImpactFactor {
+  basis: string;
+  factor: string;
+  weight_milli: number;
+}
+
+export interface WireIncidentAct {
+  act: string;
+  at_seconds: number;
+  detail?: string;
+  principal: string;
+}
+
 export interface WireIncidentRow {
   anchor: string;
   authority: string;
@@ -569,6 +587,14 @@ export interface WireObjectSpec {
   selector_kind: string;
   selector_value: string;
   tags?: Array<string>;
+}
+
+export interface WireObservationRow {
+  category?: string;
+  fields: Array<[string, string]>;
+  observation_id: string;
+  observed_at: number;
+  outcome: string;
 }
 
 export interface WireObservedComponent {
@@ -831,6 +857,10 @@ export type WireReply =
   | { SocNarrative: WireSocNarrative; }
   | { SocIncidentList: WireSocIncidentList; }
   | { SocIncidentDetail: WireSocIncidentDetail; }
+  | { SocTelemetry: WireSocTelemetry; }
+  | { SocAudit: WireSocAudit; }
+  | { SocImpact: WireSocImpact; }
+  | { SocRunState: WireSocRunState; }
   | { SocPlanMutated: WireSocPlanEffect; }
   | { PolicyMutated: WirePolicyMutated; };
 
@@ -885,6 +915,10 @@ export type WireRequest =
   | { SocNarrative: WireSocNarrativeQuery; }
   | { SocIncidentList: WireSocIncidentListQuery; }
   | { SocIncidentDetail: WireSocIncidentDetailQuery; }
+  | { SocTelemetry: WireSocTelemetryQuery; }
+  | { SocAudit: WireSocAuditQuery; }
+  | { SocImpact: WireSocImpactQuery; }
+  | { SocCognitionRun: WireSocCognitionRun; }
   | { SocPlanApprove: WireSocPlanApprove; }
   | { SocPlanModify: WireSocPlanModify; }
   | { PolicyCreate: WirePolicyCreate; }
@@ -908,6 +942,39 @@ export interface WireRiskBand {
 export interface WireScopeMember {
   agent?: string | null;
   endpoint_cn: string;
+}
+
+export interface WireSocAudit {
+  acts: Array<WireIncidentAct>;
+  explanation?: string;
+  refused: boolean;
+}
+
+export interface WireSocAuditQuery {
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
+export interface WireSocCognitionRun {
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
+export interface WireSocImpact {
+  band: string;
+  factors: Array<WireImpactFactor>;
+  refused: boolean;
+  sentence?: string;
+  sentence_state: string;
+  total_milli: number;
+}
+
+export interface WireSocImpactQuery {
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
 }
 
 export interface WireSocIncidentDetail {
@@ -981,6 +1048,25 @@ export interface WireSocPlanModify {
   operator?: OperatorDelegation;
   request_id: number;
   steps: Array<WirePlanStepInput>;
+}
+
+export interface WireSocRunState {
+  detail?: string;
+  state: string;
+}
+
+export interface WireSocTelemetry {
+  anchor: string;
+  cited_evidence: Array<WireCitedEvidence>;
+  explanation?: string;
+  observations: Array<WireObservationRow>;
+  refused: boolean;
+}
+
+export interface WireSocTelemetryQuery {
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
 }
 
 export interface WireSourceVtzEdge {

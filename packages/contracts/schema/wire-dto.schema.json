@@ -371,6 +371,22 @@
       ],
       "type": "object"
     },
+    "WireCitedEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "entry",
+        "kind"
+      ],
+      "type": "object"
+    },
     "WireClassUsage": {
       "additionalProperties": false,
       "properties": {
@@ -1457,6 +1473,49 @@
       ],
       "type": "object"
     },
+    "WireImpactFactor": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "string"
+        },
+        "factor": {
+          "type": "string"
+        },
+        "weight_milli": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "factor",
+        "weight_milli",
+        "basis"
+      ],
+      "type": "object"
+    },
+    "WireIncidentAct": {
+      "additionalProperties": false,
+      "properties": {
+        "act": {
+          "type": "string"
+        },
+        "at_seconds": {
+          "type": "integer"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "principal": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "act",
+        "principal",
+        "at_seconds"
+      ],
+      "type": "object"
+    },
     "WireIncidentRow": {
       "additionalProperties": false,
       "properties": {
@@ -2409,6 +2468,46 @@
         "selector_value",
         "description",
         "lifecycle"
+      ],
+      "type": "object"
+    },
+    "WireObservationRow": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "observation_id": {
+          "type": "string"
+        },
+        "observed_at": {
+          "type": "integer"
+        },
+        "outcome": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "observation_id",
+        "outcome",
+        "observed_at",
+        "fields"
       ],
       "type": "object"
     },
@@ -4077,6 +4176,54 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocTelemetry": {
+              "$ref": "#/$defs/WireSocTelemetry"
+            }
+          },
+          "required": [
+            "SocTelemetry"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocAudit": {
+              "$ref": "#/$defs/WireSocAudit"
+            }
+          },
+          "required": [
+            "SocAudit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocImpact": {
+              "$ref": "#/$defs/WireSocImpact"
+            }
+          },
+          "required": [
+            "SocImpact"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocRunState": {
+              "$ref": "#/$defs/WireSocRunState"
+            }
+          },
+          "required": [
+            "SocRunState"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocPlanMutated": {
               "$ref": "#/$defs/WireSocPlanEffect"
             }
@@ -4860,6 +5007,54 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocTelemetry": {
+              "$ref": "#/$defs/WireSocTelemetryQuery"
+            }
+          },
+          "required": [
+            "SocTelemetry"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocAudit": {
+              "$ref": "#/$defs/WireSocAuditQuery"
+            }
+          },
+          "required": [
+            "SocAudit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocImpact": {
+              "$ref": "#/$defs/WireSocImpactQuery"
+            }
+          },
+          "required": [
+            "SocImpact"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocCognitionRun": {
+              "$ref": "#/$defs/WireSocCognitionRun"
+            }
+          },
+          "required": [
+            "SocCognitionRun"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocPlanApprove": {
               "$ref": "#/$defs/WireSocPlanApprove"
             }
@@ -5046,6 +5241,119 @@
       },
       "required": [
         "endpoint_cn"
+      ],
+      "type": "object"
+    },
+    "WireSocAudit": {
+      "additionalProperties": false,
+      "properties": {
+        "acts": {
+          "items": {
+            "$ref": "#/$defs/WireIncidentAct"
+          },
+          "type": "array"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "acts",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocAuditQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocCognitionRun": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocImpact": {
+      "additionalProperties": false,
+      "properties": {
+        "band": {
+          "type": "string"
+        },
+        "factors": {
+          "items": {
+            "$ref": "#/$defs/WireImpactFactor"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "sentence": {
+          "type": "string"
+        },
+        "sentence_state": {
+          "type": "string"
+        },
+        "total_milli": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "band",
+        "total_milli",
+        "factors",
+        "sentence_state",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocImpactQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
       ],
       "type": "object"
     },
@@ -5344,6 +5652,73 @@
         "request_id",
         "incident",
         "steps"
+      ],
+      "type": "object"
+    },
+    "WireSocRunState": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "type": "object"
+    },
+    "WireSocTelemetry": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "type": "string"
+        },
+        "cited_evidence": {
+          "items": {
+            "$ref": "#/$defs/WireCitedEvidence"
+          },
+          "type": "array"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "observations": {
+          "items": {
+            "$ref": "#/$defs/WireObservationRow"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "anchor",
+        "observations",
+        "cited_evidence",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocTelemetryQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
       ],
       "type": "object"
     },

@@ -9,7 +9,12 @@
 
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import type { SocIncidentDetail, VerdictNarrative } from '@forge/contracts';
+import type {
+  IncidentActRow,
+  IncidentTelemetry,
+  SocIncidentDetail,
+  VerdictNarrative,
+} from '@forge/contracts';
 
 import { SocInvestigationDock } from '../surfaces/SocInvestigationDock.js';
 import { renderWithProviders } from './render.js';
@@ -75,16 +80,74 @@ const NARRATIVE: VerdictNarrative = {
   inputHash: 'sha512:abc',
 };
 
-function mockNarrative(narrative: VerdictNarrative): void {
+const TELEMETRY: IncidentTelemetry = {
+  anchor: 'anchored',
+  citedEvidence: [
+    { entry: 'Network Traffic Content', kind: 'data_component' },
+    { entry: 'leg:net:198.51.100.7', kind: 'leg' },
+  ],
+  observations: [
+    {
+      observationId: 'obs-1',
+      outcome: 'resolved',
+      observedAt: 1_700_000_000,
+      category: 'network',
+      fields: [['dst', '198.51.100.7']],
+    },
+    {
+      observationId: 'obs-2',
+      outcome: 'aged_out',
+      observedAt: 1_690_000_000,
+      category: null,
+      fields: [],
+    },
+    {
+      observationId: 'obs-3',
+      outcome: 'restricted',
+      observedAt: 1_700_000_100,
+      category: null,
+      fields: [],
+    },
+  ],
+};
+
+const TRAIL: readonly IncidentActRow[] = [
+  {
+    act: 'plan_proposed',
+    principal: 'engine',
+    atSeconds: 1_700_000_100,
+    detail: '1 step(s), revision 0',
+  },
+  { act: 'plan_approved', principal: 'op-7', atSeconds: 1_700_000_200, detail: null },
+];
+
+/** Route-aware: the dock now reads telemetry and the audit trail beside the narrative. */
+function mockNarrative(
+  narrative: VerdictNarrative,
+  telemetry: IncidentTelemetry | null = TELEMETRY,
+  trail: readonly IncidentActRow[] | null = TRAIL,
+): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(() =>
-      Promise.resolve({
+    vi.fn((url: string) => {
+      const body = url.includes('/api/soc/telemetry')
+        ? telemetry
+        : url.includes('/api/soc/audit')
+          ? trail
+          : narrative;
+      if (body === null) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({}),
+        } as Response);
+      }
+      return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(narrative),
-      } as Response),
-    ),
+        json: () => Promise.resolve(body),
+      } as Response);
+    }),
   );
 }
 
@@ -192,9 +255,10 @@ describe('the SOC investigation dock (S3.7)', () => {
     expect(screen.getByText(/does not expose a per-fire history/i)).toBeInTheDocument();
   });
 
-  it('renders Raw Telemetry as an explicit absence naming the gap', () => {
-    // An analyst opens this dock precisely when they have stopped taking the surface's word for
-    // something. A mock pane would be the worst stub in the product.
+  it('renders Raw Telemetry with unresolvable observations reported, never omitted', async () => {
+    // The pane's whole value (crdb ED.2): an absence an analyst can act on. `aged_out` and
+    // `restricted` arrive as rows WITH their references -- one is a retention fact about the
+    // estate, the other a fact about this principal, and troubleshooting a gap needs to know which.
     mockNarrative(NARRATIVE);
 
     renderWithProviders(
@@ -202,15 +266,18 @@ describe('the SOC investigation dock (S3.7)', () => {
     );
     fireEvent.click(screen.getByRole('tab', { name: 'Raw Telemetry' }));
 
-    expect(
-      screen.getByText(/Raw telemetry is not available for one incident/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/LOG_EXPLAIN keys on a decision id/i)).toBeInTheDocument();
+    const pane = await screen.findByTestId('soc-dock-raw');
+    expect(pane).toHaveTextContent('obs-1');
+    expect(pane).toHaveTextContent('dst=198.51.100.7');
+    expect(pane).toHaveTextContent('obs-2');
+    expect(pane).toHaveTextContent(/Past retention/);
+    expect(pane).toHaveTextContent('obs-3');
+    expect(pane).toHaveTextContent(/clearance/);
   });
 
-  it('renders Audit Trail as an explicit absence, without implying acts are unaudited', () => {
-    // The distinction matters: operator acts ARE audited engine-side. What is missing is a read
-    // scoped to one incident, and the pane must not let an analyst conclude otherwise.
+  it('renders the Audit Trail from the engine index, with each act and its principal', async () => {
+    // crdb ED.3: an index into the hash-chained audit record, never assembled client-side from the
+    // live stream.
     mockNarrative(NARRATIVE);
 
     renderWithProviders(
@@ -218,33 +285,55 @@ describe('the SOC investigation dock (S3.7)', () => {
     );
     fireEvent.click(screen.getByRole('tab', { name: 'Audit Trail' }));
 
-    expect(screen.getByText(/no per-incident audit trail to read/i)).toBeInTheDocument();
-    expect(screen.getByText(/ARE audited engine-side/i)).toBeInTheDocument();
+    const pane = await screen.findByTestId('soc-dock-audit');
+    expect(pane).toHaveTextContent('plan_proposed');
+    expect(pane).toHaveTextContent('plan_approved');
+    expect(pane).toHaveTextContent('by op-7');
   });
 
-  it('costs no read when the verdict panel already fetched the narrative', async () => {
-    // Both use the same query key, so TanStack serves the dock from cache. Two reads could show two
-    // different narratives on one screen.
-    const spy = vi.fn(() =>
-      Promise.resolve({
+  it('says so when nobody has acted, rather than showing an empty trail', async () => {
+    mockNarrative(NARRATIVE, TELEMETRY, []);
+
+    renderWithProviders(
+      <SocInvestigationDock incidentId="ep-soc-1" detail={DETAIL} scopedNode={null} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Audit Trail' }));
+
+    expect(await screen.findByTestId('soc-dock-audit-empty')).toHaveTextContent(
+      /No operator has acted/,
+    );
+  });
+
+  it('fetches each read once; switching tabs never refetches', async () => {
+    // One read per query key (narrative, telemetry, audit), served from cache after that. Two reads
+    // of the same key could show two different answers on one screen.
+    const spy = vi.fn((url: string) => {
+      const body = url.includes('/api/soc/telemetry')
+        ? TELEMETRY
+        : url.includes('/api/soc/audit')
+          ? TRAIL
+          : NARRATIVE;
+      return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(NARRATIVE),
-      } as Response),
-    );
+        json: () => Promise.resolve(body),
+      } as Response);
+    });
     vi.stubGlobal('fetch', spy);
 
     renderWithProviders(
       <SocInvestigationDock incidentId="ep-soc-1" detail={DETAIL} scopedNode={null} />,
     );
     await waitFor(() => {
-      expect(spy.mock.calls.length).toBe(1);
+      expect(spy.mock.calls.length).toBe(3);
     });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Model Reasoning' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Evidence' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Raw Telemetry' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Audit Trail' }));
 
-    expect(spy.mock.calls.length).toBe(1);
+    expect(spy.mock.calls.length).toBe(3);
   });
 });

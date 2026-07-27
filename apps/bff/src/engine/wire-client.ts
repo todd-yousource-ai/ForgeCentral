@@ -37,7 +37,11 @@ import type {
   WirePolicyMutated,
   WireSocIncidentDetail,
   WireSocIncidentList,
+  WireSocAudit,
+  WireSocImpact,
   WireSocNarrative,
+  WireSocRunState,
+  WireSocTelemetry,
   WireSocPlanEffect,
   WirePrincipalList,
   WireConnectionList,
@@ -184,6 +188,38 @@ export function replyToSocIncidentDetail(reply: WireReply): WireSocIncidentDetai
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a SOC incident-detail read');
+}
+
+/** Map an engine `WireReply` to `WireSocTelemetry` (SOC_INCIDENT_TELEMETRY, crdb ED.2). */
+export function replyToSocTelemetry(reply: WireReply): WireSocTelemetry {
+  if (typeof reply === 'object' && 'SocTelemetry' in reply) return reply.SocTelemetry;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC telemetry read');
+}
+
+/** Map an engine `WireReply` to `WireSocAudit` (SOC_INCIDENT_AUDIT, crdb ED.3). */
+export function replyToSocAudit(reply: WireReply): WireSocAudit {
+  if (typeof reply === 'object' && 'SocAudit' in reply) return reply.SocAudit;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC audit read');
+}
+
+/** Map an engine `WireReply` to `WireSocImpact` (SOC_INCIDENT_IMPACT, crdb ED.4/ED.5). */
+export function replyToSocImpact(reply: WireReply): WireSocImpact {
+  if (typeof reply === 'object' && 'SocImpact' in reply) return reply.SocImpact;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC impact read');
+}
+
+/** Map an engine `WireReply` to `WireSocRunState` (SOC_COGNITION_RUN, the ED runner). */
+export function replyToSocRunState(reply: WireReply): WireSocRunState {
+  if (typeof reply === 'object' && 'SocRunState' in reply) return reply.SocRunState;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC cognition run');
 }
 
 /** Map an engine `WireReply` to `WireSocNarrative` (SOC_NARRATIVE, crdb VN.7b). */
@@ -716,6 +752,48 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToSocNarrative(await dispatch(transport, { SocNarrative: request })),
+      opts,
+    );
+  }
+
+  async socTelemetry(
+    request: Parameters<CrucibleClient['socTelemetry']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocTelemetry> {
+    return this.call(
+      async (transport) =>
+        replyToSocTelemetry(await dispatch(transport, { SocTelemetry: request })),
+      opts,
+    );
+  }
+
+  async socAudit(
+    request: Parameters<CrucibleClient['socAudit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocAudit> {
+    return this.call(
+      async (transport) => replyToSocAudit(await dispatch(transport, { SocAudit: request })),
+      opts,
+    );
+  }
+
+  async socImpact(
+    request: Parameters<CrucibleClient['socImpact']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocImpact> {
+    return this.call(
+      async (transport) => replyToSocImpact(await dispatch(transport, { SocImpact: request })),
+      opts,
+    );
+  }
+
+  async socCognitionRun(
+    request: Parameters<CrucibleClient['socCognitionRun']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocRunState> {
+    return this.call(
+      async (transport) =>
+        replyToSocRunState(await dispatch(transport, { SocCognitionRun: request })),
       opts,
     );
   }

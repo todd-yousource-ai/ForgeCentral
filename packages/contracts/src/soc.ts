@@ -39,15 +39,21 @@
 
 import type {
   WireDetectSummary,
+  WireIncidentAct,
   WireIncidentRow,
   WireLineageEdge,
   WireLineageNode,
+  WireObservationRow,
   WirePlanStep,
   WirePlanStepInput,
+  WireSocAudit,
+  WireSocImpact,
   WireSocIncidentDetail,
   WireSocIncidentList,
   WireSocNarrative,
   WireSocPlanEffect,
+  WireSocRunState,
+  WireSocTelemetry,
   WireWithheldClaim,
 } from './generated/wire-dto.js';
 
@@ -788,4 +794,233 @@ export function confidenceLabel(confidence: ConfidenceTier): string {
     case 'CONTESTED':
       return 'Contested';
   }
+}
+
+// -- the evidence-depth reads (IP-CONSOLE-03 S3.8c; crdb IP-SOC-EVIDENCE-DEPTH ED.2-ED.5) ------------
+
+/** How the telemetry read anchored its window (crdb `TelemetryAnchor::tag`). */
+export const TELEMETRY_ANCHORS = ['unanchored', 'window_unavailable', 'anchored'] as const;
+export type TelemetryAnchor = (typeof TELEMETRY_ANCHORS)[number];
+
+/**
+ * What became of one cited observation (crdb `ObservationOutcome::tag`). `aged_out` and `restricted`
+ * are reported WITH their references, never omitted: one is a retention fact about the estate, the
+ * other a fact about this principal, and an analyst troubleshooting a gap needs to know which.
+ */
+export const OBSERVATION_OUTCOMES = ['resolved', 'aged_out', 'restricted'] as const;
+export type ObservationOutcome = (typeof OBSERVATION_OUTCOMES)[number];
+
+/** What one cited-evidence entry is (crdb `evidence_kind`, the producer's own vocabulary). */
+export const EVIDENCE_KINDS = ['data_component', 'leg'] as const;
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
+
+/** The operator acts an incident's trail may carry (crdb `IncidentAct::tag`). */
+export const INCIDENT_ACTS = [
+  'plan_proposed',
+  'plan_modified',
+  'plan_approved',
+  'contained',
+] as const;
+export type IncidentAct = (typeof INCIDENT_ACTS)[number];
+
+/**
+ * The impact band, on the platform's OCSF severity ladder (crdb `SeverityId`). Never `Unknown`:
+ * "assessed as minor" is not "could not assess", and the engine always lands somewhere.
+ */
+export const IMPACT_BANDS = ['Informational', 'Low', 'Medium', 'High', 'Critical'] as const;
+export type ImpactBand = (typeof IMPACT_BANDS)[number];
+
+/**
+ * The impact sentence's three states (crdb ED.5). Distinct on purpose: a model that is unavailable
+ * or refused costs the panel its SENTENCE and never its band, and "nobody asked", "the pipeline
+ * declined", and "here it is" are three different facts.
+ */
+export const IMPACT_SENTENCE_STATES = ['not_assessed', 'refused', 'published'] as const;
+export type ImpactSentenceState = (typeof IMPACT_SENTENCE_STATES)[number];
+
+/**
+ * What the engine did with a cognition-run request (crdb `SOC_COGNITION_RUN`). Never the run's
+ * RESULT -- that is read back through the narrative and impact reads once recorded.
+ */
+export const RUN_STATES = ['started', 'running', 'recorded', 'refused'] as const;
+export type RunState = (typeof RUN_STATES)[number];
+
+/** One cited-evidence entry, classified by the producer (crdb ED.2b). */
+export interface CitedEvidenceRef {
+  readonly entry: string;
+  readonly kind: EvidenceKind;
+}
+
+/** One resolved (or honestly unresolvable) raw observation behind an incident's evidence. */
+export interface TelemetryObservation {
+  readonly observationId: string;
+  readonly outcome: ObservationOutcome;
+  readonly observedAt: number;
+  readonly category: string | null;
+  readonly fields: readonly (readonly [string, string])[];
+}
+
+/** The dock's Raw Telemetry pane: an incident's evidence resolved to the records behind it (ED.2). */
+export interface IncidentTelemetry {
+  readonly anchor: TelemetryAnchor;
+  readonly citedEvidence: readonly CitedEvidenceRef[];
+  readonly observations: readonly TelemetryObservation[];
+}
+
+/** One recorded operator act against an incident (ED.3). */
+export interface IncidentActRow {
+  readonly act: IncidentAct;
+  readonly principal: string;
+  readonly atSeconds: number;
+  readonly detail: string | null;
+}
+
+/** One factor of the impact assessment, with what it observed (ED.4). */
+export interface ImpactFactorRow {
+  readonly factor: string;
+  readonly weightMilli: number;
+  readonly basis: string;
+}
+
+/**
+ * The Business impact panel (ED.4 + ED.5): the band a weighted sum decided, the factors that
+ * produced it (so the arithmetic is checkable), and the model's one explaining sentence in its
+ * three honest states. Deliberately NO currency figure -- the platform has no asset-value plane,
+ * and `INV-SOC-NO-FABRICATED-NUMBER` forbids inventing one.
+ */
+export interface BusinessImpact {
+  readonly band: ImpactBand;
+  readonly totalMilli: number;
+  readonly factors: readonly ImpactFactorRow[];
+  readonly sentenceState: ImpactSentenceState;
+  /** The published sentence, or the recorded refusal reason. Null when not assessed. */
+  readonly sentence: string | null;
+}
+
+/** What the engine did with a cognition-run request, immediately. */
+export interface CognitionRunState {
+  readonly state: RunState;
+  readonly detail: string | null;
+}
+
+function narrowTag<T extends string>(vocabulary: readonly T[], raw: string): T | null {
+  return (vocabulary as readonly string[]).includes(raw) ? (raw as T) : null;
+}
+
+/** Project the telemetry read. FAIL-CLOSED on any tag that does not narrow; `null` for a refusal. */
+export function toIncidentTelemetry(wire: WireSocTelemetry): IncidentTelemetry | null {
+  if (wire.refused) {
+    return null;
+  }
+  const anchor = narrowTag(TELEMETRY_ANCHORS, wire.anchor);
+  if (anchor === null) {
+    return null;
+  }
+  const citedEvidence: CitedEvidenceRef[] = [];
+  for (const cited of wire.cited_evidence) {
+    const kind = narrowTag(EVIDENCE_KINDS, cited.kind);
+    if (kind === null) {
+      return null;
+    }
+    citedEvidence.push({ entry: cited.entry, kind });
+  }
+  const observations: TelemetryObservation[] = [];
+  for (const row of wire.observations) {
+    const observation = toTelemetryObservation(row);
+    if (observation === null) {
+      return null;
+    }
+    observations.push(observation);
+  }
+  return { anchor, citedEvidence, observations };
+}
+
+function toTelemetryObservation(row: WireObservationRow): TelemetryObservation | null {
+  const outcome = narrowTag(OBSERVATION_OUTCOMES, row.outcome);
+  if (outcome === null) {
+    return null;
+  }
+  return {
+    observationId: row.observation_id,
+    outcome,
+    observedAt: row.observed_at,
+    category: row.category === undefined || row.category === '' ? null : row.category,
+    fields: row.fields.map(([name, value]) => [name, value] as const),
+  };
+}
+
+/**
+ * Project the audit trail. FAIL-CLOSED on an act tag that does not narrow -- an act rendered under
+ * the wrong verb is the trail asserting something the chain did not record. `null` for a refusal.
+ */
+export function toAuditTrail(wire: WireSocAudit): readonly IncidentActRow[] | null {
+  if (wire.refused) {
+    return null;
+  }
+  const acts: IncidentActRow[] = [];
+  for (const row of wire.acts) {
+    const act = toIncidentAct(row);
+    if (act === null) {
+      return null;
+    }
+    acts.push(act);
+  }
+  return acts;
+}
+
+function toIncidentAct(row: WireIncidentAct): IncidentActRow | null {
+  const act = narrowTag(INCIDENT_ACTS, row.act);
+  if (act === null) {
+    return null;
+  }
+  return {
+    act,
+    principal: row.principal,
+    atSeconds: row.at_seconds,
+    detail: row.detail === undefined || row.detail === '' ? null : row.detail,
+  };
+}
+
+/**
+ * Project the impact assessment. FAIL-CLOSED on a band or sentence state outside the vocabulary;
+ * `null` for a refusal. A published sentence with EMPTY text is also refused here: the state and
+ * the words must agree, and rendering a blank "published" sentence would show the analyst an
+ * assessment that says nothing while claiming the model stands behind it.
+ */
+export function toBusinessImpact(wire: WireSocImpact): BusinessImpact | null {
+  if (wire.refused) {
+    return null;
+  }
+  const band = narrowTag(IMPACT_BANDS, wire.band);
+  const sentenceState = narrowTag(IMPACT_SENTENCE_STATES, wire.sentence_state);
+  if (band === null || sentenceState === null) {
+    return null;
+  }
+  const sentence = wire.sentence === undefined || wire.sentence === '' ? null : wire.sentence;
+  if (sentenceState === 'published' && sentence === null) {
+    return null;
+  }
+  return {
+    band,
+    totalMilli: wire.total_milli,
+    factors: wire.factors.map((factor) => ({
+      factor: factor.factor,
+      weightMilli: factor.weight_milli,
+      basis: factor.basis,
+    })),
+    sentenceState,
+    sentence,
+  };
+}
+
+/** Project a run request's immediate answer. FAIL-CLOSED on a state outside the vocabulary. */
+export function toCognitionRunState(wire: WireSocRunState): CognitionRunState | null {
+  const state = narrowTag(RUN_STATES, wire.state);
+  if (state === null) {
+    return null;
+  }
+  return {
+    state,
+    detail: wire.detail === undefined || wire.detail === '' ? null : wire.detail,
+  };
 }

@@ -15,13 +15,21 @@
 //   * CONTRADICTIONS is TECHNIQUE-scoped and says so. The engine records mute reasons per anchor over
 //     the window, not per incident; labelling it precisely is the difference between informing an
 //     analyst and letting them read a technique-wide count as this incident's own.
-//   * Business impact renders as an explicit absence naming what it waits on. Exposure in currency
-//     needs an asset-value plane that does not exist, and a plausible dollar figure on a security
-//     surface is worse than a missing one.
+//   * Business impact is the ENGINE's assessment (crdb ED.4 + ED.5): the band a deterministic
+//     weighted sum decided, the factors that produced it, and the model's one explaining sentence in
+//     its three honest states. Still NO currency figure -- exposure in dollars needs an asset-value
+//     plane that does not exist, and a plausible figure on a security surface is worse than a
+//     missing one. The sentence, like the narrative, is always labelled generated and never repaired.
 
 import { useState, type ReactElement } from 'react';
 import { Badge, ConfirmDialog } from '@forge/design';
-import type { SocIncidentDetail, SocKpis, VerdictNarrative, WithheldClaim } from '@forge/contracts';
+import type {
+  BusinessImpact,
+  SocIncidentDetail,
+  SocKpis,
+  VerdictNarrative,
+  WithheldClaim,
+} from '@forge/contracts';
 import {
   authorityLabel,
   confidenceLabel,
@@ -32,8 +40,81 @@ import {
 import { ErrorState, LoadingState } from '../states/States.js';
 import { authorityVariant } from './SocDecisionQueue.js';
 import { SocPlanEditor } from './SocPlanEditor.js';
+import { useCognitionRun } from './useCognitionRun.js';
 import { PlanCommandError, useApprovePlan, useModifyPlan } from './usePlanCommand.js';
-import { useSocNarrative } from './useSoc.js';
+import { useSocImpact, useSocNarrative } from './useSoc.js';
+
+/**
+ * The Business impact block (crdb ED.4 + ED.5): band + checkable factors + the sentence in its
+ * three honest states. `not_assessed` renders as itself -- the Generate control exists precisely so
+ * a read never fills this gap.
+ */
+function BusinessImpactBlock({
+  impact,
+}: {
+  readonly impact: BusinessImpact | null | undefined;
+}): ReactElement {
+  if (impact === undefined) {
+    return <p className="fcx-socv__state-detail">Loading the impact assessment.</p>;
+  }
+  if (impact === null) {
+    return (
+      <p className="fcx-socv__state-detail" data-testid="soc-business-impact">
+        The impact cannot be read: the incident is unknown, another tenant&apos;s, or above this
+        session&apos;s clearance.
+      </p>
+    );
+  }
+  return (
+    <div data-testid="soc-business-impact">
+      <p className="fcx-socv__state-detail">
+        <Badge
+          variant={
+            impact.band === 'Critical' || impact.band === 'High'
+              ? 'caution'
+              : impact.band === 'Medium'
+                ? 'info'
+                : 'neutral'
+          }
+        >
+          {impact.band}
+        </Badge>
+        <span className="fcx-socv__artifact"> assessed from {impact.factors.length} factor(s)</span>
+      </p>
+      {impact.sentenceState === 'published' && impact.sentence !== null ? (
+        <p className="fcx-socv__state-detail" data-testid="soc-impact-sentence">
+          <Badge variant="info">Generated</Badge> {impact.sentence}
+        </p>
+      ) : impact.sentenceState === 'refused' ? (
+        <p className="fcx-socv__state-detail" data-testid="soc-impact-sentence">
+          The model&apos;s explanation was refused rather than published
+          {impact.sentence === null ? '.' : `: ${impact.sentence}`}
+        </p>
+      ) : (
+        <p className="fcx-socv__state-detail" data-testid="soc-impact-sentence">
+          The band is computed; no explaining sentence has been generated yet.
+        </p>
+      )}
+      <ul className="fcx-socv__plan">
+        {impact.factors
+          .filter((factor) => factor.weightMilli !== 0)
+          .map((factor) => (
+            <li key={factor.factor} className="fcx-socv__step">
+              <span className="fcx-socv__step-title">{factor.factor}</span>
+              <Badge variant={factor.weightMilli < 0 ? 'neutral' : 'info'}>
+                {factor.weightMilli > 0
+                  ? `+${String(factor.weightMilli)}`
+                  : String(factor.weightMilli)}
+              </Badge>
+              <span className="fcx-socv__step-why">{factor.basis}</span>
+            </li>
+          ))}
+      </ul>
+      {/* Still no currency figure, on purpose: exposure in dollars needs an asset-value plane the
+          platform does not have (INV-SOC-NO-FABRICATED-NUMBER). */}
+    </div>
+  );
+}
 
 /** One stat card. `unavailable` is a first-class render, never an empty box. */
 function StatCard({
@@ -216,6 +297,8 @@ export interface SocVerdictPanelProps {
 
 export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelProps): ReactElement {
   const narrative = useSocNarrative(incidentId);
+  const impact = useSocImpact(incidentId);
+  const run = useCognitionRun();
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
   const approve = useApprovePlan();
@@ -261,6 +344,37 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
         </p>
       ) : null}
 
+      <div className="fcx-socv__controls">
+        {/* The ONE control that spends model time (crdb SOC_COGNITION_RUN): explicit, audited under
+            this operator, deduplicated engine-side. Opening the incident never generates; this
+            button is the only way generation starts, and its reply is what the engine DID, not the
+            run's result. */}
+        <button
+          type="button"
+          className="fcx-socv__control"
+          data-testid="soc-generate"
+          disabled={run.isPending || run.data?.state === 'started' || run.data?.state === 'running'}
+          onClick={() => {
+            run.mutate(incidentId);
+          }}
+        >
+          Generate verdict
+        </button>
+        <span className="fcx-socv__controls-note" data-testid="soc-generate-note">
+          {run.isPending
+            ? 'Asking the engine.'
+            : run.isError
+              ? run.error.message
+              : run.data === undefined
+                ? 'Runs the narrative and impact pipelines on the on-box model. Minutes, not seconds.'
+                : run.data.state === 'started' || run.data.state === 'running'
+                  ? 'The run is in flight. These panels re-read as the records land.'
+                  : run.data.state === 'recorded'
+                    ? 'Every record for this evidence already exists; nothing was re-generated.'
+                    : `The engine refused the run${run.data.detail === null ? '.' : `: ${run.data.detail}`}`}
+        </span>
+      </div>
+
       <h5 className="fcx-socv__sub">Already enforced</h5>
       <p className="fcx-socv__state-detail">
         {executed.length === 0
@@ -269,13 +383,7 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
       </p>
 
       <h5 className="fcx-socv__sub">Business impact</h5>
-      <p className="fcx-socv__state-detail" data-testid="soc-business-impact">
-        {/* Deliberately absent, with its gating work named. Exposure in currency needs an asset-value
-            plane the platform does not have; a plausible dollar figure here would be worse than a
-            missing one, because an analyst would act on it. */}
-        Not available. Exposure and blast radius need an asset-value plane, which the platform does
-        not have -- so this reports nothing rather than an estimate.
-      </p>
+      <BusinessImpactBlock impact={impact.data} />
 
       <h5 className="fcx-socv__sub">Coordinated response</h5>
       {detail.plan.length === 0 ? (

@@ -12,7 +12,12 @@
 
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import type { SocIncidentDetail, SocKpis, VerdictNarrative } from '@forge/contracts';
+import type {
+  BusinessImpact,
+  SocIncidentDetail,
+  SocKpis,
+  VerdictNarrative,
+} from '@forge/contracts';
 
 import { SocVerdictPanel } from '../surfaces/SocVerdictPanel.js';
 import { renderWithProviders } from './render.js';
@@ -68,16 +73,38 @@ const NARRATIVE: VerdictNarrative = {
   inputHash: '',
 };
 
-function mockNarrative(narrative: VerdictNarrative): void {
+/** The impact fixture: a computed band with no sentence yet -- the commonest live state. */
+const IMPACT: BusinessImpact = {
+  band: 'Medium',
+  totalMilli: 640,
+  factors: [
+    { factor: 'confidence', weightMilli: 400, basis: 'the finding is corroborated' },
+    { factor: 'observed_leg', weightMilli: 240, basis: 'an observed telemetry leg backs it' },
+    { factor: 'suppression', weightMilli: 0, basis: 'nothing suppressed this technique' },
+  ],
+  sentenceState: 'not_assessed',
+  sentence: null,
+};
+
+/** Route-aware: the panel now reads the narrative AND the impact, and the two must not blur. */
+function mockNarrative(narrative: VerdictNarrative, impact: BusinessImpact | null = IMPACT): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(() =>
-      Promise.resolve({
+    vi.fn((url: string) => {
+      const body = url.includes('/api/soc/impact') ? impact : narrative;
+      if (body === null) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({}),
+        } as Response);
+      }
+      return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(narrative),
-      } as Response),
-    ),
+        json: () => Promise.resolve(body),
+      } as Response);
+    }),
   );
 }
 
@@ -213,17 +240,67 @@ describe('the FORGE VERDICT panel (S3.6)', () => {
     expect(card).toHaveTextContent(/Nothing suppressed T1071 in this window/);
   });
 
-  it('renders business impact as an explicit absence naming what it waits on', async () => {
-    // A plausible dollar figure on a security surface is worse than a missing one: an analyst acts
-    // on it.
+  it('renders the assessed band with its checkable factors, and still no currency figure', async () => {
+    // The band is the engine's deterministic assessment (crdb ED.4). A dollar figure would still be
+    // fabricated -- there is no asset-value plane -- so none is rendered.
     mockNarrative(NARRATIVE);
 
     renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={DETAIL} kpis={KPIS} />);
 
     const impact = await screen.findByTestId('soc-business-impact');
-    expect(impact).toHaveTextContent(/Not available/);
-    expect(impact).toHaveTextContent(/asset-value plane/);
-    expect(impact.textContent).not.toMatch(/\$|0\b/);
+    expect(impact).toHaveTextContent('Medium');
+    expect(impact).toHaveTextContent('confidence');
+    expect(impact).toHaveTextContent(/corroborated/);
+    // A zero-weight factor is noise here; the arithmetic stays checkable through the non-zero ones.
+    expect(impact).not.toHaveTextContent('nothing suppressed this technique');
+    expect(impact.textContent).not.toMatch(/\$/);
+  });
+
+  it('keeps the three sentence states distinct on the impact block', async () => {
+    // Same discipline as the narrative: "nobody asked", "the pipeline declined", and "here it is"
+    // are three different facts, and the band never waits on any of them.
+    mockNarrative(NARRATIVE, {
+      ...IMPACT,
+      sentenceState: 'published',
+      sentence: 'The assessed impact is Medium because the finding is corroborated.',
+    });
+    const { unmount } = renderWithProviders(
+      <SocVerdictPanel incidentId="ep-soc-1" detail={DETAIL} kpis={KPIS} />,
+    );
+    const published = await screen.findByTestId('soc-impact-sentence');
+    expect(published).toHaveTextContent(/Medium because the finding is corroborated/);
+    expect(published).toHaveTextContent('Generated');
+    unmount();
+
+    mockNarrative(NARRATIVE, {
+      ...IMPACT,
+      sentenceState: 'refused',
+      sentence: 'the sentence names `host-9`, which is not a fact of this incident',
+    });
+    const second = renderWithProviders(
+      <SocVerdictPanel incidentId="ep-soc-2" detail={DETAIL} kpis={KPIS} />,
+    );
+    const refused = await screen.findByTestId('soc-impact-sentence');
+    expect(refused).toHaveTextContent(/refused rather than published/);
+    expect(refused).toHaveTextContent(/host-9/);
+    second.unmount();
+
+    mockNarrative(NARRATIVE, IMPACT);
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-3" detail={DETAIL} kpis={KPIS} />);
+    const absent = await screen.findByTestId('soc-impact-sentence');
+    expect(absent).toHaveTextContent(/no explaining sentence has been generated yet/);
+  });
+
+  it('offers Generate as the one explicit way to spend model time', async () => {
+    // Opening the incident never generates (the reads are reads); this control is the only trigger,
+    // and its note says what a run costs before the operator clicks.
+    mockNarrative(NARRATIVE);
+
+    renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={DETAIL} kpis={KPIS} />);
+
+    const generate = await screen.findByTestId('soc-generate');
+    expect(generate).toBeEnabled();
+    expect(screen.getByTestId('soc-generate-note')).toHaveTextContent(/Minutes, not seconds/);
   });
 
   it('explains an empty response plan rather than showing an empty list', async () => {
@@ -303,10 +380,11 @@ describe('the plan commands (S3.8)', () => {
           json: () => Promise.resolve(effect ?? { error: 'refused' }),
         } as Response);
       }
+      const body = String(url).includes('/api/soc/impact') ? IMPACT : NARRATIVE;
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(NARRATIVE),
+        json: () => Promise.resolve(body),
       } as Response);
     });
     vi.stubGlobal('fetch', spy);
@@ -435,10 +513,11 @@ describe('the plan editor (S3.8b, the Modify deferral resolved)', () => {
           json: () => Promise.resolve(effect ?? { error: 'refused' }),
         } as Response);
       }
+      const body = String(url).includes('/api/soc/impact') ? IMPACT : NARRATIVE;
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(NARRATIVE),
+        json: () => Promise.resolve(body),
       } as Response);
     });
     vi.stubGlobal('fetch', spy);

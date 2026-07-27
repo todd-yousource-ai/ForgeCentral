@@ -84,6 +84,10 @@ import {
   resolveApprovePlan,
   resolveModifyPlan,
   resolveSocKpis,
+  resolveAuditTrail,
+  resolveBusinessImpact,
+  resolveCognitionRun,
+  resolveIncidentTelemetry,
 } from './engine/soc.js';
 import {
   resolveIdamConfigure,
@@ -1412,7 +1416,7 @@ async function handleSocCommand(
   path: string,
   res: ServerResponse,
 ): Promise<boolean> {
-  const paths = new Set(['/api/soc/plan/approve', '/api/soc/plan/modify']);
+  const paths = new Set(['/api/soc/plan/approve', '/api/soc/plan/modify', '/api/soc/generate']);
   if (!paths.has(path) || method !== 'POST') return false;
   const session = deps.authRouter?.resolveSession(req);
   if (!session) {
@@ -1439,6 +1443,16 @@ async function handleSocCommand(
   const engine = deps.operatorEngine;
   const opts = { timeoutMs: deps.config.requestTimeoutMs };
   try {
+    if (path === '/api/soc/generate') {
+      // The one control that spends model time (crdb SOC_COGNITION_RUN): explicit, engine-deduped,
+      // audited under the operator. The reply is what the engine DID (started/running/recorded/
+      // refused), never the run's result -- the surface polls the narrative + impact reads for
+      // that. The warm SOC projection is dropped so the reads observe the records as they land.
+      const state = await resolveCognitionRun(engine, principal, incident, opts);
+      deps.cache.deletePrefix(socCachePrefix(principal.tenant));
+      sendJson(res, 200, state);
+      return true;
+    }
     let effect;
     if (path === '/api/soc/plan/approve') {
       // The revision the operator was SHOWN. Required, not defaulted: defaulting it to 0 would turn
@@ -1508,6 +1522,9 @@ async function handleSoc(
     '/api/soc/incidents',
     '/api/soc/incident',
     '/api/soc/narrative',
+    '/api/soc/telemetry',
+    '/api/soc/audit',
+    '/api/soc/impact',
   ]);
   if (!reads.has(path)) return false;
   const session = deps.authRouter?.resolveSession(req);
@@ -1528,9 +1545,15 @@ async function handleSoc(
   }
   const principal = principalFromSession(session, activeTenantOverride(req));
   const prefix = socCachePrefix(principal.tenant);
-  const perIncident = path === '/api/soc/incident' || path === '/api/soc/narrative';
-  const cacheKey = perIncident
-    ? `${prefix}${path === '/api/soc/incident' ? 'detail' : 'narrative'}:${incident ?? ''}`
+  const perIncidentKind = {
+    '/api/soc/incident': 'detail',
+    '/api/soc/narrative': 'narrative',
+    '/api/soc/telemetry': 'telemetry',
+    '/api/soc/audit': 'audit',
+    '/api/soc/impact': 'impact',
+  }[path];
+  const cacheKey = perIncidentKind
+    ? `${prefix}${perIncidentKind}:${incident ?? ''}`
     : `${prefix}${path === '/api/soc/kpis' ? 'kpis' : 'incidents'}`;
   const cached = deps.cache.get(cacheKey, SOC_CACHE_VERSION);
   if (cached !== undefined) {
@@ -1557,6 +1580,24 @@ async function handleSoc(
       if (view === null) {
         // Unknown / foreign / over-clearance, indistinguishable by design. NOT cached: a later grant
         // must not be masked by a warm negative.
+        sendJson(res, 404, { error: 'not_found' });
+        return true;
+      }
+      deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
+      sendJson(res, 200, view);
+      return true;
+    }
+    if (path === '/api/soc/telemetry' || path === '/api/soc/audit' || path === '/api/soc/impact') {
+      // The three evidence-depth reads (crdb ED.2/ED.3/ED.4+5). One shared refusal shape: null is
+      // the engine's indistinguishable unknown/foreign/over-clearance, mapped to the same 404 the
+      // detail read uses, and never cached.
+      const view =
+        path === '/api/soc/telemetry'
+          ? await resolveIncidentTelemetry(engine, principal, incident ?? '', opts)
+          : path === '/api/soc/audit'
+            ? await resolveAuditTrail(engine, principal, incident ?? '', opts)
+            : await resolveBusinessImpact(engine, principal, incident ?? '', opts);
+      if (view === null) {
         sendJson(res, 404, { error: 'not_found' });
         return true;
       }

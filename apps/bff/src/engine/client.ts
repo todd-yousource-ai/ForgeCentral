@@ -48,8 +48,16 @@ import type {
   WireSocIncidentDetailQuery,
   WireSocIncidentList,
   WireSocIncidentListQuery,
+  WireSocAudit,
+  WireSocAuditQuery,
+  WireSocCognitionRun,
+  WireSocImpact,
+  WireSocImpactQuery,
   WireSocNarrative,
   WireSocNarrativeQuery,
+  WireSocRunState,
+  WireSocTelemetry,
+  WireSocTelemetryQuery,
   WireSocPlanApprove,
   WireSocPlanEffect,
   WireSocPlanModify,
@@ -168,6 +176,20 @@ export interface CrucibleClient {
   /** Read one incident's recorded verdict narrative (SOC_NARRATIVE, crdb VN.7b). A READ, never a
    * trigger: opening an incident must not cause generation. */
   socNarrative(request: WireSocNarrativeQuery, opts?: EngineCallOptions): Promise<WireSocNarrative>;
+  /** Resolve an incident's evidence to the raw records behind it (SOC_INCIDENT_TELEMETRY, crdb
+   * ED.2). Aged-out and restricted observations are reported WITH their references, never omitted. */
+  socTelemetry(request: WireSocTelemetryQuery, opts?: EngineCallOptions): Promise<WireSocTelemetry>;
+  /** Read the operator acts recorded against one incident (SOC_INCIDENT_AUDIT, crdb ED.3): an index
+   * into the hash-chained audit record, never a second log. */
+  socAudit(request: WireSocAuditQuery, opts?: EngineCallOptions): Promise<WireSocAudit>;
+  /** Read one incident's assessed impact (SOC_INCIDENT_IMPACT, crdb ED.4/ED.5): the band a weighted
+   * sum decided, its factors, and the recorded sentence in its three honest states. A READ -- it
+   * never triggers generation. */
+  socImpact(request: WireSocImpactQuery, opts?: EngineCallOptions): Promise<WireSocImpact>;
+  /** Run the narrative + impact pipelines for one incident in the background (SOC_COGNITION_RUN).
+   * Replies immediately with started/running/recorded/refused, never the run's result; the records
+   * are read back through socNarrative/socImpact once committed. Audited under the operator. */
+  socCognitionRun(request: WireSocCognitionRun, opts?: EngineCallOptions): Promise<WireSocRunState>;
   /** Approve an incident's response plan (SOC_PLAN_APPROVE, crdb SS.5). Audited under the operator.
    * The effect carries `enforcement_active`, which is FALSE on this deployment: the authorization is
    * real and each containment step comes back `refused` with its reason. */

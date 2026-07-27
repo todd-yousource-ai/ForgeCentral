@@ -230,59 +230,71 @@ describe('the lineage graph inside the surface (S3.5)', () => {
                   detectionEnabled: true,
                   suppressingInputs: [],
                 }
-              : url.includes('/narrative')
+              : url.includes('/impact')
                 ? {
-                    found: false,
-                    published: false,
-                    refusal: null,
-                    headline: '',
-                    narrative: [],
-                    impact: [],
-                    response: [],
-                    citedEvidence: [],
-                    withheld: [],
-                    needsHumanReview: false,
-                    modelRef: '',
-                    inputHash: '',
+                    band: 'Medium',
+                    totalMilli: 640,
+                    factors: [],
+                    sentenceState: 'not_assessed',
+                    sentence: null,
                   }
-                : url.includes('/incident?')
-                  ? {
-                      row: {
-                        incidentId: 'ep-soc-1',
-                        ruleId: 'LR-C2-001',
-                        anchor: 'T1071',
-                        subject: 'codex-helper',
-                        finding: 'Repeated outbound contact',
-                        authority: 'review_required',
-                        posture: 'candidate',
-                        confidence: 'HIGH',
-                        openedAt: 1,
-                        lastSeen: 2,
-                        evidenceCount: 1,
-                      },
-                      nodes: NODES,
-                      edges: EDGES,
-                      evidence: [{ leg: 'leg:net:198.51.100.7' }],
-                      plan: [],
-                      planRevision: 0,
-                      planApproved: false,
-                      narrativeRef: null,
-                    }
-                  : [
-                      {
-                        incidentId: 'ep-soc-1',
-                        ruleId: 'LR-C2-001',
-                        anchor: 'T1071',
-                        subject: 'codex-helper',
-                        finding: 'Repeated outbound contact',
-                        authority: 'review_required',
-                        posture: 'candidate',
-                        confidence: 'HIGH',
-                        openedAt: 1,
-                        lastSeen: 2,
-                        evidenceCount: 1,
-                      },
-                    ],
+                : url.includes('/telemetry')
+                  ? { anchor: 'anchored', citedEvidence: [], observations: [] }
+                  : url.includes('/audit')
+                    ? []
+                    : url.includes('/narrative')
+                      ? {
+                          found: false,
+                          published: false,
+                          refusal: null,
+                          headline: '',
+                          narrative: [],
+                          impact: [],
+                          response: [],
+                          citedEvidence: [],
+                          withheld: [],
+                          needsHumanReview: false,
+                          modelRef: '',
+                          inputHash: '',
+                        }
+                      : url.includes('/incident?')
+                        ? {
+                            row: {
+                              incidentId: 'ep-soc-1',
+                              ruleId: 'LR-C2-001',
+                              anchor: 'T1071',
+                              subject: 'codex-helper',
+                              finding: 'Repeated outbound contact',
+                              authority: 'review_required',
+                              posture: 'candidate',
+                              confidence: 'HIGH',
+                              openedAt: 1,
+                              lastSeen: 2,
+                              evidenceCount: 1,
+                            },
+                            nodes: NODES,
+                            edges: EDGES,
+                            evidence: [{ leg: 'leg:net:198.51.100.7' }],
+                            plan: [],
+                            planRevision: 0,
+                            planApproved: false,
+                            narrativeRef: null,
+                          }
+                        : [
+                            {
+                              incidentId: 'ep-soc-1',
+                              ruleId: 'LR-C2-001',
+                              anchor: 'T1071',
+                              subject: 'codex-helper',
+                              finding: 'Repeated outbound contact',
+                              authority: 'review_required',
+                              posture: 'candidate',
+                              confidence: 'HIGH',
+                              openedAt: 1,
+                              lastSeen: 2,
+                              evidenceCount: 1,
+                            },
+                          ],
           ),
       } as Response),
     );

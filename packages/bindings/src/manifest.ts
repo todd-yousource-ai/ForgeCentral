@@ -793,39 +793,57 @@ const socReads: readonly ReadBinding[] = [
     status: { kind: 'live' },
   },
   {
-    // The dock's Raw Telemetry pane. Nothing maps an incident's evidence legs back to the records
-    // behind them: LOG_EXPLAIN keys on a decision id, which an episode's legs are not. The pane
-    // renders an explicit not-available naming this, rather than a mock.
+    // The dock's Raw Telemetry pane (crdb IP-SOC-EVIDENCE-DEPTH ED.2, SOC_INCIDENT_TELEMETRY): the
+    // incident's evidence resolved to the raw records behind it, with aged-out and restricted
+    // observations reported WITH their references rather than omitted. The gap this binding named
+    // while PENDING is exactly what ED.2 closed.
     id: bindingId('soc.telemetry.raw'),
     kind: 'read',
     surface: 'cruciblql',
-    op: 'soc_incident_raw_telemetry_v1',
-    viewModel: 'EvidenceRow',
-    status: {
-      kind: 'pending',
-      owningRepo: 'crdb',
-      gatingTask:
-        'a leg-to-raw-record read scoped to one incident (LOG_EXPLAIN keys on a decision id)',
-    },
+    op: 'soc_incident_telemetry_v1',
+    viewModel: 'IncidentTelemetry',
+    status: { kind: 'live' },
   },
   {
-    // The dock's Audit Trail pane. Audit entries reach the Console on the live stream
-    // (WireStreamDelta), not as a query scoped to one incident. Operator acts ARE audited
-    // engine-side; nothing can list them per incident yet.
+    // The dock's Audit Trail pane (crdb ED.3, SOC_INCIDENT_AUDIT): the operator acts recorded
+    // against one incident -- an INDEX into the hash-chained audit record written in the SAME
+    // commit batch as each act, never a second log and never assembled from the live stream.
     id: bindingId('soc.audit.trail'),
     kind: 'read',
     surface: 'cruciblql',
     op: 'soc_incident_audit_v1',
-    viewModel: 'WireAuditEntry',
-    status: {
-      kind: 'pending',
-      owningRepo: 'crdb',
-      gatingTask: 'a per-incident audit query (entries exist only on the live stream today)',
-    },
+    viewModel: 'IncidentActRow',
+    status: { kind: 'live' },
+  },
+  {
+    // The verdict panel's Business impact (crdb ED.4 + ED.5, SOC_INCIDENT_IMPACT): the band a
+    // deterministic weighted sum decided, its factors, and the model's one explaining sentence in
+    // its three honest states. Deliberately NO currency figure -- there is no asset-value plane,
+    // and INV-SOC-NO-FABRICATED-NUMBER forbids inventing one.
+    id: bindingId('soc.impact'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_incident_impact_v1',
+    viewModel: 'BusinessImpact',
+    status: { kind: 'live' },
   },
 ];
 
 const socCommands: readonly CommandBinding[] = [
+  {
+    // Start the narrative + impact pipelines for one incident (crdb SOC_COGNITION_RUN, the ED
+    // runner). The ONE control that spends model time: explicit (a read must never trigger
+    // generation), deduplicated engine-side by reuse key and an in-flight guard, and the records
+    // commit through an audit-chained batch under the operator (INV-SOC-RUN-AUDITED). The reply is
+    // what the engine did -- started/running/recorded/refused -- never the run's result.
+    id: bindingId('soc.cognition.run'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_cognition_run_v1',
+    authz: 'operator:soc.respond',
+    audited: true,
+    status: { kind: 'live' },
+  },
   {
     // The operator authorizes a plan (crdb SS.5), audited under their principal. The effect carries
     // enforcement_active: false -- an approval is an AUTHORIZATION, never a containment.

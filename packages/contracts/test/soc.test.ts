@@ -424,3 +424,87 @@ describe('the SOC Ops contract (S3.1)', () => {
     expect([...EDGE_STATES]).toEqual(['observed', 'inferred', 'verified', 'pending']);
   });
 });
+
+// -- the evidence-depth narrowers (S3.8c; crdb ED.2-ED.5 + the runner) -------------------------------
+
+import {
+  toAuditTrail,
+  toBusinessImpact,
+  toCognitionRunState,
+  toIncidentTelemetry,
+} from '../src/index.js';
+
+describe('the evidence-depth narrowers (S3.8c)', () => {
+  it('narrows every telemetry vocabulary and preserves unresolvable references', () => {
+    const telemetry = toIncidentTelemetry({
+      anchor: 'window_unavailable',
+      cited_evidence: [
+        { entry: 'Network Traffic Content', kind: 'data_component' },
+        { entry: 'leg:obs-1', kind: 'leg' },
+      ],
+      observations: [{ observation_id: 'obs-2', outcome: 'aged_out', observed_at: 0, fields: [] }],
+      refused: false,
+    });
+    expect(telemetry?.anchor).toBe('window_unavailable');
+    expect(telemetry?.citedEvidence.map((cited) => cited.kind)).toEqual(['data_component', 'leg']);
+    expect(telemetry?.observations[0]?.outcome).toBe('aged_out');
+  });
+
+  it('refuses a telemetry payload carrying an unknown kind, outcome, or anchor', () => {
+    const base = {
+      anchor: 'anchored',
+      cited_evidence: [],
+      observations: [],
+      refused: false,
+    };
+    expect(
+      toIncidentTelemetry({
+        ...base,
+        cited_evidence: [{ entry: 'x', kind: 'hunch' }],
+      }),
+    ).toBeNull();
+    expect(
+      toIncidentTelemetry({
+        ...base,
+        observations: [{ observation_id: 'o', outcome: 'vanished', observed_at: 0, fields: [] }],
+      }),
+    ).toBeNull();
+    expect(toIncidentTelemetry({ ...base, anchor: 'floating' })).toBeNull();
+  });
+
+  it('narrows the audit trail closed on the four recorded acts', () => {
+    const trail = toAuditTrail({
+      acts: [
+        { act: 'contained', principal: 'p-1', at_seconds: 1, detail: 'quarantine aig:agent:x' },
+      ],
+      refused: false,
+    });
+    expect(trail?.[0]?.act).toBe('contained');
+    expect(
+      toAuditTrail({ acts: [{ act: 'observed', principal: 'p', at_seconds: 0 }], refused: false }),
+    ).toBeNull();
+  });
+
+  it('refuses a published impact sentence with no words in it', () => {
+    // The state and the words must agree: "published" with empty text would render an assessment
+    // that says nothing while claiming the model stands behind it.
+    expect(
+      toBusinessImpact({
+        band: 'Medium',
+        total_milli: 640,
+        factors: [],
+        sentence_state: 'published',
+        sentence: '',
+        refused: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('narrows the run acknowledgement closed', () => {
+    expect(toCognitionRunState({ state: 'recorded', detail: '' })).toEqual({
+      state: 'recorded',
+      detail: null,
+    });
+    expect(toCognitionRunState({ state: 'detonated', detail: '' })).toBeNull();
+  });
+});
