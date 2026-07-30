@@ -108,6 +108,17 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'SocIncidentList' in request ||
       'SocIncidentDetail' in request ||
       'SocNarrative' in request ||
+      // The evidence-depth reads (SOC_INCIDENT_TELEMETRY, crdb ED.2; SOC_INCIDENT_AUDIT, ED.3;
+      // SOC_INCIDENT_IMPACT, ED.4/ED.5) and the cognition command (SOC_COGNITION_RUN) ride the same
+      // opcode. They were MISSING here while their client methods, resolvers, and routes all
+      // shipped, so every call fell through to the "not yet wired" throw below and failed
+      // CLIENT-SIDE before a byte reached the engine -- diagnosed 2026-07-29 from the live BFF
+      // journal: socAudit/socImpact/socTelemetry failed 100% while every mapped verb succeeded.
+      // The hygiene test in dispatch.test.ts now fails the build if a Soc* variant is unmapped.
+      'SocTelemetry' in request ||
+      'SocAudit' in request ||
+      'SocImpact' in request ||
+      'SocCognitionRun' in request ||
       // The SOC plan COMMANDS (SOC_PLAN_APPROVE / SOC_PLAN_MODIFY, crdb SS.5) ride the QuerySubmit
       // opcode like the other data-plane writes; the engine routes them to the write path by tag.
       'SocPlanApprove' in request ||

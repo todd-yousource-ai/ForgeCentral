@@ -30,7 +30,11 @@ import type {
   WirePolicyDetailQuery,
   WireSocIncidentDetailQuery,
   WireSocIncidentListQuery,
+  WireSocAuditQuery,
+  WireSocCognitionRun,
+  WireSocImpactQuery,
   WireSocNarrativeQuery,
+  WireSocTelemetryQuery,
   WireSocPlanApprove,
   WireSocPlanModify,
   WirePolicyEdit,
@@ -567,6 +571,46 @@ function socNarrativeToCbor(request: WireSocNarrativeQuery): unknown {
   return out;
 }
 
+/** `SOC_INCIDENT_TELEMETRY` (crdb ED.2). Rust struct order: request_id, incident, operator?. */
+function socTelemetryToCbor(request: WireSocTelemetryQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_INCIDENT_AUDIT` (crdb ED.3). Rust struct order: request_id, incident, operator?. */
+function socAuditToCbor(request: WireSocAuditQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_INCIDENT_IMPACT` (crdb ED.4/ED.5). Rust struct order: request_id, incident, operator?. */
+function socImpactToCbor(request: WireSocImpactQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_COGNITION_RUN`. Rust struct order: request_id, incident, operator?. */
+function socCognitionRunToCbor(request: WireSocCognitionRun): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 function policyDetailToCbor(request: WirePolicyDetailQuery): unknown {
   const out: Record<string, unknown> = {
     request_id: request.request_id,
@@ -797,6 +841,18 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocNarrative' in request) {
     return encode({ SocNarrative: socNarrativeToCbor(request.SocNarrative) });
+  }
+  if ('SocTelemetry' in request) {
+    return encode({ SocTelemetry: socTelemetryToCbor(request.SocTelemetry) });
+  }
+  if ('SocAudit' in request) {
+    return encode({ SocAudit: socAuditToCbor(request.SocAudit) });
+  }
+  if ('SocImpact' in request) {
+    return encode({ SocImpact: socImpactToCbor(request.SocImpact) });
+  }
+  if ('SocCognitionRun' in request) {
+    return encode({ SocCognitionRun: socCognitionRunToCbor(request.SocCognitionRun) });
   }
   if ('SocPlanApprove' in request) {
     return encode({ SocPlanApprove: socPlanApproveToCbor(request.SocPlanApprove) });
