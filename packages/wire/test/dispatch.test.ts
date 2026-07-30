@@ -1,5 +1,6 @@
 // packages/wire/test/dispatch.test.ts -- F0.3b-3c operation dispatch (hermetic).
 
+import { readFile } from 'node:fs/promises';
 import { Duplex, PassThrough } from 'node:stream';
 
 import type { WireReply, WireRequest } from '@forge/contracts';
@@ -105,6 +106,20 @@ describe('dispatch', () => {
     { VtzEdit: { request_id: 1, operator: null, spec: VTZ_SPEC } },
     { VtzRescope: { request_id: 1, operator: null, vtz_id: 'a', new_name: 'b' } },
     { VtzDelete: { request_id: 1, operator: null, vtz_id: 'a' } },
+    // The SOC Ops surface. All nine ride QuerySubmit; four of them (SocTelemetry, SocAudit,
+    // SocImpact, SocCognitionRun) were UNMAPPED in dispatch while their client methods, resolvers
+    // and routes all shipped, so every call threw client-side before a byte reached the engine.
+    // This file had ZERO SOC coverage, which is why it shipped -- diagnosed 2026-07-29 from the
+    // live BFF journal (socAudit/socImpact/socTelemetry failed 100%, every mapped verb succeeded).
+    { SocIncidentList: { request_id: 1, limit: 50 } },
+    { SocIncidentDetail: { request_id: 1, incident: 'i1' } },
+    { SocNarrative: { request_id: 1, incident: 'i1' } },
+    { SocTelemetry: { request_id: 1, incident: 'i1' } },
+    { SocAudit: { request_id: 1, incident: 'i1' } },
+    { SocImpact: { request_id: 1, incident: 'i1' } },
+    { SocCognitionRun: { request_id: 1, incident: 'i1' } },
+    { SocPlanApprove: { request_id: 1, incident: 'i1', at_revision: 1 } },
+    { SocPlanModify: { request_id: 1, incident: 'i1', steps: [] } },
   ];
 
   it.each(QUERY_SUBMIT_VARIANTS.map((r) => [Object.keys(r)[0] ?? '?', r] as const))(
@@ -125,6 +140,29 @@ describe('dispatch', () => {
       await Promise.all([dispatch(client, request), serverScript]);
     },
   );
+
+  // HYGIENE (2026-07-29): the behavioural cases above only cover variants someone remembered to
+  // list. This asserts the mapping against the GENERATED CONTRACT itself, so a Soc* request added
+  // to `@forge/contracts` without a dispatch opcode fails the build instead of failing at runtime
+  // for an operator. The SOC gap that prompted it was invisible to every existing test.
+  it('maps every Soc* WireRequest variant in the generated contract', async () => {
+    const contract = await readFile(
+      new URL('../../contracts/src/generated/wire-dto.ts', import.meta.url),
+      'utf8',
+    );
+    const dispatchSrc = await readFile(new URL('../src/dispatch.ts', import.meta.url), 'utf8');
+    // The WireRequest union is the second Soc-bearing union in the file (WireReply is the first),
+    // so scope the scan to the WireRequest declaration.
+    const requestUnion = contract.slice(contract.indexOf('export type WireRequest ='));
+    const declared = new Set(
+      [...requestUnion.matchAll(/\|\s*\{\s*(Soc[A-Za-z]+):/g)].map((m) => m[1] ?? ''),
+    );
+    expect(declared.size).toBeGreaterThan(5);
+    const unmapped = [...declared].filter((v) => !dispatchSrc.includes(`'${v}' in request`));
+    expect(unmapped, `Soc* variants declared in the contract but not wired in dispatch`).toEqual(
+      [],
+    );
+  });
 
   it('refuses a request variant with no wired frame opcode (fails loud, not mis-framed)', async () => {
     const [clientStream] = duplexPair();
