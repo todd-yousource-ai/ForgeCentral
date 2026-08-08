@@ -290,9 +290,11 @@ export function SocOpsSurface(): ReactElement {
           {kpis.data ? <KpiStrip kpis={kpis.data} /> : null}
 
           <div className="fcx-socops__work">
+            {/* The ruled container name (crdb IP-SOC-CREDIBILITY-CHANNELS): the credibility
+                algorithm is the only ingress, and the container says so. */}
             <GlassPanel
-              ariaLabel="Decision queue"
-              header={<span>Decision Queue</span>}
+              ariaLabel="Credibility alerts"
+              header={<span>Credibility Alerts</span>}
               className="fcx-socops__queue"
             >
               <SocDecisionQueue
