@@ -65,7 +65,7 @@ dependencies = [
 [[package]]
 name = "cdb-artifact"
 version = "0.0.0"
-source = "git+https://github.com/todd-yousource-ai/Crucible.git?rev=5be841b38156645b884f68942d11088ae4a8c32b#5be841b38156645b884f68942d11088ae4a8c32b"
+source = "git+https://github.com/todd-yousource-ai/Crucible.git?rev=b5e301ff0f574138b8871d4823165b94afc16dbb#b5e301ff0f574138b8871d4823165b94afc16dbb"
 dependencies = [
  "aws-lc-rs",
  "cdb-observe",
@@ -80,7 +80,7 @@ dependencies = [
 [[package]]
 name = "cdb-mtls"
 version = "0.0.0"
-source = "git+https://github.com/todd-yousource-ai/Crucible.git?rev=5be841b38156645b884f68942d11088ae4a8c32b#5be841b38156645b884f68942d11088ae4a8c32b"
+source = "git+https://github.com/todd-yousource-ai/Crucible.git?rev=b5e301ff0f574138b8871d4823165b94afc16dbb#b5e301ff0f574138b8871d4823165b94afc16dbb"
 dependencies = [
  "aws-lc-rs",
  "rustls",
@@ -90,12 +90,12 @@ dependencies = [
 [[package]]
 name = "cdb-observe"
 version = "0.0.0"
-source = "git+https://github.com/todd-yousource-ai/Crucible.git?rev=5be841b38156645b884f68942d11088ae4a8c32b#5be841b38156645b884f68942d11088ae4a8c32b"
+source = "git+https://github.com/todd-yousource-ai/Crucible.git?rev=b5e301ff0f574138b8871d4823165b94afc16dbb#b5e301ff0f574138b8871d4823165b94afc16dbb"
 
 [[package]]
 name = "cdb-types"
 version = "0.0.0"
-source = "git+https://github.com/todd-yousource-ai/Crucible.git?rev=5be841b38156645b884f68942d11088ae4a8c32b#5be841b38156645b884f68942d11088ae4a8c32b"
+source = "git+https://github.com/todd-yousource-ai/Crucible.git?rev=b5e301ff0f574138b8871d4823165b94afc16dbb#b5e301ff0f574138b8871d4823165b94afc16dbb"
 dependencies = [
  "serde",
  "thiserror",
