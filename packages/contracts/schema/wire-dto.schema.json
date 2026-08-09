@@ -1528,11 +1528,20 @@
         "confidence": {
           "type": "string"
         },
+        "credibility_milli": {
+          "type": "integer"
+        },
+        "destination": {
+          "type": "string"
+        },
         "evidence_count": {
           "type": "integer"
         },
         "finding": {
           "type": "string"
+        },
+        "implied_probability_milli": {
+          "type": "integer"
         },
         "incident_id": {
           "type": "string"
@@ -1550,6 +1559,9 @@
           "type": "string"
         },
         "subject": {
+          "type": "string"
+        },
+        "subject_name": {
           "type": "string"
         }
       },
@@ -4200,6 +4212,18 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocDispositioned": {
+              "$ref": "#/$defs/WireSocDispositionOutcome"
+            }
+          },
+          "required": [
+            "SocDispositioned"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocImpact": {
               "$ref": "#/$defs/WireSocImpact"
             }
@@ -5031,6 +5055,18 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocDisposition": {
+              "$ref": "#/$defs/WireSocDisposition"
+            }
+          },
+          "required": [
+            "SocDisposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocImpact": {
               "$ref": "#/$defs/WireSocImpactQuery"
             }
@@ -5301,6 +5337,72 @@
       "required": [
         "request_id",
         "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocDisposition": {
+      "additionalProperties": false,
+      "properties": {
+        "accepting_party": {
+          "type": "string"
+        },
+        "action_taken": {
+          "type": "string"
+        },
+        "authorized_by": {
+          "type": "string"
+        },
+        "blocking_control": {
+          "type": "string"
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "expiry_seconds": {
+          "type": "integer"
+        },
+        "incident": {
+          "type": "string"
+        },
+        "justification": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "predecessor": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident",
+        "disposition"
+      ],
+      "type": "object"
+    },
+    "WireSocDispositionOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "closed_now": {
+          "type": "boolean"
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "closed_now",
+        "refused"
       ],
       "type": "object"
     },

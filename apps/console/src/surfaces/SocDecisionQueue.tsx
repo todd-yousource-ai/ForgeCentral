@@ -12,10 +12,13 @@
 // it never re-sorts, and the All channel is the default so nothing is hidden until an analyst asks.
 //
 // HONESTY RULES:
-//   * THERE IS NO SCORE. The prototype leads each card with a 94.1 and a dollar exposure; the engine
-//     records neither, the contract has no field for either, and the card leads with what an analyst
-//     actually acts on -- what the incident needs from a human. (SC.4: no probability string may
-//     render in either channel until a calibration is committed WITH a weight-set version.)
+//   * NO FABRICATED SCORE, AND A PROBABILITY ONLY WHEN THE ENGINE CALIBRATED ONE. The prototype
+//     leads each card with a 94.1 and a dollar exposure; the engine invents neither. The card
+//     leads with what an analyst acts on -- what the incident needs from a human. Since the GV.9
+//     calibration landed, a row MAY carry the engine's own implied probability, but ONLY when the
+//     node has a committed calibration (SC.4): the engine gates it server-side
+//     (INV-SOC-PROBABILITY-GATED-BY-CALIBRATION), so `impliedProbabilityMilli === null` is the
+//     honest uncalibrated state and renders as a named "Uncalibrated" tag, NEVER as a 0%.
 //   * THE ORDER IS THE ENGINE'S (INV-SOC-ONE-PAYLOAD's sibling). Rows render exactly as returned:
 //     authority urgency, then posture, confidence, recency, id. The surface never re-sorts, because
 //     the `Decision Waiting` tile counts the same authority field -- a client-side sort would let the
@@ -111,6 +114,31 @@ function ageLabel(unixSeconds: number, nowSeconds: number): string {
   return `${String(Math.floor(delta / 86_400))}d ago`;
 }
 
+/**
+ * The credibility line an analyst reads: the engine's recorded credibility, and its calibrated
+ * probability ONLY when the node committed a calibration.
+ *
+ * Three honest states, never conflated: no recorded credibility at all (`null` -> the line is
+ * omitted); a credibility with NO committed calibration (`Uncalibrated`, a named state, never 0%);
+ * and a credibility WITH a committed probability (rendered as a percent). The gating is the
+ * engine's (`impliedProbabilityMilli` is already null on an uncalibrated node); this only renders
+ * what the row carries.
+ */
+export function credibilityDisplay(row: SocIncidentRow): {
+  readonly credibility: string;
+  readonly probability: string;
+} | null {
+  if (row.credibilityMilli === null) {
+    return null;
+  }
+  const credibility = `credibility ${(row.credibilityMilli / 1000).toFixed(2)}`;
+  const probability =
+    row.impliedProbabilityMilli === null
+      ? 'Uncalibrated'
+      : `${String(Math.round(row.impliedProbabilityMilli / 10))}% likely a true positive`;
+  return { credibility, probability };
+}
+
 interface QueueCardProps {
   readonly row: SocIncidentRow;
   readonly selected: boolean;
@@ -139,13 +167,38 @@ function QueueCard({ row, selected, nowSeconds, onSelect }: QueueCardProps): Rea
             subject shows as itself. */}
         <span className="fcx-socq__path">
           <span className="fcx-socq__subject" title={row.subject}>
-            {shortIdentifier(row.subject)}
+            {row.subjectName ?? shortIdentifier(row.subject)}
           </span>
           <span className="fcx-socq__sep" aria-hidden="true">
             /
           </span>
           <span className="fcx-socq__anchor">{row.anchor}</span>
+          {row.destination !== null && (
+            <>
+              <span className="fcx-socq__sep" aria-hidden="true">
+                &rarr;
+              </span>
+              <span className="fcx-socq__destination">{row.destination}</span>
+            </>
+          )}
         </span>
+        {(() => {
+          const cred = credibilityDisplay(row);
+          return cred === null ? null : (
+            <span className="fcx-socq__credibility">
+              <span className="fcx-socq__cred-score">{cred.credibility}</span>
+              <span
+                className={
+                  row.impliedProbabilityMilli === null
+                    ? 'fcx-socq__prob fcx-socq__prob--uncalibrated'
+                    : 'fcx-socq__prob'
+                }
+              >
+                {cred.probability}
+              </span>
+            </span>
+          );
+        })()}
         <span className="fcx-socq__meta">
           <span>{postureLabel(row.posture)}</span>
           <span>{confidenceLabel(row.confidence)} confidence</span>

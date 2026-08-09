@@ -377,14 +377,18 @@ export interface WireIncidentRow {
   anchor: string;
   authority: string;
   confidence: string;
+  credibility_milli?: number;
+  destination?: string;
   evidence_count: number;
   finding: string;
+  implied_probability_milli?: number;
   incident_id: string;
   last_seen: number;
   opened_at: number;
   posture: string;
   rule_id: string;
   subject: string;
+  subject_name?: string;
 }
 
 export interface WireLineageEdge {
@@ -859,6 +863,7 @@ export type WireReply =
   | { SocIncidentDetail: WireSocIncidentDetail; }
   | { SocTelemetry: WireSocTelemetry; }
   | { SocAudit: WireSocAudit; }
+  | { SocDispositioned: WireSocDispositionOutcome; }
   | { SocImpact: WireSocImpact; }
   | { SocRunState: WireSocRunState; }
   | { SocPlanMutated: WireSocPlanEffect; }
@@ -917,6 +922,7 @@ export type WireRequest =
   | { SocIncidentDetail: WireSocIncidentDetailQuery; }
   | { SocTelemetry: WireSocTelemetryQuery; }
   | { SocAudit: WireSocAuditQuery; }
+  | { SocDisposition: WireSocDisposition; }
   | { SocImpact: WireSocImpactQuery; }
   | { SocCognitionRun: WireSocCognitionRun; }
   | { SocPlanApprove: WireSocPlanApprove; }
@@ -960,6 +966,27 @@ export interface WireSocCognitionRun {
   incident: string;
   operator?: OperatorDelegation;
   request_id: number;
+}
+
+export interface WireSocDisposition {
+  accepting_party?: string;
+  action_taken?: string;
+  authorized_by?: string;
+  blocking_control?: string;
+  disposition: string;
+  expiry_seconds?: number;
+  incident: string;
+  justification?: string;
+  operator?: OperatorDelegation;
+  predecessor?: string;
+  request_id: number;
+}
+
+export interface WireSocDispositionOutcome {
+  closed_now: boolean;
+  disposition?: string;
+  explanation?: string;
+  refused: boolean;
 }
 
 export interface WireSocImpact {

@@ -14,6 +14,7 @@ import {
   SocDecisionQueue,
   authorityVariant,
   channelOf,
+  credibilityDisplay,
   shortIdentifier,
 } from '../surfaces/SocDecisionQueue.js';
 import { renderWithProviders } from './render.js';
@@ -33,6 +34,10 @@ function row(overrides: Partial<SocIncidentRow> = {}): SocIncidentRow {
     openedAt: NOW - 7200,
     lastSeen: NOW - 600,
     evidenceCount: 2,
+    subjectName: null,
+    destination: null,
+    credibilityMilli: null,
+    impliedProbabilityMilli: null,
     ...overrides,
   };
 }
@@ -267,5 +272,44 @@ describe('the SOC decision queue (S3.4)', () => {
     expect(shortIdentifier('svc-account@corp')).toBe('svc-account@corp');
     // A short hex string (a rule tag, a port) is left alone too -- only long digests shorten.
     expect(shortIdentifier('abcd1234')).toBe('abcd1234');
+  });
+
+  it('gates the probability on a committed calibration (SC.4)', () => {
+    // No recorded credibility at all: no credibility line.
+    expect(credibilityDisplay(row({ credibilityMilli: null }))).toBeNull();
+
+    // A credibility with NO committed calibration reads as a NAMED uncalibrated state, never 0%.
+    const uncalibrated = credibilityDisplay(
+      row({ credibilityMilli: 900, impliedProbabilityMilli: null }),
+    );
+    expect(uncalibrated?.credibility).toBe('credibility 0.90');
+    expect(uncalibrated?.probability).toBe('Uncalibrated');
+
+    // A committed calibration renders the engine's implied probability as a percent.
+    const calibrated = credibilityDisplay(
+      row({ credibilityMilli: 900, impliedProbabilityMilli: 1000 }),
+    );
+    expect(calibrated?.probability).toBe('100% likely a true positive');
+  });
+
+  it('renders a device name and known-bad destination when the engine resolved them', () => {
+    mockQueue([
+      row({
+        incidentId: 'ep-c2',
+        subjectName: 'dgx-spark-01',
+        destination: '203.0.113.77',
+        credibilityMilli: 1175,
+        impliedProbabilityMilli: 1000,
+      }),
+    ]);
+    renderWithProviders(
+      <SocDecisionQueue selected={null} onSelect={() => undefined} nowSeconds={NOW} />,
+    );
+
+    return waitFor(() => {
+      expect(screen.getByText('dgx-spark-01')).toBeInTheDocument();
+      expect(screen.getByText('203.0.113.77')).toBeInTheDocument();
+      expect(screen.getByText('100% likely a true positive')).toBeInTheDocument();
+    });
   });
 });

@@ -149,6 +149,10 @@ describe('the SOC Ops shell (S3.3)', () => {
       openedAt: 1,
       lastSeen: 2,
       evidenceCount: 1,
+      subjectName: null,
+      destination: null,
+      credibilityMilli: null,
+      impliedProbabilityMilli: null,
     };
     vi.stubGlobal(
       'fetch',
