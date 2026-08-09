@@ -100,6 +100,11 @@ if [ -n "$SIDECAR_BIN" ]; then
     run_as=""
     if id "$SIDECAR_USER" >/dev/null 2>&1 && [ "$(id -u)" = "0" ]; then
         run_as="sudo -u $SIDECAR_USER"
+        # Fresh-box first run: install.sh creates OUT_DIR 0750 root:root, which refuses the service
+        # user's seed write (found 2026-08-09 on a from-scratch install). Admit the service GROUP for
+        # the mint; tightened back to 0750 after the anchor is written below.
+        chgrp "$SIDECAR_USER" "$OUT_DIR"
+        chmod 0770 "$OUT_DIR"
     fi
     if [ -f "$SIGN_SEED" ]; then
         echo "provision-sidecar: signing seed present, reading its anchor (not re-minting)"
@@ -114,6 +119,8 @@ if [ -n "$SIDECAR_BIN" ]; then
     fi
     printf '%s\n' "$anchor_json" > "$ANCHOR"
     chmod 0644 "$ANCHOR"
+    # The mint is done: back to 0750 (the service group keeps read+traverse for runtime config/seed).
+    if [ -n "$run_as" ]; then chmod 0750 "$OUT_DIR"; fi
     [ -s "$ANCHOR" ] || die "the distribution anchor is empty after provisioning: $ANCHOR"
     echo "provision-sidecar: wrote the distribution anchor -> $ANCHOR (deliver this to endpoints as TORCH_POLICY_ANCHOR)"
 else
