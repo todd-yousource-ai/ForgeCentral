@@ -32,6 +32,10 @@ const DETAIL: SocIncidentDetail = {
     openedAt: 1_700_000_000,
     lastSeen: 1_700_003_600,
     evidenceCount: 2,
+    subjectName: null,
+    destination: null,
+    credibilityMilli: null,
+    impliedProbabilityMilli: null,
   },
   nodes: [
     {

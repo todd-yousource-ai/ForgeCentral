@@ -109,6 +109,36 @@ describe('the SOC Ops contract (S3.1)', () => {
     // to put them in. This assertion is the guard against someone helpfully adding one.
     expect(row).not.toHaveProperty('score');
     expect(row).not.toHaveProperty('exposure');
+    // A pre-widening payload (no engine credibility/probability/label/destination) projects to
+    // honest nulls, never zeros or empty strings.
+    expect(row?.credibilityMilli).toBeNull();
+    expect(row?.impliedProbabilityMilli).toBeNull();
+    expect(row?.subjectName).toBeNull();
+    expect(row?.destination).toBeNull();
+  });
+
+  it('serves the calibrated probability only when the engine sent one (SC.4)', () => {
+    // The engine gates the probability server-side: an uncalibrated node omits it while still
+    // sending the recorded credibility. The projector must preserve that gap as null (a named
+    // uncalibrated state downstream), NEVER coerce it to 0.
+    const uncalibrated = toIncidentRow(
+      wireRow({
+        credibility_milli: 900,
+        subject_name: 'dgx-spark-01',
+        destination: '203.0.113.77',
+      }),
+    );
+    expect(uncalibrated?.credibilityMilli).toBe(900);
+    expect(uncalibrated?.impliedProbabilityMilli).toBeNull();
+    expect(uncalibrated?.subjectName).toBe('dgx-spark-01');
+    expect(uncalibrated?.destination).toBe('203.0.113.77');
+
+    // A calibrated node sends both.
+    const calibrated = toIncidentRow(
+      wireRow({ credibility_milli: 900, implied_probability_milli: 1000 }),
+    );
+    expect(calibrated?.credibilityMilli).toBe(900);
+    expect(calibrated?.impliedProbabilityMilli).toBe(1000);
   });
 
   it('refuses a row whose authority the Console does not know', () => {

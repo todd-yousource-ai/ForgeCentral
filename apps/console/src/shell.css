@@ -1005,6 +1005,37 @@ body {
   color: var(--fc-color-text-primary);
 }
 
+.fcx-socq__destination {
+  font-family: var(--fc-font-fontFamily-mono);
+  color: var(--fc-color-text-primary);
+}
+
+/* The credibility line: the engine's recorded score and its calibration-gated probability. */
+.fcx-socq__credibility {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fc-space-sm);
+  font-size: var(--fc-font-size-xs);
+}
+
+.fcx-socq__cred-score {
+  color: var(--fc-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fcx-socq__prob {
+  font-weight: 600;
+  color: var(--fc-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The named uncalibrated state: a distinct, quieter treatment so it never reads as a low percent. */
+.fcx-socq__prob--uncalibrated {
+  font-weight: 500;
+  color: var(--fc-color-text-muted);
+  font-style: italic;
+}
+
 .fcx-socq__meta {
   display: flex;
   flex-wrap: wrap;

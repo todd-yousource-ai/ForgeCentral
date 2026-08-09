@@ -128,7 +128,12 @@ export type WithheldRuling = (typeof WITHHELD_RULINGS)[number];
 /**
  * One row of the decision queue (`WireIncidentRow`).
  *
- * Deliberately carries NO score and NO exposure. See the module header: the engine records neither.
+ * Invents NO score and NO exposure (see the module header). What it MAY carry is the engine's OWN
+ * recorded numbers: the correlator's latest credibility reading and -- ONLY on a node with a
+ * committed calibration -- the implied probability that score maps to. Both are optional and
+ * absent by default: an uncalibrated node's row has `credibilityMilli`/`impliedProbabilityMilli`
+ * `null`, which the Console renders as a named uncalibrated state, NEVER as a zero
+ * (`INV-CONSOLE-UNCALIBRATED-IS-NAMED`).
  */
 export interface SocIncidentRow {
   /** The incident (episode) id. */
@@ -139,6 +144,11 @@ export interface SocIncidentRow {
   readonly anchor: string;
   /** The attributed subject (an agent, a process, an account). */
   readonly subject: string;
+  /** The resolved human device label for the subject, or `null` when unresolved (the fingerprint
+   * in `subject` stands). */
+  readonly subjectName: string | null;
+  /** The observed known-bad destination behind an indicator-fired series, or `null`. */
+  readonly destination: string | null;
   /** The human finding summary. */
   readonly finding: string;
   /** What it needs from a human. The queue's primary ordering key. */
@@ -147,6 +157,12 @@ export interface SocIncidentRow {
   readonly posture: IncidentPosture;
   /** The confidence tier the gate reached. */
   readonly confidence: ConfidenceTier;
+  /** The correlator's latest recorded credibility (milli), or `null` when none was recorded. */
+  readonly credibilityMilli: number | null;
+  /** The implied probability (milli, 0..=1000) the committed calibration maps that score to, or
+   * `null` when the node is uncalibrated (or no credibility was recorded). Absence is the honest
+   * uncalibrated state and is NEVER to be rendered as 0. */
+  readonly impliedProbabilityMilli: number | null;
   /** When it opened (unix seconds). */
   readonly openedAt: number;
   /** When it last fired (unix seconds). */
@@ -450,10 +466,17 @@ export function toIncidentRow(row: WireIncidentRow): SocIncidentRow | null {
     ruleId: row.rule_id,
     anchor: row.anchor,
     subject: row.subject,
+    subjectName: row.subject_name ?? null,
+    destination: row.destination ?? null,
     finding: row.finding,
     authority,
     posture,
     confidence,
+    // The engine's own recorded numbers, absent-by-default. The probability is ALREADY
+    // calibration-gated engine-side (INV-SOC-PROBABILITY-GATED-BY-CALIBRATION): an uncalibrated
+    // node omits it, so `?? null` here is honest uncalibrated absence, never a coerced zero.
+    credibilityMilli: row.credibility_milli ?? null,
+    impliedProbabilityMilli: row.implied_probability_milli ?? null,
     openedAt: row.opened_at,
     lastSeen: row.last_seen,
     evidenceCount: row.evidence_count,
