@@ -60,16 +60,26 @@ install -m 0755 "$BIN_DIR/console-crypto-sidecar" "$BIN_PREFIX/console-crypto-si
 # installer, per the deployment contract). pnpm's `deploy --prod` flattens the workspace deps + the
 # built package into one directory the service runs from -- no dev deps, no workspace symlinks.
 if [ -z "$BFF_DIST" ]; then
-  command -v pnpm >/dev/null 2>&1 || die "pnpm required to build the BFF (or set CONSOLE_BFF_DIST to a prebuilt dir)"
-  log "  building the self-contained BFF from $repo_root (pnpm build + deploy)"
-  ( cd "$repo_root" \
+  # Build AS THE REPO OWNER, never as root: a root build leaves root-owned dist/, .bff-deploy/ and
+  # node_modules/ inside the developer's checkout, and the next `scripts/ci.sh` run fails on EACCES
+  # (vitest cannot write its temp config; found 2026-09-15 on the AWS box, 1,615 root-owned files).
+  # The installer only needs root for /etc, /usr/local and systemd; the build is the owner's.
+  repo_owner="$(stat -c %U "$repo_root")"
+  runuser -u "$repo_owner" -- bash -lc 'command -v pnpm >/dev/null 2>&1' \
+    || die "pnpm required on $repo_owner's PATH to build the BFF (or set CONSOLE_BFF_DIST to a prebuilt dir)"
+  log "  building the self-contained BFF from $repo_root as $repo_owner (pnpm build + deploy)"
+  runuser -u "$repo_owner" -- bash -lc "cd '$repo_root' \
       && pnpm install --frozen-lockfile \
       && pnpm -r --if-present run build \
-      && rm -rf "$repo_root/.bff-deploy" \
-      && pnpm --filter @forge/bff --prod deploy "$repo_root/.bff-deploy" ) \
+      && rm -rf '$repo_root/.bff-deploy' \
+      && pnpm --filter @forge/bff --prod deploy '$repo_root/.bff-deploy'" \
     || die "BFF build failed"
   BFF_DIST="$repo_root/.bff-deploy"
   log "  built self-contained BFF at $BFF_DIST"
+  # Fail closed on the defect this guards against: the build must leave NOTHING root-owned in the
+  # checkout (a regression here would silently break the owner's gate again).
+  stray="$(find "$repo_root" -user root -print -quit 2>/dev/null || true)"
+  [ -z "$stray" ] || die "the BFF build left a root-owned path in the checkout: $stray (the build must run as $repo_owner)"
 fi
 install -d -m 0755 "$BFF_LIB"
 cp -a "$BFF_DIST/." "$BFF_LIB/"
