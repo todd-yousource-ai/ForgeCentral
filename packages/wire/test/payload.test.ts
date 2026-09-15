@@ -270,6 +270,38 @@ describe('encodeWireRequest: the policy verbs (IP-CONSOLE-05)', () => {
     });
   });
 
+  it('the SOC disposition COMMAND encodes over the real CBOR path, omitting absent optionals', () => {
+    // Same seam check: SocDisposition entered the contract (2026-08-09) with no encode arm, so the
+    // dispatch hygiene test failed the gate while every BFF-side test still passed. The optional
+    // fields are `skip_serializing_if = Option::is_none` on the Rust side, so an absent one must be
+    // ABSENT from the map (not null), or the engine's serde rejects the frame.
+    expect(
+      asMap({ SocDisposition: { request_id: 3, incident: 'ep-soc-1', disposition: 'closed' } }),
+    ).toEqual({ SocDisposition: { request_id: 3, incident: 'ep-soc-1', disposition: 'closed' } });
+
+    expect(
+      asMap({
+        SocDisposition: {
+          request_id: 4,
+          incident: 'ep-soc-1',
+          disposition: 'risk-accepted',
+          justification: 'known lab traffic',
+          accepting_party: 'soc-lead',
+          expiry_seconds: 86_400,
+        },
+      }),
+    ).toEqual({
+      SocDisposition: {
+        request_id: 4,
+        incident: 'ep-soc-1',
+        disposition: 'risk-accepted',
+        justification: 'known lab traffic',
+        accepting_party: 'soc-lead',
+        expiry_seconds: 86_400,
+      },
+    });
+  });
+
   it('a submitted step carries only what it DOES, never its state or authority', () => {
     // Accepting those from a client would let one hand the engine a step claiming to be executed.
     const map = asMap({

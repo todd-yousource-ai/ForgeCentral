@@ -122,7 +122,12 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // The SOC plan COMMANDS (SOC_PLAN_APPROVE / SOC_PLAN_MODIFY, crdb SS.5) ride the QuerySubmit
       // opcode like the other data-plane writes; the engine routes them to the write path by tag.
       'SocPlanApprove' in request ||
-      'SocPlanModify' in request)
+      'SocPlanModify' in request ||
+      // The SOC disposition COMMAND (SOC_DISPOSITION, crdb SD.1): the engine routes it in the same
+      // write family as the plan commands (handler.rs pairs SocDisposition with SocPlanApprove), so
+      // it rides QuerySubmit too. It was added to the contract (2026-08-09) without this line, and
+      // the hygiene test below has failed the gate on main since.
+      'SocDisposition' in request)
   ) {
     return FrameType.QuerySubmit;
   }
