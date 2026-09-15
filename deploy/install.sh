@@ -83,6 +83,10 @@ if [ -z "$BFF_DIST" ]; then
 fi
 install -d -m 0755 "$BFF_LIB"
 cp -a "$BFF_DIST/." "$BFF_LIB/"
+# The DEPLOYED tree is root-owned: `cp -a` preserves the build's ownership, which after the
+# build-as-owner change would leave the service's code writable by the developer account (the
+# service user only needs to read it).
+chown -R root:root "$BFF_LIB"
 
 # The SPA: the BFF serves the built console from FC_SPA_DIST; without it the root answers the API 404
 # ({"error":"not_found"}) instead of the UI. `pnpm -r build` above already produced apps/console/dist;
@@ -92,6 +96,7 @@ SPA_SRC="${CONSOLE_SPA_DIST:-$repo_root/apps/console/dist}"
 rm -rf "$BFF_LIB/spa"
 install -d -m 0755 "$BFF_LIB/spa"
 cp -a "$SPA_SRC/." "$BFF_LIB/spa/"
+chown -R root:root "$BFF_LIB/spa"
 log "  SPA installed at $BFF_LIB/spa"
 
 # ---- [3] provision the sidecar (D.2): admin P-384 leaf + config.json -----------------------------

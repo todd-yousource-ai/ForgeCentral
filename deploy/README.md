@@ -66,6 +66,14 @@ attestation). For the delegated-read path, the operator's IdP group must map to 
 (`CDB_ENROLL_GROUP_ROLES`) and the node must grant that role `[Data, Delegation]`
 (`CDB_WIRE_ROLE_GRANTS='operator=data,delegation'`, i.e. `wire.enrolled_role_grants`).
 
+## Uninstalling (proving the installer from clean)
+
+`deploy/uninstall.sh` reverses `install.sh`: dry-run by default (prints what would go), `--yes` removes
+the units, the deployed binary + BFF tree, both `/etc` config dirs and the two service users. It keeps
+`/etc/cdb/control` (crucible's), the `node.cbor` peer pin (re-asserted unchanged by the next install)
+and `/etc/cdb/secrets` (an operator-entered connector secret; `--with-secrets` takes it). A rebuild that
+inherits yesterday's state proves nothing, so an install validated from clean starts here.
+
 ## Browsing the Console (`:8443`)
 
 The BFF serves the built SPA behind the admin plane (`FC_SPA_DIST` -> `apps/console/dist`), so once the

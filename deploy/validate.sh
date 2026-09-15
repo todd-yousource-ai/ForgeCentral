@@ -19,6 +19,10 @@ systemctl is-active --quiet console-crypto-sidecar || fail "console-crypto-sidec
 systemctl is-active --quiet console-bff            || fail "console-bff is not active"
 ok "both units active"
 
+echo "==> [1b] deployed tree is root-owned (not writable by a developer account)"
+stray="$(find /usr/local/lib/console-bff /usr/local/bin/console-crypto-sidecar ! -user root -print -quit 2>/dev/null || true)"
+[ -z "$stray" ] || fail "deployed path not root-owned: $stray"
+ok "deployed tree root-owned"
 echo "==> [2/4] engine leg: BFF /readyz (BFF -> sidecar -> mTLS :7878, Node doing no TLS)"
 # Retry: install.sh [4b] restarts cdb when it pins the console peer, and the engine takes tens of
 # seconds to serve the wire again -- a single immediate probe races that boot and fails a good install.
