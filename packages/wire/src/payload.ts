@@ -37,6 +37,7 @@ import type {
   WireSocTelemetryQuery,
   WireSocPlanApprove,
   WireSocPlanModify,
+  WireSocDisposition,
   WirePolicyEdit,
   WirePolicyEffectiveQuery,
   WirePolicyListQuery,
@@ -548,6 +549,29 @@ function socPlanApproveToCbor(request: WireSocPlanApprove): unknown {
   return out;
 }
 
+/**
+ * `SOC_DISPOSITION` (crdb SD.1). Rust struct order: request_id, incident, disposition, then the
+ * optional fields justification, authorized_by, action_taken, blocking_control, accepting_party,
+ * expiry_seconds, predecessor, operator? -- each `skip_serializing_if = Option::is_none`, so an
+ * absent field is OMITTED from the map (never sent as null), byte-identical to the Rust encoder.
+ */
+function socDispositionToCbor(request: WireSocDisposition): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+    disposition: request.disposition,
+  };
+  if (request.justification !== undefined) out['justification'] = request.justification;
+  if (request.authorized_by !== undefined) out['authorized_by'] = request.authorized_by;
+  if (request.action_taken !== undefined) out['action_taken'] = request.action_taken;
+  if (request.blocking_control !== undefined) out['blocking_control'] = request.blocking_control;
+  if (request.accepting_party !== undefined) out['accepting_party'] = request.accepting_party;
+  if (request.expiry_seconds !== undefined) out['expiry_seconds'] = request.expiry_seconds;
+  if (request.predecessor !== undefined) out['predecessor'] = request.predecessor;
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SOC_PLAN_MODIFY` (crdb SS.5). Rust struct order: request_id, incident, steps, operator?. */
 function socPlanModifyToCbor(request: WireSocPlanModify): unknown {
   const out: Record<string, unknown> = {
@@ -859,6 +883,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocPlanModify' in request) {
     return encode({ SocPlanModify: socPlanModifyToCbor(request.SocPlanModify) });
+  }
+  if ('SocDisposition' in request) {
+    return encode({ SocDisposition: socDispositionToCbor(request.SocDisposition) });
   }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });

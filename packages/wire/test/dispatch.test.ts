@@ -120,6 +120,7 @@ describe('dispatch', () => {
     { SocCognitionRun: { request_id: 1, incident: 'i1' } },
     { SocPlanApprove: { request_id: 1, incident: 'i1', at_revision: 1 } },
     { SocPlanModify: { request_id: 1, incident: 'i1', steps: [] } },
+    { SocDisposition: { request_id: 1, incident: 'i1', disposition: 'closed' } },
   ];
 
   it.each(QUERY_SUBMIT_VARIANTS.map((r) => [Object.keys(r)[0] ?? '?', r] as const))(
