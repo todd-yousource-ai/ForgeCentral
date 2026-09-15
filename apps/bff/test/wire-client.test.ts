@@ -28,6 +28,7 @@ import {
 const config: BffConfig = {
   engineHost: '127.0.0.1',
   enginePort: 7878,
+  httpHost: '127.0.0.1',
   httpPort: 0,
   logLevel: 'error',
   cacheTtlMs: 2000,

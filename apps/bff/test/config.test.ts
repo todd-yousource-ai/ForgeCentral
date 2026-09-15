@@ -12,6 +12,7 @@ describe('loadConfig', () => {
     const config = loadConfig(complete);
     expect(config.engineHost).toBe('127.0.0.1');
     expect(config.enginePort).toBe(8789);
+    expect(config.httpHost).toBe('127.0.0.1');
     expect(config.httpPort).toBe(8787);
     expect(config.logLevel).toBe('info');
     expect(config.requestTimeoutMs).toBe(5000);
@@ -33,6 +34,14 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...complete, FC_ENGINE_HOST: 'engine.public.example' })).toThrow(
       ConfigError,
     );
+  });
+
+  it('fails closed on a routable (non-loopback) BFF bind host', () => {
+    // The sidecar's node-IP:8443 admin plane is the only user leg; a routable plaintext bind would
+    // serve the SPA, API and /auth beside it in the clear.
+    expect(() => loadConfig({ ...complete, FC_HTTP_HOST: '0.0.0.0' })).toThrow(ConfigError);
+    expect(() => loadConfig({ ...complete, FC_HTTP_HOST: '172.31.1.36' })).toThrow(ConfigError);
+    expect(loadConfig({ ...complete, FC_HTTP_HOST: '::1' }).httpHost).toBe('::1');
   });
 
   it('fails closed on a non-numeric port', () => {

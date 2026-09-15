@@ -21,6 +21,7 @@ import { createServer, type ServerLogger } from '../src/server.js';
 const config: BffConfig = {
   engineHost: 'engine.internal',
   enginePort: 7878,
+  httpHost: '127.0.0.1',
   httpPort: 0,
   logLevel: 'error',
   cacheTtlMs: 2000,
