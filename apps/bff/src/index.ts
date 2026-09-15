@@ -53,8 +53,10 @@ async function main(): Promise<void> {
   });
 
   await new Promise<void>((resolve) => {
-    server.listen(config.httpPort, () => {
-      log.info({ port: config.httpPort }, 'BFF listening');
+    // Bind the loopback host explicitly: `listen(port)` alone binds every interface, which put the
+    // plaintext BFF on the VPC beside the 8443 admin plane (found on the 2026-09-15 AWS install).
+    server.listen(config.httpPort, config.httpHost, () => {
+      log.info({ host: config.httpHost, port: config.httpPort }, 'BFF listening');
       resolve();
     });
   });

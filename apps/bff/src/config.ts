@@ -35,6 +35,12 @@ const ConfigSchema = z.object({
   engineHost: z.string().min(1).default('127.0.0.1'),
   /** The crypto sidecar's egress port (the BFF speaks plaintext wire to it; the sidecar owns the mTLS). */
   enginePort: z.coerce.number().int().positive().default(8789),
+  /**
+   * The host the BFF's own plaintext HTTP surface binds. Loopback ONLY (guarded below): the browser
+   * leg is the sidecar's node-IP:8443 admin plane (INV-CONSOLE-ADMIN-PLANE), which forwards to this
+   * listener over loopback; a routable bind would serve the SPA, API and /auth in the clear beside it.
+   */
+  httpHost: z.string().min(1).default('127.0.0.1'),
   /** The port the BFF's own HTTP surface listens on. */
   httpPort: z.coerce.number().int().positive().default(8787),
   /** Log level. */
@@ -101,6 +107,7 @@ export interface SessionSettings {
 export interface BffConfig {
   readonly engineHost: string;
   readonly enginePort: number;
+  readonly httpHost: string;
   readonly httpPort: number;
   readonly logLevel: RawConfig['logLevel'];
   readonly cacheTtlMs: number;
@@ -189,6 +196,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
   const parsed = ConfigSchema.safeParse({
     engineHost: env['FC_ENGINE_HOST'],
     enginePort: env['FC_ENGINE_PORT'],
+    httpHost: env['FC_HTTP_HOST'],
     httpPort: env['FC_HTTP_PORT'],
     logLevel: env['FC_LOG_LEVEL'],
     cacheTtlMs: env['FC_CACHE_TTL_MS'],
@@ -225,10 +233,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
       `FC_ENGINE_HOST must be loopback (the crypto sidecar egress), not a routable host: ${raw.engineHost}`,
     );
   }
+  // The BFF's own listener is plaintext too, and the ONLY sanctioned user leg is the sidecar's
+  // node-IP:8443 admin plane in front of it (INV-CONSOLE-ADMIN-PLANE). Binding it to a routable
+  // address would expose the SPA, API and /auth unencrypted beside that plane -- refuse fail-closed.
+  if (!isLoopbackHost(raw.httpHost)) {
+    throw new ConfigError(
+      `FC_HTTP_HOST must be loopback (the sidecar admin plane fronts the BFF), not a routable host: ${raw.httpHost}`,
+    );
+  }
   const oidc = resolveOidc(raw);
   return {
     engineHost: raw.engineHost,
     enginePort: raw.enginePort,
+    httpHost: raw.httpHost,
     httpPort: raw.httpPort,
     logLevel: raw.logLevel,
     cacheTtlMs: raw.cacheTtlMs,

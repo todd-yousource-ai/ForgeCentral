@@ -31,6 +31,14 @@ done
 echo "$ready" | grep -q '"ready":true' || fail "/readyz not green after 60s (got: ${ready:-<none>}) -- the sidecar could not reach the engine with the enrolled identity"
 ok "engine leg green"
 
+echo "==> [2a] BFF plaintext listener is loopback-only (not reachable on the node IP)"
+# The only user leg is the sidecar's node-IP:8443 admin plane (INV-CONSOLE-ADMIN-PLANE). A BFF bound to
+# every interface serves the SPA, API and /auth in the clear beside it -- which is exactly what
+# `listen(port)` with no host did until 2026-09-15. Prove the plaintext port is NOT on the node IP.
+if curl -fsS -m 5 "http://${NODE_IP}:${BFF_HTTP_PORT}/readyz" >/dev/null 2>&1; then
+  fail "the BFF plaintext listener answers on ${NODE_IP}:${BFF_HTTP_PORT} -- it must bind loopback only (FC_HTTP_HOST)"
+fi
+ok "BFF plaintext listener not exposed on the node IP"
 echo "==> [2b] SPA: the BFF root serves the console UI (not the API 404)"
 curl -fsS -m 15 "http://127.0.0.1:${BFF_HTTP_PORT}/" 2>/dev/null | grep -qi "<!doctype html" \
   || fail "the BFF root does not serve the SPA (FC_SPA_DIST missing or empty) -- the operator would get {\"error\":\"not_found\"}"
