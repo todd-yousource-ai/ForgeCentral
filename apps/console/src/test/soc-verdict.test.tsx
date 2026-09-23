@@ -50,6 +50,7 @@ const DETAIL: SocIncidentDetail = {
 };
 
 const KPIS: SocKpis = {
+  coverage: null,
   eventsAnalyzed: 1,
   noiseCollapsed: 0,
   totalFirings: 9,

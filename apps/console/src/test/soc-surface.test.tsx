@@ -17,6 +17,15 @@ import { SocOpsSurface } from '../surfaces/SocOpsSurface.js';
 import { renderWithProviders } from './render.js';
 
 const KPIS: SocKpis = {
+  coverage: {
+    source: 'bundled',
+    rulesLoaded: 49,
+    evaluable: 24,
+    unevaluable: 25,
+    blockingLogsources: [{ name: '-/aws/cloudtrail', rules: 3 }],
+    blockingFields: [],
+    truncated: false,
+  },
   eventsAnalyzed: 428_000,
   noiseCollapsed: 97,
   totalFirings: 100,
@@ -209,5 +218,23 @@ describe('the SOC Ops shell (S3.3)', () => {
     expect(screen.queryByTestId('soc-kpi-strip')).not.toBeInTheDocument();
     // No fabricated table stands in for the missing focus.
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('renders N of M rules evaluable with the top blocker (crdb B.8a)', async () => {
+    mockKpis(KPIS);
+    renderWithProviders(<SocOpsSurface />);
+    await screen.findByTestId('soc-kpi-strip');
+    expect(screen.getByText('24 of 49')).toBeInTheDocument();
+    expect(screen.getByTestId('soc-coverage-blocker')).toHaveTextContent(
+      '-/aws/cloudtrail would unlock 3',
+    );
+  });
+
+  it('renders an explicit not-reported state when the node sent no coverage', async () => {
+    mockKpis({ ...KPIS, coverage: null });
+    renderWithProviders(<SocOpsSurface />);
+    await screen.findByTestId('soc-kpi-strip');
+    expect(screen.getByText('Not reported')).toBeInTheDocument();
+    expect(screen.queryByText('24 of 49')).not.toBeInTheDocument();
   });
 });
