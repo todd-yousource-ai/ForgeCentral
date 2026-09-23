@@ -20,7 +20,7 @@
 
 import { useState, type ReactElement } from 'react';
 import { AmbientBackdrop, GlassPanel, KpiCard, TabStrip } from '@forge/design';
-import type { SocKpis } from '@forge/contracts';
+import type { SocKpis, SocCoverage } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { SocDecisionQueue } from './SocDecisionQueue.js';
@@ -107,7 +107,42 @@ function KpiStrip({ kpis }: { readonly kpis: SocKpis }): ReactElement {
             : { text: 'Clear', variant: 'good' }
         }
       />
+      <CoverageCard coverage={kpis.coverage} />
     </div>
+  );
+}
+
+/**
+ * "N of M rules evaluable on your sources" (crdb B.8a, INV-DET-COVERAGE-VISIBLE), with the one
+ * blocker that would unlock the most. A node that reported no coverage renders that fact, never a
+ * zero: the number would read as "no detection" where the truth is "an older node".
+ */
+function CoverageCard({ coverage }: { readonly coverage: SocCoverage | null }): ReactElement {
+  if (coverage === null) {
+    return (
+      <KpiCard
+        label="Rules Evaluable"
+        value="Not reported"
+        badge={{ text: 'Older node', variant: 'neutral' }}
+      />
+    );
+  }
+  const top = coverage.blockingLogsources[0] ?? coverage.blockingFields[0];
+  return (
+    <KpiCard
+      label="Rules Evaluable"
+      value={
+        <>
+          {`${formatCount(coverage.evaluable)} of ${formatCount(coverage.rulesLoaded)}`}
+          <span className="fcx-socops__kpi-sub" data-testid="soc-coverage-blocker">
+            {top === undefined
+              ? 'nothing blocked on your sources'
+              : `${top.name} would unlock ${formatCount(top.rules)}${coverage.truncated ? ' (list cut)' : ''}`}
+          </span>
+        </>
+      }
+      badge={{ text: coverage.source, variant: 'neutral' }}
+    />
   );
 }
 

@@ -180,6 +180,11 @@ export interface WireConvergenceMember {
   state: string;
 }
 
+export interface WireCoverageBlocker {
+  name: string;
+  rules: number;
+}
+
 export interface WireDecision {
   anchor: string;
   confidence: string;
@@ -230,9 +235,20 @@ export interface WireDecisionRow {
   technique: string;
 }
 
+export interface WireDetectCoverage {
+  blocking_fields: Array<WireCoverageBlocker>;
+  blocking_logsources: Array<WireCoverageBlocker>;
+  evaluable: number;
+  rules_loaded: number;
+  source: string;
+  truncated: boolean;
+  unevaluable: number;
+}
+
 export interface WireDetectSummary {
   active_alerts: number;
   auto_contained: number;
+  coverage?: WireDetectCoverage;
   enabled: boolean;
   events_analyzed: number;
   muted_total: number;

@@ -38,6 +38,8 @@
 // and a blank panel that says so is strictly better than a confident wrong one.
 
 import type {
+  WireCoverageBlocker,
+  WireDetectCoverage,
   WireDetectSummary,
   WireIncidentAct,
   WireIncidentRow,
@@ -341,7 +343,38 @@ export interface SocPlanEffect {
  *     as the second understates what the engine actually knows about itself.
  *   * `eventsAnalyzed` can legitimately be 0 on a node that has admitted no telemetry in the window.
  */
+/** One coverage blocker: a logsource or a field, and the rules it holds back (crdb B.8a). */
+export interface SocCoverageBlocker {
+  /** The logsource as `category/product/service` (`-` for an unspecified part), or the field. */
+  readonly name: string;
+  /** Rules blocked on it. */
+  readonly rules: number;
+}
+
+/**
+ * What the node's loaded Sigma corpus can do on ITS sources (crdb B.8a, `INV-DET-COVERAGE-VISIBLE`).
+ *
+ * `evaluable` counts rules that can fire on the logsources the node produces by construction or has
+ * ingested in the window; the blockers are what would unlock the rest, most-unlocking first, and
+ * `truncated` says whether a list was cut (the totals are always complete).
+ */
+export interface SocCoverage {
+  /** The corpus the node compiled (`bundled`, or the configured directory). */
+  readonly source: string;
+  readonly rulesLoaded: number;
+  readonly evaluable: number;
+  readonly unevaluable: number;
+  readonly blockingLogsources: readonly SocCoverageBlocker[];
+  readonly blockingFields: readonly SocCoverageBlocker[];
+  readonly truncated: boolean;
+}
+
 export interface SocKpis {
+  /**
+   * The corpus coverage on this node's sources, or `null` when the node did not report one (a
+   * pre-B.8a node): the surface renders an explicit not-reported state, never a fabricated zero.
+   */
+  readonly coverage: SocCoverage | null;
   /**
    * Telemetry records admitted for evaluation in the window (crdb SS.3/SS.3a).
    *
@@ -699,6 +732,7 @@ export function toSocKpis(
     return null;
   }
   return {
+    coverage: toSocCoverage(summary.coverage),
     eventsAnalyzed: summary.events_analyzed,
     noiseCollapsed: summary.muted_total,
     totalFirings: summary.techniques.reduce((total, row) => total + row.fires, 0),
@@ -712,6 +746,24 @@ export function toSocKpis(
       ratifiedBaseline: row.muted_ratified,
       firings: row.fires,
     })),
+  };
+}
+
+/** The wire coverage as the surface reads it; absent on the wire is `null`, never zeroes. */
+export function toSocCoverage(coverage: WireDetectCoverage | undefined): SocCoverage | null {
+  if (coverage === undefined) {
+    return null;
+  }
+  const blockers = (rows: readonly WireCoverageBlocker[]): SocCoverageBlocker[] =>
+    rows.map((row) => ({ name: row.name, rules: row.rules }));
+  return {
+    source: coverage.source,
+    rulesLoaded: coverage.rules_loaded,
+    evaluable: coverage.evaluable,
+    unevaluable: coverage.unevaluable,
+    blockingLogsources: blockers(coverage.blocking_logsources),
+    blockingFields: blockers(coverage.blocking_fields),
+    truncated: coverage.truncated,
   };
 }
 

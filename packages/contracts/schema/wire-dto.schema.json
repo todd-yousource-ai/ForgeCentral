@@ -707,6 +707,22 @@
       ],
       "type": "object"
     },
+    "WireCoverageBlocker": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "rules"
+      ],
+      "type": "object"
+    },
     "WireDecision": {
       "additionalProperties": false,
       "properties": {
@@ -924,6 +940,48 @@
       ],
       "type": "object"
     },
+    "WireDetectCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking_fields": {
+          "items": {
+            "$ref": "#/$defs/WireCoverageBlocker"
+          },
+          "type": "array"
+        },
+        "blocking_logsources": {
+          "items": {
+            "$ref": "#/$defs/WireCoverageBlocker"
+          },
+          "type": "array"
+        },
+        "evaluable": {
+          "type": "integer"
+        },
+        "rules_loaded": {
+          "type": "integer"
+        },
+        "source": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "unevaluable": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source",
+        "rules_loaded",
+        "evaluable",
+        "unevaluable",
+        "blocking_logsources",
+        "blocking_fields",
+        "truncated"
+      ],
+      "type": "object"
+    },
     "WireDetectSummary": {
       "additionalProperties": false,
       "properties": {
@@ -932,6 +990,9 @@
         },
         "auto_contained": {
           "type": "integer"
+        },
+        "coverage": {
+          "$ref": "#/$defs/WireDetectCoverage"
         },
         "enabled": {
           "type": "boolean"

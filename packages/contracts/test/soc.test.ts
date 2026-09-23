@@ -22,9 +22,12 @@ import {
   toPlanEffect,
   toResponseStep,
   toVerdictNarrative,
+  toSocCoverage,
+  toSocKpis,
   toWirePlanSteps,
 } from '../src/index.js';
 import type {
+  WireDetectSummary,
   WireIncidentRow,
   WireSocIncidentDetail,
   WireSocIncidentList,
@@ -536,5 +539,52 @@ describe('the evidence-depth narrowers (S3.8c)', () => {
       detail: null,
     });
     expect(toCognitionRunState({ state: 'detonated', detail: '' })).toBeNull();
+  });
+});
+
+describe('toSocKpis coverage (crdb B.8a, INV-DET-COVERAGE-VISIBLE)', () => {
+  const summary: WireDetectSummary = {
+    enabled: true,
+    techniques_lit: 0,
+    muted_total: 0,
+    active_alerts: 0,
+    summary_refused: false,
+    techniques: [],
+    observed_components: [],
+    observed_in_window: 0,
+    events_analyzed: 10,
+    auto_contained: 0,
+  };
+
+  it('carries the node coverage with its ranked blockers', () => {
+    const kpis = toSocKpis(
+      {
+        ...summary,
+        coverage: {
+          source: 'bundled',
+          rules_loaded: 49,
+          evaluable: 24,
+          unevaluable: 25,
+          blocking_logsources: [{ name: '-/aws/cloudtrail', rules: 3 }],
+          blocking_fields: [{ name: 'TargetObject', rules: 2 }],
+          truncated: false,
+        },
+      },
+      [],
+    );
+    expect(kpis?.coverage).toEqual({
+      source: 'bundled',
+      rulesLoaded: 49,
+      evaluable: 24,
+      unevaluable: 25,
+      blockingLogsources: [{ name: '-/aws/cloudtrail', rules: 3 }],
+      blockingFields: [{ name: 'TargetObject', rules: 2 }],
+      truncated: false,
+    });
+  });
+
+  it('reads an absent coverage as null, never as zeroes', () => {
+    expect(toSocKpis(summary, [])?.coverage).toBeNull();
+    expect(toSocCoverage(undefined)).toBeNull();
   });
 });

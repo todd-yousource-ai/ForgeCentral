@@ -221,6 +221,7 @@ describe('the lineage graph inside the surface (S3.5)', () => {
           Promise.resolve(
             url.includes('/kpis')
               ? {
+                  coverage: null,
                   eventsAnalyzed: 1,
                   noiseCollapsed: 0,
                   totalFirings: 0,

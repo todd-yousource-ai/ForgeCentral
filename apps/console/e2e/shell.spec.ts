@@ -34,6 +34,7 @@ async function mockBff(page: Page, authed: boolean): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        coverage: null,
         eventsAnalyzed: 428_000,
         noiseCollapsed: 97,
         totalFirings: 100,
