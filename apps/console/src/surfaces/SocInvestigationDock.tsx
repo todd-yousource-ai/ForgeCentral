@@ -263,7 +263,11 @@ function RawTelemetryPane({
 export function actGloss(act: IncidentAct): string {
   switch (act) {
     case 'plan_proposed':
-      return 'a response plan was proposed';
+      return 'a response plan was proposed by the engine';
+    case 'plan_withheld':
+      // crdb C.3 (INV-SOC-TIER-GATED): the calibrated probability did not reach the tier that
+      // licenses containment; the detail carries the count and the tier reason.
+      return 'the engine withheld containment under the response tier';
     case 'plan_modified':
       return 'the plan was modified';
     case 'plan_approved':
