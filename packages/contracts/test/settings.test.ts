@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { settingApplyClass, settingSourceLabel, toSettingsView } from '../src/settings.js';
+import {
+  adminRoleLabel,
+  settingApplyClass,
+  settingSourceLabel,
+  toConsoleRbacView,
+  toSettingsView,
+} from '../src/settings.js';
 
 const row = (key: string, origin: string, liveApply: string, value?: string) => ({
   key,
@@ -93,5 +99,39 @@ describe('the governed settings view (ST.1, crdb SET.1 INV-SETTINGS-TIER-GATED)'
     expect(
       toSettingsView({ ...wire, section_values: { dual_control: [] } })?.sectionValues,
     ).toBeNull();
+  });
+
+  it('projects the identity sections typed, never from the ambiguous rendering (SET.1b)', () => {
+    expect(toSettingsView(wire)?.identity).toBeNull();
+    const tricky = 'proxy:alice;mallory=[Root]@Secret';
+    const view = toSettingsView({
+      ...wire,
+      identity_values: {
+        admins: [{ identity: tricky, roles: ['auditor', 'operator'], clearance: 'confidential' }],
+        sso_group_roles: [{ group: 'soc-admins', roles: ['tenantadmin'] }],
+      },
+    });
+    expect(view?.identity).toEqual({
+      admins: [{ identity: tricky, roles: ['auditor', 'operator'], clearance: 'confidential' }],
+      ssoGroupRoles: [{ group: 'soc-admins', roles: ['tenantadmin'] }],
+    });
+    expect(adminRoleLabel('securityadmin')).toBe('Security admin');
+    expect(adminRoleLabel('futurerole')).toBe('futurerole');
+  });
+});
+
+describe('the Console role map view (ST.3)', () => {
+  it('narrows the BFF body and fails closed on an unknown role or shape', () => {
+    const body = {
+      groupRoles: [{ key: 'fc-admins', role: 'global-admin', tenant: null }],
+      localRbac: [{ key: 'auth0|abc', role: 'tenant-user', tenant: 't1' }],
+      defaultTenant: 't1',
+    };
+    expect(toConsoleRbacView(body)).toEqual(body);
+    expect(
+      toConsoleRbacView({ ...body, groupRoles: [{ key: 'x', role: 'superuser', tenant: null }] }),
+    ).toBeNull();
+    expect(toConsoleRbacView({ ...body, localRbac: 'nope' })).toBeNull();
+    expect(toConsoleRbacView(null)).toBeNull();
   });
 });

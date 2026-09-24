@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { operatorPrincipalId } from '../src/auth/operator-id.js';
-import { resolveAuthority, type RbacConfig } from '../src/auth/rbac.js';
+import { rbacConfigView, resolveAuthority, type RbacConfig } from '../src/auth/rbac.js';
 
 describe('operatorPrincipalId', () => {
   it('is deterministic and a valid v5 UUID', () => {
@@ -82,5 +82,27 @@ describe('resolveAuthority', () => {
       localRbac: {},
     };
     expect(resolveAuthority('auth0|x', ['broken.admin'], bad)).toBeUndefined();
+  });
+});
+
+describe('the Settings RBAC projection (IP-CONSOLE-11 ST.3)', () => {
+  it('lists every grant sorted by key, a global admin with no tenant', () => {
+    expect(
+      rbacConfigView({
+        groupRoles: {
+          'tenant.b': { role: 'tenant-user', tenant: 'tb' },
+          'admins.global': { role: 'global-admin', tenant: 'ignored' },
+        },
+        localRbac: { 'auth0|x': { role: 'tenant-admin', tenant: 'ta' } },
+        defaultTenant: 'ta',
+      }),
+    ).toEqual({
+      groupRoles: [
+        { key: 'admins.global', role: 'global-admin', tenant: null },
+        { key: 'tenant.b', role: 'tenant-user', tenant: 'tb' },
+      ],
+      localRbac: [{ key: 'auth0|x', role: 'tenant-admin', tenant: 'ta' }],
+      defaultTenant: 'ta',
+    });
   });
 });

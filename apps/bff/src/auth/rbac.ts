@@ -80,3 +80,40 @@ export function resolveAuthority(
   if (grant.tenant === undefined) return undefined;
   return { role: grant.role, activeTenant: grant.tenant, allTenants: false };
 }
+
+/** One grant as the Settings RBAC tab shows it (IP-CONSOLE-11 ST.3). */
+export interface RbacGrantRow {
+  readonly key: string;
+  readonly role: OperatorRole;
+  readonly tenant: string | null;
+}
+
+/** The Console's role map projected read-only for the Settings RBAC tab (ST.3), sorted by key. */
+export interface RbacConfigView {
+  readonly groupRoles: readonly RbacGrantRow[];
+  readonly localRbac: readonly RbacGrantRow[];
+  readonly defaultTenant: string | null;
+}
+
+function grantRows(map: Readonly<Record<string, RoleGrant>>): RbacGrantRow[] {
+  return Object.keys(map)
+    .sort()
+    .map((key) => {
+      const grant = map[key] as RoleGrant;
+      // A global admin spans every tenant; any tenant on its grant is ignored by `resolveAuthority`.
+      const tenant = grant.role === 'global-admin' ? null : (grant.tenant ?? null);
+      return { key, role: grant.role, tenant };
+    });
+}
+
+/**
+ * Project the RBAC configuration the BFF started with (`FC_RBAC_CONFIG`). Read-only: the map is
+ * installer configuration and changes with a re-install, never from the Console.
+ */
+export function rbacConfigView(config: RbacConfig): RbacConfigView {
+  return {
+    groupRoles: grantRows(config.groupRoles),
+    localRbac: grantRows(config.localRbac),
+    defaultTenant: config.defaultTenant ?? null,
+  };
+}

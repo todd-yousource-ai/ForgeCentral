@@ -138,6 +138,7 @@ const GOVERNED: SettingsView = {
   surfaces: ['admin_endpoint', 'maintenance'],
   dualControlRequired: false,
   sectionValues: null,
+  identity: null,
   rows: [
     {
       key: 'maintenance.cadence_secs',
@@ -208,7 +209,7 @@ describe('the Settings tab strip and the Configuration tab (ST.1)', () => {
     renderWithProviders(<SettingsSurface />, { route: '/settings' });
     const strip = await screen.findByRole('tablist', { name: 'Settings' });
     const tabs = within(strip).getAllByRole('tab');
-    expect(tabs.map((t) => t.textContent)).toEqual(['SOC', 'Configuration']);
+    expect(tabs.map((t) => t.textContent)).toEqual(['SOC', 'Configuration', 'RBAC', 'Federation']);
     await screen.findByTestId('settings-soc');
   });
 
@@ -456,5 +457,108 @@ describe('the typed section forms on the Configuration tab (ST.2b)', () => {
   it('shows no section forms under dual control', async () => {
     await openSections({ ...WITH_SECTIONS, dualControlRequired: true });
     expect(screen.queryByTestId('settings-sections')).toBeNull();
+  });
+});
+
+const TRICKY = 'proxy:alice;mallory=[Root]@Secret';
+
+const IDENTITY_VIEW: SettingsView = {
+  version: 12,
+  surfaces: ['identity'],
+  dualControlRequired: false,
+  sectionValues: null,
+  identity: {
+    admins: [{ identity: TRICKY, roles: ['auditor', 'operator'], clearance: 'confidential' }],
+    ssoGroupRoles: [{ group: 'soc-admins', roles: ['tenantadmin'] }],
+  },
+  rows: ['identity.admins', 'identity.sso_group_roles'].map((key) => ({
+    key,
+    surface: 'identity',
+    origin: 'section' as const,
+    value: key === 'identity.admins' ? `${TRICKY}=[Operator,Auditor]@Confidential` : 'x',
+    valueType: 'record_list',
+    defaultValue: 'empty',
+    bound: 'non-empty roles',
+    liveApply: 'boot-bound (the admin plane reads it at start)',
+    changeVia: 'config-commit / config-apply',
+    uiBinding: `console:settings/${key.replace('.', '/')}`,
+    summary: key,
+    editable: false,
+  })),
+};
+
+function mockIdentity(view: SettingsView | null, rbac: unknown): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      const reply = (status: number, body: unknown) =>
+        Promise.resolve({
+          ok: status === 200,
+          status,
+          json: () => Promise.resolve(body),
+        } as Response);
+      if (url === '/api/settings') return reply(view === null ? 403 : 200, view);
+      if (url === '/api/settings/console-rbac') return reply(rbac === null ? 403 : 200, rbac);
+      if (url === '/api/idam/connectors') return reply(200, []);
+      return reply(200, SETTINGS);
+    }),
+  );
+}
+
+describe('the RBAC and Federation tabs (ST.3 / ST.4)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the engine admins from the typed values, read-only with the boot-bound path', async () => {
+    mockIdentity(IDENTITY_VIEW, {
+      groupRoles: [{ key: 'fc-admins', role: 'global-admin', tenant: null }],
+      localRbac: [],
+      defaultTenant: 't1',
+    });
+    renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    fireEvent.click(screen.getByRole('tab', { name: 'RBAC' }));
+    const admins = await screen.findByRole('table', { name: 'The engine admin assignments' });
+    // One admin: the identity verbatim, separators and all -- never split into a forged second row.
+    expect(within(admins).getAllByRole('row')).toHaveLength(2);
+    expect(within(admins).getByText(TRICKY)).toBeInTheDocument();
+    expect(within(admins).getByText('Auditor')).toBeInTheDocument();
+    expect(within(admins).getByText('confidential')).toBeInTheDocument();
+    expect(screen.getAllByText(/Source: committed at version 12/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/then restart the node/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /edit|commit/i })).not.toBeInTheDocument();
+    const consoleRoles = await screen.findByRole('table', {
+      name: 'Console roles granted by IdP group',
+    });
+    expect(within(consoleRoles).getByText('fc-admins')).toBeInTheDocument();
+    expect(within(consoleRoles).getByText('every tenant')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Users' })).toHaveAttribute('href', '/users');
+  });
+
+  it('withholds the Console role map from a non-global admin and states the tier below', async () => {
+    mockIdentity(IDENTITY_VIEW, null);
+    const view = renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    fireEvent.click(screen.getByRole('tab', { name: 'RBAC' }));
+    await screen.findByText('Global admin required');
+    view.unmount();
+    vi.unstubAllGlobals();
+    mockIdentity(null, null);
+    renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    fireEvent.click(screen.getByRole('tab', { name: 'RBAC' }));
+    await screen.findByText('Admin or SecurityAudit tier required');
+    expect(screen.queryByRole('table', { name: 'The engine admin assignments' })).toBeNull();
+  });
+
+  it('mounts the connector panel and shows the SSO map read-only on Federation', async () => {
+    mockIdentity(IDENTITY_VIEW, null);
+    renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    fireEvent.click(screen.getByRole('tab', { name: 'Federation' }));
+    const sso = await screen.findByRole('table', { name: 'The SSO group to admin role map' });
+    expect(within(sso).getByText('soc-admins')).toBeInTheDocument();
+    expect(within(sso).getByText('Tenant admin')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Identity providers' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/idam/connectors', expect.anything());
+    });
   });
 });

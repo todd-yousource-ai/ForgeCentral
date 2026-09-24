@@ -31,6 +31,7 @@ import {
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { GovernedReceipt, SectionForms } from './SettingsSectionForms.js';
+import { FederationTab, RbacTab } from './SettingsIdentityTabs.js';
 import {
   useCommitGovernedSettings,
   useCommitSocSettings,
@@ -495,6 +496,8 @@ function SocTab(): ReactElement {
 const SETTINGS_TABS = [
   { id: 'soc', label: 'SOC' },
   { id: 'configuration', label: 'Configuration' },
+  { id: 'rbac', label: 'RBAC' },
+  { id: 'federation', label: 'Federation' },
 ] as const;
 
 export function SettingsSurface(): ReactElement {
@@ -505,7 +508,15 @@ export function SettingsSurface(): ReactElement {
         Settings
       </h2>
       <TabStrip tabs={[...SETTINGS_TABS]} activeId={tab} onChange={setTab} ariaLabel="Settings" />
-      {tab === 'configuration' ? <ConfigurationTab /> : <SocTab />}
+      {tab === 'configuration' ? (
+        <ConfigurationTab />
+      ) : tab === 'rbac' ? (
+        <RbacTab />
+      ) : tab === 'federation' ? (
+        <FederationTab />
+      ) : (
+        <SocTab />
+      )}
     </section>
   );
 }

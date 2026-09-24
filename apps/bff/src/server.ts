@@ -36,6 +36,7 @@ import type {
 } from '@forge/contracts';
 
 import type { AuthRouter } from './auth/router.js';
+import { rbacConfigView } from './auth/rbac.js';
 import type { BffConfig } from './config.js';
 import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
@@ -2083,6 +2084,32 @@ async function commitGovernedSettings(
   }
 }
 
+/**
+ * `GET /api/settings/console-rbac` (IP-CONSOLE-11 ST.3): the Console's own role map, read-only. It
+ * names every tenant and subject the Console grants, so only a `global-admin` may read it; any other
+ * role is refused (403) without the map. The map is the BFF's start configuration, not engine state.
+ */
+function handleConsoleRbac(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): boolean {
+  if (path !== '/api/settings/console-rbac' || method !== 'GET') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (session.role !== 'global-admin') {
+    sendJson(res, 403, { error: 'refused', class: 'Role' });
+    return true;
+  }
+  sendJson(res, 200, rbacConfigView(deps.config.rbac));
+  return true;
+}
+
 async function handleSocSettings(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -2377,6 +2404,9 @@ async function route(
     return;
   }
   if (await handleGovernedSettings(deps, req, method, path, res)) {
+    return;
+  }
+  if (handleConsoleRbac(deps, req, method, path, res)) {
     return;
   }
   if (await handleSocSettings(deps, req, method, path, res)) {

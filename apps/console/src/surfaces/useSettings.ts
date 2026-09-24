@@ -13,7 +13,9 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { toConsoleRbacView } from '@forge/contracts';
 import type {
+  ConsoleRbacView,
   SettingsCommitRequest,
   SettingsReceipt,
   SettingsView,
@@ -119,5 +121,32 @@ export function useCommitGovernedSettings(): UseMutationResult<
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['settings', 'governed'] });
     },
+  });
+}
+
+/**
+ * The Console's own role map (IP-CONSOLE-11 ST.3, `GET /api/settings/console-rbac`). A 403 means the
+ * operator is not a global admin and resolves to `null`; a body this build cannot narrow is an error.
+ */
+export async function fetchConsoleRbac(): Promise<ConsoleRbacView | null> {
+  const res = await fetch('/api/settings/console-rbac', { credentials: 'include' });
+  if (res.status === 403) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`console rbac failed: ${String(res.status)}`);
+  }
+  const view = toConsoleRbacView(await res.json());
+  if (view === null) {
+    throw new Error('console rbac: unrecognized shape');
+  }
+  return view;
+}
+
+export function useConsoleRbac(): UseQueryResult<ConsoleRbacView | null> {
+  return useQuery({
+    queryKey: ['settings', 'console-rbac'],
+    queryFn: fetchConsoleRbac,
+    staleTime: 0,
   });
 }
