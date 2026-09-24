@@ -152,11 +152,11 @@ is removed as impossible by construction.
 |-----|---------|----------------------|-------|
 | **SOC** (new) | response tiers, SIEM write-back, narrative model ref | `SOC_SETTINGS_READ` / `SOC_SETTINGS_COMMIT` | LIVE (S3.18) |
 | **Configuration** (new) | every committed section and knob by surface, with the registry's definition beside each value; edit and commit per section; version history, diff and rollback; propose / approve under dual control | the governed document over the wire (crdb `IP-CONSOLE-SETTINGS-WIRE`) | PENDING engine, then LIVE |
-| **RBAC** | the engine's admin assignments (`admins`: identity, roles, clearance) and the SSO group-to-role map (`sso_group_roles`); the Console's own operator roles (`global-admin` / `tenant-admin` / `tenant-user`, BFF `rbac.ts`) shown read-only with their source | committed sections via the Configuration ops; the BFF RBAC map is installer config | PENDING engine, then LIVE |
-| **Federation** | the IdAM connectors (Auth0 today; shared with `Users -> External IDAM`), the `sso_group_roles` enrollment map | `IDAM_CONNECTORS` / `IDAM_CONFIGURE` / `IDAM_CONNECT` / `IDAM_SYNC` (LIVE); the map via Configuration | LIVE for connectors; map PENDING engine |
+| **RBAC** | the engine's admin assignments (`admins`: identity, roles, clearance) and the SSO group-to-role map (`sso_group_roles`), READ-ONLY: both are boot-bound (the admin plane reads them at start), so they change through `cdb-actl` plus a restart and the tab says so; the Console's own operator roles (`global-admin` / `tenant-admin` / `tenant-user`, BFF `rbac.ts`) shown read-only with their source | `SETTINGS_READ` (crdb SET.1); the BFF RBAC map is installer config | read-only (engine read LIVE) |
+| **Federation** | the IdAM connectors (Auth0 today; shared with `Users -> External IDAM`), the `sso_group_roles` enrollment map (read-only: boot-bound) | `IDAM_CONNECTORS` / `IDAM_CONFIGURE` / `IDAM_CONNECT` / `IDAM_SYNC` (LIVE); the map via `SETTINGS_READ` | LIVE for connectors; map read-only |
 | **Security** | the connectivity report (listener, mutual TLS, identities, post-quantum key exchange), the security report (classification, audit chain verified, artifact spot checks, retention), `key_issuing` and `egress_destinations`, the admin endpoint knobs, and the admin-plane crypto posture (the negotiated group for THIS session: hybrid or the P-384 floor) | reports over the wire (PENDING engine); the sidecar must surface the negotiated group to the BFF (PENDING Console) | PENDING, then LIVE |
 | **KeyLock** | the key-issuing report and section (enabled, dual control, validity), the signing key ids the audit chain names | key-issuing report over the wire (PENDING engine) | read-only; **rotation is PENDING** (TRD-04 rotation as an admin verb, owning repo crdb) |
-| **Policy** | the detection posture, detection retention, credibility weights (read-only: a weight set is versioned and replay-pinned), served models and the narrative model ref; the tiers link to the SOC tab | Configuration ops | PENDING engine, then LIVE |
+| **Policy** | the narrative model ref (editable), and read-only: the detection watermark bounds and detection retention (both pending in the engine: no live consumer), served models (pending), and the credibility weights (versioned and replay-pinned); the tiers link to the SOC tab | `SETTINGS_READ` / `SETTINGS_COMMIT` (crdb SET.1, SET.2b) | LIVE for the model ref; the rest read-only |
 | **Observability** | the telemetry report (OTLP / flow planes, bound tenants, datagram counts) and the two observability knobs | telemetry report over the wire (PENDING engine); knobs via Configuration | PENDING, then LIVE |
 | **HA & Topology** | this node: shards, serving, durable, maintenance cadence, version (node-status / server report); the configured regions and shard placement | node-status over the wire (PENDING engine) | read-only; **cluster leader / lag, Rotate Leadership, Test Quorum Loss are PENDING** (TRD-07 cluster status and leadership as admin verbs, owning repo crdb) |
 | **Failover & DR** | the configured regions and residency tags | boot config, read-only | **DR targets, RPO / RTO, Test Failover are PENDING** (TRD-07 DR as admin verbs, owning repo crdb) |
@@ -178,8 +178,10 @@ a placeholder (`INV-CONSOLE-NO-STUB`); the plan names the row that adds it.
 - Under dual control the Console offers PROPOSE (and shows the pending proposals) and APPROVE (by a
   distinct principal); it never commits directly and never fakes an approval. A self-approval is
   refused and the refusal shown.
-- A boot-bound setting (the registry says `boot-bound`) is shown with that label and no edit
-  control; the Console never offers a change that cannot apply.
+- A boot-bound setting (the registry says `boot-bound`) and a pending one (`pending`) are shown with
+  that label and no edit control; the Console never offers a change that cannot apply. The engine
+  enforces the same rule: the wire has no field for a boot-bound or pending section, and a knob
+  edit to one is refused (`boot_bound` / `pending_subsystem`).
 - The FIPS tab shows the build posture and offers no toggle. HA, DR and KeyLock offer no
   Rotate / Test / Rotate-key control until the engine verb exists; the absence is stated, not filled.
 - The admin-plane crypto panel shows the group negotiated for the current session as the sidecar
