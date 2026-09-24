@@ -253,6 +253,20 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         refused: false,
       });
     },
+    socReport: (req) => {
+      calls.push(`socReport:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        incident: req.incident,
+        generated_at: 0,
+        narrative_state: 'absent',
+        input_hash: '',
+        sections: [],
+        cited_evidence: [],
+        needs_human_review: false,
+        refused: false,
+      });
+    },
     socCognitionRun: (req) => {
       calls.push(`socCognitionRun:${String(req.request_id)}`);
       reads.push(req);

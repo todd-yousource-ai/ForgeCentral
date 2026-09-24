@@ -2653,6 +2653,12 @@
         "ordinal": {
           "type": "integer"
         },
+        "reversibility": {
+          "type": "string"
+        },
+        "rollback": {
+          "type": "string"
+        },
         "state": {
           "type": "string"
         },
@@ -4345,6 +4351,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocReport": {
+              "$ref": "#/$defs/WireSocReport"
+            }
+          },
+          "required": [
+            "SocReport"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocUeba": {
+              "$ref": "#/$defs/WireSocUebaReport"
+            }
+          },
+          "required": [
+            "SocUeba"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocRunState": {
               "$ref": "#/$defs/WireSocRunState"
             }
@@ -4379,6 +4409,29 @@
           "type": "object"
         }
       ]
+    },
+    "WireReportSection": {
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "lines"
+      ],
+      "type": "object"
     },
     "WireRequest": {
       "oneOf": [
@@ -5212,6 +5265,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocReport": {
+              "$ref": "#/$defs/WireSocReportQuery"
+            }
+          },
+          "required": [
+            "SocReport"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocUeba": {
+              "$ref": "#/$defs/WireSocUebaQuery"
+            }
+          },
+          "required": [
+            "SocUeba"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocCognitionRun": {
               "$ref": "#/$defs/WireSocCognitionRun"
             }
@@ -5985,6 +6062,80 @@
       ],
       "type": "object"
     },
+    "WireSocReport": {
+      "additionalProperties": false,
+      "properties": {
+        "cited_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "generated_at": {
+          "type": "integer"
+        },
+        "incident": {
+          "type": "string"
+        },
+        "input_hash": {
+          "type": "string"
+        },
+        "model_ref": {
+          "type": "string"
+        },
+        "narrative_detail": {
+          "type": "string"
+        },
+        "narrative_state": {
+          "type": "string"
+        },
+        "needs_human_review": {
+          "type": "boolean"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/WireReportSection"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "incident",
+        "generated_at",
+        "narrative_state",
+        "input_hash",
+        "sections",
+        "cited_evidence",
+        "needs_human_review",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocReportQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
+      ],
+      "type": "object"
+    },
     "WireSocRunState": {
       "additionalProperties": false,
       "properties": {
@@ -6049,6 +6200,92 @@
       "required": [
         "request_id",
         "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocUebaQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocUebaReport": {
+      "additionalProperties": false,
+      "properties": {
+        "anomalies": {
+          "items": {
+            "$ref": "#/$defs/WireUebaAnomaly"
+          },
+          "type": "array"
+        },
+        "baseline_behaviors": {
+          "type": "integer"
+        },
+        "distinct_behaviors": {
+          "type": "integer"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "generated_at": {
+          "type": "integer"
+        },
+        "incident": {
+          "type": "string"
+        },
+        "maturity": {
+          "type": "string"
+        },
+        "pack_basis": {
+          "type": "string"
+        },
+        "profiled": {
+          "type": "boolean"
+        },
+        "recommended_investigation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "subject_kind": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "incident",
+        "subject",
+        "profiled",
+        "distinct_behaviors",
+        "baseline_behaviors",
+        "anomalies",
+        "truncated",
+        "recommended_investigation",
+        "pack_basis",
+        "generated_at",
+        "refused"
       ],
       "type": "object"
     },
@@ -6207,6 +6444,87 @@
         "active_candidate",
         "active_escalate",
         "last_fired_secs"
+      ],
+      "type": "object"
+    },
+    "WireUebaAnomaly": {
+      "additionalProperties": false,
+      "properties": {
+        "behavior_id": {
+          "type": "string"
+        },
+        "capability": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "covered_by_detection": {
+          "type": "boolean"
+        },
+        "effective_frequency_milli": {
+          "type": "integer"
+        },
+        "feature": {
+          "type": "string"
+        },
+        "first_seen": {
+          "type": "integer"
+        },
+        "fused_priority_milli": {
+          "type": "integer"
+        },
+        "hour_of_week": {
+          "type": "integer"
+        },
+        "kev_listed": {
+          "type": "boolean"
+        },
+        "last_seen": {
+          "type": "integer"
+        },
+        "object": {
+          "type": "string"
+        },
+        "object_kind": {
+          "type": "string"
+        },
+        "peer_prevalence_milli": {
+          "type": "integer"
+        },
+        "rarity": {
+          "type": "string"
+        },
+        "rarity_threshold_milli": {
+          "type": "integer"
+        },
+        "relation": {
+          "type": "string"
+        },
+        "technique": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "behavior_id",
+        "relation",
+        "object_kind",
+        "object",
+        "hour_of_week",
+        "count",
+        "first_seen",
+        "last_seen",
+        "effective_frequency_milli",
+        "rarity_threshold_milli",
+        "peer_prevalence_milli",
+        "rarity",
+        "confidence",
+        "kev_listed",
+        "covered_by_detection",
+        "fused_priority_milli"
       ],
       "type": "object"
     },

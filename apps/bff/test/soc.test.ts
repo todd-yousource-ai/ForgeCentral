@@ -603,3 +603,63 @@ describe('the case acts and the disposition (S3.11)', () => {
     expect(seen[0]).not.toHaveProperty('accepting_party');
   });
 });
+
+import { resolveIncidentReport } from '../src/engine/soc.js';
+
+describe('the incident report resolver (S3.16, crdb C.5)', () => {
+  function reportEngineOf(reply: unknown, seen: unknown[] = []): OperatorEngine {
+    return {
+      socReport: (_principal: OperatorPrincipal, request: unknown) => {
+        seen.push(request);
+        return Promise.resolve(reply);
+      },
+    } as unknown as OperatorEngine;
+  }
+
+  it('projects the report with every section source declared, as a READ', async () => {
+    const seen: unknown[] = [];
+    const report = await resolveIncidentReport(
+      reportEngineOf(
+        {
+          incident: 'ep-1',
+          generated_at: 1,
+          narrative_state: 'absent',
+          narrative_detail: 'not_run',
+          input_hash: 'sha512:in',
+          sections: [{ name: 'what_happened', source: 'template', lines: ['line'] }],
+          cited_evidence: [],
+          needs_human_review: false,
+          refused: false,
+        },
+        seen,
+      ),
+      PRINCIPAL,
+      'ep-1',
+    );
+    expect(report?.sections[0]?.source).toBe('template');
+    expect(report?.narrativeDetail).toBe('not_run');
+    expect((seen[0] as { incident: string }).incident).toBe('ep-1');
+  });
+
+  it('maps the engine refusal to null and an unnarrowable report to unavailable', async () => {
+    expect(
+      await resolveIncidentReport(reportEngineOf({ refused: true, sections: [] }), PRINCIPAL, 'x'),
+    ).toBeNull();
+    await expect(
+      resolveIncidentReport(
+        reportEngineOf({
+          incident: 'ep-1',
+          generated_at: 1,
+          narrative_state: 'absent',
+          input_hash: 'h',
+          sections: [{ name: 'what_happened', source: 'oracle', lines: [] }],
+          cited_evidence: [],
+          needs_human_review: false,
+          refused: false,
+        }),
+        PRINCIPAL,
+        'ep-1',
+      ),
+    ).rejects.toBeInstanceOf(SocUnavailableError);
+  });
+});

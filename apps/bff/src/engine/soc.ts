@@ -50,6 +50,8 @@ import type {
   WireSocPlanApprove,
   WireSocPlanModify,
   WireSocTelemetryQuery,
+  SocReport,
+  WireSocReportQuery,
 } from '@forge/contracts';
 import {
   toAuditTrail,
@@ -67,6 +69,7 @@ import {
   toWireCaseAct,
   toWireDisposition,
   toWirePlanSteps,
+  toSocReport,
 } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
@@ -329,6 +332,32 @@ export async function resolveBusinessImpact(
     throw new SocUnavailableError('the impact carries an unknown band or sentence state');
   }
   return impact;
+}
+
+/**
+ * Read one incident's shaped report (crdb C.5, `SOC_INCIDENT_REPORT`): the six sections, each with
+ * its declared source. A READ: it never triggers generation. `null` is the engine's one
+ * indistinguishable refusal; a report whose sections do not narrow is unavailable, never rendered
+ * under a guessed label.
+ */
+export async function resolveIncidentReport(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  opts?: EngineCallOptions,
+): Promise<SocReport | null> {
+  const request: WireSocReportQuery = { request_id: requestId(), incident };
+  const wire = await engine.socReport(principal, request, opts);
+  if (wire.refused) {
+    return null;
+  }
+  const report = toSocReport(wire);
+  if (report === null) {
+    throw new SocUnavailableError(
+      'the report carries an unknown section, source or narrative state',
+    );
+  }
+  return report;
 }
 
 /**

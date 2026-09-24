@@ -99,6 +99,8 @@ import type {
   WireVtzRescope,
   WireVtzTree,
   WireVtzTreeQuery,
+  WireSocReport,
+  WireSocReportQuery,
 } from '@forge/contracts';
 
 /** Per-call bounds. At least one of `timeoutMs`/`signal` should be set; the caller passes the config default. */
@@ -192,6 +194,8 @@ export interface CrucibleClient {
    * sum decided, its factors, and the recorded sentence in its three honest states. A READ -- it
    * never triggers generation. */
   socImpact(request: WireSocImpactQuery, opts?: EngineCallOptions): Promise<WireSocImpact>;
+  /** Read one incident's shaped report (SOC_INCIDENT_REPORT, crdb C.5): every section states its source. */
+  socReport(request: WireSocReportQuery, opts?: EngineCallOptions): Promise<WireSocReport>;
   /** Run the narrative + impact pipelines for one incident in the background (SOC_COGNITION_RUN).
    * Replies immediately with started/running/recorded/refused, never the run's result; the records
    * are read back through socNarrative/socImpact once committed. Audited under the operator. */

@@ -54,6 +54,7 @@ function engineWith(parts: {
     socTelemetry: unused,
     socAudit: unused,
     socImpact: unused,
+    socReport: unused,
     socCognitionRun: unused,
     socIncidentAct: unused,
     socNotes: unused,

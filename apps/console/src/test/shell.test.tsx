@@ -112,7 +112,7 @@ afterEach(() => {
 // the select-then-act drawer frame surrounds every surface, and no fabricated data renders.
 
 describe('the SPA shell', () => {
-  it('renders all eleven primary destinations in the rail', () => {
+  it('renders every primary destination in the rail, and only those (nine in Step 1)', () => {
     renderWithProviders(<Shell operator={TEST_OPERATOR} />);
     const rail = screen.getByRole('navigation', { name: 'Primary' });
     for (const dest of DESTINATIONS) {

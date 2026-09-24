@@ -21,6 +21,7 @@ import type {
   SocIncidentRow,
   SocKpis,
   VerdictNarrative,
+  SocReport,
 } from '@forge/contracts';
 
 /** Fetch the five KPI tiles. Throws on a non-2xx so the strip shows a load error, never blanks. */
@@ -227,6 +228,33 @@ export function useSocNotes(
   return useQuery({
     queryKey: ['soc', 'notes', incidentId],
     queryFn: () => fetchSocNotes(incidentId as string),
+    enabled: incidentId !== null,
+  });
+}
+
+/**
+ * Fetch the incident's shaped report (crdb C.5, `SOC_INCIDENT_REPORT`; S3.16): the six sections, each
+ * with its declared source (model / engine / template). A READ: opening the Reports tab never
+ * generates anything. A 404 is the engine's one indistinguishable refusal and resolves to `null`.
+ */
+export async function fetchSocReport(incidentId: string): Promise<SocReport | null> {
+  const res = await fetch(`/api/soc/report?id=${encodeURIComponent(incidentId)}`, {
+    credentials: 'include',
+  });
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`soc report failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as SocReport;
+}
+
+/** The Reports tab's read for one incident. */
+export function useSocReport(incidentId: string | null): UseQueryResult<SocReport | null> {
+  return useQuery({
+    queryKey: ['soc', 'report', incidentId],
+    queryFn: () => fetchSocReport(incidentId as string),
     enabled: incidentId !== null,
   });
 }

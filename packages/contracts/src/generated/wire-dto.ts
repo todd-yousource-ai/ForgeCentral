@@ -636,6 +636,8 @@ export interface WirePlanStep {
   authority: string;
   explanation?: string;
   ordinal: number;
+  reversibility?: string;
+  rollback?: string;
   state: string;
   title: string;
 }
@@ -890,9 +892,17 @@ export type WireReply =
   | { SocActed: WireSocActOutcome; }
   | { SocNotes: WireSocNotes; }
   | { SocImpact: WireSocImpact; }
+  | { SocReport: WireSocReport; }
+  | { SocUeba: WireSocUebaReport; }
   | { SocRunState: WireSocRunState; }
   | { SocPlanMutated: WireSocPlanEffect; }
   | { PolicyMutated: WirePolicyMutated; };
+
+export interface WireReportSection {
+  lines: Array<string>;
+  name: string;
+  source: string;
+}
 
 export type WireRequest =
   | { QuerySubmit: WireQuerySubmit; }
@@ -951,6 +961,8 @@ export type WireRequest =
   | { SocIncidentAct: WireSocIncidentAct; }
   | { SocNotes: WireSocNotesQuery; }
   | { SocImpact: WireSocImpactQuery; }
+  | { SocReport: WireSocReportQuery; }
+  | { SocUeba: WireSocUebaQuery; }
   | { SocCognitionRun: WireSocCognitionRun; }
   | { SocPlanApprove: WireSocPlanApprove; }
   | { SocPlanModify: WireSocPlanModify; }
@@ -1133,6 +1145,26 @@ export interface WireSocPlanModify {
   steps: Array<WirePlanStepInput>;
 }
 
+export interface WireSocReport {
+  cited_evidence: Array<string>;
+  explanation?: string;
+  generated_at: number;
+  incident: string;
+  input_hash: string;
+  model_ref?: string;
+  narrative_detail?: string;
+  narrative_state: string;
+  needs_human_review: boolean;
+  refused: boolean;
+  sections: Array<WireReportSection>;
+}
+
+export interface WireSocReportQuery {
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
 export interface WireSocRunState {
   detail?: string;
   state: string;
@@ -1150,6 +1182,29 @@ export interface WireSocTelemetryQuery {
   incident: string;
   operator?: OperatorDelegation;
   request_id: number;
+}
+
+export interface WireSocUebaQuery {
+  incident: string;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
+export interface WireSocUebaReport {
+  anomalies: Array<WireUebaAnomaly>;
+  baseline_behaviors: number;
+  distinct_behaviors: number;
+  explanation?: string;
+  generated_at: number;
+  incident: string;
+  maturity?: string;
+  pack_basis: string;
+  profiled: boolean;
+  recommended_investigation: Array<string>;
+  refused: boolean;
+  subject: string;
+  subject_kind?: string;
+  truncated: boolean;
 }
 
 export interface WireSourceVtzEdge {
@@ -1189,6 +1244,28 @@ export interface WireTechniqueSummary {
   muted_fp_feedback: number;
   muted_ratified: number;
   raised: number;
+}
+
+export interface WireUebaAnomaly {
+  behavior_id: string;
+  capability?: string;
+  confidence: string;
+  count: number;
+  covered_by_detection: boolean;
+  effective_frequency_milli: number;
+  feature?: string;
+  first_seen: number;
+  fused_priority_milli: number;
+  hour_of_week: number;
+  kev_listed: boolean;
+  last_seen: number;
+  object: string;
+  object_kind: string;
+  peer_prevalence_milli: number;
+  rarity: string;
+  rarity_threshold_milli: number;
+  relation: string;
+  technique?: string;
 }
 
 export interface WireUsageOverview {

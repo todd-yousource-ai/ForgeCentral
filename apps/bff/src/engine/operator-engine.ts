@@ -105,6 +105,8 @@ import type {
   WireVtzRescope,
   WireVtzTree,
   WireVtzTreeQuery,
+  WireSocReport,
+  WireSocReportQuery,
 } from '@forge/contracts';
 
 import type { ExplainTier } from '../auth/tier.js';
@@ -126,6 +128,7 @@ export type EngineAction =
   | 'socTelemetry'
   | 'socAudit'
   | 'socImpact'
+  | 'socReport'
   | 'socCognitionRun'
   | 'socPlanApprove'
   | 'socPlanModify'
@@ -311,6 +314,12 @@ export interface OperatorEngine {
     request: WireSocImpactQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSocImpact>;
+  /** Read one incident's shaped report (SOC_INCIDENT_REPORT, crdb C.5) on behalf of `principal`. */
+  socReport(
+    principal: OperatorPrincipal,
+    request: WireSocReportQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocReport>;
   /** Start a cognition run (SOC_COGNITION_RUN, the ED runner) on behalf of `principal`. */
   socCognitionRun(
     principal: OperatorPrincipal,
@@ -664,6 +673,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'socImpact', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.socImpact({ ...request, operator }, opts);
+    },
+    socReport: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socReport', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socReport({ ...request, operator }, opts);
     },
     socCognitionRun: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'socCognitionRun', request.request_id));

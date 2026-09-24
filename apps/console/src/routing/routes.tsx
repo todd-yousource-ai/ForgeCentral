@@ -11,6 +11,7 @@ import { VtzSurface } from '../surfaces/VtzSurface.js';
 import { UsersSurface } from '../surfaces/UsersSurface.js';
 import { ObjectsSurface } from '../surfaces/ObjectsSurface.js';
 import { PoliciesSurface } from '../surfaces/PoliciesSurface.js';
+import { ReportsSurface } from '../surfaces/ReportsSurface.js';
 
 // One route per destination, generated from the IA (single source). A real surface renders its own
 // element; the rest render the honest empty placeholder until their phase lands. An unknown path is an
@@ -27,6 +28,8 @@ const SURFACES: Readonly<Record<string, ReactElement>> = {
   users: <UsersSurface />,
   objects: <ObjectsSurface />,
   policies: <PoliciesSurface />,
+  // S3.16 (crdb C.9): the incident report export over SOC_INCIDENT_REPORT.
+  reports: <ReportsSurface />,
   // NOT a real surface: the SOC Ops VISUAL-LANGUAGE proof (glass + ambient over the honeycomb). It
   // keeps the full placeholder honesty contract (the canonical empty state, zero fabricated values)
   // and is intentionally absent from REAL_SURFACES until the SOC Ops phase binds real reads.
