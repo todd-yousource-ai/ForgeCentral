@@ -588,3 +588,190 @@ describe('toSocKpis coverage (crdb B.8a, INV-DET-COVERAGE-VISIBLE)', () => {
     expect(toSocCoverage(undefined)).toBeNull();
   });
 });
+
+// -- the case acts + the disposition verdict (S3.11 over crdb IP-AISOC-STEP1 C.1 + SC.7) --------------
+
+import {
+  toCaseActDraft,
+  toCaseActResult,
+  toDispositionDraft,
+  toDispositionResult,
+  toIncidentNotes,
+  toWireCaseAct,
+  toWireDisposition,
+} from '../src/index.js';
+
+describe('the case acts (S3.11 / crdb C.1)', () => {
+  it('the audit trail narrows every act the engine can record, including the four case acts', () => {
+    const trail = toAuditTrail({
+      acts: [
+        { act: 'dispositioned', principal: 'p-1', at_seconds: 1, detail: 'false_positive' },
+        { act: 'assigned', principal: 'p-1', at_seconds: 2, detail: 'p-2' },
+        { act: 'acked', principal: 'p-2', at_seconds: 3 },
+        { act: 'noted', principal: 'p-2', at_seconds: 4, detail: 'note:9a7334d2cb44add6' },
+        { act: 'closed', principal: 'p-2', at_seconds: 5 },
+      ],
+      refused: false,
+    });
+    expect(trail?.map((row) => row.act)).toEqual([
+      'dispositioned',
+      'assigned',
+      'acked',
+      'noted',
+      'closed',
+    ]);
+    expect(trail?.[2]?.detail).toBeNull();
+  });
+
+  it('parses a case-act body fail-closed: exactly the field the act takes', () => {
+    const id = 'B4464672-F4CC-577F-AE05-F3ECE3C67B64';
+    expect(toCaseActDraft({ act: 'assigned', assignee: ` ${id} ` })).toEqual({
+      act: 'assigned',
+      assignee: id.toLowerCase(),
+    });
+    expect(toCaseActDraft({ act: 'acked' })).toEqual({ act: 'acked' });
+    expect(toCaseActDraft({ act: 'noted', note: 'pivot to the proxy logs' })).toEqual({
+      act: 'noted',
+      note: 'pivot to the proxy logs',
+    });
+    expect(toCaseActDraft({ act: 'closed' })).toEqual({ act: 'closed' });
+    // Refusals: unknown act, a malformed assignee, a blank note, a stray field.
+    expect(toCaseActDraft({ act: 'escalated' })).toBeNull();
+    expect(toCaseActDraft({ act: 'assigned', assignee: 'alice' })).toBeNull();
+    expect(toCaseActDraft({ act: 'assigned' })).toBeNull();
+    expect(toCaseActDraft({ act: 'noted', note: '   ' })).toBeNull();
+    expect(toCaseActDraft({ act: 'acked', note: 'x' })).toBeNull();
+    expect(toCaseActDraft({ act: 'closed', assignee: id })).toBeNull();
+    expect(toCaseActDraft(null)).toBeNull();
+  });
+
+  it('the wire request carries only the field the act took', () => {
+    expect(toWireCaseAct({ act: 'acked' }, 'ep-1', 7)).toEqual({
+      request_id: 7,
+      incident: 'ep-1',
+      act: 'acked',
+    });
+    expect(toWireCaseAct({ act: 'noted', note: 'n' }, 'ep-1', 8)).toEqual({
+      request_id: 8,
+      incident: 'ep-1',
+      act: 'noted',
+      note: 'n',
+    });
+  });
+
+  it('projects a recorded act, keeps an in-band refusal with its reason, and refuses an unknown verb', () => {
+    expect(
+      toCaseActResult({ act: 'noted', closed_now: false, note_ref: 'note:abc', refused: false }),
+    ).toEqual({ kind: 'recorded', act: 'noted', closedNow: false, noteRef: 'note:abc' });
+    expect(toCaseActResult({ act: 'closed', closed_now: true, refused: false })).toEqual({
+      kind: 'recorded',
+      act: 'closed',
+      closedNow: true,
+      noteRef: null,
+    });
+    expect(
+      toCaseActResult({ closed_now: false, refused: true, explanation: 'already closed' }),
+    ).toEqual({ kind: 'refused', explanation: 'already closed' });
+    expect(toCaseActResult({ closed_now: false, refused: true })).toEqual({
+      kind: 'refused',
+      explanation: '',
+    });
+    expect(toCaseActResult({ act: 'plan_approved', closed_now: false, refused: false })).toBeNull();
+  });
+
+  it('projects the notes, or null on the engine refusal', () => {
+    expect(
+      toIncidentNotes({
+        notes: [{ principal: 'p-1', at_seconds: 5, note_ref: 'note:abc', text: 'hello' }],
+        refused: false,
+      }),
+    ).toEqual([{ principal: 'p-1', atSeconds: 5, noteRef: 'note:abc', text: 'hello' }]);
+    expect(toIncidentNotes({ notes: [], refused: true, explanation: '' })).toBeNull();
+  });
+});
+
+describe('the disposition verdict (S3.11 / crdb SC.7)', () => {
+  it('parses every verdict with exactly its ruled field, and refuses a missing one', () => {
+    expect(
+      toDispositionDraft({ disposition: 'false_positive', justification: 'bad parser' }),
+    ).toEqual({ disposition: 'false_positive', justification: 'bad parser' });
+    expect(toDispositionDraft({ disposition: 'benign_authorized', authorizedBy: 'CHG-1' })).toEqual(
+      {
+        disposition: 'benign_authorized',
+        authorizedBy: 'CHG-1',
+      },
+    );
+    expect(
+      toDispositionDraft({ disposition: 'true_positive_remediated', actionTaken: 'Reimage' }),
+    ).toEqual({ disposition: 'true_positive_remediated', actionTaken: 'reimage' });
+    expect(
+      toDispositionDraft({ disposition: 'true_positive_blocked', blockingControl: 'EDR' }),
+    ).toEqual({ disposition: 'true_positive_blocked', blockingControl: 'EDR' });
+    expect(
+      toDispositionDraft({
+        disposition: 'true_positive_risk_accepted',
+        acceptingParty: 'ciso',
+        expirySeconds: 86_400,
+      }),
+    ).toEqual({
+      disposition: 'true_positive_risk_accepted',
+      acceptingParty: 'ciso',
+      expirySeconds: 86_400,
+    });
+    expect(toDispositionDraft({ disposition: 'duplicate', predecessor: 'ep-0' })).toEqual({
+      disposition: 'duplicate',
+      predecessor: 'ep-0',
+    });
+    expect(toDispositionDraft({ disposition: 'undetermined' })).toEqual({
+      disposition: 'undetermined',
+    });
+    expect(toDispositionDraft({ disposition: 'closed' })).toBeNull();
+    expect(toDispositionDraft({ disposition: 'false_positive' })).toBeNull();
+    expect(
+      toDispositionDraft({ disposition: 'true_positive_remediated', actionTaken: 'shrug' }),
+    ).toBeNull();
+    expect(
+      toDispositionDraft({ disposition: 'true_positive_risk_accepted', acceptingParty: 'ciso' }),
+    ).toBeNull();
+    expect(
+      toDispositionDraft({
+        disposition: 'true_positive_risk_accepted',
+        acceptingParty: 'ciso',
+        expirySeconds: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it('the wire request names the engine field for the verdict and nothing else', () => {
+    expect(
+      toWireDisposition(
+        { disposition: 'true_positive_risk_accepted', acceptingParty: 'ciso', expirySeconds: 60 },
+        'ep-1',
+        9,
+      ),
+    ).toEqual({
+      request_id: 9,
+      incident: 'ep-1',
+      disposition: 'true_positive_risk_accepted',
+      accepting_party: 'ciso',
+      expiry_seconds: 60,
+    });
+    expect(toWireDisposition({ disposition: 'undetermined' }, 'ep-1', 10)).toEqual({
+      request_id: 10,
+      incident: 'ep-1',
+      disposition: 'undetermined',
+    });
+  });
+
+  it('projects the outcome, keeps the refusal reason, and refuses an unknown verdict', () => {
+    expect(
+      toDispositionResult({ closed_now: true, disposition: 'false_positive', refused: false }),
+    ).toEqual({ kind: 'recorded', disposition: 'false_positive', closedNow: true });
+    expect(
+      toDispositionResult({ closed_now: false, refused: true, explanation: 'no such predecessor' }),
+    ).toEqual({ kind: 'refused', explanation: 'no such predecessor' });
+    expect(
+      toDispositionResult({ closed_now: true, disposition: 'closed', refused: false }),
+    ).toBeNull();
+  });
+});

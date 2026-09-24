@@ -42,17 +42,23 @@ import type {
   WireDetectCoverage,
   WireDetectSummary,
   WireIncidentAct,
+  WireIncidentNote,
   WireIncidentRow,
   WireLineageEdge,
   WireLineageNode,
   WireObservationRow,
   WirePlanStep,
   WirePlanStepInput,
+  WireSocActOutcome,
   WireSocAudit,
+  WireSocDisposition,
+  WireSocDispositionOutcome,
   WireSocImpact,
+  WireSocIncidentAct,
   WireSocIncidentDetail,
   WireSocIncidentList,
   WireSocNarrative,
+  WireSocNotes,
   WireSocPlanEffect,
   WireSocRunState,
   WireSocTelemetry,
@@ -895,8 +901,39 @@ export const INCIDENT_ACTS = [
   'plan_modified',
   'plan_approved',
   'contained',
+  'dispositioned',
+  'assigned',
+  'acked',
+  'noted',
+  'closed',
 ] as const;
 export type IncidentAct = (typeof INCIDENT_ACTS)[number];
+
+/** The operator CASE acts (crdb IP-AISOC-STEP1 C.1, `SOC_INCIDENT_ACT`): the subset an operator submits. */
+export const CASE_ACTS = ['assigned', 'acked', 'noted', 'closed'] as const;
+export type CaseAct = (typeof CASE_ACTS)[number];
+
+/** The disposition verdicts (crdb SC.7 / GV.4, `OperatorDisposition::tag`). */
+export const DISPOSITIONS = [
+  'false_positive',
+  'benign_authorized',
+  'true_positive_remediated',
+  'true_positive_blocked',
+  'true_positive_risk_accepted',
+  'duplicate',
+  'undetermined',
+] as const;
+export type Disposition = (typeof DISPOSITIONS)[number];
+
+/** The structured remediation a `true_positive_remediated` disposition names (crdb `RemediationAction`). */
+export const REMEDIATION_ACTIONS = [
+  'reimage',
+  'credential_rotation',
+  'patch',
+  'isolate',
+  'remove',
+] as const;
+export type RemediationAction = (typeof REMEDIATION_ACTIONS)[number];
 
 /**
  * The impact band, on the platform's OCSF severity ladder (crdb `SeverityId`). Never `Unknown`:
@@ -1054,6 +1091,261 @@ function toIncidentAct(row: WireIncidentAct): IncidentActRow | null {
     atSeconds: row.at_seconds,
     detail: row.detail === undefined || row.detail === '' ? null : row.detail,
   };
+}
+
+// -- the case acts + the disposition verdict (IP-CONSOLE-03 S3.11 over crdb C.1 + SC.7) -----------
+
+/** One operator case act as the Console submits it: exactly the field the act requires, no more. */
+export type CaseActDraft =
+  | { readonly act: 'assigned'; readonly assignee: string }
+  | { readonly act: 'acked' }
+  | { readonly act: 'noted'; readonly note: string }
+  | { readonly act: 'closed' };
+
+const PRINCIPAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Parse a case-act request body FAIL-CLOSED: an unknown act, a missing or malformed required field
+ * (`assignee` must be a principal id, `note` must be non-blank), or a field the act does not take is
+ * `null`, so a bad body never reaches the engine and a stray field is never silently recorded.
+ */
+export function toCaseActDraft(raw: unknown): CaseActDraft | null {
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const body = raw as Record<string, unknown>;
+  const act = typeof body['act'] === 'string' ? narrowTag(CASE_ACTS, body['act']) : null;
+  if (act === null) {
+    return null;
+  }
+  const assignee = body['assignee'];
+  const note = body['note'];
+  switch (act) {
+    case 'assigned': {
+      if (
+        typeof assignee !== 'string' ||
+        !PRINCIPAL_ID.test(assignee.trim()) ||
+        note !== undefined
+      ) {
+        return null;
+      }
+      return { act, assignee: assignee.trim().toLowerCase() };
+    }
+    case 'noted': {
+      if (typeof note !== 'string' || note.trim() === '' || assignee !== undefined) {
+        return null;
+      }
+      return { act, note };
+    }
+    case 'acked':
+    case 'closed': {
+      if (assignee !== undefined || note !== undefined) {
+        return null;
+      }
+      return { act };
+    }
+  }
+}
+
+/** The wire request for a case act (the BFF injects the operator delegation). */
+export function toWireCaseAct(
+  draft: CaseActDraft,
+  incident: string,
+  requestId: number,
+): WireSocIncidentAct {
+  const wire: WireSocIncidentAct = { request_id: requestId, incident, act: draft.act };
+  if (draft.act === 'assigned') {
+    return { ...wire, assignee: draft.assignee };
+  }
+  if (draft.act === 'noted') {
+    return { ...wire, note: draft.note };
+  }
+  return wire;
+}
+
+/** An in-band engine refusal of a SOC command: the reason, verbatim from the engine. */
+export interface SocCommandRefused {
+  readonly kind: 'refused';
+  /** Empty when the incident is unknown or above clearance (the engine's ONE indistinguishable shape). */
+  readonly explanation: string;
+}
+
+/** A case act the engine recorded (crdb C.1). */
+export interface CaseActRecorded {
+  readonly kind: 'recorded';
+  readonly act: CaseAct;
+  /** True only when THIS act closed the incident (`closed`). */
+  readonly closedNow: boolean;
+  /** For `noted`: the note's reference, which is also the `noted` act's detail in the audit trail. */
+  readonly noteRef: string | null;
+}
+export type CaseActResult = CaseActRecorded | SocCommandRefused;
+
+/** Project a case-act outcome. FAIL-CLOSED on an act tag outside the vocabulary. */
+export function toCaseActResult(wire: WireSocActOutcome): CaseActResult | null {
+  if (wire.refused) {
+    return { kind: 'refused', explanation: wire.explanation ?? '' };
+  }
+  const act = narrowTag(CASE_ACTS, wire.act ?? '');
+  if (act === null) {
+    return null;
+  }
+  return {
+    kind: 'recorded',
+    act,
+    closedNow: wire.closed_now,
+    noteRef: wire.note_ref === undefined || wire.note_ref === '' ? null : wire.note_ref,
+  };
+}
+
+/** One case note on an incident (crdb C.1, `SOC_INCIDENT_NOTES`). */
+export interface IncidentNote {
+  readonly principal: string;
+  readonly atSeconds: number;
+  /** The reference the `noted` audit act carries for this note. */
+  readonly noteRef: string;
+  readonly text: string;
+}
+
+/** Project the notes read; `null` for a refusal (unknown incident, over clearance, or over ceiling). */
+export function toIncidentNotes(wire: WireSocNotes): readonly IncidentNote[] | null {
+  if (wire.refused) {
+    return null;
+  }
+  return wire.notes.map((note: WireIncidentNote) => ({
+    principal: note.principal,
+    atSeconds: note.at_seconds,
+    noteRef: note.note_ref,
+    text: note.text,
+  }));
+}
+
+/**
+ * A disposition as the Console submits it: the verdict plus EXACTLY the field the SC.7 ruling
+ * attaches to it. Mirrors the engine's `parse_disposition` so a malformed body is refused here,
+ * before a byte reaches the engine.
+ */
+export type DispositionDraft =
+  | { readonly disposition: 'false_positive'; readonly justification: string }
+  | { readonly disposition: 'benign_authorized'; readonly authorizedBy: string }
+  | { readonly disposition: 'true_positive_remediated'; readonly actionTaken: RemediationAction }
+  | { readonly disposition: 'true_positive_blocked'; readonly blockingControl: string }
+  | {
+      readonly disposition: 'true_positive_risk_accepted';
+      readonly acceptingParty: string;
+      readonly expirySeconds: number;
+    }
+  | { readonly disposition: 'duplicate'; readonly predecessor: string }
+  | { readonly disposition: 'undetermined' };
+
+function requiredText(body: Record<string, unknown>, key: string): string | null {
+  const value = body[key];
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+/** Parse a disposition request body FAIL-CLOSED: the verdict must narrow and carry its one field. */
+export function toDispositionDraft(raw: unknown): DispositionDraft | null {
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const body = raw as Record<string, unknown>;
+  const tag = body['disposition'];
+  const disposition = typeof tag === 'string' ? narrowTag(DISPOSITIONS, tag) : null;
+  if (disposition === null) {
+    return null;
+  }
+  switch (disposition) {
+    case 'false_positive': {
+      const justification = requiredText(body, 'justification');
+      return justification === null ? null : { disposition, justification };
+    }
+    case 'benign_authorized': {
+      const authorizedBy = requiredText(body, 'authorizedBy');
+      return authorizedBy === null ? null : { disposition, authorizedBy };
+    }
+    case 'true_positive_remediated': {
+      const raw = requiredText(body, 'actionTaken');
+      const actionTaken = raw === null ? null : narrowTag(REMEDIATION_ACTIONS, raw.toLowerCase());
+      return actionTaken === null ? null : { disposition, actionTaken };
+    }
+    case 'true_positive_blocked': {
+      const blockingControl = requiredText(body, 'blockingControl');
+      return blockingControl === null ? null : { disposition, blockingControl };
+    }
+    case 'true_positive_risk_accepted': {
+      const acceptingParty = requiredText(body, 'acceptingParty');
+      const expirySeconds = body['expirySeconds'];
+      if (
+        acceptingParty === null ||
+        typeof expirySeconds !== 'number' ||
+        !Number.isInteger(expirySeconds) ||
+        expirySeconds <= 0
+      ) {
+        return null;
+      }
+      return { disposition, acceptingParty, expirySeconds };
+    }
+    case 'duplicate': {
+      const predecessor = requiredText(body, 'predecessor');
+      return predecessor === null ? null : { disposition, predecessor };
+    }
+    case 'undetermined':
+      return { disposition };
+  }
+}
+
+/** The wire request for a disposition (the BFF injects the operator delegation). */
+export function toWireDisposition(
+  draft: DispositionDraft,
+  incident: string,
+  requestId: number,
+): WireSocDisposition {
+  const wire: WireSocDisposition = {
+    request_id: requestId,
+    incident,
+    disposition: draft.disposition,
+  };
+  switch (draft.disposition) {
+    case 'false_positive':
+      return { ...wire, justification: draft.justification };
+    case 'benign_authorized':
+      return { ...wire, authorized_by: draft.authorizedBy };
+    case 'true_positive_remediated':
+      return { ...wire, action_taken: draft.actionTaken };
+    case 'true_positive_blocked':
+      return { ...wire, blocking_control: draft.blockingControl };
+    case 'true_positive_risk_accepted':
+      return {
+        ...wire,
+        accepting_party: draft.acceptingParty,
+        expiry_seconds: draft.expirySeconds,
+      };
+    case 'duplicate':
+      return { ...wire, predecessor: draft.predecessor };
+    case 'undetermined':
+      return wire;
+  }
+}
+
+/** A disposition the engine recorded (crdb SC.7 / GV.4). */
+export interface DispositionRecorded {
+  readonly kind: 'recorded';
+  readonly disposition: Disposition;
+  /** False on a re-disposition of an already-closed incident (the correction path). */
+  readonly closedNow: boolean;
+}
+export type DispositionResult = DispositionRecorded | SocCommandRefused;
+
+/** Project a disposition outcome. FAIL-CLOSED on a verdict tag outside the vocabulary. */
+export function toDispositionResult(wire: WireSocDispositionOutcome): DispositionResult | null {
+  if (wire.refused) {
+    return { kind: 'refused', explanation: wire.explanation ?? '' };
+  }
+  const disposition = narrowTag(DISPOSITIONS, wire.disposition ?? '');
+  if (disposition === null) {
+    return null;
+  }
+  return { kind: 'recorded', disposition, closedNow: wire.closed_now };
 }
 
 /**

@@ -18,6 +18,8 @@ import {
   objectId,
   principalId,
   toPolicyDraftInput,
+  toCaseActDraft,
+  toDispositionDraft,
   toResponseStepDrafts,
   toVtzSpecInput,
   vtzId,
@@ -86,7 +88,10 @@ import {
   resolveSocKpis,
   resolveAuditTrail,
   resolveBusinessImpact,
+  resolveCaseAct,
   resolveCognitionRun,
+  resolveDisposition,
+  resolveIncidentNotes,
   resolveIncidentTelemetry,
 } from './engine/soc.js';
 import {
@@ -1416,7 +1421,13 @@ async function handleSocCommand(
   path: string,
   res: ServerResponse,
 ): Promise<boolean> {
-  const paths = new Set(['/api/soc/plan/approve', '/api/soc/plan/modify', '/api/soc/generate']);
+  const paths = new Set([
+    '/api/soc/plan/approve',
+    '/api/soc/plan/modify',
+    '/api/soc/generate',
+    '/api/soc/act',
+    '/api/soc/disposition',
+  ]);
   if (!paths.has(path) || method !== 'POST') return false;
   const session = deps.authRouter?.resolveSession(req);
   if (!session) {
@@ -1451,6 +1462,44 @@ async function handleSocCommand(
       const state = await resolveCognitionRun(engine, principal, incident, opts);
       deps.cache.deletePrefix(socCachePrefix(principal.tenant));
       sendJson(res, 200, state);
+      return true;
+    }
+    if (path === '/api/soc/act' || path === '/api/soc/disposition') {
+      // The case acts (crdb IP-AISOC-STEP1 C.1) and the disposition verdict (SC.7 / GV.4). The body
+      // is parsed FAIL-CLOSED into exactly the field the act or verdict takes (400 otherwise). The
+      // engine's refusal is IN-BAND: a blank reason is its one indistinguishable "unknown or above
+      // clearance" shape and maps to 404 like the reads; any other reason (already closed, a blank
+      // note, an unresolved duplicate predecessor) is a 409 carrying the reason verbatim. Either way
+      // the warm SOC projection is dropped, so the operator's own act is never masked by a stale
+      // read.
+      const result =
+        path === '/api/soc/act'
+          ? await (async () => {
+              const draft = toCaseActDraft(body);
+              return draft === null
+                ? null
+                : resolveCaseAct(engine, principal, incident, draft, opts);
+            })()
+          : await (async () => {
+              const draft = toDispositionDraft(body);
+              return draft === null
+                ? null
+                : resolveDisposition(engine, principal, incident, draft, opts);
+            })();
+      if (result === null) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      deps.cache.deletePrefix(socCachePrefix(principal.tenant));
+      if (result.kind === 'refused') {
+        if (result.explanation === '') {
+          sendJson(res, 404, { error: 'not_found' });
+        } else {
+          sendJson(res, 409, { error: 'refused', explanation: result.explanation });
+        }
+        return true;
+      }
+      sendJson(res, 200, result);
       return true;
     }
     let effect;
@@ -1524,6 +1573,7 @@ async function handleSoc(
     '/api/soc/narrative',
     '/api/soc/telemetry',
     '/api/soc/audit',
+    '/api/soc/notes',
     '/api/soc/impact',
   ]);
   if (!reads.has(path)) return false;
@@ -1550,6 +1600,7 @@ async function handleSoc(
     '/api/soc/narrative': 'narrative',
     '/api/soc/telemetry': 'telemetry',
     '/api/soc/audit': 'audit',
+    '/api/soc/notes': 'notes',
     '/api/soc/impact': 'impact',
   }[path];
   const cacheKey = perIncidentKind
@@ -1580,6 +1631,17 @@ async function handleSoc(
       if (view === null) {
         // Unknown / foreign / over-clearance, indistinguishable by design. NOT cached: a later grant
         // must not be masked by a warm negative.
+        sendJson(res, 404, { error: 'not_found' });
+        return true;
+      }
+      deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
+      sendJson(res, 200, view);
+      return true;
+    }
+    if (path === '/api/soc/notes') {
+      // The case notes (crdb C.1): 404 on the engine's one indistinguishable refusal, like the trail.
+      const view = await resolveIncidentNotes(engine, principal, incident ?? '', opts);
+      if (view === null) {
         sendJson(res, 404, { error: 'not_found' });
         return true;
       }

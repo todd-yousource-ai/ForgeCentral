@@ -485,3 +485,41 @@ describe('decodeWireReply', () => {
     });
   });
 });
+
+describe('encodeWireRequest: the case acts (IP-CONSOLE-03 S3.11 over crdb C.1)', () => {
+  const asMap = (request: WireRequest): Record<string, unknown> =>
+    decode(encodeWireRequest(request)) as Record<string, unknown>;
+
+  it('the case-act COMMAND encodes over the real CBOR path, omitting absent optionals', () => {
+    // `assignee` and `note` are `skip_serializing_if = Option::is_none` on the Rust side: an absent
+    // one must be ABSENT from the map (never null), or the engine's serde rejects the frame.
+    expect(
+      asMap({ SocIncidentAct: { request_id: 5, incident: 'ep-soc-1', act: 'acked' } }),
+    ).toEqual({ SocIncidentAct: { request_id: 5, incident: 'ep-soc-1', act: 'acked' } });
+    expect(
+      asMap({
+        SocIncidentAct: {
+          request_id: 6,
+          incident: 'ep-soc-1',
+          act: 'noted',
+          note: 'pivot to the proxy logs',
+          operator: { principal: 'p-1', tenant: 't-1' },
+        },
+      }),
+    ).toEqual({
+      SocIncidentAct: {
+        request_id: 6,
+        incident: 'ep-soc-1',
+        act: 'noted',
+        note: 'pivot to the proxy logs',
+        operator: { principal: 'p-1', tenant: 't-1' },
+      },
+    });
+  });
+
+  it('the notes READ encodes over the real CBOR path', () => {
+    expect(asMap({ SocNotes: { request_id: 7, incident: 'ep-soc-1' } })).toEqual({
+      SocNotes: { request_id: 7, incident: 'ep-soc-1' },
+    });
+  });
+});
