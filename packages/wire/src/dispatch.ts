@@ -141,7 +141,9 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // The SOC settings read + governed commit (SOC_SETTINGS_READ / SOC_SETTINGS_COMMIT, crdb
       // C.9c; S3.18): the engine gates both by tier and routes the commit through its config store.
       'SocSettingsRead' in request ||
-      'SocSettingsCommit' in request)
+      'SocSettingsCommit' in request ||
+      // The governed settings read (SETTINGS_READ, crdb SET.1; IP-CONSOLE-11 ST.1).
+      'SettingsRead' in request)
   ) {
     return FrameType.QuerySubmit;
   }

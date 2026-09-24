@@ -106,7 +106,7 @@ export class SocUnavailableError extends Error {
 const QUEUE_LIMIT = 200;
 
 let nextRequestId = 1n;
-function requestId(): number {
+export function requestId(): number {
   nextRequestId += 1n;
   return Number(nextRequestId % 1_000_000_000n);
 }

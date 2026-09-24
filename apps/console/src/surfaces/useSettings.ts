@@ -13,7 +13,12 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { SocSettings, SocSettingsPatch, SocSettingsReceipt } from '@forge/contracts';
+import type {
+  SettingsView,
+  SocSettings,
+  SocSettingsPatch,
+  SocSettingsReceipt,
+} from '@forge/contracts';
 
 /** A 403 is the engine's tier refusal and resolves to `null`; the surface says what tier is needed. */
 export async function fetchSocSettings(): Promise<SocSettings | null> {
@@ -56,5 +61,30 @@ export function useCommitSocSettings(): UseMutationResult<
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['settings', 'soc'] });
     },
+  });
+}
+
+/**
+ * Fetch the governed settings (crdb SET.1, `SETTINGS_READ`; IP-CONSOLE-11 ST.1): every setting of the
+ * node with the engine's own rendering of its committed value. A 403 is the engine's tier refusal.
+ */
+export async function fetchGovernedSettings(): Promise<SettingsView | null> {
+  const res = await fetch('/api/settings', { credentials: 'include' });
+  if (res.status === 403) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`settings failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as SettingsView;
+}
+
+/** The Configuration tab's read; only fetched while the tab is open. */
+export function useGovernedSettings(enabled: boolean): UseQueryResult<SettingsView | null> {
+  return useQuery({
+    queryKey: ['settings', 'governed'],
+    queryFn: fetchGovernedSettings,
+    staleTime: 0,
+    enabled,
   });
 }

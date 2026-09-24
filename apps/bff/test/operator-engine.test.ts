@@ -277,6 +277,17 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         refused: false,
       });
     },
+    settingsRead: (req) => {
+      calls.push(`settingsRead:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        version: 0,
+        rows: [],
+        surfaces: [],
+        dual_control_required: false,
+        refused: false,
+      });
+    },
     socSettingsRead: (req) => {
       calls.push(`socSettingsRead:${String(req.request_id)}`);
       reads.push(req);

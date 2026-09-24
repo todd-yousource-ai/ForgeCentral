@@ -38,6 +38,7 @@ import type {
   WireSocWeeklyQuery,
   WireSocSettingsCommit,
   WireSocSettingsQuery,
+  WireSettingsQuery,
   WireSocNarrativeQuery,
   WireSocTelemetryQuery,
   WireSocPlanApprove,
@@ -690,6 +691,14 @@ function socWeeklyToCbor(request: WireSocWeeklyQuery): unknown {
   return out;
 }
 
+/** `SETTINGS_READ` (crdb SET.1). Rust struct order: request_id, surface?, operator?. */
+function settingsReadToCbor(request: WireSettingsQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  if (request.surface != null) out['surface'] = request.surface;
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SOC_SETTINGS_READ` (crdb C.9c). Rust struct order: request_id, operator?. */
 function socSettingsReadToCbor(request: WireSocSettingsQuery): unknown {
   const out: Record<string, unknown> = { request_id: request.request_id };
@@ -979,6 +988,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocWeekly' in request) {
     return encode({ SocWeekly: socWeeklyToCbor(request.SocWeekly) });
+  }
+  if ('SettingsRead' in request) {
+    return encode({ SettingsRead: settingsReadToCbor(request.SettingsRead) });
   }
   if ('SocSettingsRead' in request) {
     return encode({ SocSettingsRead: socSettingsReadToCbor(request.SocSettingsRead) });
