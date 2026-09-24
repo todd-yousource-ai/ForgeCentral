@@ -106,6 +106,29 @@
         "Audit"
       ]
     },
+    "WireAdminAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "clearance": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "identity",
+        "roles",
+        "clearance"
+      ],
+      "type": "object"
+    },
     "WireAgentList": {
       "additionalProperties": false,
       "properties": {
@@ -1584,6 +1607,25 @@
       "required": [
         "provider"
       ],
+      "type": "object"
+    },
+    "WireIdentitySettings": {
+      "additionalProperties": false,
+      "properties": {
+        "admins": {
+          "items": {
+            "$ref": "#/$defs/WireAdminAssignment"
+          },
+          "type": "array"
+        },
+        "sso_group_roles": {
+          "items": {
+            "$ref": "#/$defs/WireSsoGroupRoles"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
       "type": "object"
     },
     "WireImpactFactor": {
@@ -5838,6 +5880,9 @@
         "explanation": {
           "type": "string"
         },
+        "identity_values": {
+          "$ref": "#/$defs/WireIdentitySettings"
+        },
         "refused": {
           "type": "boolean"
         },
@@ -7054,6 +7099,25 @@
         "source_class",
         "vtz_id",
         "weight"
+      ],
+      "type": "object"
+    },
+    "WireSsoGroupRoles": {
+      "additionalProperties": false,
+      "properties": {
+        "group": {
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "group",
+        "roles"
       ],
       "type": "object"
     },

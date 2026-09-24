@@ -34,6 +34,12 @@ export type RetryClass = 'Never' | 'SafeSameRequest' | 'SafeAfterRefresh' | 'Cal
 
 export type StreamKind = 'Decision' | 'Audit';
 
+export interface WireAdminAssignment {
+  clearance: string;
+  identity: string;
+  roles: Array<string>;
+}
+
 export interface WireAgentList {
   agents: Array<WireAgentRecord>;
 }
@@ -389,6 +395,11 @@ export interface WireIdamSync {
 
 export interface WireIdamSyncStarted {
   provider: string;
+}
+
+export interface WireIdentitySettings {
+  admins?: Array<WireAdminAssignment>;
+  sso_group_roles?: Array<WireSsoGroupRoles>;
 }
 
 export interface WireImpactFactor {
@@ -1063,6 +1074,7 @@ export interface WireSettingRow {
 export interface WireSettings {
   dual_control_required: boolean;
   explanation?: string;
+  identity_values?: WireIdentitySettings;
   refused: boolean;
   rows: Array<WireSettingRow>;
   section_values?: WireSectionPatch;
@@ -1396,6 +1408,11 @@ export interface WireSourceVtzEdge {
   source_class: string;
   vtz_id: string;
   weight: number;
+}
+
+export interface WireSsoGroupRoles {
+  group: string;
+  roles: Array<string>;
 }
 
 export type WireStreamDelta =

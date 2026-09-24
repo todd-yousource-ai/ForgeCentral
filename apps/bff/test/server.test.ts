@@ -1276,6 +1276,30 @@ describe('BFF HTTP surface', () => {
     expect(seen).toEqual(['ten-a', 'ten-b']);
   });
 
+  it('GET /api/settings/console-rbac serves the role map to a global admin only (ST.3)', async () => {
+    const tenantAdmin = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession) },
+    );
+    const refused = await fetch(`${tenantAdmin}/api/settings/console-rbac`);
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({ error: 'refused', class: 'Role' });
+
+    const anonymous = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined) },
+    );
+    expect((await fetch(`${anonymous}/api/settings/console-rbac`)).status).toBe(401);
+
+    const global = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith({ ...operatorSession, role: 'global-admin' }) },
+    );
+    const ok = await fetch(`${global}/api/settings/console-rbac`);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ groupRoles: [], localRbac: [], defaultTenant: null });
+  });
+
   it('POST /api/vtz commits an authored zone through the audited path', async () => {
     const base = await start(
       mockClient(() => Promise.resolve()),

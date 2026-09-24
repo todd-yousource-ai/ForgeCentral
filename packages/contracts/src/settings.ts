@@ -8,7 +8,9 @@
 
 import { CLASSIFICATION_TAGS } from './soc.js';
 import type {
+  WireAdminAssignment,
   WireEgressSetting,
+  WireIdentitySettings,
   WireSectionPatch as WireSectionPatchDto,
   WireSettingsCommit,
   WireSettingsCommitted,
@@ -17,6 +19,7 @@ import type {
   WireSettingRow,
   WireSettings,
   WireSourceFormatMapping,
+  WireSsoGroupRoles,
 } from './generated/wire-dto.js';
 
 /** Where a setting's value lives (crdb SET.1 `origin`). */
@@ -72,6 +75,114 @@ export interface SettingsView {
   readonly surfaces: readonly string[];
   readonly dualControlRequired: boolean;
   readonly sectionValues: SectionValues | null;
+  /** The committed identity sections, typed and read-only (crdb SET.1b); null when absent. */
+  readonly identity: IdentityValues | null;
+}
+
+/**
+ * The engine's admin assignments and SSO group map (crdb SET.1b). Both are boot-bound, so the Console
+ * shows them read-only. Typed on purpose: the engine's text rendering of `identity.admins` is ambiguous
+ * (a free-form identity may contain its separators), so the Console never parses it.
+ */
+export interface IdentityValues {
+  readonly admins: readonly {
+    readonly identity: string;
+    readonly roles: readonly string[];
+    readonly clearance: string;
+  }[];
+  readonly ssoGroupRoles: readonly { readonly group: string; readonly roles: readonly string[] }[];
+}
+
+/** The engine's admin role names (`AdminRole::name`) with their display labels. */
+const ADMIN_ROLE_LABELS: Readonly<Record<string, string>> = {
+  operator: 'Operator',
+  securityadmin: 'Security admin',
+  tenantadmin: 'Tenant admin',
+  auditor: 'Auditor',
+  root: 'Root',
+};
+
+/** A role's label; a name this build does not know is shown verbatim, never dropped or guessed. */
+export function adminRoleLabel(name: string): string {
+  return ADMIN_ROLE_LABELS[name] ?? name;
+}
+
+function toIdentityValues(w: WireIdentitySettings | undefined): IdentityValues | null {
+  if (w === undefined) {
+    return null;
+  }
+  return {
+    admins: (w.admins ?? []).map((a: WireAdminAssignment) => ({
+      identity: a.identity,
+      roles: a.roles,
+      clearance: a.clearance,
+    })),
+    ssoGroupRoles: (w.sso_group_roles ?? []).map((g: WireSsoGroupRoles) => ({
+      group: g.group,
+      roles: g.roles,
+    })),
+  };
+}
+
+/** The Console's own operator roles (BFF `auth/rbac.ts`; installer configuration, not the engine's). */
+export const CONSOLE_ROLES = ['global-admin', 'tenant-admin', 'tenant-user'] as const;
+export type ConsoleRole = (typeof CONSOLE_ROLES)[number];
+
+/** One grant in the Console's role map: keyed by an IdP group or, as the fallback, an OIDC subject. */
+export interface ConsoleRoleGrant {
+  readonly key: string;
+  readonly role: ConsoleRole;
+  /** The tenant a tenant-scoped role acts in; null for `global-admin`. */
+  readonly tenant: string | null;
+}
+
+/** The Console's role map as the BFF was configured at start (`FC_RBAC_CONFIG`), read-only. */
+export interface ConsoleRbacView {
+  readonly groupRoles: readonly ConsoleRoleGrant[];
+  readonly localRbac: readonly ConsoleRoleGrant[];
+  readonly defaultTenant: string | null;
+}
+
+function toConsoleGrants(raw: unknown): ConsoleRoleGrant[] | null {
+  if (!Array.isArray(raw)) {
+    return null;
+  }
+  const out: ConsoleRoleGrant[] = [];
+  for (const item of raw as unknown[]) {
+    if (typeof item !== 'object' || item === null) {
+      return null;
+    }
+    const g = item as Record<string, unknown>;
+    if (
+      typeof g['key'] !== 'string' ||
+      typeof g['role'] !== 'string' ||
+      !(CONSOLE_ROLES as readonly string[]).includes(g['role']) ||
+      !(g['tenant'] === null || typeof g['tenant'] === 'string')
+    ) {
+      return null;
+    }
+    out.push({ key: g['key'], role: g['role'] as ConsoleRole, tenant: g['tenant'] });
+  }
+  return out;
+}
+
+/** Narrow the BFF's `/api/settings/console-rbac` body; null (fail-closed) on any unknown shape. */
+export function toConsoleRbacView(raw: unknown): ConsoleRbacView | null {
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const r = raw as Record<string, unknown>;
+  const groupRoles = toConsoleGrants(r['groupRoles']);
+  const localRbac = toConsoleGrants(r['localRbac']);
+  const defaultTenant = r['defaultTenant'];
+  if (
+    groupRoles === null ||
+    localRbac === null ||
+    !(defaultTenant === null || typeof defaultTenant === 'string')
+  ) {
+    return null;
+  }
+  return { groupRoles, localRbac, defaultTenant };
 }
 
 function toSettingRow(row: WireSettingRow): SettingRow | null {
@@ -158,6 +269,7 @@ export function toSettingsView(wire: WireSettings): SettingsView | null {
     surfaces: wire.surfaces,
     dualControlRequired: wire.dual_control_required,
     sectionValues: toSectionValues(wire.section_values),
+    identity: toIdentityValues(wire.identity_values),
   };
 }
 
