@@ -326,6 +326,12 @@ describe('the SOC investigation dock (S3.7)', () => {
     // arrive ordered by TAG. The pane renders them as returned and states the limit rather than
     // presenting "acked before assigned" as a sequence.
     const caseTrail: readonly IncidentActRow[] = [
+      {
+        act: 'plan_withheld',
+        principal: '00000000-0000-0000-0000-000000000000',
+        atSeconds: 1_700_000_300,
+        detail: '3 containment step(s) withheld: tier=investigate p=none p_low=0 p_high=1000',
+      },
       { act: 'acked', principal: 'op-7', atSeconds: 1_700_000_400, detail: null },
       { act: 'assigned', principal: 'op-7', atSeconds: 1_700_000_400, detail: 'op-9' },
       { act: 'noted', principal: 'op-7', atSeconds: 1_700_000_400, detail: 'note:abc123' },
@@ -348,14 +354,19 @@ describe('the SOC investigation dock (S3.7)', () => {
     const pane = await screen.findByTestId('soc-dock-audit');
     const rows = pane.querySelectorAll('li');
     // Two same-second `noted` rows differ by detail and BOTH render (the key includes detail).
-    expect(rows).toHaveLength(6);
-    expect(rows[0]).toHaveTextContent('acked');
-    expect(rows[0]).toHaveTextContent(/a human acknowledged/);
-    expect(rows[1]).toHaveTextContent(/handed to a principal/);
-    expect(rows[1]).toHaveTextContent('op-9');
-    expect(rows[4]).toHaveTextContent(/a verdict was recorded/);
-    expect(rows[4]).toHaveTextContent('false_positive');
-    expect(rows[5]).toHaveTextContent(/closed without a verdict/);
+    expect(rows).toHaveLength(7);
+    // crdb C.3: the engine's withholding renders with its tier reason, never as an unknown tag
+    // that would blank the whole trail (the S3.11 `dispositioned` defect, guarded here).
+    expect(rows[0]).toHaveTextContent('plan_withheld');
+    expect(rows[0]).toHaveTextContent(/withheld containment under the response tier/);
+    expect(rows[0]).toHaveTextContent('tier=investigate p=none p_low=0 p_high=1000');
+    expect(rows[1]).toHaveTextContent('acked');
+    expect(rows[1]).toHaveTextContent(/a human acknowledged/);
+    expect(rows[2]).toHaveTextContent(/handed to a principal/);
+    expect(rows[2]).toHaveTextContent('op-9');
+    expect(rows[5]).toHaveTextContent(/a verdict was recorded/);
+    expect(rows[5]).toHaveTextContent('false_positive');
+    expect(rows[6]).toHaveTextContent(/closed without a verdict/);
     expect(screen.getByTestId('soc-dock-audit-order')).toHaveTextContent(
       /listed by kind, not by the order they were submitted/,
     );

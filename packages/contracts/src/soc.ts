@@ -898,6 +898,7 @@ export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
 /** The operator acts an incident's trail may carry (crdb `IncidentAct::tag`). */
 export const INCIDENT_ACTS = [
   'plan_proposed',
+  'plan_withheld',
   'plan_modified',
   'plan_approved',
   'contained',

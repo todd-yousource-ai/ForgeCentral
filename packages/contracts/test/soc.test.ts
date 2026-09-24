@@ -607,6 +607,14 @@ describe('the case acts (S3.11 / crdb C.1)', () => {
   it('the audit trail narrows every act the engine can record, including the four case acts', () => {
     const trail = toAuditTrail({
       acts: [
+        // crdb C.3 (INV-SOC-TIER-GATED): the engine's withholding, an unknown tag to a pre-C.3
+        // Console -- which would have blanked the WHOLE trail (the fail-closed narrower).
+        {
+          act: 'plan_withheld',
+          principal: '00000000-0000-0000-0000-000000000000',
+          at_seconds: 0,
+          detail: '3 containment step(s) withheld: tier=investigate p=none p_low=0 p_high=1000',
+        },
         { act: 'dispositioned', principal: 'p-1', at_seconds: 1, detail: 'false_positive' },
         { act: 'assigned', principal: 'p-1', at_seconds: 2, detail: 'p-2' },
         { act: 'acked', principal: 'p-2', at_seconds: 3 },
@@ -616,13 +624,15 @@ describe('the case acts (S3.11 / crdb C.1)', () => {
       refused: false,
     });
     expect(trail?.map((row) => row.act)).toEqual([
+      'plan_withheld',
       'dispositioned',
       'assigned',
       'acked',
       'noted',
       'closed',
     ]);
-    expect(trail?.[2]?.detail).toBeNull();
+    expect(trail?.[0]?.detail).toContain('tier=investigate');
+    expect(trail?.[3]?.detail).toBeNull();
   });
 
   it('parses a case-act body fail-closed: exactly the field the act takes', () => {
