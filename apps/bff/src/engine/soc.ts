@@ -54,6 +54,11 @@ import type {
   WireSocReportQuery,
   SocWeekly,
   WireSocWeeklyQuery,
+  SocSettings,
+  SocSettingsPatch,
+  SocSettingsReceipt,
+  WireSocSettingsCommit,
+  WireSocSettingsQuery,
 } from '@forge/contracts';
 import {
   toAuditTrail,
@@ -73,6 +78,9 @@ import {
   toWirePlanSteps,
   toSocReport,
   toSocWeekly,
+  toSocSettings,
+  toSocSettingsReceipt,
+  toWireSocSettingsCommitFields,
 } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
@@ -390,6 +398,46 @@ export async function resolveWeekly(
     throw new SocUnavailableError('the weekly summary is not in week order');
   }
   return weekly;
+}
+
+/**
+ * Read the committed SOC settings the Console binds (crdb C.9c, `SOC_SETTINGS_READ`). `null` is the
+ * engine's refusal (a tier below Admin / SecurityAudit); an unnarrowable vendor or ceiling is
+ * unavailable, never rendered under a guessed label.
+ */
+export async function resolveSocSettings(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  opts?: EngineCallOptions,
+): Promise<SocSettings | null> {
+  const request: WireSocSettingsQuery = { request_id: requestId() };
+  const wire = await engine.socSettingsRead(principal, request, opts);
+  if (wire.refused) {
+    return null;
+  }
+  const settings = toSocSettings(wire);
+  if (settings === null) {
+    throw new SocUnavailableError('the settings carry an unknown vendor or ceiling');
+  }
+  return settings;
+}
+
+/**
+ * Commit a typed SOC settings patch (crdb C.9c, `SOC_SETTINGS_COMMIT`), Admin tier only, on the
+ * operator's behalf. The reply is a RECEIPT: a refusal (tier, dual control, validation) is a state
+ * the form renders with the engine's own violations, never a throw.
+ */
+export async function resolveSocSettingsCommit(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  patch: SocSettingsPatch,
+  opts?: EngineCallOptions,
+): Promise<SocSettingsReceipt> {
+  const request: WireSocSettingsCommit = {
+    request_id: requestId(),
+    ...toWireSocSettingsCommitFields(patch),
+  };
+  return toSocSettingsReceipt(await engine.socSettingsCommit(principal, request, opts));
 }
 
 /**

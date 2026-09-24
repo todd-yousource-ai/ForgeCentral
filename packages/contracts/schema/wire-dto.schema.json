@@ -403,6 +403,42 @@
       ],
       "type": "object"
     },
+    "WireConfigSettingRow": {
+      "additionalProperties": false,
+      "properties": {
+        "bound": {
+          "type": "string"
+        },
+        "default_value": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "live_apply": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "ui_binding": {
+          "type": "string"
+        },
+        "value_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value_type",
+        "default_value",
+        "bound",
+        "live_apply",
+        "ui_binding",
+        "summary"
+      ],
+      "type": "object"
+    },
     "WireConnClass": {
       "additionalProperties": false,
       "properties": {
@@ -4387,6 +4423,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocSettings": {
+              "$ref": "#/$defs/WireSocSettings"
+            }
+          },
+          "required": [
+            "SocSettings"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocSettingsCommitted": {
+              "$ref": "#/$defs/WireSocSettingsCommitted"
+            }
+          },
+          "required": [
+            "SocSettingsCommitted"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocRunState": {
               "$ref": "#/$defs/WireSocRunState"
             }
@@ -5313,6 +5373,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocSettingsRead": {
+              "$ref": "#/$defs/WireSocSettingsQuery"
+            }
+          },
+          "required": [
+            "SocSettingsRead"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocSettingsCommit": {
+              "$ref": "#/$defs/WireSocSettingsCommit"
+            }
+          },
+          "required": [
+            "SocSettingsCommit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocCognitionRun": {
               "$ref": "#/$defs/WireSocCognitionRun"
             }
@@ -5511,6 +5595,38 @@
       },
       "required": [
         "endpoint_cn"
+      ],
+      "type": "object"
+    },
+    "WireSiemWritebackSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "case_url_base": {
+          "type": "string"
+        },
+        "ceiling": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "host": {
+          "type": "string"
+        },
+        "stream": {
+          "type": "string"
+        },
+        "vendor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "vendor",
+        "host",
+        "stream",
+        "case_url_base",
+        "ceiling"
       ],
       "type": "object"
     },
@@ -6175,6 +6291,113 @@
       ],
       "type": "object"
     },
+    "WireSocSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "dual_control_required": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "narrative_model_ref": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "registry": {
+          "items": {
+            "$ref": "#/$defs/WireConfigSettingRow"
+          },
+          "type": "array"
+        },
+        "siem_writeback": {
+          "$ref": "#/$defs/WireSiemWritebackSettings"
+        },
+        "tiers": {
+          "$ref": "#/$defs/WireSocTierSettings"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "tiers",
+        "siem_writeback",
+        "dual_control_required",
+        "registry",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocSettingsCommit": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "siem_writeback": {
+          "$ref": "#/$defs/WireSiemWritebackSettings"
+        },
+        "tiers": {
+          "$ref": "#/$defs/WireSocTierSettings"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WireSocSettingsCommitted": {
+      "additionalProperties": false,
+      "properties": {
+        "dual_control_required": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "integer"
+        },
+        "violations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "dual_control_required",
+        "violations",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocSettingsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
     "WireSocTelemetry": {
       "additionalProperties": false,
       "properties": {
@@ -6224,6 +6447,22 @@
       "required": [
         "request_id",
         "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocTierSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "p_high_milli": {
+          "type": "integer"
+        },
+        "p_low_milli": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "p_low_milli",
+        "p_high_milli"
       ],
       "type": "object"
     },

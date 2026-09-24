@@ -726,3 +726,64 @@ describe('the weekly volume resolver (S3.17, crdb C.9b)', () => {
     ).rejects.toBeInstanceOf(SocUnavailableError);
   });
 });
+
+import { resolveSocSettings, resolveSocSettingsCommit } from '../src/engine/soc.js';
+
+describe('the SOC settings resolvers (S3.18, crdb C.9c)', () => {
+  const settingsWire = {
+    version: 3,
+    tiers: { p_low_milli: 200, p_high_milli: 800 },
+    siem_writeback: {
+      enabled: false,
+      vendor: 'splunk',
+      host: '',
+      stream: '',
+      case_url_base: '',
+      ceiling: 'unclassified',
+    },
+    dual_control_required: false,
+    registry: [],
+    refused: false,
+  };
+  const engineOfSettings = (read: unknown, commit: unknown, seen: unknown[] = []): OperatorEngine =>
+    ({
+      socSettingsRead: (_principal: OperatorPrincipal, request: unknown) => {
+        seen.push(request);
+        return Promise.resolve(read);
+      },
+      socSettingsCommit: (_principal: OperatorPrincipal, request: unknown) => {
+        seen.push(request);
+        return Promise.resolve(commit);
+      },
+    }) as unknown as OperatorEngine;
+
+  it('reads the settings and maps the engine tier refusal to null', async () => {
+    const settings = await resolveSocSettings(engineOfSettings(settingsWire, {}), PRINCIPAL);
+    expect(settings?.tiers).toEqual({ pLowMilli: 200, pHighMilli: 800 });
+    expect(
+      await resolveSocSettings(engineOfSettings({ ...settingsWire, refused: true }, {}), PRINCIPAL),
+    ).toBeNull();
+  });
+
+  it('commits the compiled patch and returns the engine receipt, refusals included', async () => {
+    const seen: unknown[] = [];
+    const receipt = await resolveSocSettingsCommit(
+      engineOfSettings(
+        settingsWire,
+        {
+          version: 0,
+          dual_control_required: false,
+          violations: ['the SOC tier thresholds p_low=900 / p_high=100 (milli) are not ordered'],
+          refused: true,
+          explanation: 'the candidate did not validate',
+        },
+        seen,
+      ),
+      PRINCIPAL,
+      { tiers: { pLowMilli: 900, pHighMilli: 100 } },
+    );
+    expect((seen[0] as { tiers: { p_low_milli: number } }).tiers.p_low_milli).toBe(900);
+    expect(receipt.refused).toBe(true);
+    expect(receipt.violations[0]).toContain('p_low=900');
+  });
+});

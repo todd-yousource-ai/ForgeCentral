@@ -137,7 +137,11 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'SocReport' in request ||
       'SocUeba' in request ||
       // The weekly volume read (SOC_WEEKLY_SUMMARY, crdb C.9b; S3.17), tenant-level like DetectSummary.
-      'SocWeekly' in request)
+      'SocWeekly' in request ||
+      // The SOC settings read + governed commit (SOC_SETTINGS_READ / SOC_SETTINGS_COMMIT, crdb
+      // C.9c; S3.18): the engine gates both by tier and routes the commit through its config store.
+      'SocSettingsRead' in request ||
+      'SocSettingsCommit' in request)
   ) {
     return FrameType.QuerySubmit;
   }

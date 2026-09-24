@@ -23,6 +23,7 @@ import {
   toResponseStepDrafts,
   toVtzSpecInput,
   vtzId,
+  toSocSettingsPatch,
 } from '@forge/contracts';
 import type {
   EntityRef,
@@ -90,6 +91,8 @@ import {
   resolveBusinessImpact,
   resolveIncidentReport,
   resolveWeekly,
+  resolveSocSettings,
+  resolveSocSettingsCommit,
   resolveCaseAct,
   resolveCognitionRun,
   resolveDisposition,
@@ -1965,6 +1968,70 @@ async function handleIdamConfigure(
   return true;
 }
 
+/**
+ * The Settings tab's SOC section (IP-CONSOLE-11 S3.18 over crdb C.9c): `GET /api/settings/soc` reads
+ * the committed SOC settings (Admin / SecurityAudit tier, gated by the ENGINE: a refusal is a 403);
+ * `POST /api/settings/soc` commits a typed patch (Admin tier). The commit reply is a receipt --
+ * a validation or dual-control refusal is a 200 with the engine's violations, never a fabricated
+ * success and never a bare error the form cannot explain. Nothing is cached: settings must read
+ * what was just committed.
+ */
+async function handleSocSettings(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/settings/soc' || (method !== 'GET' && method !== 'POST')) return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    if (method === 'GET') {
+      const view = await resolveSocSettings(deps.operatorEngine, principal, opts);
+      if (view === null) {
+        sendJson(res, 403, { error: 'refused', class: 'Tier' });
+        return true;
+      }
+      sendJson(res, 200, view);
+      return true;
+    }
+    let body: unknown;
+    try {
+      body = await readJsonBody(req, MAX_COMMAND_BODY_BYTES);
+    } catch {
+      sendJson(res, 400, { error: 'malformed_request' });
+      return true;
+    }
+    const patch = toSocSettingsPatch(body);
+    if (patch === null || (patch.tiers === undefined && patch.siemWriteback === undefined)) {
+      sendJson(res, 400, { error: 'malformed_request' });
+      return true;
+    }
+    const receipt = await resolveSocSettingsCommit(deps.operatorEngine, principal, patch, opts);
+    sendJson(res, 200, receipt);
+  } catch (err) {
+    if (err instanceof SocUnavailableError) {
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'soc settings failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleIdamSecret(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -2200,6 +2267,9 @@ async function route(
     return;
   }
   if (await handleIdamSecret(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleSocSettings(deps, req, method, path, res)) {
     return;
   }
   if (await handleIdamConfigure(deps, req, method, path, res)) {

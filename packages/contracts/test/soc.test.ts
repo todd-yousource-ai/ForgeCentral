@@ -910,3 +910,117 @@ describe('the weekly volume narrower (S3.17, crdb C.9b INV-SOC-WEEKLY-DERIVED)',
     ).toBeNull();
   });
 });
+
+import {
+  toSocSettings,
+  toSocSettingsPatch,
+  toSocSettingsReceipt,
+  toWireSocSettingsCommitFields,
+} from '../src/soc.js';
+
+describe('the SOC settings narrowers (S3.18, crdb C.9c INV-SOC-SETTINGS-GOVERNED)', () => {
+  const wire = {
+    version: 3,
+    tiers: { p_low_milli: 0, p_high_milli: 1000 },
+    siem_writeback: {
+      enabled: false,
+      vendor: 'splunk',
+      host: '',
+      stream: '',
+      case_url_base: '',
+      ceiling: 'unclassified',
+    },
+    dual_control_required: false,
+    registry: [
+      {
+        key: 'soc.tiers',
+        value_type: 'struct',
+        default_value: 'p_low=0, p_high=1000',
+        bound: '0 <= p_low <= p_high <= 1000',
+        live_apply: 'live',
+        ui_binding: 'console:settings/soc/tiers',
+        summary: 'The SOC response-tier thresholds.',
+      },
+    ],
+    refused: false,
+  };
+
+  it('projects the committed settings with the registry rows and an unbound model as null', () => {
+    const settings = toSocSettings(wire);
+    expect(settings?.tiers).toEqual({ pLowMilli: 0, pHighMilli: 1000 });
+    expect(settings?.siemWriteback.vendor).toBe('splunk');
+    expect(settings?.narrativeModelRef).toBeNull();
+    expect(settings?.registry[0]?.uiBinding).toBe('console:settings/soc/tiers');
+  });
+
+  it('refuses a refusal, an unknown vendor and an unknown ceiling', () => {
+    expect(toSocSettings({ ...wire, refused: true })).toBeNull();
+    expect(
+      toSocSettings({ ...wire, siem_writeback: { ...wire.siem_writeback, vendor: 'arcsight' } }),
+    ).toBeNull();
+    expect(
+      toSocSettings({ ...wire, siem_writeback: { ...wire.siem_writeback, ceiling: 'top' } }),
+    ).toBeNull();
+  });
+
+  it('narrows a client patch closed and compiles it to the wire fields', () => {
+    expect(toSocSettingsPatch({ tiers: { pLowMilli: 200, pHighMilli: 800 } })).toEqual({
+      tiers: { pLowMilli: 200, pHighMilli: 800 },
+    });
+    expect(toSocSettingsPatch({ tiers: { pLowMilli: 2.5, pHighMilli: 800 } })).toBeNull();
+    expect(
+      toSocSettingsPatch({
+        siemWriteback: {
+          enabled: true,
+          vendor: 'arcsight',
+          host: 'h',
+          stream: 's',
+          caseUrlBase: 'https://c',
+          ceiling: 'internal',
+        },
+      }),
+    ).toBeNull();
+    expect(
+      toWireSocSettingsCommitFields({
+        tiers: { pLowMilli: 200, pHighMilli: 800 },
+        siemWriteback: {
+          enabled: true,
+          vendor: 'elastic',
+          host: 'es.example',
+          stream: 'soc',
+          caseUrlBase: 'https://c',
+          ceiling: 'internal',
+        },
+      }),
+    ).toEqual({
+      tiers: { p_low_milli: 200, p_high_milli: 800 },
+      siem_writeback: {
+        enabled: true,
+        vendor: 'elastic',
+        host: 'es.example',
+        stream: 'soc',
+        case_url_base: 'https://c',
+        ceiling: 'internal',
+      },
+    });
+    expect(toWireSocSettingsCommitFields({})).toEqual({});
+  });
+
+  it('carries the commit refusal with its violations as a state, never a throw', () => {
+    expect(
+      toSocSettingsReceipt({
+        version: 0,
+        dual_control_required: true,
+        violations: [],
+        refused: true,
+        explanation: 'tenant-config is under dual control',
+      }),
+    ).toEqual({
+      version: 0,
+      dualControlRequired: true,
+      violations: [],
+      refused: true,
+      explanation: 'tenant-config is under dual control',
+    });
+  });
+});
