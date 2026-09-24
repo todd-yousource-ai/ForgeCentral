@@ -277,6 +277,18 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         refused: false,
       });
     },
+    settingsCommit: (req) => {
+      calls.push(`settingsCommit:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        version: 1,
+        needs_restart: [],
+        dual_control_required: false,
+        refused_edits: [],
+        violations: [],
+        refused: false,
+      });
+    },
     settingsRead: (req) => {
       calls.push(`settingsRead:${String(req.request_id)}`);
       reads.push(req);

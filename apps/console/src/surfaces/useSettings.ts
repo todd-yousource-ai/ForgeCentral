@@ -14,6 +14,8 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type {
+  SettingsCommitRequest,
+  SettingsReceipt,
   SettingsView,
   SocSettings,
   SocSettingsPatch,
@@ -86,5 +88,36 @@ export function useGovernedSettings(enabled: boolean): UseQueryResult<SettingsVi
     queryFn: fetchGovernedSettings,
     staleTime: 0,
     enabled,
+  });
+}
+
+/** POST a batch of knob edits; a 200 is the engine's receipt (committed OR refused with causes). */
+export async function postGovernedSettings(
+  request: SettingsCommitRequest,
+): Promise<SettingsReceipt> {
+  const res = await fetch('/api/settings', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    throw new Error(`settings commit failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as SettingsReceipt;
+}
+
+/** The Configuration tab's commit; a success re-reads the governed settings. */
+export function useCommitGovernedSettings(): UseMutationResult<
+  SettingsReceipt,
+  Error,
+  SettingsCommitRequest
+> {
+  const client = useQueryClient();
+  return useMutation<SettingsReceipt, Error, SettingsCommitRequest>({
+    mutationFn: postGovernedSettings,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['settings', 'governed'] });
+    },
   });
 }

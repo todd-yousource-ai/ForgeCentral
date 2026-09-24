@@ -58,6 +58,7 @@ function engineWith(parts: {
     socWeekly: unused,
     socSettingsRead: unused,
     settingsRead: unused,
+    settingsCommit: unused,
     socSettingsCommit: unused,
     socCognitionRun: unused,
     socIncidentAct: unused,

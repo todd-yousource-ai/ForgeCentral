@@ -8,6 +8,8 @@
 
 import type {
   WireEgressSetting,
+  WireSettingsCommit,
+  WireSettingsCommitted,
   WireLugExposureSettings,
   WireSectionPatch,
   WireSettingRow,
@@ -192,4 +194,140 @@ export function settingApplyClass(row: SettingRow): 'live' | 'boot-bound' | 'pen
     return 'pending';
   }
   return 'boot-bound';
+}
+
+// ── The governed commit (IP-CONSOLE-11 ST.2a over crdb SET.2, `SETTINGS_COMMIT`) ──
+
+/** One knob edit: the registry key and the value as `cdb-actl config-set-key` takes it. */
+export interface SettingEdit {
+  readonly key: string;
+  readonly value: string;
+}
+
+/** A settings commit request: an atomic batch of knob edits. */
+export interface SettingsCommitRequest {
+  readonly edits: readonly SettingEdit[];
+}
+
+/** Why the engine refused one edit (crdb SET.2 cause tags). */
+export const SETTING_REFUSAL_CAUSES = [
+  'unknown_key',
+  'not_a_knob',
+  'boot_bound',
+  'pending_subsystem',
+  'unparseable',
+  'kind_mismatch',
+  'duplicate',
+] as const;
+export type SettingRefusalCause = (typeof SETTING_REFUSAL_CAUSES)[number];
+
+export interface SettingRefusal {
+  readonly key: string;
+  /** The cause tag; an unknown tag is kept verbatim as `other` so a refusal is never hidden. */
+  readonly cause: SettingRefusalCause | 'other';
+  readonly causeTag: string;
+  readonly detail: string | null;
+}
+
+/** What the engine did with a settings commit: committed, or refused with its own reasons. */
+export interface SettingsReceipt {
+  readonly version: number;
+  readonly needsRestart: readonly string[];
+  readonly dualControlRequired: boolean;
+  readonly refusedEdits: readonly SettingRefusal[];
+  readonly violations: readonly string[];
+  readonly refused: boolean;
+  readonly explanation: string | null;
+}
+
+/** The most edits one commit carries (the engine bounds a batch by its registry size). */
+export const MAX_SETTING_EDITS = 64;
+
+/**
+ * Narrow a client request body closed: a non-empty list of `{key, value}` strings, keys in the
+ * registry key shape, no more than [`MAX_SETTING_EDITS`]. The ENGINE decides whether each edit may
+ * apply; this only refuses a malformed body before it leaves the BFF.
+ */
+export function toSettingsCommitRequest(raw: unknown): SettingsCommitRequest | null {
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const edits = (raw as Record<string, unknown>)['edits'];
+  if (!Array.isArray(edits) || edits.length === 0 || edits.length > MAX_SETTING_EDITS) {
+    return null;
+  }
+  const out: SettingEdit[] = [];
+  for (const edit of edits as unknown[]) {
+    if (typeof edit !== 'object' || edit === null) {
+      return null;
+    }
+    const e = edit as Record<string, unknown>;
+    const key = e['key'];
+    const value = e['value'];
+    if (
+      typeof key !== 'string' ||
+      typeof value !== 'string' ||
+      !/^[a-z_][a-z0-9_.]{0,127}$/.test(key) ||
+      value.length > 256
+    ) {
+      return null;
+    }
+    out.push({ key, value });
+  }
+  return { edits: out };
+}
+
+/** The engine commit fields for a request (the BFF adds request_id and the delegation). */
+export function toWireSettingsCommitFields(
+  request: SettingsCommitRequest,
+): Omit<WireSettingsCommit, 'request_id' | 'operator'> {
+  return { edits: request.edits.map((e) => ({ key: e.key, value: e.value })) };
+}
+
+/** Project the commit reply. Never null: a refusal is a state the surface renders. */
+export function toSettingsReceipt(wire: WireSettingsCommitted): SettingsReceipt {
+  return {
+    version: wire.version,
+    needsRestart: wire.needs_restart,
+    dualControlRequired: wire.dual_control_required,
+    refusedEdits: wire.refused_edits.map((r) => ({
+      key: r.key,
+      cause: (SETTING_REFUSAL_CAUSES as readonly string[]).includes(r.cause)
+        ? (r.cause as SettingRefusalCause)
+        : 'other',
+      causeTag: r.cause,
+      detail: r.detail === undefined || r.detail === '' ? null : r.detail,
+    })),
+    violations: wire.violations,
+    refused: wire.refused,
+    explanation:
+      wire.explanation === undefined || wire.explanation === '' ? null : wire.explanation,
+  };
+}
+
+/** A refusal cause in the operator's words. */
+export function refusalCauseLabel(refusal: SettingRefusal): string {
+  switch (refusal.cause) {
+    case 'unknown_key':
+      return 'not a governed setting';
+    case 'not_a_knob':
+      return 'a section: change it through its form';
+    case 'boot_bound':
+      return 'boot-bound: needs a restart, not editable here';
+    case 'pending_subsystem':
+      return 'pending: nothing applies it yet';
+    case 'unparseable':
+      return 'not a valid value for this setting';
+    case 'kind_mismatch':
+      return 'the wrong kind of value';
+    case 'duplicate':
+      return 'listed twice in one commit';
+    case 'other':
+      return `refused (${refusal.causeTag})`;
+  }
+}
+
+/** Whether the Configuration tab offers a key edit for this row (knob, editable, not a set). */
+export function isKeyEditable(row: SettingRow): boolean {
+  return row.editable && row.origin === 'knob' && row.valueType !== 'CapabilitySet';
 }

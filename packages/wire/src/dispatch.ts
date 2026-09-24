@@ -143,7 +143,9 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'SocSettingsRead' in request ||
       'SocSettingsCommit' in request ||
       // The governed settings read (SETTINGS_READ, crdb SET.1; IP-CONSOLE-11 ST.1).
-      'SettingsRead' in request)
+      'SettingsRead' in request ||
+      // The governed commit (SETTINGS_COMMIT, crdb SET.2 / SET.2b; IP-CONSOLE-11 ST.2a).
+      'SettingsCommit' in request)
   ) {
     return FrameType.QuerySubmit;
   }
