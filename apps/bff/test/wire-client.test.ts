@@ -20,6 +20,9 @@ import {
   replyToConnectivityGraph,
   replyToDecisionList,
   replyToQueryRows,
+  replyToSocActOutcome,
+  replyToSocDispositionOutcome,
+  replyToSocNotes,
   replyToVtzDetail,
   replyToVtzMutation,
   replyToVtzTree,
@@ -333,5 +336,29 @@ describe('WireCrucibleClient', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('the SOC case-act reply helpers (S3.11 over crdb C.1 + SC.7)', () => {
+  const refused = {
+    Refused: { error: { class: 'Denied', code: 2, retry: 'Never', correlation_id: 0 } },
+  } as const;
+
+  it('replyToSocActOutcome returns the outcome, or throws on a refusal', () => {
+    const outcome = { act: 'acked', closed_now: false, refused: false };
+    expect(replyToSocActOutcome({ SocActed: outcome })).toEqual(outcome);
+    expect(() => replyToSocActOutcome(refused)).toThrow(EngineRefusedError);
+  });
+
+  it('replyToSocNotes returns the notes, or throws on a refusal', () => {
+    const notes = { notes: [], refused: false };
+    expect(replyToSocNotes({ SocNotes: notes })).toEqual(notes);
+    expect(() => replyToSocNotes(refused)).toThrow(EngineRefusedError);
+  });
+
+  it('replyToSocDispositionOutcome returns the outcome, or throws on a refusal', () => {
+    const outcome = { closed_now: true, disposition: 'undetermined', refused: false };
+    expect(replyToSocDispositionOutcome({ SocDispositioned: outcome })).toEqual(outcome);
+    expect(() => replyToSocDispositionOutcome(refused)).toThrow(EngineRefusedError);
   });
 });

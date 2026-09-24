@@ -493,3 +493,113 @@ describe('the evidence-depth resolvers (S3.8c)', () => {
     ).rejects.toBeInstanceOf(SocUnavailableError);
   });
 });
+
+// -- the case acts + the disposition (S3.11 over crdb C.1 + SC.7) ---------------------------------
+
+import type { WireSocActOutcome, WireSocDispositionOutcome, WireSocNotes } from '@forge/contracts';
+import { resolveCaseAct, resolveDisposition, resolveIncidentNotes } from '../src/engine/soc.js';
+
+function caseEngineOf(replies: {
+  acted?: WireSocActOutcome;
+  notes?: WireSocNotes;
+  dispositioned?: WireSocDispositionOutcome;
+  seen?: unknown[];
+}): OperatorEngine {
+  return {
+    socIncidentAct: (_principal: OperatorPrincipal, request: unknown) => {
+      replies.seen?.push(request);
+      return Promise.resolve(replies.acted ?? { act: 'acked', closed_now: false, refused: false });
+    },
+    socNotes: (_principal: OperatorPrincipal, request: unknown) => {
+      replies.seen?.push(request);
+      return Promise.resolve(replies.notes ?? { notes: [], refused: false });
+    },
+    socDisposition: (_principal: OperatorPrincipal, request: unknown) => {
+      replies.seen?.push(request);
+      return Promise.resolve(
+        replies.dispositioned ?? { closed_now: true, disposition: 'undetermined', refused: false },
+      );
+    },
+  } as unknown as OperatorEngine;
+}
+
+describe('the case acts and the disposition (S3.11)', () => {
+  it('sends exactly the act and its field, and returns the recorded act', async () => {
+    const seen: unknown[] = [];
+    const engine = caseEngineOf({
+      seen,
+      acted: { act: 'noted', closed_now: false, note_ref: 'note:abc', refused: false },
+    });
+    const result = await resolveCaseAct(engine, PRINCIPAL, 'ep-soc-1', {
+      act: 'noted',
+      note: 'pivot to the proxy logs',
+    });
+    expect(result).toEqual({
+      kind: 'recorded',
+      act: 'noted',
+      closedNow: false,
+      noteRef: 'note:abc',
+    });
+    expect(seen[0]).toMatchObject({
+      incident: 'ep-soc-1',
+      act: 'noted',
+      note: 'pivot to the proxy logs',
+    });
+    expect(seen[0]).not.toHaveProperty('assignee');
+  });
+
+  it('returns an in-band refusal WITH the engine reason, never a recorded act', async () => {
+    const engine = caseEngineOf({
+      acted: { closed_now: false, refused: true, explanation: 'the incident is already closed' },
+    });
+    await expect(resolveCaseAct(engine, PRINCIPAL, 'ep-soc-1', { act: 'closed' })).resolves.toEqual(
+      {
+        kind: 'refused',
+        explanation: 'the incident is already closed',
+      },
+    );
+  });
+
+  it('refuses an act verb outside the contract rather than rendering it', async () => {
+    const engine = caseEngineOf({ acted: { act: 'escalated', closed_now: false, refused: false } });
+    await expect(resolveCaseAct(engine, PRINCIPAL, 'ep-soc-1', { act: 'acked' })).rejects.toThrow(
+      SocUnavailableError,
+    );
+  });
+
+  it('resolves the notes, null on the engine refusal', async () => {
+    const notes = await resolveIncidentNotes(
+      caseEngineOf({
+        notes: {
+          notes: [{ principal: 'p-1', at_seconds: 5, note_ref: 'note:abc', text: 'hello' }],
+          refused: false,
+        },
+      }),
+      PRINCIPAL,
+      'ep-soc-1',
+    );
+    expect(notes).toEqual([{ principal: 'p-1', atSeconds: 5, noteRef: 'note:abc', text: 'hello' }]);
+    await expect(
+      resolveIncidentNotes(caseEngineOf({ notes: { notes: [], refused: true } }), PRINCIPAL, 'x'),
+    ).resolves.toBeNull();
+  });
+
+  it('sends the verdict with exactly its ruled field and returns the recorded disposition', async () => {
+    const seen: unknown[] = [];
+    const engine = caseEngineOf({
+      seen,
+      dispositioned: { closed_now: true, disposition: 'false_positive', refused: false },
+    });
+    const result = await resolveDisposition(engine, PRINCIPAL, 'ep-soc-1', {
+      disposition: 'false_positive',
+      justification: 'wrong parser',
+    });
+    expect(result).toEqual({ kind: 'recorded', disposition: 'false_positive', closedNow: true });
+    expect(seen[0]).toMatchObject({
+      incident: 'ep-soc-1',
+      disposition: 'false_positive',
+      justification: 'wrong parser',
+    });
+    expect(seen[0]).not.toHaveProperty('accepting_party');
+  });
+});

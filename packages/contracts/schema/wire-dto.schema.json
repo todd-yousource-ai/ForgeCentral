@@ -1577,6 +1577,30 @@
       ],
       "type": "object"
     },
+    "WireIncidentNote": {
+      "additionalProperties": false,
+      "properties": {
+        "at_seconds": {
+          "type": "integer"
+        },
+        "note_ref": {
+          "type": "string"
+        },
+        "principal": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "principal",
+        "at_seconds",
+        "note_ref",
+        "text"
+      ],
+      "type": "object"
+    },
     "WireIncidentRow": {
       "additionalProperties": false,
       "properties": {
@@ -4285,6 +4309,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocActed": {
+              "$ref": "#/$defs/WireSocActOutcome"
+            }
+          },
+          "required": [
+            "SocActed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocNotes": {
+              "$ref": "#/$defs/WireSocNotes"
+            }
+          },
+          "required": [
+            "SocNotes"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocImpact": {
               "$ref": "#/$defs/WireSocImpact"
             }
@@ -5128,6 +5176,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocIncidentAct": {
+              "$ref": "#/$defs/WireSocIncidentAct"
+            }
+          },
+          "required": [
+            "SocIncidentAct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocNotes": {
+              "$ref": "#/$defs/WireSocNotesQuery"
+            }
+          },
+          "required": [
+            "SocNotes"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocImpact": {
               "$ref": "#/$defs/WireSocImpactQuery"
             }
@@ -5341,6 +5413,31 @@
       ],
       "type": "object"
     },
+    "WireSocActOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "act": {
+          "type": "string"
+        },
+        "closed_now": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "note_ref": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "closed_now",
+        "refused"
+      ],
+      "type": "object"
+    },
     "WireSocAudit": {
       "additionalProperties": false,
       "properties": {
@@ -5517,6 +5614,35 @@
       "required": [
         "request_id",
         "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocIncidentAct": {
+      "additionalProperties": false,
+      "properties": {
+        "act": {
+          "type": "string"
+        },
+        "assignee": {
+          "type": "string"
+        },
+        "incident": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident",
+        "act"
       ],
       "type": "object"
     },
@@ -5727,6 +5853,47 @@
               "type": "null"
             }
           ]
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "incident"
+      ],
+      "type": "object"
+    },
+    "WireSocNotes": {
+      "additionalProperties": false,
+      "properties": {
+        "explanation": {
+          "type": "string"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/WireIncidentNote"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "notes",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocNotesQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "incident": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
         },
         "request_id": {
           "type": "integer"

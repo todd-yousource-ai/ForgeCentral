@@ -25,8 +25,13 @@
 
 import type {
   BusinessImpact,
+  CaseActDraft,
+  CaseActResult,
   CognitionRunState,
+  DispositionDraft,
+  DispositionResult,
   IncidentActRow,
+  IncidentNote,
   IncidentTelemetry,
   ResponseStepDraft,
   SocIncidentDetail,
@@ -41,6 +46,7 @@ import type {
   WireSocCognitionRun,
   WireSocImpactQuery,
   WireSocNarrativeQuery,
+  WireSocNotesQuery,
   WireSocPlanApprove,
   WireSocPlanModify,
   WireSocTelemetryQuery,
@@ -48,13 +54,18 @@ import type {
 import {
   toAuditTrail,
   toBusinessImpact,
+  toCaseActResult,
   toCognitionRunState,
+  toDispositionResult,
   toIncidentDetail,
   toIncidentTelemetry,
+  toIncidentNotes,
   toIncidentQueue,
   toPlanEffect,
   toSocKpis,
   toVerdictNarrative,
+  toWireCaseAct,
+  toWireDisposition,
   toWirePlanSteps,
 } from '@forge/contracts';
 
@@ -341,4 +352,68 @@ export async function resolveCognitionRun(
     throw new SocUnavailableError('the run state is outside the contract vocabulary');
   }
   return state;
+}
+
+/**
+ * Apply one operator case act -- assign / ack / note / close -- on the operator's behalf (crdb
+ * IP-AISOC-STEP1 C.1). One engine transaction: the act's effect and its audit row commit together.
+ * An in-band refusal (unknown incident, already closed, a blank or over-long note) is returned AS a
+ * refusal with the engine's reason, never swallowed and never rendered as a recorded act.
+ */
+export async function resolveCaseAct(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  draft: CaseActDraft,
+  opts?: EngineCallOptions,
+): Promise<CaseActResult> {
+  const wire = await engine.socIncidentAct(
+    principal,
+    toWireCaseAct(draft, incident, requestId()),
+    opts,
+  );
+  const result = toCaseActResult(wire);
+  if (result === null) {
+    throw new SocUnavailableError('the recorded act carries a verb the Console cannot narrow');
+  }
+  return result;
+}
+
+/** Resolve the dock's case notes (crdb C.1): each note was written with its `noted` audit act. */
+export async function resolveIncidentNotes(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  opts?: EngineCallOptions,
+): Promise<readonly IncidentNote[] | null> {
+  const request: WireSocNotesQuery = { request_id: requestId(), incident };
+  const wire = await engine.socNotes(principal, request, opts);
+  return toIncidentNotes(wire);
+}
+
+/**
+ * Record the operator's closure verdict (crdb SC.7 / GV.4): the training signal, the closure out of
+ * both SOC channels, and the audit act in one transaction. `false_positive` is the ONE verdict that
+ * down-weights the rule tenant-wide; the three true-positive verdicts are calibration's positive
+ * labels. Refusals are in-band with the engine's reason.
+ */
+export async function resolveDisposition(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  incident: string,
+  draft: DispositionDraft,
+  opts?: EngineCallOptions,
+): Promise<DispositionResult> {
+  const wire = await engine.socDisposition(
+    principal,
+    toWireDisposition(draft, incident, requestId()),
+    opts,
+  );
+  const result = toDispositionResult(wire);
+  if (result === null) {
+    throw new SocUnavailableError(
+      'the recorded disposition carries a verdict the Console cannot narrow',
+    );
+  }
+  return result;
 }

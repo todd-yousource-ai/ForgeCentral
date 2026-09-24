@@ -49,7 +49,13 @@ import type {
   WireSocIncidentList,
   WireSocIncidentListQuery,
   WireSocAudit,
+  WireSocActOutcome,
   WireSocAuditQuery,
+  WireSocDisposition,
+  WireSocDispositionOutcome,
+  WireSocIncidentAct,
+  WireSocNotes,
+  WireSocNotesQuery,
   WireSocCognitionRun,
   WireSocImpact,
   WireSocImpactQuery,
@@ -197,6 +203,19 @@ export interface CrucibleClient {
   /** Replace an unapproved plan's steps (SOC_PLAN_MODIFY, crdb SS.5). Refused once approved; a
    * successful modify bumps the revision so a stale approval refuses rather than applying. */
   socPlanModify(request: WireSocPlanModify, opts?: EngineCallOptions): Promise<WireSocPlanEffect>;
+  /** Apply one operator case act -- assign / ack / note / close -- to an incident (SOC_INCIDENT_ACT,
+   * crdb IP-AISOC-STEP1 C.1). One engine transaction: the act's effect and its audit row commit
+   * together. Refusals come back IN-BAND (`refused` + reason), never as a silent no-op. */
+  socIncidentAct(request: WireSocIncidentAct, opts?: EngineCallOptions): Promise<WireSocActOutcome>;
+  /** Read the case notes on one incident (SOC_INCIDENT_NOTES, crdb C.1), oldest first; each note
+   * was written in the same transaction as its `noted` audit act. */
+  socNotes(request: WireSocNotesQuery, opts?: EngineCallOptions): Promise<WireSocNotes>;
+  /** Record the operator's closure verdict on an incident (SOC_INCIDENT_DISPOSITION, crdb SC.7 /
+   * GV.4): the training signal, the closure, and the audit act in one transaction. */
+  socDisposition(
+    request: WireSocDisposition,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocDispositionOutcome>;
   /** Read the tenant's authored policies grouped by zone (POLICY_LIST_BY_ZONE, crdb PS.5): draft +
    * published, each at its newest version, bounded and tenant-private. */
   policyListByZone(request: WirePolicyListQuery, opts?: EngineCallOptions): Promise<WirePolicyList>;

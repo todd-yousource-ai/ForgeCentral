@@ -816,6 +816,17 @@ const socReads: readonly ReadBinding[] = [
     status: { kind: 'live' },
   },
   {
+    // The dock's case notes (crdb IP-AISOC-STEP1 C.1, SOC_INCIDENT_NOTES): each note body was written
+    // in the SAME transaction as its `noted` audit act, whose detail is the note's reference; the
+    // audit index never carries the prose itself.
+    id: bindingId('soc.notes'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_incident_notes_v1',
+    viewModel: 'IncidentNote',
+    status: { kind: 'live' },
+  },
+  {
     // The verdict panel's Business impact (crdb ED.4 + ED.5, SOC_INCIDENT_IMPACT): the band a
     // deterministic weighted sum decided, its factors, and the model's one explaining sentence in
     // its three honest states. Deliberately NO currency figure -- there is no asset-value plane,
@@ -862,6 +873,65 @@ const socCommands: readonly CommandBinding[] = [
     kind: 'command',
     surface: 'cruciblql',
     op: 'soc_plan_modify_v1',
+    authz: 'operator:soc.respond',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Hand the incident to a principal (crdb IP-AISOC-STEP1 C.1, SOC_INCIDENT_ACT `assigned`). The
+    // assignee id is the act's audit detail; who holds the case is a trail fact, not an episode field.
+    // Assignees come from the RBAC groups on Settings -> RBAC (operator ruling 2026-09-24); the
+    // engine records the id the Console submits (rider C.1r validates it engine-side once the engine
+    // RBAC store lands).
+    id: bindingId('soc.case.assign'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_incident_act_v1',
+    authz: 'operator:soc.respond',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // "A human has seen this" (C.1, `acked`): an audit act with no detail.
+    id: bindingId('soc.case.ack'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_incident_act_v1',
+    authz: 'operator:soc.respond',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Attach a case note (C.1, `noted`): the body lands in the note store, the act's detail is the
+    // note's reference. Bounded engine-side (4000 chars, blank refused). Accepted on a closed
+    // incident too -- the post-incident write-up is legitimate.
+    id: bindingId('soc.case.note'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_incident_act_v1',
+    authz: 'operator:soc.respond',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Close WITHOUT a verdict (C.1, `closed`): out of both SOC channels like a disposition, but no
+    // training signal is recorded -- calibration never sees a plain close. Refused once closed.
+    id: bindingId('soc.case.close'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_incident_act_v1',
+    authz: 'operator:soc.respond',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // The operator's closure VERDICT (crdb SC.7 / GV.4, SOC_INCIDENT_DISPOSITION): one verb, seven
+    // verdicts, each with exactly its required field. `false_positive` is the ONE verdict that
+    // down-weights the rule tenant-wide; the true-positive verdicts are calibration's positive labels.
+    id: bindingId('soc.disposition'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_incident_disposition_v1',
     authz: 'operator:soc.respond',
     audited: true,
     status: { kind: 'live' },

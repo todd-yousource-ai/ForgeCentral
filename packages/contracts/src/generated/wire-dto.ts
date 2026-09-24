@@ -389,6 +389,13 @@ export interface WireIncidentAct {
   principal: string;
 }
 
+export interface WireIncidentNote {
+  at_seconds: number;
+  note_ref: string;
+  principal: string;
+  text: string;
+}
+
 export interface WireIncidentRow {
   anchor: string;
   authority: string;
@@ -880,6 +887,8 @@ export type WireReply =
   | { SocTelemetry: WireSocTelemetry; }
   | { SocAudit: WireSocAudit; }
   | { SocDispositioned: WireSocDispositionOutcome; }
+  | { SocActed: WireSocActOutcome; }
+  | { SocNotes: WireSocNotes; }
   | { SocImpact: WireSocImpact; }
   | { SocRunState: WireSocRunState; }
   | { SocPlanMutated: WireSocPlanEffect; }
@@ -939,6 +948,8 @@ export type WireRequest =
   | { SocTelemetry: WireSocTelemetryQuery; }
   | { SocAudit: WireSocAuditQuery; }
   | { SocDisposition: WireSocDisposition; }
+  | { SocIncidentAct: WireSocIncidentAct; }
+  | { SocNotes: WireSocNotesQuery; }
   | { SocImpact: WireSocImpactQuery; }
   | { SocCognitionRun: WireSocCognitionRun; }
   | { SocPlanApprove: WireSocPlanApprove; }
@@ -964,6 +975,14 @@ export interface WireRiskBand {
 export interface WireScopeMember {
   agent?: string | null;
   endpoint_cn: string;
+}
+
+export interface WireSocActOutcome {
+  act?: string;
+  closed_now: boolean;
+  explanation?: string;
+  note_ref?: string;
+  refused: boolean;
 }
 
 export interface WireSocAudit {
@@ -1020,6 +1039,15 @@ export interface WireSocImpactQuery {
   request_id: number;
 }
 
+export interface WireSocIncidentAct {
+  act: string;
+  assignee?: string;
+  incident: string;
+  note?: string;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
 export interface WireSocIncidentDetail {
   edges: Array<WireLineageEdge>;
   evidence: Array<string>;
@@ -1068,6 +1096,18 @@ export interface WireSocNarrative {
 export interface WireSocNarrativeQuery {
   incident: string;
   operator?: OperatorDelegation | null;
+  request_id: number;
+}
+
+export interface WireSocNotes {
+  explanation?: string;
+  notes: Array<WireIncidentNote>;
+  refused: boolean;
+}
+
+export interface WireSocNotesQuery {
+  incident: string;
+  operator?: OperatorDelegation;
   request_id: number;
 }
 

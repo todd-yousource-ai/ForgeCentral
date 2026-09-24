@@ -74,6 +74,9 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     socAudit: unused,
     socImpact: unused,
     socCognitionRun: unused,
+    socIncidentAct: unused,
+    socNotes: unused,
+    socDisposition: unused,
     policyCreate: unused,
     policyEdit: unused,
     policyPublish: unused,
@@ -153,6 +156,9 @@ function operatorEngineWith(soc: Partial<OperatorEngine> = {}): OperatorEngine {
     socAudit: unused,
     socImpact: unused,
     socCognitionRun: unused,
+    socIncidentAct: unused,
+    socNotes: unused,
+    socDisposition: unused,
     policyCreate: () => Promise.resolve({ id: 'p-new', version: '1.0.0', lifecycle: 'draft' }),
     policyEdit: () => Promise.resolve({ id: 'p-1', version: '1.1.0', lifecycle: 'draft' }),
     policyPublish: () =>
@@ -1944,5 +1950,135 @@ describe('BFF HTTP surface', () => {
       });
       expect(res.status, `${path} must reach its handler, not the 405 gate`).toBe(401);
     }
+  });
+});
+
+describe('the SOC case acts and the disposition (IP-CONSOLE-03 S3.11 over crdb C.1 + SC.7)', () => {
+  it('POST /api/soc/act records an act through the engine and returns it (mounted ABOVE the 405 gate)', async () => {
+    const seen: unknown[] = [];
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socIncidentAct: (_principal, request) => {
+            seen.push(request);
+            return Promise.resolve({ act: 'assigned', closed_now: false, refused: false });
+          },
+        }),
+      },
+    );
+    const assignee = 'b4464672-f4cc-577f-ae05-f3ece3c67b64';
+
+    const res = await fetch(`${base}/api/soc/act`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ incident: 'ep-soc-1', act: 'assigned', assignee }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      kind: 'recorded',
+      act: 'assigned',
+      closedNow: false,
+      noteRef: null,
+    });
+    expect(seen[0]).toMatchObject({ incident: 'ep-soc-1', act: 'assigned', assignee });
+  });
+
+  it('POST /api/soc/act refuses a malformed body before the engine, and maps in-band refusals honestly', async () => {
+    let calls = 0;
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socIncidentAct: (_principal, request) => {
+            calls += 1;
+            return Promise.resolve(
+              request.act === 'closed'
+                ? {
+                    closed_now: false,
+                    refused: true,
+                    explanation: 'the incident is already closed',
+                  }
+                : { closed_now: false, refused: true },
+            );
+          },
+        }),
+      },
+    );
+    const post = (body: unknown) =>
+      fetch(`${base}/api/soc/act`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    const malformed = await post({ incident: 'ep-soc-1', act: 'assigned', assignee: 'alice' });
+    expect(malformed.status).toBe(400);
+    expect(calls).toBe(0);
+
+    const conflict = await post({ incident: 'ep-soc-1', act: 'closed' });
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toEqual({
+      error: 'refused',
+      explanation: 'the incident is already closed',
+    });
+
+    // The engine's blank refusal is its ONE indistinguishable shape (unknown / above clearance).
+    const unknown = await post({ incident: 'ep-nope', act: 'acked' });
+    expect(unknown.status).toBe(404);
+  });
+
+  it('POST /api/soc/disposition records the verdict and GET /api/soc/notes reads the notes back', async () => {
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          socDisposition: (_principal, request) =>
+            Promise.resolve({
+              closed_now: true,
+              disposition: request.disposition,
+              refused: false,
+            }),
+          socNotes: () =>
+            Promise.resolve({
+              notes: [{ principal: 'p-1', at_seconds: 5, note_ref: 'note:abc', text: 'hello' }],
+              refused: false,
+            }),
+        }),
+      },
+    );
+
+    const dispositioned = await fetch(`${base}/api/soc/disposition`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        incident: 'ep-soc-1',
+        disposition: 'benign_authorized',
+        authorizedBy: 'CHG-4411',
+      }),
+    });
+    expect(dispositioned.status).toBe(200);
+    expect(await dispositioned.json()).toEqual({
+      kind: 'recorded',
+      disposition: 'benign_authorized',
+      closedNow: true,
+    });
+
+    const missingField = await fetch(`${base}/api/soc/disposition`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ incident: 'ep-soc-1', disposition: 'false_positive' }),
+    });
+    expect(missingField.status).toBe(400);
+
+    const notes = await fetch(`${base}/api/soc/notes?id=ep-soc-1`);
+    expect(notes.status).toBe(200);
+    expect(await notes.json()).toEqual([
+      { principal: 'p-1', atSeconds: 5, noteRef: 'note:abc', text: 'hello' },
+    ]);
   });
 });

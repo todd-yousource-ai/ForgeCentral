@@ -227,6 +227,21 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ acts: [], refused: false });
     },
+    socIncidentAct: (req) => {
+      calls.push(`socIncidentAct:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ act: req.act, closed_now: req.act === 'closed', refused: false });
+    },
+    socNotes: (req) => {
+      calls.push(`socNotes:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ notes: [], refused: false });
+    },
+    socDisposition: (req) => {
+      calls.push(`socDisposition:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ closed_now: true, disposition: req.disposition, refused: false });
+    },
     socImpact: (req) => {
       calls.push(`socImpact:${String(req.request_id)}`);
       reads.push(req);

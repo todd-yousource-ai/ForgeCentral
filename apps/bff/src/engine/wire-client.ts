@@ -37,7 +37,10 @@ import type {
   WirePolicyMutated,
   WireSocIncidentDetail,
   WireSocIncidentList,
+  WireSocActOutcome,
   WireSocAudit,
+  WireSocDispositionOutcome,
+  WireSocNotes,
   WireSocImpact,
   WireSocNarrative,
   WireSocRunState,
@@ -204,6 +207,30 @@ export function replyToSocAudit(reply: WireReply): WireSocAudit {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a SOC audit read');
+}
+
+/** Map an engine `WireReply` to `WireSocActOutcome` (SOC_INCIDENT_ACT, crdb IP-AISOC-STEP1 C.1). */
+export function replyToSocActOutcome(reply: WireReply): WireSocActOutcome {
+  if (typeof reply === 'object' && 'SocActed' in reply) return reply.SocActed;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC case act');
+}
+
+/** Map an engine `WireReply` to `WireSocNotes` (SOC_INCIDENT_NOTES, crdb C.1). */
+export function replyToSocNotes(reply: WireReply): WireSocNotes {
+  if (typeof reply === 'object' && 'SocNotes' in reply) return reply.SocNotes;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC notes read');
+}
+
+/** Map an engine `WireReply` to `WireSocDispositionOutcome` (SOC_INCIDENT_DISPOSITION, crdb SC.7). */
+export function replyToSocDispositionOutcome(reply: WireReply): WireSocDispositionOutcome {
+  if (typeof reply === 'object' && 'SocDispositioned' in reply) return reply.SocDispositioned;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC disposition');
 }
 
 /** Map an engine `WireReply` to `WireSocImpact` (SOC_INCIDENT_IMPACT, crdb ED.4/ED.5). */
@@ -816,6 +843,38 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToSocPlanEffect(await dispatch(transport, { SocPlanModify: request })),
+      opts,
+    );
+  }
+
+  async socIncidentAct(
+    request: Parameters<CrucibleClient['socIncidentAct']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocActOutcome> {
+    return this.call(
+      async (transport) =>
+        replyToSocActOutcome(await dispatch(transport, { SocIncidentAct: request })),
+      opts,
+    );
+  }
+
+  async socNotes(
+    request: Parameters<CrucibleClient['socNotes']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocNotes> {
+    return this.call(
+      async (transport) => replyToSocNotes(await dispatch(transport, { SocNotes: request })),
+      opts,
+    );
+  }
+
+  async socDisposition(
+    request: Parameters<CrucibleClient['socDisposition']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocDispositionOutcome> {
+    return this.call(
+      async (transport) =>
+        replyToSocDispositionOutcome(await dispatch(transport, { SocDisposition: request })),
       opts,
     );
   }

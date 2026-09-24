@@ -127,7 +127,11 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // write family as the plan commands (handler.rs pairs SocDisposition with SocPlanApprove), so
       // it rides QuerySubmit too. It was added to the contract (2026-08-09) without this line, and
       // the hygiene test below has failed the gate on main since.
-      'SocDisposition' in request)
+      'SocDisposition' in request ||
+      // The case acts (SOC_INCIDENT_ACT, crdb IP-AISOC-STEP1 C.1) ride the same write family as the
+      // disposition; the notes read (SOC_INCIDENT_NOTES) rides beside SOC_INCIDENT_AUDIT.
+      'SocIncidentAct' in request ||
+      'SocNotes' in request)
   ) {
     return FrameType.QuerySubmit;
   }

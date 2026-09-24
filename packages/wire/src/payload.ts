@@ -38,6 +38,8 @@ import type {
   WireSocPlanApprove,
   WireSocPlanModify,
   WireSocDisposition,
+  WireSocIncidentAct,
+  WireSocNotesQuery,
   WirePolicyEdit,
   WirePolicyEffectiveQuery,
   WirePolicyListQuery,
@@ -615,6 +617,33 @@ function socAuditToCbor(request: WireSocAuditQuery): unknown {
   return out;
 }
 
+/**
+ * `SOC_INCIDENT_ACT` (crdb IP-AISOC-STEP1 C.1). Rust struct order: request_id, incident, act, then the
+ * optional assignee, note, operator? -- each `skip_serializing_if = Option::is_none`, so an absent
+ * field is OMITTED from the map (never sent as null), byte-identical to the Rust encoder.
+ */
+function socIncidentActToCbor(request: WireSocIncidentAct): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+    act: request.act,
+  };
+  if (request.assignee !== undefined) out['assignee'] = request.assignee;
+  if (request.note !== undefined) out['note'] = request.note;
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_INCIDENT_NOTES` (crdb C.1). Rust struct order: request_id, incident, operator?. */
+function socNotesToCbor(request: WireSocNotesQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SOC_INCIDENT_IMPACT` (crdb ED.4/ED.5). Rust struct order: request_id, incident, operator?. */
 function socImpactToCbor(request: WireSocImpactQuery): unknown {
   const out: Record<string, unknown> = {
@@ -886,6 +915,12 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocDisposition' in request) {
     return encode({ SocDisposition: socDispositionToCbor(request.SocDisposition) });
+  }
+  if ('SocIncidentAct' in request) {
+    return encode({ SocIncidentAct: socIncidentActToCbor(request.SocIncidentAct) });
+  }
+  if ('SocNotes' in request) {
+    return encode({ SocNotes: socNotesToCbor(request.SocNotes) });
   }
   if ('CursorFetch' in request)
     return encode({ CursorFetch: { handle: request.CursorFetch.handle } });
