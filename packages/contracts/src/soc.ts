@@ -907,6 +907,7 @@ export const INCIDENT_ACTS = [
   'acked',
   'noted',
   'closed',
+  'siem_enriched',
 ] as const;
 export type IncidentAct = (typeof INCIDENT_ACTS)[number];
 

@@ -343,6 +343,12 @@ describe('the SOC investigation dock (S3.7)', () => {
         detail: 'false_positive',
       },
       { act: 'closed', principal: 'op-7', atSeconds: 1_700_000_600, detail: null },
+      {
+        act: 'siem_enriched',
+        principal: '00000000-0000-0000-0000-000000000000',
+        atSeconds: 1_700_000_601,
+        detail: 'vendor=splunk trigger=closed status=ok',
+      },
     ];
     mockNarrative(NARRATIVE, TELEMETRY, caseTrail);
 
@@ -354,7 +360,12 @@ describe('the SOC investigation dock (S3.7)', () => {
     const pane = await screen.findByTestId('soc-dock-audit');
     const rows = pane.querySelectorAll('li');
     // Two same-second `noted` rows differ by detail and BOTH render (the key includes detail).
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(8);
+    // crdb C.8b: the engine's SIEM write-back renders with its vendor / trigger / status detail,
+    // never as an unknown tag that would blank the trail.
+    expect(rows[7]).toHaveTextContent('siem_enriched');
+    expect(rows[7]).toHaveTextContent(/wrote the enrichment row to the SIEM/);
+    expect(rows[7]).toHaveTextContent('vendor=splunk trigger=closed status=ok');
     // crdb C.3: the engine's withholding renders with its tier reason, never as an unknown tag
     // that would blank the whole trail (the S3.11 `dispositioned` defect, guarded here).
     expect(rows[0]).toHaveTextContent('plan_withheld');

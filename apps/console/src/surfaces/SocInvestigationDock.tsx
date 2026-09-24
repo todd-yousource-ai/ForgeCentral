@@ -284,6 +284,10 @@ export function actGloss(act: IncidentAct): string {
       return 'a note was recorded';
     case 'closed':
       return 'closed without a verdict';
+    case 'siem_enriched':
+      // crdb C.8b (INV-SOC-ENRICHMENT-WRITTEN): the engine wrote, or failed to write, the
+      // enrichment row to the committed SIEM; the detail carries vendor, trigger and status.
+      return 'the engine wrote the enrichment row to the SIEM';
   }
 }
 
