@@ -6,8 +6,10 @@
 // value itself. The narrowers fail closed: an unknown origin refuses the whole view rather than
 // guessing whether a setting is committed, boot configuration, or a constant.
 
+import { CLASSIFICATION_TAGS } from './soc.js';
 import type {
   WireEgressSetting,
+  WireSectionPatch as WireSectionPatchDto,
   WireSettingsCommit,
   WireSettingsCommitted,
   WireLugExposureSettings,
@@ -204,9 +206,40 @@ export interface SettingEdit {
   readonly value: string;
 }
 
-/** A settings commit request: an atomic batch of knob edits. */
+/**
+ * The admin capability names a dual-control set is drawn from (crdb `AdminCapability::name`). The
+ * engine refuses an unknown name, so a stale list here fails closed, never open.
+ */
+export const ADMIN_CAPABILITIES = [
+  'read-status',
+  'server-lifecycle',
+  'storage-manage',
+  'maintenance-manage',
+  'security-policy-change',
+  'key-issue',
+  'identity-manage',
+  'artifact-approve',
+  'tenant-config',
+  'config-read',
+  'audit-read',
+  'audit-export',
+] as const;
+
+/** A typed patch over the live sections (crdb SET.2b); absent parts are unchanged. */
+export interface SectionPatch {
+  readonly dualControl?: readonly string[];
+  readonly egressDestinations?: readonly { readonly id: string; readonly ceiling: string }[];
+  readonly lugExposure?: SectionValues['lugExposure'];
+  readonly disabledDecoderFamilies?: readonly string[];
+  readonly sourceFormatMap?: readonly { readonly source: string; readonly format: string }[];
+  /** Empty = unbind the narrative model. */
+  readonly socNarrativeModelRef?: string;
+}
+
+/** A settings commit request: an atomic batch of knob edits and / or a section patch. */
 export interface SettingsCommitRequest {
   readonly edits: readonly SettingEdit[];
+  readonly sections?: SectionPatch;
 }
 
 /** Why the engine refused one edit (crdb SET.2 cause tags). */
@@ -244,20 +277,21 @@ export interface SettingsReceipt {
 export const MAX_SETTING_EDITS = 64;
 
 /**
- * Narrow a client request body closed: a non-empty list of `{key, value}` strings, keys in the
- * registry key shape, no more than [`MAX_SETTING_EDITS`]. The ENGINE decides whether each edit may
- * apply; this only refuses a malformed body before it leaves the BFF.
+ * Narrow a client request body closed: `{key, value}` strings in the registry key shape (at most
+ * [`MAX_SETTING_EDITS`]) and / or a well-formed section patch; at least one of the two. The ENGINE
+ * decides whether each change may apply; this only refuses a malformed body before it leaves the BFF.
  */
 export function toSettingsCommitRequest(raw: unknown): SettingsCommitRequest | null {
   if (typeof raw !== 'object' || raw === null) {
     return null;
   }
-  const edits = (raw as Record<string, unknown>)['edits'];
-  if (!Array.isArray(edits) || edits.length === 0 || edits.length > MAX_SETTING_EDITS) {
+  const body = raw as Record<string, unknown>;
+  const rawEdits = body['edits'] ?? [];
+  if (!Array.isArray(rawEdits) || rawEdits.length > MAX_SETTING_EDITS) {
     return null;
   }
-  const out: SettingEdit[] = [];
-  for (const edit of edits as unknown[]) {
+  const edits: SettingEdit[] = [];
+  for (const edit of rawEdits as unknown[]) {
     if (typeof edit !== 'object' || edit === null) {
       return null;
     }
@@ -272,16 +306,193 @@ export function toSettingsCommitRequest(raw: unknown): SettingsCommitRequest | n
     ) {
       return null;
     }
-    out.push({ key, value });
+    edits.push({ key, value });
   }
-  return { edits: out };
+  let sections: SectionPatch | undefined;
+  if (body['sections'] !== undefined) {
+    const parsed = toSectionPatch(body['sections']);
+    if (parsed === null) {
+      return null;
+    }
+    sections = parsed;
+  }
+  if (edits.length === 0 && sections === undefined) {
+    return null;
+  }
+  return sections === undefined ? { edits } : { edits, sections };
+}
+
+/** The most entries a list-valued section may carry in one patch. */
+export const MAX_SECTION_ENTRIES = 256;
+
+function stringList(raw: unknown): string[] | null {
+  if (!Array.isArray(raw) || raw.length > MAX_SECTION_ENTRIES) {
+    return null;
+  }
+  const out: string[] = [];
+  for (const v of raw as unknown[]) {
+    if (typeof v !== 'string' || v.length > 256) {
+      return null;
+    }
+    out.push(v);
+  }
+  return out;
+}
+
+function nonNegativeInt(v: unknown, max: number): number | null {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max ? v : null;
+}
+
+/** Narrow a section patch closed; `null` on any malformed field (the ENGINE validates the values). */
+export function toSectionPatch(raw: unknown): SectionPatch | null {
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const p = raw as Record<string, unknown>;
+  const out: {
+    dualControl?: string[];
+    egressDestinations?: { id: string; ceiling: string }[];
+    lugExposure?: SectionValues['lugExposure'];
+    disabledDecoderFamilies?: string[];
+    sourceFormatMap?: { source: string; format: string }[];
+    socNarrativeModelRef?: string;
+  } = {};
+  if (p['dualControl'] !== undefined) {
+    const list = stringList(p['dualControl']);
+    if (list === null) return null;
+    out.dualControl = list;
+  }
+  if (p['egressDestinations'] !== undefined) {
+    const raws = p['egressDestinations'];
+    if (!Array.isArray(raws) || raws.length > MAX_SECTION_ENTRIES) return null;
+    const list: { id: string; ceiling: string }[] = [];
+    for (const r of raws as unknown[]) {
+      if (typeof r !== 'object' || r === null) return null;
+      const e = r as Record<string, unknown>;
+      const id = e['id'];
+      const ceiling = e['ceiling'];
+      if (
+        typeof id !== 'string' ||
+        id.trim() === '' ||
+        id.length > 128 ||
+        typeof ceiling !== 'string' ||
+        !(CLASSIFICATION_TAGS as readonly string[]).includes(ceiling)
+      ) {
+        return null;
+      }
+      list.push({ id, ceiling });
+    }
+    out.egressDestinations = list;
+  }
+  if (p['lugExposure'] !== undefined) {
+    const l = p['lugExposure'];
+    if (typeof l !== 'object' || l === null) return null;
+    const x = l as Record<string, unknown>;
+    const u32 = 4_294_967_295;
+    const fields = [
+      nonNegativeInt(x['maxAccountsPerNamespace'], u32),
+      nonNegativeInt(x['maxGroupsPerNamespace'], u32),
+      nonNegativeInt(x['maxSessionsPerDevice'], u32),
+      nonNegativeInt(x['lastSeenBucketHours'], u32),
+      nonNegativeInt(x['bindingConfirmThresholdPermille'], 65_535),
+      nonNegativeInt(x['snapshotCadenceHours'], u32),
+    ];
+    if (
+      typeof x['enabled'] !== 'boolean' ||
+      typeof x['resolutionEnabled'] !== 'boolean' ||
+      fields.some((f) => f === null)
+    ) {
+      return null;
+    }
+    const [a, g, se, lb, bt, sc] = fields as number[];
+    out.lugExposure = {
+      enabled: x['enabled'],
+      resolutionEnabled: x['resolutionEnabled'],
+      maxAccountsPerNamespace: a ?? 0,
+      maxGroupsPerNamespace: g ?? 0,
+      maxSessionsPerDevice: se ?? 0,
+      lastSeenBucketHours: lb ?? 0,
+      bindingConfirmThresholdPermille: bt ?? 0,
+      snapshotCadenceHours: sc ?? 0,
+    };
+  }
+  if (p['disabledDecoderFamilies'] !== undefined) {
+    const list = stringList(p['disabledDecoderFamilies']);
+    if (list === null) return null;
+    out.disabledDecoderFamilies = list;
+  }
+  if (p['sourceFormatMap'] !== undefined) {
+    const raws = p['sourceFormatMap'];
+    if (!Array.isArray(raws) || raws.length > MAX_SECTION_ENTRIES) return null;
+    const list: { source: string; format: string }[] = [];
+    for (const r of raws as unknown[]) {
+      if (typeof r !== 'object' || r === null) return null;
+      const m = r as Record<string, unknown>;
+      if (
+        typeof m['source'] !== 'string' ||
+        typeof m['format'] !== 'string' ||
+        m['source'].trim() === '' ||
+        m['format'].trim() === ''
+      ) {
+        return null;
+      }
+      list.push({ source: m['source'], format: m['format'] });
+    }
+    out.sourceFormatMap = list;
+  }
+  if (p['socNarrativeModelRef'] !== undefined) {
+    const ref = p['socNarrativeModelRef'];
+    if (typeof ref !== 'string' || ref.length > 256) return null;
+    out.socNarrativeModelRef = ref;
+  }
+  return Object.keys(out).length === 0 ? null : out;
+}
+
+function toWireSectionPatch(p: SectionPatch): WireSectionPatchDto {
+  const l = p.lugExposure;
+  return {
+    ...(p.dualControl === undefined ? {} : { dual_control: [...p.dualControl] }),
+    ...(p.egressDestinations === undefined
+      ? {}
+      : {
+          egress_destinations: p.egressDestinations.map((e) => ({ id: e.id, ceiling: e.ceiling })),
+        }),
+    ...(l === undefined
+      ? {}
+      : {
+          lug_exposure: {
+            enabled: l.enabled,
+            resolution_enabled: l.resolutionEnabled,
+            max_accounts_per_namespace: l.maxAccountsPerNamespace,
+            max_groups_per_namespace: l.maxGroupsPerNamespace,
+            max_sessions_per_device: l.maxSessionsPerDevice,
+            last_seen_bucket_hours: l.lastSeenBucketHours,
+            binding_confirm_threshold_permille: l.bindingConfirmThresholdPermille,
+            snapshot_cadence_hours: l.snapshotCadenceHours,
+          },
+        }),
+    ...(p.disabledDecoderFamilies === undefined
+      ? {}
+      : { disabled_decoder_families: [...p.disabledDecoderFamilies] }),
+    ...(p.sourceFormatMap === undefined
+      ? {}
+      : {
+          source_format_map: p.sourceFormatMap.map((m) => ({ source: m.source, format: m.format })),
+        }),
+    ...(p.socNarrativeModelRef === undefined
+      ? {}
+      : { soc_narrative_model_ref: p.socNarrativeModelRef }),
+  };
 }
 
 /** The engine commit fields for a request (the BFF adds request_id and the delegation). */
 export function toWireSettingsCommitFields(
   request: SettingsCommitRequest,
 ): Omit<WireSettingsCommit, 'request_id' | 'operator'> {
-  return { edits: request.edits.map((e) => ({ key: e.key, value: e.value })) };
+  const edits = request.edits.map((e) => ({ key: e.key, value: e.value }));
+  return request.sections === undefined
+    ? { edits }
+    : { edits, sections: toWireSectionPatch(request.sections) };
 }
 
 /** Project the commit reply. Never null: a refusal is a state the surface renders. */

@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  toSectionPatch,
   isKeyEditable,
   refusalCauseLabel,
   toSettingsCommitRequest,
@@ -21,6 +22,7 @@ describe('the settings commit contract (ST.2a, crdb SET.2)', () => {
       null,
       {},
       { edits: [] },
+      { edits: [], sections: {} },
       { edits: [{ key: 'Maintenance', value: '1' }] },
       { edits: [{ key: 'a.b', value: 1 }] },
       { edits: Array.from({ length: 65 }, () => ({ key: 'a.b', value: '1' })) },
@@ -75,5 +77,53 @@ describe('the settings commit contract (ST.2a, crdb SET.2)', () => {
     expect(isKeyEditable({ ...base, valueType: 'CapabilitySet' })).toBe(false);
     expect(isKeyEditable({ ...base, origin: 'section' })).toBe(false);
     expect(isKeyEditable({ ...base, editable: false })).toBe(false);
+  });
+});
+
+describe('the section patch contract (ST.2b, crdb SET.2b)', () => {
+  it('narrows every section closed and compiles it to the wire', () => {
+    const patch = toSectionPatch({
+      dualControl: ['tenant-config'],
+      egressDestinations: [{ id: 'frontier', ceiling: 'internal' }],
+      sourceFormatMap: [{ source: 'fw-1', format: 'cef' }],
+      socNarrativeModelRef: '',
+    });
+    expect(patch).not.toBeNull();
+    const request = toSettingsCommitRequest({ sections: patch });
+    expect(request).not.toBeNull();
+    if (request === null) throw new Error('narrows');
+    expect(toWireSettingsCommitFields(request)).toEqual({
+      edits: [],
+      sections: {
+        dual_control: ['tenant-config'],
+        egress_destinations: [{ id: 'frontier', ceiling: 'internal' }],
+        source_format_map: [{ source: 'fw-1', format: 'cef' }],
+        soc_narrative_model_ref: '',
+      },
+    });
+  });
+
+  it('refuses a malformed section before it leaves the BFF', () => {
+    for (const bad of [
+      {},
+      { egressDestinations: [{ id: 'x', ceiling: 'top' }] },
+      { egressDestinations: [{ id: ' ', ceiling: 'internal' }] },
+      { dualControl: 'tenant-config' },
+      { sourceFormatMap: [{ source: 'fw', format: '' }] },
+      {
+        lugExposure: {
+          enabled: true,
+          resolutionEnabled: true,
+          maxAccountsPerNamespace: -1,
+          maxGroupsPerNamespace: 1,
+          maxSessionsPerDevice: 1,
+          lastSeenBucketHours: 1,
+          bindingConfirmThresholdPermille: 1,
+          snapshotCadenceHours: 1,
+        },
+      },
+    ]) {
+      expect(toSectionPatch(bad)).toBeNull();
+    }
   });
 });
