@@ -8,16 +8,17 @@ defect. The paired engine ledger is crdb `IP-CONSOLE-SETTINGS-WIRE-LEDGER.md`.
 ## Resume here (rewrite at every merge)
 
 - **State (2026-09-24, ~22:45 UTC):** crdb SET.1 + SET.2 merged and deployed; SET.2b on branch. **Corrections recorded:** the admin assignments and the SSO map are boot-bound (RBAC / Federation show them read-only); the detection watermark bounds are pending (Policy shows them read-only). ST.3 / ST.4b now wait only on SET.1 (deployed). Prior: **ST.0 LANDED with the plan** (the TRD amendment). The SOC tab is LIVE from
-  IP-CONSOLE-03 S3.18. **NEXT = crdb SET.1 + SET.2** (the generalized read + commit), then ST.1.
-  ST.4a (the Federation tab's connector panel mount) needs no engine work and may land any time.
+  IP-CONSOLE-03 S3.18. **NEXT = crdb SET.2b merge + deploy, then ST.1** (the generalized contract
+  and the Settings shell over SET.1 / SET.2 / SET.2b). ST.4a (the Federation tab's connector panel
+  mount) needs no engine work and may land any time.
 
 ## Roster (ForgeCentral)
 
 | Step | Acceptance | Status | Commit | Notes |
 |------|-----------|--------|--------|-------|
 | ST.0 | TRD 9 | LANDED (2026-09-24, with the plan) | -- | TRD-CONSOLE-11 Section 9: the engine's real admin surface, the corrected tab set (SOC + Configuration added; FIPS toggle removed; HA / DR / rotation PENDING with owning work), Step 1 scope, added acceptance + failure semantics. |
-| ST.1 | 9.1, 9.4 | PLANNED (waits crdb SET.1) | | |
-| ST.2 | 9.2 Configuration | PLANNED (waits crdb SET.2) | | |
+| ST.1 | 9.1, 9.4 | PLANNED (engine read + commit deployed: SET.1, SET.2; SET.2b on branch) | | |
+| ST.2 | 9.2 Configuration | PLANNED (waits crdb SET.2b deploy) | | |
 | ST.3 | 9.2 RBAC | PLANNED (engine read deployed: SET.1) | | read-only: boot-bound |
 | ST.4 | 9.2 Federation | PLANNED (a: no engine dependency; b: engine read deployed) | | the SSO map read-only |
 | ST.5 | 9.2 Security | PLANNED (waits crdb SET.4 + the sidecar rider) | | |
