@@ -267,6 +267,16 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         refused: false,
       });
     },
+    socWeekly: (req) => {
+      calls.push(`socWeekly:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        weeks: [],
+        episodes_truncated: false,
+        until_seconds: 0,
+        refused: false,
+      });
+    },
     socCognitionRun: (req) => {
       calls.push(`socCognitionRun:${String(req.request_id)}`);
       reads.push(req);

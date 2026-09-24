@@ -107,6 +107,8 @@ import type {
   WireVtzTreeQuery,
   WireSocReport,
   WireSocReportQuery,
+  WireSocWeeklyQuery,
+  WireSocWeeklySummary,
 } from '@forge/contracts';
 
 import type { ExplainTier } from '../auth/tier.js';
@@ -129,6 +131,7 @@ export type EngineAction =
   | 'socAudit'
   | 'socImpact'
   | 'socReport'
+  | 'socWeekly'
   | 'socCognitionRun'
   | 'socPlanApprove'
   | 'socPlanModify'
@@ -320,6 +323,12 @@ export interface OperatorEngine {
     request: WireSocReportQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSocReport>;
+  /** Read the last N weeks of detection volume (SOC_WEEKLY_SUMMARY, crdb C.9b) on behalf of `principal`. */
+  socWeekly(
+    principal: OperatorPrincipal,
+    request: WireSocWeeklyQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocWeeklySummary>;
   /** Start a cognition run (SOC_COGNITION_RUN, the ED runner) on behalf of `principal`. */
   socCognitionRun(
     principal: OperatorPrincipal,
@@ -678,6 +687,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'socReport', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.socReport({ ...request, operator }, opts);
+    },
+    socWeekly: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socWeekly', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socWeekly({ ...request, operator }, opts);
     },
     socCognitionRun: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'socCognitionRun', request.request_id));

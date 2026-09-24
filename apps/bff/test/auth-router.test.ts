@@ -55,6 +55,7 @@ const unusedClient: CrucibleClient = {
   socAudit: () => Promise.reject(new Error('unused')),
   socImpact: () => Promise.reject(new Error('unused')),
   socReport: () => Promise.reject(new Error('unused')),
+  socWeekly: () => Promise.reject(new Error('unused')),
   socCognitionRun: () => Promise.reject(new Error('unused')),
   socIncidentAct: () => Promise.reject(new Error('unused')),
   socNotes: () => Promise.reject(new Error('unused')),

@@ -4375,6 +4375,18 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SocWeekly": {
+              "$ref": "#/$defs/WireSocWeeklySummary"
+            }
+          },
+          "required": [
+            "SocWeekly"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocRunState": {
               "$ref": "#/$defs/WireSocRunState"
             }
@@ -5283,6 +5295,18 @@
           },
           "required": [
             "SocUeba"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SocWeekly": {
+              "$ref": "#/$defs/WireSocWeeklyQuery"
+            }
+          },
+          "required": [
+            "SocWeekly"
           ],
           "type": "object"
         },
@@ -6285,6 +6309,117 @@
         "recommended_investigation",
         "pack_basis",
         "generated_at",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSocWeekRow": {
+      "additionalProperties": false,
+      "properties": {
+        "demoted": {
+          "type": "integer"
+        },
+        "dropped": {
+          "type": "integer"
+        },
+        "events_analyzed": {
+          "type": "integer"
+        },
+        "fires": {
+          "type": "integer"
+        },
+        "incidents_closed": {
+          "type": "integer"
+        },
+        "incidents_opened": {
+          "type": "integer"
+        },
+        "muted": {
+          "type": "integer"
+        },
+        "opened": {
+          "type": "integer"
+        },
+        "promoted": {
+          "type": "integer"
+        },
+        "techniques_fired": {
+          "type": "integer"
+        },
+        "transitioned": {
+          "type": "integer"
+        },
+        "week_start_seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "week_start_seconds",
+        "fires",
+        "opened",
+        "promoted",
+        "transitioned",
+        "demoted",
+        "dropped",
+        "muted",
+        "events_analyzed",
+        "techniques_fired",
+        "incidents_opened",
+        "incidents_closed"
+      ],
+      "type": "object"
+    },
+    "WireSocWeeklyQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "until_seconds": {
+          "type": "integer"
+        },
+        "weeks": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "weeks"
+      ],
+      "type": "object"
+    },
+    "WireSocWeeklySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage": {
+          "$ref": "#/$defs/WireDetectCoverage"
+        },
+        "episodes_truncated": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "until_seconds": {
+          "type": "integer"
+        },
+        "weeks": {
+          "items": {
+            "$ref": "#/$defs/WireSocWeekRow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "weeks",
+        "episodes_truncated",
+        "until_seconds",
         "refused"
       ],
       "type": "object"

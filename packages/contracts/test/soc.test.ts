@@ -870,3 +870,43 @@ describe('the incident report narrower (S3.16, crdb C.5 INV-SOC-REPORT-SHAPED)',
     expect(text).toContain('- leg:net:198.51.100.7');
   });
 });
+
+import { toSocWeekly } from '../src/soc.js';
+
+describe('the weekly volume narrower (S3.17, crdb C.9b INV-SOC-WEEKLY-DERIVED)', () => {
+  const week = (start: number, fires: number) => ({
+    week_start_seconds: start,
+    fires,
+    opened: 1,
+    promoted: 0,
+    transitioned: 0,
+    demoted: 0,
+    dropped: 0,
+    muted: 2,
+    events_analyzed: 20,
+    techniques_fired: 2,
+    incidents_opened: 1,
+    incidents_closed: 0,
+  });
+  const wire = {
+    weeks: [week(1_699_228_800, 3), week(1_699_833_600, 7)],
+    episodes_truncated: false,
+    until_seconds: 1_700_000_000,
+    refused: false,
+  };
+
+  it('projects the weeks oldest first with the current coverage beside them', () => {
+    const weekly = toSocWeekly(wire);
+    expect(weekly?.weeks.map((w) => w.fires)).toEqual([3, 7]);
+    expect(weekly?.weeks[1]?.techniquesFired).toBe(2);
+    expect(weekly?.coverage).toBeNull();
+    expect(weekly?.episodesTruncated).toBe(false);
+  });
+
+  it('refuses a refusal and weeks out of Monday order', () => {
+    expect(toSocWeekly({ ...wire, refused: true, explanation: '' })).toBeNull();
+    expect(
+      toSocWeekly({ ...wire, weeks: [week(1_699_833_600, 7), week(1_699_228_800, 3)] }),
+    ).toBeNull();
+  });
+});

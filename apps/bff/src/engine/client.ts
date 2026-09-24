@@ -101,6 +101,8 @@ import type {
   WireVtzTreeQuery,
   WireSocReport,
   WireSocReportQuery,
+  WireSocWeeklyQuery,
+  WireSocWeeklySummary,
 } from '@forge/contracts';
 
 /** Per-call bounds. At least one of `timeoutMs`/`signal` should be set; the caller passes the config default. */
@@ -196,6 +198,8 @@ export interface CrucibleClient {
   socImpact(request: WireSocImpactQuery, opts?: EngineCallOptions): Promise<WireSocImpact>;
   /** Read one incident's shaped report (SOC_INCIDENT_REPORT, crdb C.5): every section states its source. */
   socReport(request: WireSocReportQuery, opts?: EngineCallOptions): Promise<WireSocReport>;
+  /** Read the last N weeks of detection volume (SOC_WEEKLY_SUMMARY, crdb C.9b). */
+  socWeekly(request: WireSocWeeklyQuery, opts?: EngineCallOptions): Promise<WireSocWeeklySummary>;
   /** Run the narrative + impact pipelines for one incident in the background (SOC_COGNITION_RUN).
    * Replies immediately with started/running/recorded/refused, never the run's result; the records
    * are read back through socNarrative/socImpact once committed. Audited under the operator. */

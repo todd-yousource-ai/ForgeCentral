@@ -65,6 +65,8 @@ import type {
   WireWithheldClaim,
   WireReportSection,
   WireSocReport,
+  WireSocWeekRow,
+  WireSocWeeklySummary,
 } from './generated/wire-dto.js';
 
 // -- closed vocabularies (each pinned by a crdb accessor, never a Debug rendering) -------------------
@@ -1551,4 +1553,75 @@ export function reportToText(report: SocReport): string {
       ? ['## Cited evidence', '- none']
       : ['## Cited evidence', ...report.citedEvidence.map((leg) => `- ${leg}`)];
   return [...head, '', ...body.flatMap((b) => [b, '']), ...evidence, ''].join('\n');
+}
+
+// ── The weekly volume read (crdb IP-AISOC-STEP1 C.9b, `SOC_WEEKLY_SUMMARY`; Console S3.17) ──
+
+/** One ISO week (Monday 00:00 UTC) of detection volume, derived by the engine from persisted records. */
+export interface SocWeekRow {
+  readonly weekStartSeconds: number;
+  readonly fires: number;
+  readonly opened: number;
+  readonly promoted: number;
+  readonly transitioned: number;
+  readonly demoted: number;
+  readonly dropped: number;
+  readonly muted: number;
+  readonly eventsAnalyzed: number;
+  /** Distinct techniques with at least one fire in the week: what fired, the honest historical coverage. */
+  readonly techniquesFired: number;
+  readonly incidentsOpened: number;
+  /** Closed in the week by the closing fire's week (the record carries no close instant). */
+  readonly incidentsClosed: number;
+}
+
+export interface SocWeekly {
+  /** Oldest first; the last row is the partial current week. */
+  readonly weeks: readonly SocWeekRow[];
+  /** The CURRENT corpus coverage (not historical), or null when the node has none. */
+  readonly coverage: SocCoverage | null;
+  /** True when the engine's episode scan hit its ceiling, so incident counts may undercount. */
+  readonly episodesTruncated: boolean;
+  readonly untilSeconds: number;
+}
+
+function toWeekRow(row: WireSocWeekRow): SocWeekRow {
+  return {
+    weekStartSeconds: row.week_start_seconds,
+    fires: row.fires,
+    opened: row.opened,
+    promoted: row.promoted,
+    transitioned: row.transitioned,
+    demoted: row.demoted,
+    dropped: row.dropped,
+    muted: row.muted,
+    eventsAnalyzed: row.events_analyzed,
+    techniquesFired: row.techniques_fired,
+    incidentsOpened: row.incidents_opened,
+    incidentsClosed: row.incidents_closed,
+  };
+}
+
+/**
+ * Project the `SOC_WEEKLY_SUMMARY` reply. `null` for a refusal, or when the weeks are not in
+ * ascending Monday order (a row out of order would render one week's volume under another's date).
+ */
+export function toSocWeekly(wire: WireSocWeeklySummary): SocWeekly | null {
+  if (wire.refused) {
+    return null;
+  }
+  const weeks = wire.weeks.map(toWeekRow);
+  for (let i = 1; i < weeks.length; i += 1) {
+    const prev = weeks[i - 1];
+    const cur = weeks[i];
+    if (prev === undefined || cur === undefined || cur.weekStartSeconds <= prev.weekStartSeconds) {
+      return null;
+    }
+  }
+  return {
+    weeks,
+    coverage: toSocCoverage(wire.coverage),
+    episodesTruncated: wire.episodes_truncated,
+    untilSeconds: wire.until_seconds,
+  };
 }
