@@ -24,6 +24,7 @@ import {
   toVtzSpecInput,
   vtzId,
   toSocSettingsPatch,
+  toSettingsCommitRequest,
 } from '@forge/contracts';
 import type {
   EntityRef,
@@ -99,7 +100,11 @@ import {
   resolveIncidentNotes,
   resolveIncidentTelemetry,
 } from './engine/soc.js';
-import { SettingsUnavailableError, resolveSettings } from './engine/settings.js';
+import {
+  SettingsUnavailableError,
+  resolveSettings,
+  resolveSettingsCommit,
+} from './engine/settings.js';
 import {
   resolveIdamConfigure,
   resolveIdamConnect,
@@ -1988,7 +1993,7 @@ async function handleGovernedSettings(
   path: string,
   res: ServerResponse,
 ): Promise<boolean> {
-  if (path !== '/api/settings' || method !== 'GET') return false;
+  if (path !== '/api/settings' || (method !== 'GET' && method !== 'POST')) return false;
   const session = deps.authRouter?.resolveSession(req);
   if (!session) {
     sendJson(res, 401, { error: 'unauthorized' });
@@ -1996,6 +2001,15 @@ async function handleGovernedSettings(
   }
   if (!deps.operatorEngine) {
     sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  if (method === 'POST') {
+    await commitGovernedSettings(
+      deps,
+      req,
+      res,
+      principalFromSession(session, activeTenantOverride(req)),
+    );
     return true;
   }
   const surfaceParam = new URL(req.url ?? '/', 'http://localhost').searchParams.get('surface');
@@ -2025,6 +2039,48 @@ async function handleGovernedSettings(
     }
   }
   return true;
+}
+
+/**
+ * `POST /api/settings` (IP-CONSOLE-11 ST.2a over crdb SET.2): a batch of knob edits. A malformed body
+ * is a 400 before any engine call; the engine's receipt (committed OR refused with its causes) is a
+ * 200, so the surface can show exactly why; nothing is cached.
+ */
+async function commitGovernedSettings(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  res: ServerResponse,
+  principal: ReturnType<typeof principalFromSession>,
+): Promise<void> {
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return;
+  }
+  let body: unknown;
+  try {
+    body = await readJsonBody(req, MAX_COMMAND_BODY_BYTES);
+  } catch {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return;
+  }
+  const request = toSettingsCommitRequest(body);
+  if (request === null) {
+    sendJson(res, 400, { error: 'malformed_request' });
+    return;
+  }
+  try {
+    const receipt = await resolveSettingsCommit(deps.operatorEngine, principal, request, {
+      timeoutMs: deps.config.requestTimeoutMs,
+    });
+    sendJson(res, 200, receipt);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'settings commit failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
 }
 
 async function handleSocSettings(

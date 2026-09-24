@@ -170,10 +170,22 @@ const GOVERNED: SettingsView = {
   ],
 };
 
-function mockGoverned(view: SettingsView | null): void {
+function mockGoverned(
+  view: SettingsView | null,
+  receipt: unknown = null,
+  posted: unknown[] = [],
+): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
+    vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/settings' && init?.method === 'POST') {
+        posted.push(JSON.parse(typeof init.body === 'string' ? init.body : '{}'));
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(receipt),
+        } as Response);
+      }
       if (url === '/api/settings') {
         return Promise.resolve({
           ok: view !== null,
@@ -223,5 +235,104 @@ describe('the Settings tab strip and the Configuration tab (ST.1)', () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Configuration' }));
     await screen.findByText('Admin or SecurityAudit tier required');
     expect(screen.queryByTestId('settings-configuration')).not.toBeInTheDocument();
+  });
+});
+
+describe('knob edits on the Configuration tab (ST.2a)', () => {
+  async function openMaintenance(): Promise<void> {
+    renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Configuration' }));
+    await screen.findByTestId('settings-configuration');
+    fireEvent.change(screen.getByTestId('settings-surface-picker'), {
+      target: { value: 'maintenance' },
+    });
+  }
+
+  it('stages an edit, confirms it with old and new, and shows the engine receipt', async () => {
+    const posted: unknown[] = [];
+    mockGoverned(
+      GOVERNED,
+      {
+        version: 10,
+        needsRestart: [],
+        dualControlRequired: false,
+        refusedEdits: [],
+        violations: [],
+        refused: false,
+        explanation: null,
+      },
+      posted,
+    );
+    await openMaintenance();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit maintenance.cadence_secs' }));
+    fireEvent.change(screen.getByLabelText('New value for maintenance.cadence_secs'), {
+      target: { value: '300' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Stage' }));
+    expect(screen.getByTestId('settings-configuration-staged')).toHaveTextContent(
+      '1 staged change',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Commit 1 change' }));
+    // Nothing leaves before the confirm, and the confirm states old -> new.
+    expect(posted).toHaveLength(0);
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      'maintenance.cadence_secs: 120 -> 300',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toEqual({ edits: [{ key: 'maintenance.cadence_secs', value: '300' }] });
+    expect(await screen.findByTestId('settings-configuration-receipt')).toHaveTextContent(
+      'Committed at version 10. Applied live.',
+    );
+  });
+
+  it('shows a refused batch with every cause in words, and offers no edit on a boot-bound row', async () => {
+    mockGoverned(GOVERNED, {
+      version: 0,
+      needsRestart: [],
+      dualControlRequired: false,
+      refusedEdits: [
+        {
+          key: 'maintenance.cadence_secs',
+          cause: 'unparseable',
+          causeTag: 'unparseable',
+          detail: 'cannot parse "soon"',
+        },
+      ],
+      violations: [],
+      refused: true,
+      explanation: 'an edit was refused; nothing was committed',
+    });
+    renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Configuration' }));
+    const table = await screen.findByTestId('settings-configuration');
+    // The boot-bound row on the first surface is read-only.
+    expect(within(table).getAllByText('read-only').length).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole('button', { name: 'Edit admin_endpoint.max_payload_bytes' }),
+    ).toBeNull();
+    fireEvent.change(screen.getByTestId('settings-surface-picker'), {
+      target: { value: 'maintenance' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit maintenance.cadence_secs' }));
+    fireEvent.change(screen.getByLabelText('New value for maintenance.cadence_secs'), {
+      target: { value: 'soon' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Stage' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Commit 1 change' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }));
+    const refusals = await screen.findByTestId('settings-configuration-refusals');
+    expect(refusals).toHaveTextContent(
+      'maintenance.cadence_secs: not a valid value for this setting',
+    );
+    // A refused batch stays staged so the operator can correct it.
+    expect(screen.getByTestId('settings-configuration-staged')).toBeInTheDocument();
+  });
+
+  it('offers no edit under dual control', async () => {
+    mockGoverned({ ...GOVERNED, dualControlRequired: true });
+    await openMaintenance();
+    expect(screen.queryByRole('button', { name: 'Edit maintenance.cadence_secs' })).toBeNull();
+    expect(screen.getByTestId('settings-configuration-version')).toHaveTextContent('dual control');
   });
 });

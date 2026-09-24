@@ -39,6 +39,7 @@ import type {
   WireSocSettingsCommit,
   WireSocSettingsQuery,
   WireSettingsQuery,
+  WireSettingsCommit,
   WireSocNarrativeQuery,
   WireSocTelemetryQuery,
   WireSocPlanApprove,
@@ -699,6 +700,49 @@ function settingsReadToCbor(request: WireSettingsQuery): unknown {
   return out;
 }
 
+/** `SETTINGS_COMMIT` (crdb SET.2 / SET.2b). Rust struct order: request_id, edits, sections?, operator?. */
+function settingsCommitToCbor(request: WireSettingsCommit): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    edits: request.edits.map((e) => ({ key: e.key, value: e.value })),
+  };
+  const p = request.sections;
+  if (p != null) {
+    const sections: Record<string, unknown> = {};
+    if (p.dual_control != null) sections['dual_control'] = [...p.dual_control];
+    if (p.egress_destinations != null)
+      sections['egress_destinations'] = p.egress_destinations.map((e) => ({
+        id: e.id,
+        ceiling: e.ceiling,
+      }));
+    if (p.lug_exposure != null) {
+      const l = p.lug_exposure;
+      sections['lug_exposure'] = {
+        enabled: l.enabled,
+        resolution_enabled: l.resolution_enabled,
+        max_accounts_per_namespace: l.max_accounts_per_namespace,
+        max_groups_per_namespace: l.max_groups_per_namespace,
+        max_sessions_per_device: l.max_sessions_per_device,
+        last_seen_bucket_hours: l.last_seen_bucket_hours,
+        binding_confirm_threshold_permille: l.binding_confirm_threshold_permille,
+        snapshot_cadence_hours: l.snapshot_cadence_hours,
+      };
+    }
+    if (p.disabled_decoder_families != null)
+      sections['disabled_decoder_families'] = [...p.disabled_decoder_families];
+    if (p.source_format_map != null)
+      sections['source_format_map'] = p.source_format_map.map((m) => ({
+        source: m.source,
+        format: m.format,
+      }));
+    if (p.soc_narrative_model_ref != null)
+      sections['soc_narrative_model_ref'] = p.soc_narrative_model_ref;
+    out['sections'] = sections;
+  }
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SOC_SETTINGS_READ` (crdb C.9c). Rust struct order: request_id, operator?. */
 function socSettingsReadToCbor(request: WireSocSettingsQuery): unknown {
   const out: Record<string, unknown> = { request_id: request.request_id };
@@ -988,6 +1032,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocWeekly' in request) {
     return encode({ SocWeekly: socWeeklyToCbor(request.SocWeekly) });
+  }
+  if ('SettingsCommit' in request) {
+    return encode({ SettingsCommit: settingsCommitToCbor(request.SettingsCommit) });
   }
   if ('SettingsRead' in request) {
     return encode({ SettingsRead: settingsReadToCbor(request.SettingsRead) });

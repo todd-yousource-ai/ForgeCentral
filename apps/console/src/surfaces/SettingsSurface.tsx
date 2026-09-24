@@ -3,8 +3,8 @@
 //
 // TRD-CONSOLE-11 Section 9 (amended 2026-09-24) sets the tab set against the engine's real admin
 // surface. A tab is present only when its engine binding is live (INV-CONSOLE-NO-STUB); the others
-// land with their IP-CONSOLE-11 rows. Live now: SOC (S3.18, crdb C.9c) and Configuration (ST.1,
-// crdb SET.1 -- read-only here; editing lands in ST.2).
+// land with their IP-CONSOLE-11 rows. Live now: SOC (S3.18, crdb C.9c) and Configuration (ST.1 read,
+// crdb SET.1; ST.2a knob edits, crdb SET.2 -- the section forms land in ST.2b).
 //
 // Every value shown is the engine's committed document. A commit is confirm-gated and goes to the
 // engine's config store through the same validation its admin plane applies; the engine's receipt is
@@ -16,6 +16,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { Badge, ConfirmDialog, DataTable, GlassPanel, TabStrip } from '@forge/design';
 import type {
   SettingRow,
+  SettingsReceipt,
   SettingsView,
   SocSettings,
   SocSettingsPatch,
@@ -24,12 +25,19 @@ import type {
 import {
   CLASSIFICATION_TAGS,
   SIEM_VENDORS,
+  isKeyEditable,
+  refusalCauseLabel,
   settingApplyClass,
   settingSourceLabel,
 } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { useCommitSocSettings, useGovernedSettings, useSocSettings } from './useSettings.js';
+import {
+  useCommitGovernedSettings,
+  useCommitSocSettings,
+  useGovernedSettings,
+  useSocSettings,
+} from './useSettings.js';
 
 function receiptLine(receipt: SocSettingsReceipt): string {
   if (!receipt.refused) {
@@ -284,17 +292,104 @@ function applyLabel(row: SettingRow): string {
   }
 }
 
+/** The engine's receipt for a Configuration commit, verbatim: version and restarts, or every cause. */
+function GovernedReceipt({ receipt }: { readonly receipt: SettingsReceipt }): ReactElement {
+  if (!receipt.refused) {
+    return (
+      <div className="fcx-settings__receipt" data-testid="settings-configuration-receipt">
+        <Badge variant="good">Committed</Badge> Committed at version {String(receipt.version)}.
+        {receipt.needsRestart.length > 0
+          ? ` Committed but not applied until a restart: ${receipt.needsRestart.join(', ')}.`
+          : ' Applied live.'}
+      </div>
+    );
+  }
+  return (
+    <div className="fcx-settings__receipt" data-testid="settings-configuration-receipt">
+      <Badge variant="caution">Refused</Badge>{' '}
+      {receipt.dualControlRequired
+        ? 'Tenant-config is under dual control: propose and approve instead.'
+        : (receipt.explanation ?? 'Refused by the engine; nothing was committed.')}
+      {receipt.refusedEdits.length > 0 || receipt.violations.length > 0 ? (
+        <ul className="fcx-settings__violations" data-testid="settings-configuration-refusals">
+          {receipt.refusedEdits.map((r) => (
+            <li key={`${r.key}-${r.causeTag}`}>
+              <code>{r.key}</code>: {refusalCauseLabel(r)}
+              {r.detail === null ? '' : ` (${r.detail})`}
+            </li>
+          ))}
+          {receipt.violations.map((v) => (
+            <li key={v}>{v}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactElement {
   const surfaces = view.surfaces.filter((s) => view.rows.some((r) => r.surface === s));
   const [surface, setSurface] = useState(surfaces[0] ?? '');
+  const [editing, setEditing] = useState<{ key: string; value: string } | null>(null);
+  const [staged, setStaged] = useState<Readonly<Record<string, string>>>({});
+  const [confirming, setConfirming] = useState(false);
+  const commit = useCommitGovernedSettings();
   const rows = view.rows.filter((r) => r.surface === surface);
+  const byKey = new Map(view.rows.map((r) => [r.key, r]));
+  const stagedKeys = Object.keys(staged);
+  // Under dual control the engine refuses a direct commit; the surface does not offer one.
+  const locked = view.dualControlRequired;
+
+  const changeCell = (r: SettingRow): ReactElement => {
+    if (!isKeyEditable(r) || locked) {
+      return <span>read-only</span>;
+    }
+    if (editing?.key === r.key) {
+      return (
+        <span className="fcx-settings__edit">
+          <input
+            type="text"
+            aria-label={`New value for ${r.key}`}
+            value={editing.value}
+            onChange={(e) => setEditing({ key: r.key, value: e.target.value })}
+          />
+          <button
+            type="button"
+            className="fcx-btn"
+            onClick={() => {
+              setStaged({ ...staged, [r.key]: editing.value });
+              setEditing(null);
+            }}
+          >
+            Stage
+          </button>
+          <button type="button" className="fcx-btn" onClick={() => setEditing(null)}>
+            Cancel
+          </button>
+        </span>
+      );
+    }
+    return (
+      <button
+        type="button"
+        className="fcx-btn"
+        aria-label={`Edit ${r.key}`}
+        onClick={() => setEditing({ key: r.key, value: staged[r.key] ?? r.value ?? '' })}
+      >
+        {staged[r.key] === undefined ? 'Edit' : `Staged: ${staged[r.key] ?? ''}`}
+      </button>
+    );
+  };
+
   return (
     <div data-testid="settings-configuration">
       <p className="fcx-settings__model" data-testid="settings-configuration-version">
         {view.version === 0
           ? 'Nothing is committed: every value is the fail-closed default.'
           : `Committed configuration at version ${String(view.version)}.`}
-        {view.dualControlRequired ? ' Changes require dual control (propose and approve).' : ''}
+        {locked
+          ? ' Tenant-config is under dual control: the Console reads these settings but does not commit them.'
+          : ''}
       </p>
       <label className="fcx-reports__picker">
         Surface
@@ -326,6 +421,7 @@ function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactEle
           },
           { id: 'source', header: 'Source', cell: (r) => settingSourceLabel(r, view.version) },
           { id: 'applies', header: 'Applies', cell: applyLabel },
+          { id: 'change', header: 'Change', cell: changeCell },
           {
             id: 'definition',
             header: 'Definition',
@@ -334,6 +430,49 @@ function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactEle
         ]}
         rows={rows}
         rowKey={(r) => r.key}
+      />
+      {stagedKeys.length > 0 ? (
+        <div className="fcx-settings__staged" data-testid="settings-configuration-staged">
+          <p>
+            {String(stagedKeys.length)} staged change{stagedKeys.length === 1 ? '' : 's'}; the
+            engine applies them together or not at all.
+          </p>
+          <button type="button" className="fcx-btn" onClick={() => setConfirming(true)}>
+            Commit {String(stagedKeys.length)} change{stagedKeys.length === 1 ? '' : 's'}
+          </button>{' '}
+          <button type="button" className="fcx-btn" onClick={() => setStaged({})}>
+            Discard staged
+          </button>
+        </div>
+      ) : null}
+      {commit.isPending ? <LoadingState label="Committing" /> : null}
+      {commit.isError ? (
+        <ErrorState title="The commit could not be sent" onRetry={() => commit.reset()} />
+      ) : null}
+      {commit.isSuccess ? <GovernedReceipt receipt={commit.data} /> : null}
+      <ConfirmDialog
+        open={confirming}
+        title="Commit these settings?"
+        description={stagedKeys
+          .map((k) => `${k}: ${byKey.get(k)?.value ?? '(unset)'} -> ${staged[k] ?? ''}`)
+          .join('; ')
+          .concat('. The engine validates the batch and commits it under your principal.')}
+        confirmLabel="Commit"
+        tone="critical"
+        onConfirm={() => {
+          commit.mutate(
+            { edits: stagedKeys.map((key) => ({ key, value: staged[key] ?? '' })) },
+            {
+              onSuccess: (receipt) => {
+                if (!receipt.refused) {
+                  setStaged({});
+                }
+              },
+            },
+          );
+          setConfirming(false);
+        }}
+        onCancel={() => setConfirming(false)}
       />
     </div>
   );

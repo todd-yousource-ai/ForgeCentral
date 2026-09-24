@@ -109,6 +109,8 @@ import type {
   WireSocSettingsQuery,
   WireSettings,
   WireSettingsQuery,
+  WireSettingsCommit,
+  WireSettingsCommitted,
 } from '@forge/contracts';
 
 /** Per-call bounds. At least one of `timeoutMs`/`signal` should be set; the caller passes the config default. */
@@ -208,6 +210,11 @@ export interface CrucibleClient {
   socWeekly(request: WireSocWeeklyQuery, opts?: EngineCallOptions): Promise<WireSocWeeklySummary>;
   /** Read the governed settings of one registry surface, or all (SETTINGS_READ, crdb SET.1). */
   settingsRead(request: WireSettingsQuery, opts?: EngineCallOptions): Promise<WireSettings>;
+  /** Commit knob edits / section patches (SETTINGS_COMMIT, crdb SET.2 / SET.2b). */
+  settingsCommit(
+    request: WireSettingsCommit,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsCommitted>;
   /** Read the committed SOC settings the Console binds (SOC_SETTINGS_READ, crdb C.9c). */
   socSettingsRead(
     request: WireSocSettingsQuery,

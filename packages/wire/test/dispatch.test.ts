@@ -127,6 +127,9 @@ describe('dispatch', () => {
     { SocWeekly: { request_id: 1, weeks: 4 } },
     { SocSettingsRead: { request_id: 1 } },
     { SettingsRead: { request_id: 1, surface: 'maintenance' } },
+    {
+      SettingsCommit: { request_id: 1, edits: [{ key: 'maintenance.cadence_secs', value: '120' }] },
+    },
     { SocSettingsCommit: { request_id: 1, tiers: { p_low_milli: 200, p_high_milli: 800 } } },
   ];
 

@@ -5,8 +5,14 @@
 // resolver projects fail-closed and never renders a value of its own. Nothing is cached: a Settings
 // read must show what was just committed.
 
-import type { SettingsView, WireSettingsQuery } from '@forge/contracts';
-import { toSettingsView } from '@forge/contracts';
+import type {
+  SettingsCommitRequest,
+  SettingsReceipt,
+  SettingsView,
+  WireSettingsCommit,
+  WireSettingsQuery,
+} from '@forge/contracts';
+import { toSettingsReceipt, toSettingsView, toWireSettingsCommitFields } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -42,4 +48,22 @@ export async function resolveSettings(
     throw new SettingsUnavailableError('a setting carries an origin this build does not know');
   }
   return view;
+}
+
+/**
+ * Commit an atomic batch of knob edits (crdb SET.2, `SETTINGS_COMMIT`), Admin tier, on the operator's
+ * behalf and audited under them. The reply is a RECEIPT: a refused batch carries the engine's own
+ * per-edit causes and validation violations, never a throw.
+ */
+export async function resolveSettingsCommit(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  request: SettingsCommitRequest,
+  opts?: EngineCallOptions,
+): Promise<SettingsReceipt> {
+  const wire: WireSettingsCommit = {
+    request_id: requestId(),
+    ...toWireSettingsCommitFields(request),
+  };
+  return toSettingsReceipt(await engine.settingsCommit(principal, wire, opts));
 }

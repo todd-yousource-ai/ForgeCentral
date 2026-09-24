@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import type { OperatorPrincipal } from '../src/engine/principal.js';
-import { SettingsUnavailableError, resolveSettings } from '../src/engine/settings.js';
+import {
+  SettingsUnavailableError,
+  resolveSettings,
+  resolveSettingsCommit,
+} from '../src/engine/settings.js';
 
 const PRINCIPAL = {
   principal: '00000000-0000-0000-0000-000000000001',
@@ -82,5 +86,33 @@ describe('the governed settings resolver (ST.1, crdb SET.1)', () => {
         null,
       ),
     ).rejects.toBeInstanceOf(SettingsUnavailableError);
+  });
+});
+
+describe('the settings commit resolver (ST.2a, crdb SET.2)', () => {
+  it('sends the edits and returns the engine receipt, a refusal included', async () => {
+    const seen: unknown[] = [];
+    const engine = {
+      settingsCommit: (_principal: OperatorPrincipal, request: unknown) => {
+        seen.push(request);
+        return Promise.resolve({
+          version: 0,
+          needs_restart: [],
+          dual_control_required: false,
+          refused_edits: [{ key: 'admin_endpoint.max_payload_bytes', cause: 'boot_bound' }],
+          violations: [],
+          refused: true,
+          explanation: 'an edit was refused; nothing was committed',
+        });
+      },
+    } as unknown as OperatorEngine;
+    const receipt = await resolveSettingsCommit(engine, PRINCIPAL, {
+      edits: [{ key: 'admin_endpoint.max_payload_bytes', value: '8192' }],
+    });
+    expect((seen[0] as { edits: unknown[] }).edits).toEqual([
+      { key: 'admin_endpoint.max_payload_bytes', value: '8192' },
+    ]);
+    expect(receipt.refused).toBe(true);
+    expect(receipt.refusedEdits[0]?.cause).toBe('boot_bound');
   });
 });

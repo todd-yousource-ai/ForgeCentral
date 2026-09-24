@@ -115,6 +115,8 @@ import type {
   WireSocSettingsQuery,
   WireSettings,
   WireSettingsQuery,
+  WireSettingsCommit,
+  WireSettingsCommitted,
 } from '@forge/contracts';
 
 import type { ExplainTier } from '../auth/tier.js';
@@ -140,6 +142,7 @@ export type EngineAction =
   | 'socWeekly'
   | 'socSettingsRead'
   | 'settingsRead'
+  | 'settingsCommit'
   | 'socSettingsCommit'
   | 'socCognitionRun'
   | 'socPlanApprove'
@@ -338,6 +341,12 @@ export interface OperatorEngine {
     request: WireSocWeeklyQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSocWeeklySummary>;
+  /** Commit knob edits / section patches (SETTINGS_COMMIT, crdb SET.2) on behalf of `principal`. */
+  settingsCommit(
+    principal: OperatorPrincipal,
+    request: WireSettingsCommit,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsCommitted>;
   /** Read the governed settings (SETTINGS_READ, crdb SET.1) on behalf of `principal`. */
   settingsRead(
     principal: OperatorPrincipal,
@@ -729,6 +738,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'settingsRead', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.settingsRead({ ...request, operator }, opts);
+    },
+    settingsCommit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'settingsCommit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.settingsCommit({ ...request, operator }, opts);
     },
     socSettingsCommit: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'socSettingsCommit', request.request_id));
