@@ -50,4 +50,10 @@ jobs:
           pnpm --filter @forge/console-spa exec playwright install --with-deps chromium
 
       - name: Run the gate
-        run: bash scripts/ci.sh
+        run: |
+          if [ -n "${CRUCIBLE_TOKEN}" ]; then
+            bash scripts/ci.sh
+          else
+            echo "CRUCIBLE_TOKEN is not set; skipping sidecar Rust gate that requires private Crucible access."
+            bash scripts/ci.sh --skip-sidecar
+          fi
