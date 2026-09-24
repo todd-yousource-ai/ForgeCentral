@@ -11,6 +11,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type {
   IncidentActRow,
+  IncidentNote,
   IncidentTelemetry,
   SocIncidentDetail,
   VerdictNarrative,
@@ -125,20 +126,45 @@ const TRAIL: readonly IncidentActRow[] = [
   { act: 'plan_approved', principal: 'op-7', atSeconds: 1_700_000_200, detail: null },
 ];
 
-/** Route-aware: the dock now reads telemetry and the audit trail beside the narrative. */
+const NOTES: readonly IncidentNote[] = [
+  {
+    principal: 'op-7',
+    atSeconds: 1_700_000_300,
+    noteRef: 'note:abc123',
+    text: 'Confirmed the destination is the vendor CDN.',
+  },
+];
+
+/** Route-aware: the dock now reads telemetry, the audit trail and the notes beside the narrative. */
 function mockNarrative(
   narrative: VerdictNarrative,
   telemetry: IncidentTelemetry | null = TELEMETRY,
   trail: readonly IncidentActRow[] | null = TRAIL,
+  notes: readonly IncidentNote[] | null = NOTES,
 ): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
+    vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              kind: 'recorded',
+              act: 'noted',
+              closedNow: false,
+              noteRef: 'note:new',
+            }),
+        } as Response);
+      }
       const body = url.includes('/api/soc/telemetry')
         ? telemetry
         : url.includes('/api/soc/audit')
           ? trail
-          : narrative;
+          : url.includes('/api/soc/notes')
+            ? notes
+            : narrative;
       if (body === null) {
         return Promise.resolve({
           ok: false,
@@ -295,6 +321,46 @@ describe('the SOC investigation dock (S3.7)', () => {
     expect(pane).toHaveTextContent('by op-7');
   });
 
+  it('renders the case acts and the verdict with their gloss, and never infers same-second order', async () => {
+    // crdb C.1: the audit key is (incident, at_seconds, tag, detail), so two acts in one second
+    // arrive ordered by TAG. The pane renders them as returned and states the limit rather than
+    // presenting "acked before assigned" as a sequence.
+    const caseTrail: readonly IncidentActRow[] = [
+      { act: 'acked', principal: 'op-7', atSeconds: 1_700_000_400, detail: null },
+      { act: 'assigned', principal: 'op-7', atSeconds: 1_700_000_400, detail: 'op-9' },
+      { act: 'noted', principal: 'op-7', atSeconds: 1_700_000_400, detail: 'note:abc123' },
+      { act: 'noted', principal: 'op-7', atSeconds: 1_700_000_400, detail: 'note:def456' },
+      {
+        act: 'dispositioned',
+        principal: 'op-7',
+        atSeconds: 1_700_000_500,
+        detail: 'false_positive',
+      },
+      { act: 'closed', principal: 'op-7', atSeconds: 1_700_000_600, detail: null },
+    ];
+    mockNarrative(NARRATIVE, TELEMETRY, caseTrail);
+
+    renderWithProviders(
+      <SocInvestigationDock incidentId="ep-soc-1" detail={DETAIL} scopedNode={null} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Audit Trail' }));
+
+    const pane = await screen.findByTestId('soc-dock-audit');
+    const rows = pane.querySelectorAll('li');
+    // Two same-second `noted` rows differ by detail and BOTH render (the key includes detail).
+    expect(rows).toHaveLength(6);
+    expect(rows[0]).toHaveTextContent('acked');
+    expect(rows[0]).toHaveTextContent(/a human acknowledged/);
+    expect(rows[1]).toHaveTextContent(/handed to a principal/);
+    expect(rows[1]).toHaveTextContent('op-9');
+    expect(rows[4]).toHaveTextContent(/a verdict was recorded/);
+    expect(rows[4]).toHaveTextContent('false_positive');
+    expect(rows[5]).toHaveTextContent(/closed without a verdict/);
+    expect(screen.getByTestId('soc-dock-audit-order')).toHaveTextContent(
+      /listed by kind, not by the order they were submitted/,
+    );
+  });
+
   it('says so when nobody has acted, rather than showing an empty trail', async () => {
     mockNarrative(NARRATIVE, TELEMETRY, []);
 
@@ -316,7 +382,9 @@ describe('the SOC investigation dock (S3.7)', () => {
         ? TELEMETRY
         : url.includes('/api/soc/audit')
           ? TRAIL
-          : NARRATIVE;
+          : url.includes('/api/soc/notes')
+            ? NOTES
+            : NARRATIVE;
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -339,5 +407,107 @@ describe('the SOC investigation dock (S3.7)', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Audit Trail' }));
 
     expect(spy.mock.calls.length).toBe(3);
+
+    // Notes is the one pane read on OPEN (a fourth key), and once read it is cached like the rest.
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }));
+    await waitFor(() => {
+      expect(spy.mock.calls.length).toBe(4);
+    });
+    fireEvent.click(screen.getByRole('tab', { name: 'Evidence' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }));
+    expect(spy.mock.calls.length).toBe(4);
+  });
+});
+
+describe('the Notes pane (S3.12)', () => {
+  it('lists the recorded notes with who and when, off the engine read', async () => {
+    mockNarrative(NARRATIVE);
+
+    renderWithProviders(
+      <SocInvestigationDock incidentId="ep-soc-1" detail={DETAIL} scopedNode={null} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }));
+
+    const list = await screen.findByTestId('soc-dock-notes-list');
+    expect(list).toHaveTextContent('Confirmed the destination is the vendor CDN.');
+    expect(list).toHaveTextContent('op-7');
+    expect(list).toHaveTextContent('note:abc123');
+  });
+
+  it('says so when there are no notes, and names the refusal when the read is refused', async () => {
+    mockNarrative(NARRATIVE, TELEMETRY, TRAIL, []);
+    const view = renderWithProviders(
+      <SocInvestigationDock incidentId="ep-soc-1" detail={DETAIL} scopedNode={null} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }));
+    expect(await screen.findByTestId('soc-dock-notes-empty')).toHaveTextContent(/No notes/);
+    view.unmount();
+
+    mockNarrative(NARRATIVE, TELEMETRY, TRAIL, null);
+    renderWithProviders(
+      <SocInvestigationDock incidentId="ep-soc-1" detail={DETAIL} scopedNode={null} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }));
+    expect(await screen.findByText(/The notes cannot be read/)).toBeInTheDocument();
+  });
+
+  it('refuses a blank or over-long note before a round trip', async () => {
+    mockNarrative(NARRATIVE);
+    renderWithProviders(
+      <SocInvestigationDock incidentId="ep-soc-1" detail={DETAIL} scopedNode={null} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }));
+    await screen.findByTestId('soc-dock-notes-list');
+
+    const record = screen.getByTestId('soc-note-record');
+    expect(record).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Case note'), { target: { value: '   ' } });
+    expect(record).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Case note'), { target: { value: 'x'.repeat(4001) } });
+    expect(record).toBeDisabled();
+    expect(screen.getByTestId('soc-note-count')).toHaveTextContent(/over the engine/);
+    fireEvent.change(screen.getByLabelText('Case note'), { target: { value: 'x'.repeat(4000) } });
+    expect(record).toBeEnabled();
+  });
+
+  it('records a note behind a confirm gate as {incident, act, note}, then re-reads rather than appends', async () => {
+    mockNarrative(NARRATIVE);
+    renderWithProviders(
+      <SocInvestigationDock incidentId="ep-soc-1" detail={DETAIL} scopedNode={null} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }));
+    await screen.findByTestId('soc-dock-notes-list');
+    const spy = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const readsBefore = spy.mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText('Case note'), {
+      target: { value: '  Vendor confirmed the CDN range.  ' },
+    });
+    fireEvent.click(screen.getByTestId('soc-note-record'));
+    expect(spy.mock.calls.length).toBe(readsBefore);
+    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('soc-note-outcome')).toHaveTextContent(/recorded as note:new/);
+    });
+    const post = spy.mock.calls.find(
+      (call) => (call[1] as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(String(post?.[0])).toBe('/api/soc/act');
+    expect(JSON.parse((post?.[1] as RequestInit).body as string)).toEqual({
+      incident: 'ep-soc-1',
+      act: 'noted',
+      note: 'Vendor confirmed the CDN range.',
+    });
+    // The draft is cleared on success and the notes key was re-read (a second GET of /notes).
+    expect(screen.getByLabelText('Case note')).toHaveValue('');
+    await waitFor(() => {
+      const notesReads = spy.mock.calls.filter(
+        (call) =>
+          String(call[0]).includes('/api/soc/notes') &&
+          (call[1] as RequestInit | undefined)?.method !== 'POST',
+      );
+      expect(notesReads.length).toBe(2);
+    });
   });
 });

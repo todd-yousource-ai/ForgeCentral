@@ -15,7 +15,9 @@ import { describe, expect, it } from 'vitest';
 import {
   AUTHORITY_STATES,
   EDGE_STATES,
+  isPrincipalId,
   isWaitingOnAHuman,
+  MAX_NOTE_CHARS,
   toIncidentDetail,
   toIncidentQueue,
   toIncidentRow,
@@ -773,5 +775,19 @@ describe('the disposition verdict (S3.11 / crdb SC.7)', () => {
     expect(
       toDispositionResult({ closed_now: true, disposition: 'closed', refused: false }),
     ).toBeNull();
+  });
+});
+
+describe('the shared assignee + note helpers (S3.12)', () => {
+  it('isPrincipalId accepts the v5 UUID shape the BFF derives, trimmed, any case', () => {
+    expect(isPrincipalId('b4464672-f4cc-577f-ae05-f3ece3c67b64')).toBe(true);
+    expect(isPrincipalId('  B4464672-F4CC-577F-AE05-F3ECE3C67B64 ')).toBe(true);
+    expect(isPrincipalId('alice')).toBe(false);
+    expect(isPrincipalId('auth0|6a3abf93a1c6aeb8baddbc94')).toBe(false);
+    expect(isPrincipalId('')).toBe(false);
+  });
+
+  it('MAX_NOTE_CHARS mirrors the engine ceiling', () => {
+    expect(MAX_NOTE_CHARS).toBe(4000);
   });
 });

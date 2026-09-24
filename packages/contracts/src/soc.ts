@@ -1105,6 +1105,22 @@ export type CaseActDraft =
 const PRINCIPAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * Whether a string is a principal id as the engine records one (the v5 UUID the BFF derives from the
+ * operator subject). Shared by the BFF parser and the SPA's assignee field, so the two cannot drift
+ * on what an assignee looks like.
+ */
+export function isPrincipalId(value: string): boolean {
+  return PRINCIPAL_ID.test(value.trim());
+}
+
+/**
+ * The engine's per-note ceiling (crdb C.1 `MAX_NOTE_CHARS`). TUNE: mirrors the engine constant so the
+ * composer can refuse an over-long note before a round trip; the engine remains the authority and
+ * refuses in-band regardless.
+ */
+export const MAX_NOTE_CHARS = 4000;
+
+/**
  * Parse a case-act request body FAIL-CLOSED: an unknown act, a missing or malformed required field
  * (`assignee` must be a principal id, `note` must be non-blank), or a field the act does not take is
  * `null`, so a bad body never reaches the engine and a stray field is never silently recorded.
@@ -1122,11 +1138,7 @@ export function toCaseActDraft(raw: unknown): CaseActDraft | null {
   const note = body['note'];
   switch (act) {
     case 'assigned': {
-      if (
-        typeof assignee !== 'string' ||
-        !PRINCIPAL_ID.test(assignee.trim()) ||
-        note !== undefined
-      ) {
+      if (typeof assignee !== 'string' || !isPrincipalId(assignee) || note !== undefined) {
         return null;
       }
       return { act, assignee: assignee.trim().toLowerCase() };

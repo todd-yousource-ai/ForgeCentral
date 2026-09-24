@@ -1,7 +1,8 @@
 // apps/console/src/surfaces/useSoc.ts -- the SOC Ops read hooks (IP-CONSOLE-03 S3.3).
 //
 // Reads the SOC surface's data from the BFF, which brokers DETECT_SUMMARY (crdb FV.6),
-// SOC_INCIDENT_LIST and SOC_INCIDENT_DETAIL (SS.4b) and SOC_NARRATIVE (VN.7b) over :7878. The engine
+// SOC_INCIDENT_LIST and SOC_INCIDENT_DETAIL (SS.4b), SOC_NARRATIVE (VN.7b) and the case notes
+// (SOC_INCIDENT_NOTES, C.1) over :7878. The engine
 // owns every number; the BFF projects and fails closed on an unknown tag; these hooks only carry the
 // result, so nothing on the surface is fabricated (INV-SOC-NO-FABRICATED-NUMBER). Same-origin with
 // the session cookie; the SPA never holds a token. TanStack Query owns caching + loading/error.
@@ -14,6 +15,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type {
   BusinessImpact,
   IncidentActRow,
+  IncidentNote,
   IncidentTelemetry,
   SocIncidentDetail,
   SocIncidentRow,
@@ -196,6 +198,35 @@ export function useSocImpact(incidentId: string | null): UseQueryResult<Business
   return useQuery({
     queryKey: ['soc', 'impact', incidentId],
     queryFn: () => fetchSocImpact(incidentId as string),
+    enabled: incidentId !== null,
+  });
+}
+
+/**
+ * Fetch the incident's case notes (crdb C.1, `SOC_INCIDENT_NOTES`): each note body was written in the
+ * same transaction as its `noted` audit act. A 404 is the engine's one indistinguishable refusal and
+ * resolves to `null`.
+ */
+export async function fetchSocNotes(incidentId: string): Promise<readonly IncidentNote[] | null> {
+  const res = await fetch(`/api/soc/notes?id=${encodeURIComponent(incidentId)}`, {
+    credentials: 'include',
+  });
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`soc notes failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as readonly IncidentNote[];
+}
+
+/** The Notes pane's read. The composer's success drops this key so the new note is re-read, never appended locally. */
+export function useSocNotes(
+  incidentId: string | null,
+): UseQueryResult<readonly IncidentNote[] | null> {
+  return useQuery({
+    queryKey: ['soc', 'notes', incidentId],
+    queryFn: () => fetchSocNotes(incidentId as string),
     enabled: incidentId !== null,
   });
 }
