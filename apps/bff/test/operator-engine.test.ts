@@ -277,6 +277,35 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         refused: false,
       });
     },
+    socSettingsRead: (req) => {
+      calls.push(`socSettingsRead:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        version: 0,
+        tiers: { p_low_milli: 0, p_high_milli: 1000 },
+        siem_writeback: {
+          enabled: false,
+          vendor: 'splunk',
+          host: '',
+          stream: '',
+          case_url_base: '',
+          ceiling: 'unclassified',
+        },
+        dual_control_required: false,
+        registry: [],
+        refused: false,
+      });
+    },
+    socSettingsCommit: (req) => {
+      calls.push(`socSettingsCommit:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        version: 1,
+        dual_control_required: false,
+        violations: [],
+        refused: false,
+      });
+    },
     socCognitionRun: (req) => {
       calls.push(`socCognitionRun:${String(req.request_id)}`);
       reads.push(req);

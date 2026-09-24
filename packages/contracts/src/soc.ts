@@ -67,6 +67,12 @@ import type {
   WireSocReport,
   WireSocWeekRow,
   WireSocWeeklySummary,
+  WireConfigSettingRow,
+  WireSiemWritebackSettings,
+  WireSocSettings,
+  WireSocSettingsCommit,
+  WireSocSettingsCommitted,
+  WireSocTierSettings,
 } from './generated/wire-dto.js';
 
 // -- closed vocabularies (each pinned by a crdb accessor, never a Debug rendering) -------------------
@@ -1624,4 +1630,224 @@ export function toSocWeekly(wire: WireSocWeeklySummary): SocWeekly | null {
     episodesTruncated: wire.episodes_truncated,
     untilSeconds: wire.until_seconds,
   };
+}
+
+// ── The SOC settings (crdb IP-AISOC-STEP1 C.9c, `SOC_SETTINGS_READ` / `SOC_SETTINGS_COMMIT`; Console S3.18) ──
+
+/** The SIEM write-back vendors the engine speaks (crdb `SiemVendor::tag`). */
+export const SIEM_VENDORS = ['splunk', 'sentinel', 'qradar', 'elastic', 'chronicle'] as const;
+export type SiemVendor = (typeof SIEM_VENDORS)[number];
+
+/** The classification ceilings a setting may name (crdb `Classification`, wire tags). */
+export const CLASSIFICATION_TAGS = [
+  'unclassified',
+  'internal',
+  'confidential',
+  'restricted',
+  'secret',
+] as const;
+export type ClassificationTag = (typeof CLASSIFICATION_TAGS)[number];
+
+export interface SocTierSettings {
+  readonly pLowMilli: number;
+  readonly pHighMilli: number;
+}
+
+export interface SiemWritebackSettings {
+  readonly enabled: boolean;
+  readonly vendor: SiemVendor;
+  readonly host: string;
+  readonly stream: string;
+  readonly caseUrlBase: string;
+  readonly ceiling: ClassificationTag;
+}
+
+/** One registry row describing a Console-bound setting (the engine's admin contract, verbatim). */
+export interface ConfigSettingRow {
+  readonly key: string;
+  readonly valueType: string;
+  readonly defaultValue: string;
+  readonly bound: string;
+  readonly liveApply: string;
+  readonly uiBinding: string;
+  readonly summary: string;
+}
+
+/** The committed SOC settings the Console binds, as the engine serves them. */
+export interface SocSettings {
+  /** The store version the values were read at. */
+  readonly version: number;
+  readonly tiers: SocTierSettings;
+  readonly siemWriteback: SiemWritebackSettings;
+  /** The committed narrative model ref, or null when unbound. */
+  readonly narrativeModelRef: string | null;
+  /** True when governance requires dual control: the Console must not commit, and says so. */
+  readonly dualControlRequired: boolean;
+  readonly registry: readonly ConfigSettingRow[];
+}
+
+/** A typed patch: absent parts are left as committed. */
+export interface SocSettingsPatch {
+  readonly tiers?: SocTierSettings;
+  readonly siemWriteback?: SiemWritebackSettings;
+}
+
+/** What the engine did with a settings commit. */
+export interface SocSettingsReceipt {
+  readonly version: number;
+  readonly dualControlRequired: boolean;
+  /** The engine's validation violations, verbatim; empty when committed. */
+  readonly violations: readonly string[];
+  readonly refused: boolean;
+  readonly explanation: string | null;
+}
+
+function toSiemWritebackSettings(wire: WireSiemWritebackSettings): SiemWritebackSettings | null {
+  const vendor = narrowTag(SIEM_VENDORS, wire.vendor);
+  const ceiling = narrowTag(CLASSIFICATION_TAGS, wire.ceiling);
+  if (vendor === null || ceiling === null) {
+    return null;
+  }
+  return {
+    enabled: wire.enabled,
+    vendor,
+    host: wire.host,
+    stream: wire.stream,
+    caseUrlBase: wire.case_url_base,
+    ceiling,
+  };
+}
+
+/**
+ * Project the `SOC_SETTINGS_READ` reply. `null` for the engine's refusal (a tier below Admin /
+ * SecurityAudit, or a delegation the engine will not honour) or an unknown vendor / ceiling tag.
+ */
+export function toSocSettings(wire: WireSocSettings): SocSettings | null {
+  if (wire.refused) {
+    return null;
+  }
+  const siemWriteback = toSiemWritebackSettings(wire.siem_writeback);
+  if (siemWriteback === null) {
+    return null;
+  }
+  return {
+    version: wire.version,
+    tiers: { pLowMilli: wire.tiers.p_low_milli, pHighMilli: wire.tiers.p_high_milli },
+    siemWriteback,
+    narrativeModelRef:
+      wire.narrative_model_ref === undefined || wire.narrative_model_ref === ''
+        ? null
+        : wire.narrative_model_ref,
+    dualControlRequired: wire.dual_control_required,
+    registry: wire.registry.map((row: WireConfigSettingRow) => ({
+      key: row.key,
+      valueType: row.value_type,
+      defaultValue: row.default_value,
+      bound: row.bound,
+      liveApply: row.live_apply,
+      uiBinding: row.ui_binding,
+      summary: row.summary,
+    })),
+  };
+}
+
+/** Compile a patch into the engine's commit fields (the BFF adds request_id and the delegation). */
+export function toWireSocSettingsCommitFields(
+  patch: SocSettingsPatch,
+): Omit<WireSocSettingsCommit, 'request_id' | 'operator'> {
+  const tiers: WireSocTierSettings | undefined =
+    patch.tiers === undefined
+      ? undefined
+      : { p_low_milli: patch.tiers.pLowMilli, p_high_milli: patch.tiers.pHighMilli };
+  const siem: WireSiemWritebackSettings | undefined =
+    patch.siemWriteback === undefined
+      ? undefined
+      : {
+          enabled: patch.siemWriteback.enabled,
+          vendor: patch.siemWriteback.vendor,
+          host: patch.siemWriteback.host,
+          stream: patch.siemWriteback.stream,
+          case_url_base: patch.siemWriteback.caseUrlBase,
+          ceiling: patch.siemWriteback.ceiling,
+        };
+  return {
+    ...(tiers === undefined ? {} : { tiers }),
+    ...(siem === undefined ? {} : { siem_writeback: siem }),
+  };
+}
+
+/** Project the commit reply. Never null: a refusal is a state the form renders, with its violations. */
+export function toSocSettingsReceipt(wire: WireSocSettingsCommitted): SocSettingsReceipt {
+  return {
+    version: wire.version,
+    dualControlRequired: wire.dual_control_required,
+    violations: wire.violations,
+    refused: wire.refused,
+    explanation:
+      wire.explanation === undefined || wire.explanation === '' ? null : wire.explanation,
+  };
+}
+
+/**
+ * Narrow a client-side settings patch (the BFF's request body) fail-closed: a bad vendor, ceiling,
+ * or a non-integer milli refuses the whole patch before it reaches the engine.
+ */
+export function toSocSettingsPatch(raw: unknown): SocSettingsPatch | null {
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const body = raw as Record<string, unknown>;
+  const patch: { tiers?: SocTierSettings; siemWriteback?: SiemWritebackSettings } = {};
+  if (body['tiers'] !== undefined) {
+    const t = body['tiers'];
+    if (typeof t !== 'object' || t === null) {
+      return null;
+    }
+    const tiers = t as Record<string, unknown>;
+    const low = tiers['pLowMilli'];
+    const high = tiers['pHighMilli'];
+    if (
+      typeof low !== 'number' ||
+      typeof high !== 'number' ||
+      !Number.isInteger(low) ||
+      !Number.isInteger(high) ||
+      low < 0 ||
+      high < 0 ||
+      low > 65_535 ||
+      high > 65_535
+    ) {
+      return null;
+    }
+    patch.tiers = { pLowMilli: low, pHighMilli: high };
+  }
+  if (body['siemWriteback'] !== undefined) {
+    const w = body['siemWriteback'];
+    if (typeof w !== 'object' || w === null) {
+      return null;
+    }
+    const siem = w as Record<string, unknown>;
+    const vendor =
+      typeof siem['vendor'] === 'string' ? narrowTag(SIEM_VENDORS, siem['vendor']) : null;
+    const ceiling =
+      typeof siem['ceiling'] === 'string' ? narrowTag(CLASSIFICATION_TAGS, siem['ceiling']) : null;
+    if (
+      vendor === null ||
+      ceiling === null ||
+      typeof siem['enabled'] !== 'boolean' ||
+      typeof siem['host'] !== 'string' ||
+      typeof siem['stream'] !== 'string' ||
+      typeof siem['caseUrlBase'] !== 'string'
+    ) {
+      return null;
+    }
+    patch.siemWriteback = {
+      enabled: siem['enabled'],
+      vendor,
+      host: siem['host'],
+      stream: siem['stream'],
+      caseUrlBase: siem['caseUrlBase'],
+      ceiling,
+    };
+  }
+  return patch;
 }

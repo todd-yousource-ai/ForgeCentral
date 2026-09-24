@@ -103,6 +103,10 @@ import type {
   WireSocReportQuery,
   WireSocWeeklyQuery,
   WireSocWeeklySummary,
+  WireSocSettings,
+  WireSocSettingsCommit,
+  WireSocSettingsCommitted,
+  WireSocSettingsQuery,
 } from '@forge/contracts';
 
 /** Per-call bounds. At least one of `timeoutMs`/`signal` should be set; the caller passes the config default. */
@@ -200,6 +204,16 @@ export interface CrucibleClient {
   socReport(request: WireSocReportQuery, opts?: EngineCallOptions): Promise<WireSocReport>;
   /** Read the last N weeks of detection volume (SOC_WEEKLY_SUMMARY, crdb C.9b). */
   socWeekly(request: WireSocWeeklyQuery, opts?: EngineCallOptions): Promise<WireSocWeeklySummary>;
+  /** Read the committed SOC settings the Console binds (SOC_SETTINGS_READ, crdb C.9c). */
+  socSettingsRead(
+    request: WireSocSettingsQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocSettings>;
+  /** Commit a typed patch over the SOC settings (SOC_SETTINGS_COMMIT, crdb C.9c). */
+  socSettingsCommit(
+    request: WireSocSettingsCommit,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocSettingsCommitted>;
   /** Run the narrative + impact pipelines for one incident in the background (SOC_COGNITION_RUN).
    * Replies immediately with started/running/recorded/refused, never the run's result; the records
    * are read back through socNarrative/socImpact once committed. Audited under the operator. */

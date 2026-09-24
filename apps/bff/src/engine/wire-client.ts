@@ -64,6 +64,8 @@ import type {
   WireVtzTree,
   WireSocReport,
   WireSocWeeklySummary,
+  WireSocSettings,
+  WireSocSettingsCommitted,
 } from '@forge/contracts';
 
 import type { BffConfig } from '../config.js';
@@ -257,6 +259,23 @@ export function replyToSocWeekly(reply: WireReply): WireSocWeeklySummary {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a SOC weekly read');
+}
+
+/** Map an engine `WireReply` to `WireSocSettings` (SOC_SETTINGS_READ, crdb C.9c). */
+export function replyToSocSettings(reply: WireReply): WireSocSettings {
+  if (typeof reply === 'object' && 'SocSettings' in reply) return reply.SocSettings;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC settings read');
+}
+
+/** Map an engine `WireReply` to `WireSocSettingsCommitted` (SOC_SETTINGS_COMMIT, crdb C.9c). */
+export function replyToSocSettingsCommitted(reply: WireReply): WireSocSettingsCommitted {
+  if (typeof reply === 'object' && 'SocSettingsCommitted' in reply)
+    return reply.SocSettingsCommitted;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC settings commit');
 }
 
 /** Map an engine `WireReply` to `WireSocRunState` (SOC_COGNITION_RUN, the ED runner). */
@@ -848,6 +867,28 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireSocWeeklySummary> {
     return this.call(
       async (transport) => replyToSocWeekly(await dispatch(transport, { SocWeekly: request })),
+      opts,
+    );
+  }
+
+  async socSettingsRead(
+    request: Parameters<CrucibleClient['socSettingsRead']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocSettings> {
+    return this.call(
+      async (transport) =>
+        replyToSocSettings(await dispatch(transport, { SocSettingsRead: request })),
+      opts,
+    );
+  }
+
+  async socSettingsCommit(
+    request: Parameters<CrucibleClient['socSettingsCommit']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocSettingsCommitted> {
+    return this.call(
+      async (transport) =>
+        replyToSocSettingsCommitted(await dispatch(transport, { SocSettingsCommit: request })),
       opts,
     );
   }

@@ -125,6 +125,8 @@ describe('dispatch', () => {
     { SocReport: { request_id: 1, incident: 'i1' } },
     { SocUeba: { request_id: 1, incident: 'i1' } },
     { SocWeekly: { request_id: 1, weeks: 4 } },
+    { SocSettingsRead: { request_id: 1 } },
+    { SocSettingsCommit: { request_id: 1, tiers: { p_low_milli: 200, p_high_milli: 800 } } },
   ];
 
   it.each(QUERY_SUBMIT_VARIANTS.map((r) => [Object.keys(r)[0] ?? '?', r] as const))(

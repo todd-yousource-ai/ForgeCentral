@@ -108,6 +108,16 @@ export interface WireClassUsage {
   octets: number;
 }
 
+export interface WireConfigSettingRow {
+  bound: string;
+  default_value: string;
+  key: string;
+  live_apply: string;
+  summary: string;
+  ui_binding: string;
+  value_type: string;
+}
+
 export interface WireConnClass {
   class: string;
   count: number;
@@ -895,6 +905,8 @@ export type WireReply =
   | { SocReport: WireSocReport; }
   | { SocUeba: WireSocUebaReport; }
   | { SocWeekly: WireSocWeeklySummary; }
+  | { SocSettings: WireSocSettings; }
+  | { SocSettingsCommitted: WireSocSettingsCommitted; }
   | { SocRunState: WireSocRunState; }
   | { SocPlanMutated: WireSocPlanEffect; }
   | { PolicyMutated: WirePolicyMutated; };
@@ -965,6 +977,8 @@ export type WireRequest =
   | { SocReport: WireSocReportQuery; }
   | { SocUeba: WireSocUebaQuery; }
   | { SocWeekly: WireSocWeeklyQuery; }
+  | { SocSettingsRead: WireSocSettingsQuery; }
+  | { SocSettingsCommit: WireSocSettingsCommit; }
   | { SocCognitionRun: WireSocCognitionRun; }
   | { SocPlanApprove: WireSocPlanApprove; }
   | { SocPlanModify: WireSocPlanModify; }
@@ -989,6 +1003,15 @@ export interface WireRiskBand {
 export interface WireScopeMember {
   agent?: string | null;
   endpoint_cn: string;
+}
+
+export interface WireSiemWritebackSettings {
+  case_url_base: string;
+  ceiling: string;
+  enabled: boolean;
+  host: string;
+  stream: string;
+  vendor: string;
 }
 
 export interface WireSocActOutcome {
@@ -1172,6 +1195,37 @@ export interface WireSocRunState {
   state: string;
 }
 
+export interface WireSocSettings {
+  dual_control_required: boolean;
+  explanation?: string;
+  narrative_model_ref?: string;
+  refused: boolean;
+  registry: Array<WireConfigSettingRow>;
+  siem_writeback: WireSiemWritebackSettings;
+  tiers: WireSocTierSettings;
+  version: number;
+}
+
+export interface WireSocSettingsCommit {
+  operator?: OperatorDelegation;
+  request_id: number;
+  siem_writeback?: WireSiemWritebackSettings;
+  tiers?: WireSocTierSettings;
+}
+
+export interface WireSocSettingsCommitted {
+  dual_control_required: boolean;
+  explanation?: string;
+  refused: boolean;
+  version: number;
+  violations: Array<string>;
+}
+
+export interface WireSocSettingsQuery {
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
 export interface WireSocTelemetry {
   anchor: string;
   cited_evidence: Array<WireCitedEvidence>;
@@ -1184,6 +1238,11 @@ export interface WireSocTelemetryQuery {
   incident: string;
   operator?: OperatorDelegation;
   request_id: number;
+}
+
+export interface WireSocTierSettings {
+  p_high_milli: number;
+  p_low_milli: number;
 }
 
 export interface WireSocUebaQuery {

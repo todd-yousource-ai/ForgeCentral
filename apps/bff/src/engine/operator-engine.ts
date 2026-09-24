@@ -109,6 +109,10 @@ import type {
   WireSocReportQuery,
   WireSocWeeklyQuery,
   WireSocWeeklySummary,
+  WireSocSettings,
+  WireSocSettingsCommit,
+  WireSocSettingsCommitted,
+  WireSocSettingsQuery,
 } from '@forge/contracts';
 
 import type { ExplainTier } from '../auth/tier.js';
@@ -132,6 +136,8 @@ export type EngineAction =
   | 'socImpact'
   | 'socReport'
   | 'socWeekly'
+  | 'socSettingsRead'
+  | 'socSettingsCommit'
   | 'socCognitionRun'
   | 'socPlanApprove'
   | 'socPlanModify'
@@ -329,6 +335,18 @@ export interface OperatorEngine {
     request: WireSocWeeklyQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSocWeeklySummary>;
+  /** Read the committed SOC settings (SOC_SETTINGS_READ, crdb C.9c) on behalf of `principal`. */
+  socSettingsRead(
+    principal: OperatorPrincipal,
+    request: WireSocSettingsQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocSettings>;
+  /** Commit a SOC settings patch (SOC_SETTINGS_COMMIT, crdb C.9c) on behalf of `principal`; audited. */
+  socSettingsCommit(
+    principal: OperatorPrincipal,
+    request: WireSocSettingsCommit,
+    opts?: EngineCallOptions,
+  ): Promise<WireSocSettingsCommitted>;
   /** Start a cognition run (SOC_COGNITION_RUN, the ED runner) on behalf of `principal`. */
   socCognitionRun(
     principal: OperatorPrincipal,
@@ -692,6 +710,16 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'socWeekly', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.socWeekly({ ...request, operator }, opts);
+    },
+    socSettingsRead: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socSettingsRead', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socSettingsRead({ ...request, operator }, opts);
+    },
+    socSettingsCommit: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'socSettingsCommit', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.socSettingsCommit({ ...request, operator }, opts);
     },
     socCognitionRun: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'socCognitionRun', request.request_id));

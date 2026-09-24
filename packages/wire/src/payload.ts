@@ -36,6 +36,8 @@ import type {
   WireSocReportQuery,
   WireSocUebaQuery,
   WireSocWeeklyQuery,
+  WireSocSettingsCommit,
+  WireSocSettingsQuery,
   WireSocNarrativeQuery,
   WireSocTelemetryQuery,
   WireSocPlanApprove,
@@ -688,6 +690,37 @@ function socWeeklyToCbor(request: WireSocWeeklyQuery): unknown {
   return out;
 }
 
+/** `SOC_SETTINGS_READ` (crdb C.9c). Rust struct order: request_id, operator?. */
+function socSettingsReadToCbor(request: WireSocSettingsQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_SETTINGS_COMMIT` (crdb C.9c). Rust struct order: request_id, tiers?, siem_writeback?, operator?. */
+function socSettingsCommitToCbor(request: WireSocSettingsCommit): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  if (request.tiers != null) {
+    out['tiers'] = {
+      p_low_milli: request.tiers.p_low_milli,
+      p_high_milli: request.tiers.p_high_milli,
+    };
+  }
+  if (request.siem_writeback != null) {
+    const w = request.siem_writeback;
+    out['siem_writeback'] = {
+      enabled: w.enabled,
+      vendor: w.vendor,
+      host: w.host,
+      stream: w.stream,
+      case_url_base: w.case_url_base,
+      ceiling: w.ceiling,
+    };
+  }
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SOC_COGNITION_RUN`. Rust struct order: request_id, incident, operator?. */
 function socCognitionRunToCbor(request: WireSocCognitionRun): unknown {
   const out: Record<string, unknown> = {
@@ -946,6 +979,12 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocWeekly' in request) {
     return encode({ SocWeekly: socWeeklyToCbor(request.SocWeekly) });
+  }
+  if ('SocSettingsRead' in request) {
+    return encode({ SocSettingsRead: socSettingsReadToCbor(request.SocSettingsRead) });
+  }
+  if ('SocSettingsCommit' in request) {
+    return encode({ SocSettingsCommit: socSettingsCommitToCbor(request.SocSettingsCommit) });
   }
   if ('SocCognitionRun' in request) {
     return encode({ SocCognitionRun: socCognitionRunToCbor(request.SocCognitionRun) });
