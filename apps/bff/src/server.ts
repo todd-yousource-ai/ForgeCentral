@@ -88,6 +88,7 @@ import {
   resolveSocKpis,
   resolveAuditTrail,
   resolveBusinessImpact,
+  resolveIncidentReport,
   resolveCaseAct,
   resolveCognitionRun,
   resolveDisposition,
@@ -1575,6 +1576,7 @@ async function handleSoc(
     '/api/soc/audit',
     '/api/soc/notes',
     '/api/soc/impact',
+    '/api/soc/report',
   ]);
   if (!reads.has(path)) return false;
   const session = deps.authRouter?.resolveSession(req);
@@ -1602,6 +1604,7 @@ async function handleSoc(
     '/api/soc/audit': 'audit',
     '/api/soc/notes': 'notes',
     '/api/soc/impact': 'impact',
+    '/api/soc/report': 'report',
   }[path];
   const cacheKey = perIncidentKind
     ? `${prefix}${perIncidentKind}:${incident ?? ''}`
@@ -1659,6 +1662,18 @@ async function handleSoc(
           : path === '/api/soc/audit'
             ? await resolveAuditTrail(engine, principal, incident ?? '', opts)
             : await resolveBusinessImpact(engine, principal, incident ?? '', opts);
+      if (view === null) {
+        sendJson(res, 404, { error: 'not_found' });
+        return true;
+      }
+      deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
+      sendJson(res, 200, view);
+      return true;
+    }
+    if (path === '/api/soc/report') {
+      // The shaped report (crdb C.5; S3.16). Same refusal shape as the depth reads; never cached
+      // on a null so a later grant is not masked.
+      const view = await resolveIncidentReport(engine, principal, incident ?? '', opts);
       if (view === null) {
         sendJson(res, 404, { error: 'not_found' });
         return true;

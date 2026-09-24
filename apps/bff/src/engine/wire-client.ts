@@ -62,6 +62,7 @@ import type {
   WireBundleConvergence,
   WireVtzMutation,
   WireVtzTree,
+  WireSocReport,
 } from '@forge/contracts';
 
 import type { BffConfig } from '../config.js';
@@ -239,6 +240,14 @@ export function replyToSocImpact(reply: WireReply): WireSocImpact {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a SOC impact read');
+}
+
+/** Map an engine `WireReply` to `WireSocReport` (SOC_INCIDENT_REPORT, crdb C.5). */
+export function replyToSocReport(reply: WireReply): WireSocReport {
+  if (typeof reply === 'object' && 'SocReport' in reply) return reply.SocReport;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC report read');
 }
 
 /** Map an engine `WireReply` to `WireSocRunState` (SOC_COGNITION_RUN, the ED runner). */
@@ -810,6 +819,16 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireSocImpact> {
     return this.call(
       async (transport) => replyToSocImpact(await dispatch(transport, { SocImpact: request })),
+      opts,
+    );
+  }
+
+  async socReport(
+    request: Parameters<CrucibleClient['socReport']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocReport> {
+    return this.call(
+      async (transport) => replyToSocReport(await dispatch(transport, { SocReport: request })),
       opts,
     );
   }

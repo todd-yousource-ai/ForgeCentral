@@ -801,3 +801,72 @@ describe('the shared assignee + note helpers (S3.12)', () => {
     expect(MAX_NOTE_CHARS).toBe(4000);
   });
 });
+
+import { reportToText, toSocReport } from '../src/soc.js';
+
+describe('the incident report narrower (S3.16, crdb C.5 INV-SOC-REPORT-SHAPED)', () => {
+  const summary = {
+    name: 'executive_summary',
+    source: 'template',
+    lines: ['Candidate incident on codex-helper.'],
+  };
+  const wire = {
+    incident: 'ep-1',
+    generated_at: 1_700_000_000,
+    narrative_state: 'absent',
+    narrative_detail: 'unbound',
+    input_hash: 'sha512:in',
+    sections: [
+      summary,
+      {
+        name: 'immediate_actions',
+        source: 'engine',
+        lines: ['1. Inspect codex-helper [proposed]'],
+      },
+    ],
+    cited_evidence: ['leg:net:198.51.100.7'],
+    needs_human_review: false,
+    refused: false,
+  };
+
+  it('projects every section with its declared source and the narrative state', () => {
+    const report = toSocReport(wire);
+    expect(report?.narrativeState).toBe('absent');
+    expect(report?.narrativeDetail).toBe('unbound');
+    expect(report?.modelRef).toBeNull();
+    expect(report?.sections.map((s) => [s.name, s.source])).toEqual([
+      ['executive_summary', 'template'],
+      ['immediate_actions', 'engine'],
+    ]);
+  });
+
+  it('refuses an unknown source, an unknown section, a duplicated section, and a refusal', () => {
+    // A template section rendered under a "model" label would claim an adjudication that never
+    // happened; an unknown label is refused rather than guessed.
+    expect(
+      toSocReport({
+        ...wire,
+        sections: [{ name: 'executive_summary', source: 'oracle', lines: [] }],
+      }),
+    ).toBeNull();
+    expect(
+      toSocReport({ ...wire, sections: [{ name: 'appendix', source: 'engine', lines: [] }] }),
+    ).toBeNull();
+    expect(toSocReport({ ...wire, sections: [summary, summary] })).toBeNull();
+    expect(toSocReport({ ...wire, narrative_state: 'pending' })).toBeNull();
+    expect(toSocReport({ ...wire, refused: true, explanation: '' })).toBeNull();
+  });
+
+  it('renders the export as the read, verbatim, with every source declared', () => {
+    const report = toSocReport(wire);
+    if (report === null) {
+      throw new Error('the fixture narrows');
+    }
+    const text = reportToText(report);
+    expect(text).toContain('## Executive summary [template (declared fallback)]');
+    expect(text).toContain('- Candidate incident on codex-helper.');
+    expect(text).toContain('## Immediate actions [engine (record)]');
+    expect(text).toContain('Narrative: absent (unbound)');
+    expect(text).toContain('- leg:net:198.51.100.7');
+  });
+});

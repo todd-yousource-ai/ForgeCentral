@@ -1,4 +1,4 @@
-// The Console information architecture: the eleven primary destinations of the left rail, in the order of
+// The Console information architecture: the primary destinations of the left rail (nine in Step 1), in the order of
 // TRD-CONSOLE-00 Section 5.1. This is the single source for nav + routing; the rail renders it and the
 // router builds one route per entry. Adding a surface later is a data edit here plus its route element.
 //
@@ -24,8 +24,12 @@ export const HOME: Destination = { id: 'overview', label: 'Overview', path: '/',
 // the governance surfaces lead (VTZ -> Users -> Objects -> Policies, the noun-then-contract sequence the
 // Phase-3 build established), then the three ops centers under their product names -- SOC Ops (was
 // Dashboards), Agent Ops (was TrustFlow), Network Ops (was AIOps) -- then Reports, Logs, Settings. The
-// three renamed surfaces are still placeholders (not in REAL_SURFACES), so id + path + label rename
+// three renamed surfaces were placeholders (not in REAL_SURFACES), so id + path + label renamed
 // together; nothing real bound to the old ids.
+//
+// crdb IP-AISOC-STEP1 C.9 (INV-FC-NO-STUB, 2026-09-24): Agent Ops and Network Ops are REMOVED from the
+// Step 1 nav rather than shipped as placeholders -- a destination that fabricates nothing but exists
+// still promises a surface. They return with their phases (CONSOLE-07 / CONSOLE-08). Nine remain.
 export const DESTINATIONS: readonly Destination[] = [
   HOME,
   { id: 'vtz', label: 'Virtual Trust Zones', path: '/vtz', short: 'Vz' },
@@ -33,8 +37,6 @@ export const DESTINATIONS: readonly Destination[] = [
   { id: 'objects', label: 'Objects', path: '/objects', short: 'Ob' },
   { id: 'policies', label: 'Policies', path: '/policies', short: 'Po' },
   { id: 'soc-ops', label: 'SOC Ops', path: '/soc-ops', short: 'So' },
-  { id: 'agent-ops', label: 'Agent Ops', path: '/agent-ops', short: 'Ag' },
-  { id: 'network-ops', label: 'Network Ops', path: '/network-ops', short: 'Nw' },
   { id: 'reports', label: 'Reports', path: '/reports', short: 'Re' },
   { id: 'logs', label: 'Logs', path: '/logs', short: 'Lo' },
   { id: 'settings', label: 'Settings', path: '/settings', short: 'St' },

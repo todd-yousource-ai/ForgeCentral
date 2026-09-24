@@ -131,7 +131,11 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // The case acts (SOC_INCIDENT_ACT, crdb IP-AISOC-STEP1 C.1) ride the same write family as the
       // disposition; the notes read (SOC_INCIDENT_NOTES) rides beside SOC_INCIDENT_AUDIT.
       'SocIncidentAct' in request ||
-      'SocNotes' in request)
+      'SocNotes' in request ||
+      // The shaped incident report (SOC_INCIDENT_REPORT, crdb C.5) and the incident's UEBA report
+      // (SOC_INCIDENT_UEBA, C.5b) are READS beside SOC_INCIDENT_IMPACT (IP-CONSOLE-03 S3.16).
+      'SocReport' in request ||
+      'SocUeba' in request)
   ) {
     return FrameType.QuerySubmit;
   }

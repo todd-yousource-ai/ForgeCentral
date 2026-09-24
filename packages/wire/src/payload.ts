@@ -33,6 +33,8 @@ import type {
   WireSocAuditQuery,
   WireSocCognitionRun,
   WireSocImpactQuery,
+  WireSocReportQuery,
+  WireSocUebaQuery,
   WireSocNarrativeQuery,
   WireSocTelemetryQuery,
   WireSocPlanApprove,
@@ -654,6 +656,26 @@ function socImpactToCbor(request: WireSocImpactQuery): unknown {
   return out;
 }
 
+/** `SOC_INCIDENT_REPORT` (crdb C.5). Rust struct order: request_id, incident, operator?. */
+function socReportToCbor(request: WireSocReportQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SOC_INCIDENT_UEBA` (crdb C.5b). Rust struct order: request_id, incident, operator?. */
+function socUebaToCbor(request: WireSocUebaQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    incident: request.incident,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SOC_COGNITION_RUN`. Rust struct order: request_id, incident, operator?. */
 function socCognitionRunToCbor(request: WireSocCognitionRun): unknown {
   const out: Record<string, unknown> = {
@@ -903,6 +925,12 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocImpact' in request) {
     return encode({ SocImpact: socImpactToCbor(request.SocImpact) });
+  }
+  if ('SocReport' in request) {
+    return encode({ SocReport: socReportToCbor(request.SocReport) });
+  }
+  if ('SocUeba' in request) {
+    return encode({ SocUeba: socUebaToCbor(request.SocUeba) });
   }
   if ('SocCognitionRun' in request) {
     return encode({ SocCognitionRun: socCognitionRunToCbor(request.SocCognitionRun) });
