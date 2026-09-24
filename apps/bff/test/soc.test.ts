@@ -663,3 +663,66 @@ describe('the incident report resolver (S3.16, crdb C.5)', () => {
     ).rejects.toBeInstanceOf(SocUnavailableError);
   });
 });
+
+import { resolveWeekly } from '../src/engine/soc.js';
+
+describe('the weekly volume resolver (S3.17, crdb C.9b)', () => {
+  const engineOfWeekly = (reply: unknown, seen: unknown[] = []): OperatorEngine =>
+    ({
+      socWeekly: (_principal: OperatorPrincipal, request: unknown) => {
+        seen.push(request);
+        return Promise.resolve(reply);
+      },
+    }) as unknown as OperatorEngine;
+  const row = (start: number) => ({
+    week_start_seconds: start,
+    fires: 1,
+    opened: 0,
+    promoted: 0,
+    transitioned: 0,
+    demoted: 0,
+    dropped: 0,
+    muted: 0,
+    events_analyzed: 0,
+    techniques_fired: 1,
+    incidents_opened: 0,
+    incidents_closed: 0,
+  });
+
+  it('asks for a bounded number of weeks and projects the reply', async () => {
+    const seen: unknown[] = [];
+    const weekly = await resolveWeekly(
+      engineOfWeekly(
+        {
+          weeks: [row(1), row(604_801)],
+          episodes_truncated: false,
+          until_seconds: 9,
+          refused: false,
+        },
+        seen,
+      ),
+      PRINCIPAL,
+      99,
+    );
+    expect((seen[0] as { weeks: number }).weeks).toBe(12);
+    expect(weekly?.weeks).toHaveLength(2);
+  });
+
+  it('maps a refusal to null and weeks out of order to unavailable', async () => {
+    expect(
+      await resolveWeekly(engineOfWeekly({ weeks: [], refused: true }), PRINCIPAL, 4),
+    ).toBeNull();
+    await expect(
+      resolveWeekly(
+        engineOfWeekly({
+          weeks: [row(604_801), row(1)],
+          episodes_truncated: false,
+          until_seconds: 9,
+          refused: false,
+        }),
+        PRINCIPAL,
+        4,
+      ),
+    ).rejects.toBeInstanceOf(SocUnavailableError);
+  });
+});

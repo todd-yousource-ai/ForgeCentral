@@ -135,7 +135,9 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       // The shaped incident report (SOC_INCIDENT_REPORT, crdb C.5) and the incident's UEBA report
       // (SOC_INCIDENT_UEBA, C.5b) are READS beside SOC_INCIDENT_IMPACT (IP-CONSOLE-03 S3.16).
       'SocReport' in request ||
-      'SocUeba' in request)
+      'SocUeba' in request ||
+      // The weekly volume read (SOC_WEEKLY_SUMMARY, crdb C.9b; S3.17), tenant-level like DetectSummary.
+      'SocWeekly' in request)
   ) {
     return FrameType.QuerySubmit;
   }

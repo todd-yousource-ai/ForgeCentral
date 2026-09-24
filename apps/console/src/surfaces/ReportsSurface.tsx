@@ -7,15 +7,17 @@
 // model is bound or no run is recorded). Export downloads exactly that read as text or JSON; nothing
 // is generated, summarized or reordered on the way out. Weekly coverage / volume is NOT here: the
 // engine has no windowed summary yet (DETECT_SUMMARY is a point-in-time read), and the roadmap rule
-// is to extend the engine rather than aggregate in the BFF -- it lands with its engine read (C.9b).
+// is to extend the engine rather than aggregate in the BFF -- so it landed WITH its engine read
+// (C.9b, SOC_WEEKLY_SUMMARY): the weekly panel below renders what the engine derived from its
+// persisted rollup and episode records, week by week, and labels the coverage figure as current.
 
 import { useState, type ReactElement } from 'react';
-import { GlassPanel } from '@forge/design';
-import type { SocIncidentRow, SocReport } from '@forge/contracts';
+import { DataTable, GlassPanel } from '@forge/design';
+import type { SocIncidentRow, SocReport, SocWeekRow, SocWeekly } from '@forge/contracts';
 import { reportSectionLabel, reportSourceLabel, reportToText } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { useSocIncidents, useSocReport } from './useSoc.js';
+import { useSocIncidents, useSocReport, useSocWeekly } from './useSoc.js';
 
 /** Trigger a browser download of the report AS READ (text or JSON); the file is the engine's answer. */
 export function downloadReport(report: SocReport, format: 'text' | 'json'): void {
@@ -91,6 +93,80 @@ function ReportView({ report }: { readonly report: SocReport }): ReactElement {
   );
 }
 
+/** TUNE: the tab shows a quarter; the engine clamps at 12 either way. */
+const WEEKS_SHOWN = 12;
+
+function weekLabel(row: SocWeekRow): string {
+  return new Date(row.weekStartSeconds * 1000).toISOString().slice(0, 10);
+}
+
+function WeeklyTable({ weekly }: { readonly weekly: SocWeekly }): ReactElement {
+  return (
+    <div data-testid="reports-weekly">
+      <p className="fcx-reports__state" data-testid="reports-weekly-coverage">
+        {weekly.coverage === null
+          ? 'Corpus coverage: no reading on this node.'
+          : `Corpus coverage now: ${String(weekly.coverage.evaluable)} of ${String(weekly.coverage.rulesLoaded)} rules evaluable on this node's sources (current reading, not per week).`}
+        {weekly.episodesTruncated
+          ? ' Incident counts may undercount: the engine scan hit its ceiling.'
+          : ''}
+      </p>
+      <DataTable<SocWeekRow>
+        caption="Detection volume by ISO week (Monday, UTC); oldest first, the last row is the current partial week"
+        columns={[
+          { id: 'week', header: 'Week of', cell: weekLabel },
+          { id: 'fires', header: 'Firings', cell: (r) => String(r.fires), align: 'end' },
+          { id: 'opened', header: 'Opened', cell: (r) => String(r.opened), align: 'end' },
+          { id: 'promoted', header: 'Promoted', cell: (r) => String(r.promoted), align: 'end' },
+          { id: 'muted', header: 'Muted', cell: (r) => String(r.muted), align: 'end' },
+          {
+            id: 'techniques',
+            header: 'Techniques fired',
+            cell: (r) => String(r.techniquesFired),
+            align: 'end',
+          },
+          {
+            id: 'inc-opened',
+            header: 'Incidents opened',
+            cell: (r) => String(r.incidentsOpened),
+            align: 'end',
+          },
+          {
+            id: 'inc-closed',
+            header: 'Incidents closed',
+            cell: (r) => String(r.incidentsClosed),
+            align: 'end',
+          },
+        ]}
+        rows={weekly.weeks}
+        rowKey={(r) => String(r.weekStartSeconds)}
+      />
+    </div>
+  );
+}
+
+function WeeklyPanel(): ReactElement {
+  const weekly = useSocWeekly(WEEKS_SHOWN);
+  return (
+    <GlassPanel ariaLabel="Weekly volume" header={<span>Weekly volume and coverage</span>}>
+      {weekly.isPending ? <LoadingState label="Deriving the weeks" /> : null}
+      {weekly.isError ? (
+        <ErrorState
+          title="The weekly volume could not be read"
+          onRetry={() => void weekly.refetch()}
+        />
+      ) : null}
+      {weekly.isSuccess && weekly.data === null ? (
+        <EmptyState
+          title="No weekly volume for this tenant"
+          hint="The engine refused the read: nothing is shown in its place."
+        />
+      ) : null}
+      {weekly.isSuccess && weekly.data !== null ? <WeeklyTable weekly={weekly.data} /> : null}
+    </GlassPanel>
+  );
+}
+
 export function ReportsSurface(): ReactElement {
   const incidents = useSocIncidents();
   const [selected, setSelected] = useState<string | null>(null);
@@ -101,6 +177,7 @@ export function ReportsSurface(): ReactElement {
       <h2 id="surface-reports" className="fcx-surface__heading">
         Reports
       </h2>
+      <WeeklyPanel />
       <GlassPanel ariaLabel="Incident report" header={<span>Incident report</span>}>
         {incidents.isPending ? <LoadingState label="Loading incidents" /> : null}
         {incidents.isError ? (

@@ -89,6 +89,7 @@ import {
   resolveAuditTrail,
   resolveBusinessImpact,
   resolveIncidentReport,
+  resolveWeekly,
   resolveCaseAct,
   resolveCognitionRun,
   resolveDisposition,
@@ -1577,6 +1578,7 @@ async function handleSoc(
     '/api/soc/notes',
     '/api/soc/impact',
     '/api/soc/report',
+    '/api/soc/weekly',
   ]);
   if (!reads.has(path)) return false;
   const session = deps.authRouter?.resolveSession(req);
@@ -1591,7 +1593,18 @@ async function handleSoc(
   const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
   const incident = params.get('id')?.trim();
   // The per-incident reads need their id up front, so a malformed request never reaches the engine.
-  if (path !== '/api/soc/incidents' && path !== '/api/soc/kpis' && !incident) {
+  const weeksParam = params.get('weeks');
+  const weeks = weeksParam === null ? 4 : Number.parseInt(weeksParam, 10);
+  if (path === '/api/soc/weekly' && (!Number.isFinite(weeks) || weeks < 1 || weeks > 12)) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return true;
+  }
+  if (
+    path !== '/api/soc/incidents' &&
+    path !== '/api/soc/kpis' &&
+    path !== '/api/soc/weekly' &&
+    !incident
+  ) {
     sendJson(res, 400, { error: 'bad_request' });
     return true;
   }
@@ -1608,7 +1621,9 @@ async function handleSoc(
   }[path];
   const cacheKey = perIncidentKind
     ? `${prefix}${perIncidentKind}:${incident ?? ''}`
-    : `${prefix}${path === '/api/soc/kpis' ? 'kpis' : 'incidents'}`;
+    : path === '/api/soc/weekly'
+      ? `${prefix}weekly:${String(weeks)}`
+      : `${prefix}${path === '/api/soc/kpis' ? 'kpis' : 'incidents'}`;
   const cached = deps.cache.get(cacheKey, SOC_CACHE_VERSION);
   if (cached !== undefined) {
     sendJson(res, 200, cached);
@@ -1619,6 +1634,18 @@ async function handleSoc(
   try {
     if (path === '/api/soc/kpis') {
       const view = await resolveSocKpis(engine, principal, opts);
+      deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
+      sendJson(res, 200, view);
+      return true;
+    }
+    if (path === '/api/soc/weekly') {
+      // The weekly volume (crdb C.9b; S3.17): a tenant-level read like the KPIs. A refusal is a
+      // 404 (never cached).
+      const view = await resolveWeekly(engine, principal, weeks, opts);
+      if (view === null) {
+        sendJson(res, 404, { error: 'not_found' });
+        return true;
+      }
       deps.cache.set(cacheKey, view, SOC_CACHE_VERSION);
       sendJson(res, 200, view);
       return true;

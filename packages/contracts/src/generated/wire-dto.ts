@@ -894,6 +894,7 @@ export type WireReply =
   | { SocImpact: WireSocImpact; }
   | { SocReport: WireSocReport; }
   | { SocUeba: WireSocUebaReport; }
+  | { SocWeekly: WireSocWeeklySummary; }
   | { SocRunState: WireSocRunState; }
   | { SocPlanMutated: WireSocPlanEffect; }
   | { PolicyMutated: WirePolicyMutated; };
@@ -963,6 +964,7 @@ export type WireRequest =
   | { SocImpact: WireSocImpactQuery; }
   | { SocReport: WireSocReportQuery; }
   | { SocUeba: WireSocUebaQuery; }
+  | { SocWeekly: WireSocWeeklyQuery; }
   | { SocCognitionRun: WireSocCognitionRun; }
   | { SocPlanApprove: WireSocPlanApprove; }
   | { SocPlanModify: WireSocPlanModify; }
@@ -1205,6 +1207,37 @@ export interface WireSocUebaReport {
   subject: string;
   subject_kind?: string;
   truncated: boolean;
+}
+
+export interface WireSocWeekRow {
+  demoted: number;
+  dropped: number;
+  events_analyzed: number;
+  fires: number;
+  incidents_closed: number;
+  incidents_opened: number;
+  muted: number;
+  opened: number;
+  promoted: number;
+  techniques_fired: number;
+  transitioned: number;
+  week_start_seconds: number;
+}
+
+export interface WireSocWeeklyQuery {
+  operator?: OperatorDelegation;
+  request_id: number;
+  until_seconds?: number;
+  weeks: number;
+}
+
+export interface WireSocWeeklySummary {
+  coverage?: WireDetectCoverage;
+  episodes_truncated: boolean;
+  explanation?: string;
+  refused: boolean;
+  until_seconds: number;
+  weeks: Array<WireSocWeekRow>;
 }
 
 export interface WireSourceVtzEdge {

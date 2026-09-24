@@ -22,6 +22,7 @@ import type {
   SocKpis,
   VerdictNarrative,
   SocReport,
+  SocWeekly,
 } from '@forge/contracts';
 
 /** Fetch the five KPI tiles. Throws on a non-2xx so the strip shows a load error, never blanks. */
@@ -256,5 +257,29 @@ export function useSocReport(incidentId: string | null): UseQueryResult<SocRepor
     queryKey: ['soc', 'report', incidentId],
     queryFn: () => fetchSocReport(incidentId as string),
     enabled: incidentId !== null,
+  });
+}
+
+/**
+ * Fetch the last `weeks` ISO weeks of detection volume (crdb C.9b, `SOC_WEEKLY_SUMMARY`; S3.17):
+ * every number derived by the engine from its persisted rollup and episode records. A 404 is the
+ * engine's refusal and resolves to `null`.
+ */
+export async function fetchSocWeekly(weeks: number): Promise<SocWeekly | null> {
+  const res = await fetch(`/api/soc/weekly?weeks=${String(weeks)}`, { credentials: 'include' });
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`soc weekly failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as SocWeekly;
+}
+
+/** The Reports tab's weekly volume read. */
+export function useSocWeekly(weeks: number): UseQueryResult<SocWeekly | null> {
+  return useQuery({
+    queryKey: ['soc', 'weekly', weeks],
+    queryFn: () => fetchSocWeekly(weeks),
   });
 }

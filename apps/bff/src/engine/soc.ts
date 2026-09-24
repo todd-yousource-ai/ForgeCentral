@@ -52,6 +52,8 @@ import type {
   WireSocTelemetryQuery,
   SocReport,
   WireSocReportQuery,
+  SocWeekly,
+  WireSocWeeklyQuery,
 } from '@forge/contracts';
 import {
   toAuditTrail,
@@ -70,6 +72,7 @@ import {
   toWireDisposition,
   toWirePlanSteps,
   toSocReport,
+  toSocWeekly,
 } from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
@@ -358,6 +361,35 @@ export async function resolveIncidentReport(
     );
   }
   return report;
+}
+
+/** The most weeks a Console read asks for. TUNE: the engine clamps to 12; the tab shows a quarter. */
+export const MAX_WEEKLY_WEEKS = 12;
+
+/**
+ * Read the last `weeks` ISO weeks of detection volume (crdb C.9b, `SOC_WEEKLY_SUMMARY`): every
+ * number derived by the engine from its persisted rollup and episode records. `null` is the
+ * engine's refusal; weeks out of order are unavailable, never re-sorted here.
+ */
+export async function resolveWeekly(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  weeks: number,
+  opts?: EngineCallOptions,
+): Promise<SocWeekly | null> {
+  const request: WireSocWeeklyQuery = {
+    request_id: requestId(),
+    weeks: Math.min(Math.max(1, Math.trunc(weeks)), MAX_WEEKLY_WEEKS),
+  };
+  const wire = await engine.socWeekly(principal, request, opts);
+  if (wire.refused) {
+    return null;
+  }
+  const weekly = toSocWeekly(wire);
+  if (weekly === null) {
+    throw new SocUnavailableError('the weekly summary is not in week order');
+  }
+  return weekly;
 }
 
 /**

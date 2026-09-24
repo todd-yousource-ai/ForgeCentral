@@ -35,6 +35,7 @@ import type {
   WireSocImpactQuery,
   WireSocReportQuery,
   WireSocUebaQuery,
+  WireSocWeeklyQuery,
   WireSocNarrativeQuery,
   WireSocTelemetryQuery,
   WireSocPlanApprove,
@@ -676,6 +677,17 @@ function socUebaToCbor(request: WireSocUebaQuery): unknown {
   return out;
 }
 
+/** `SOC_WEEKLY_SUMMARY` (crdb C.9b). Rust struct order: request_id, weeks, until_seconds?, operator?. */
+function socWeeklyToCbor(request: WireSocWeeklyQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    weeks: request.weeks,
+  };
+  if (request.until_seconds != null) out['until_seconds'] = request.until_seconds;
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SOC_COGNITION_RUN`. Rust struct order: request_id, incident, operator?. */
 function socCognitionRunToCbor(request: WireSocCognitionRun): unknown {
   const out: Record<string, unknown> = {
@@ -931,6 +943,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SocUeba' in request) {
     return encode({ SocUeba: socUebaToCbor(request.SocUeba) });
+  }
+  if ('SocWeekly' in request) {
+    return encode({ SocWeekly: socWeeklyToCbor(request.SocWeekly) });
   }
   if ('SocCognitionRun' in request) {
     return encode({ SocCognitionRun: socCognitionRunToCbor(request.SocCognitionRun) });

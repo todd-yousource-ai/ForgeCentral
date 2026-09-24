@@ -63,6 +63,7 @@ import type {
   WireVtzMutation,
   WireVtzTree,
   WireSocReport,
+  WireSocWeeklySummary,
 } from '@forge/contracts';
 
 import type { BffConfig } from '../config.js';
@@ -248,6 +249,14 @@ export function replyToSocReport(reply: WireReply): WireSocReport {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a SOC report read');
+}
+
+/** Map an engine `WireReply` to `WireSocWeeklySummary` (SOC_WEEKLY_SUMMARY, crdb C.9b). */
+export function replyToSocWeekly(reply: WireReply): WireSocWeeklySummary {
+  if (typeof reply === 'object' && 'SocWeekly' in reply) return reply.SocWeekly;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a SOC weekly read');
 }
 
 /** Map an engine `WireReply` to `WireSocRunState` (SOC_COGNITION_RUN, the ED runner). */
@@ -829,6 +838,16 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireSocReport> {
     return this.call(
       async (transport) => replyToSocReport(await dispatch(transport, { SocReport: request })),
+      opts,
+    );
+  }
+
+  async socWeekly(
+    request: Parameters<CrucibleClient['socWeekly']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSocWeeklySummary> {
+    return this.call(
+      async (transport) => replyToSocWeekly(await dispatch(transport, { SocWeekly: request })),
       opts,
     );
   }
