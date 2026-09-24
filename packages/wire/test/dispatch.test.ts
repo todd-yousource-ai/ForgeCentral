@@ -126,6 +126,7 @@ describe('dispatch', () => {
     { SocUeba: { request_id: 1, incident: 'i1' } },
     { SocWeekly: { request_id: 1, weeks: 4 } },
     { SocSettingsRead: { request_id: 1 } },
+    { SettingsRead: { request_id: 1, surface: 'maintenance' } },
     { SocSettingsCommit: { request_id: 1, tiers: { p_low_milli: 200, p_high_milli: 800 } } },
   ];
 

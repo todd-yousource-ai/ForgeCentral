@@ -1,10 +1,10 @@
 // apps/console/src/surfaces/SettingsSurface.tsx -- the Settings tab (TRD-CONSOLE-11), Step 1 slice:
 // the SOC section (IP-CONSOLE-11 S3.18 over crdb IP-AISOC-STEP1 C.9c, INV-SOC-SETTINGS-GOVERNED).
 //
-// TRD-CONSOLE-11 names nine tabs (HA, DR, RBAC, federation, security, keys, policy, observability,
-// FIPS). Step 1 ships ONLY the SOC settings the engine binds to `console:settings/soc/*` -- the
-// response tiers (crdb C.3) and the SIEM write-back (C.8) -- plus the narrative model ref read-only.
-// The other tabs are absent, not placeholders (INV-CONSOLE-NO-STUB); they land with their phases.
+// TRD-CONSOLE-11 Section 9 (amended 2026-09-24) sets the tab set against the engine's real admin
+// surface. A tab is present only when its engine binding is live (INV-CONSOLE-NO-STUB); the others
+// land with their IP-CONSOLE-11 rows. Live now: SOC (S3.18, crdb C.9c) and Configuration (ST.1,
+// crdb SET.1 -- read-only here; editing lands in ST.2).
 //
 // Every value shown is the engine's committed document. A commit is confirm-gated and goes to the
 // engine's config store through the same validation its admin plane applies; the engine's receipt is
@@ -13,12 +13,23 @@
 // button that cannot work.
 
 import { useEffect, useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog, GlassPanel } from '@forge/design';
-import type { SocSettings, SocSettingsPatch, SocSettingsReceipt } from '@forge/contracts';
-import { CLASSIFICATION_TAGS, SIEM_VENDORS } from '@forge/contracts';
+import { Badge, ConfirmDialog, DataTable, GlassPanel, TabStrip } from '@forge/design';
+import type {
+  SettingRow,
+  SettingsView,
+  SocSettings,
+  SocSettingsPatch,
+  SocSettingsReceipt,
+} from '@forge/contracts';
+import {
+  CLASSIFICATION_TAGS,
+  SIEM_VENDORS,
+  settingApplyClass,
+  settingSourceLabel,
+} from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { useCommitSocSettings, useSocSettings } from './useSettings.js';
+import { useCommitSocSettings, useGovernedSettings, useSocSettings } from './useSettings.js';
 
 function receiptLine(receipt: SocSettingsReceipt): string {
   if (!receipt.refused) {
@@ -259,31 +270,138 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
   );
 }
 
-export function SettingsSurface(): ReactElement {
+/** The apply class in the operator's words; a non-live setting says why it has no edit control. */
+function applyLabel(row: SettingRow): string {
+  switch (settingApplyClass(row)) {
+    case 'live':
+      return 'live';
+    case 'boot-bound':
+      return 'boot-bound: changes need a restart';
+    case 'pending':
+      return 'pending: no live consumer yet';
+    case 'fixed':
+      return 'fixed at boot';
+  }
+}
+
+function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactElement {
+  const surfaces = view.surfaces.filter((s) => view.rows.some((r) => r.surface === s));
+  const [surface, setSurface] = useState(surfaces[0] ?? '');
+  const rows = view.rows.filter((r) => r.surface === surface);
+  return (
+    <div data-testid="settings-configuration">
+      <p className="fcx-settings__model" data-testid="settings-configuration-version">
+        {view.version === 0
+          ? 'Nothing is committed: every value is the fail-closed default.'
+          : `Committed configuration at version ${String(view.version)}.`}
+        {view.dualControlRequired ? ' Changes require dual control (propose and approve).' : ''}
+      </p>
+      <label className="fcx-reports__picker">
+        Surface
+        <select
+          value={surface}
+          onChange={(e) => setSurface(e.target.value)}
+          data-testid="settings-surface-picker"
+        >
+          {surfaces.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </label>
+      <DataTable<SettingRow>
+        caption={`The ${surface} settings as the engine renders them`}
+        columns={[
+          { id: 'key', header: 'Setting', cell: (r) => <code>{r.key}</code> },
+          {
+            id: 'value',
+            header: 'Value',
+            cell: (r) =>
+              r.value === null ? (
+                <span>not in the committed document</span>
+              ) : (
+                <code>{r.value}</code>
+              ),
+          },
+          { id: 'source', header: 'Source', cell: (r) => settingSourceLabel(r, view.version) },
+          { id: 'applies', header: 'Applies', cell: applyLabel },
+          {
+            id: 'definition',
+            header: 'Definition',
+            cell: (r) => `${r.summary} Bound: ${r.bound}.`,
+          },
+        ]}
+        rows={rows}
+        rowKey={(r) => r.key}
+      />
+    </div>
+  );
+}
+
+function ConfigurationTab(): ReactElement {
+  const governed = useGovernedSettings(true);
+  return (
+    <GlassPanel ariaLabel="Configuration" header={<span>Configuration</span>}>
+      {governed.isPending ? <LoadingState label="Reading the committed configuration" /> : null}
+      {governed.isError ? (
+        <ErrorState
+          title="The configuration could not be read"
+          onRetry={() => void governed.refetch()}
+        />
+      ) : null}
+      {governed.isSuccess && governed.data === null ? (
+        <EmptyState
+          title="Admin or SecurityAudit tier required"
+          hint="The engine serves the governed configuration to Admin and SecurityAudit operators only."
+        />
+      ) : null}
+      {governed.isSuccess && governed.data !== null ? (
+        <ConfigurationTable view={governed.data} />
+      ) : null}
+    </GlassPanel>
+  );
+}
+
+function SocTab(): ReactElement {
   const settings = useSocSettings();
+  return (
+    <GlassPanel ariaLabel="SOC settings" header={<span>SOC</span>}>
+      {settings.isPending ? <LoadingState label="Reading the committed settings" /> : null}
+      {settings.isError ? (
+        <ErrorState
+          title="The settings could not be read"
+          onRetry={() => void settings.refetch()}
+        />
+      ) : null}
+      {settings.isSuccess && settings.data === null ? (
+        <EmptyState
+          title="Admin or SecurityAudit tier required"
+          hint="The engine serves these settings to Admin and SecurityAudit operators only; nothing is shown in their place."
+        />
+      ) : null}
+      {settings.isSuccess && settings.data !== null ? (
+        <SocSection settings={settings.data} />
+      ) : null}
+    </GlassPanel>
+  );
+}
+
+/** The tabs whose engine bindings are live (TRD-CONSOLE-11 Section 9.2); the rest are absent. */
+const SETTINGS_TABS = [
+  { id: 'soc', label: 'SOC' },
+  { id: 'configuration', label: 'Configuration' },
+] as const;
+
+export function SettingsSurface(): ReactElement {
+  const [tab, setTab] = useState<string>('soc');
   return (
     <section className="fcx-surface" aria-labelledby="surface-settings">
       <h2 id="surface-settings" className="fcx-surface__heading">
         Settings
       </h2>
-      <GlassPanel ariaLabel="SOC settings" header={<span>SOC</span>}>
-        {settings.isPending ? <LoadingState label="Reading the committed settings" /> : null}
-        {settings.isError ? (
-          <ErrorState
-            title="The settings could not be read"
-            onRetry={() => void settings.refetch()}
-          />
-        ) : null}
-        {settings.isSuccess && settings.data === null ? (
-          <EmptyState
-            title="Admin or SecurityAudit tier required"
-            hint="The engine serves these settings to Admin and SecurityAudit operators only; nothing is shown in their place."
-          />
-        ) : null}
-        {settings.isSuccess && settings.data !== null ? (
-          <SocSection settings={settings.data} />
-        ) : null}
-      </GlassPanel>
+      <TabStrip tabs={[...SETTINGS_TABS]} activeId={tab} onChange={setTab} ariaLabel="Settings" />
+      {tab === 'configuration' ? <ConfigurationTab /> : <SocTab />}
     </section>
   );
 }

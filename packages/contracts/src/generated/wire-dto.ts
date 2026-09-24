@@ -282,6 +282,11 @@ export interface WireDomainPosture {
 
 export type WireDriftTrigger = 'Schema' | 'Policy' | 'Statistics' | 'Model' | 'AsOf' | 'Workspace';
 
+export interface WireEgressSetting {
+  ceiling: string;
+  id: string;
+}
+
 export interface WireEntityConnections {
   limit: number;
   operator?: OperatorDelegation | null;
@@ -510,6 +515,17 @@ export interface WireLugEventsApplied {
   observations_written: number;
   sessions_unchanged: number;
   sessions_written: number;
+}
+
+export interface WireLugExposureSettings {
+  binding_confirm_threshold_permille: number;
+  enabled: boolean;
+  last_seen_bucket_hours: number;
+  max_accounts_per_namespace: number;
+  max_groups_per_namespace: number;
+  max_sessions_per_device: number;
+  resolution_enabled: boolean;
+  snapshot_cadence_hours: number;
 }
 
 export interface WireLugIdentityEvent {
@@ -906,6 +922,8 @@ export type WireReply =
   | { SocUeba: WireSocUebaReport; }
   | { SocWeekly: WireSocWeeklySummary; }
   | { SocSettings: WireSocSettings; }
+  | { Settings: WireSettings; }
+  | { SettingsCommitted: WireSettingsCommitted; }
   | { SocSettingsCommitted: WireSocSettingsCommitted; }
   | { SocRunState: WireSocRunState; }
   | { SocPlanMutated: WireSocPlanEffect; }
@@ -978,6 +996,8 @@ export type WireRequest =
   | { SocUeba: WireSocUebaQuery; }
   | { SocWeekly: WireSocWeeklyQuery; }
   | { SocSettingsRead: WireSocSettingsQuery; }
+  | { SettingsRead: WireSettingsQuery; }
+  | { SettingsCommit: WireSettingsCommit; }
   | { SocSettingsCommit: WireSocSettingsCommit; }
   | { SocCognitionRun: WireSocCognitionRun; }
   | { SocPlanApprove: WireSocPlanApprove; }
@@ -1003,6 +1023,74 @@ export interface WireRiskBand {
 export interface WireScopeMember {
   agent?: string | null;
   endpoint_cn: string;
+}
+
+export interface WireSectionPatch {
+  disabled_decoder_families?: Array<string>;
+  dual_control?: Array<string>;
+  egress_destinations?: Array<WireEgressSetting>;
+  lug_exposure?: WireLugExposureSettings;
+  soc_narrative_model_ref?: string;
+  source_format_map?: Array<WireSourceFormatMapping>;
+}
+
+export interface WireSettingEdit {
+  key: string;
+  value: string;
+}
+
+export interface WireSettingRefusal {
+  cause: string;
+  detail?: string;
+  key: string;
+}
+
+export interface WireSettingRow {
+  bound: string;
+  change_via: string;
+  default_value: string;
+  editable: boolean;
+  key: string;
+  live_apply: string;
+  origin: string;
+  summary: string;
+  surface: string;
+  ui_binding: string;
+  value?: string;
+  value_type: string;
+}
+
+export interface WireSettings {
+  dual_control_required: boolean;
+  explanation?: string;
+  refused: boolean;
+  rows: Array<WireSettingRow>;
+  section_values?: WireSectionPatch;
+  surfaces: Array<string>;
+  version: number;
+}
+
+export interface WireSettingsCommit {
+  edits: Array<WireSettingEdit>;
+  operator?: OperatorDelegation;
+  request_id: number;
+  sections?: WireSectionPatch;
+}
+
+export interface WireSettingsCommitted {
+  dual_control_required: boolean;
+  explanation?: string;
+  needs_restart: Array<string>;
+  refused: boolean;
+  refused_edits: Array<WireSettingRefusal>;
+  version: number;
+  violations: Array<string>;
+}
+
+export interface WireSettingsQuery {
+  operator?: OperatorDelegation;
+  request_id: number;
+  surface?: string;
 }
 
 export interface WireSiemWritebackSettings {
@@ -1297,6 +1385,11 @@ export interface WireSocWeeklySummary {
   refused: boolean;
   until_seconds: number;
   weeks: Array<WireSocWeekRow>;
+}
+
+export interface WireSourceFormatMapping {
+  format: string;
+  source: string;
 }
 
 export interface WireSourceVtzEdge {

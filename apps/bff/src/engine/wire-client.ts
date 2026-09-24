@@ -66,6 +66,7 @@ import type {
   WireSocWeeklySummary,
   WireSocSettings,
   WireSocSettingsCommitted,
+  WireSettings,
 } from '@forge/contracts';
 
 import type { BffConfig } from '../config.js';
@@ -259,6 +260,14 @@ export function replyToSocWeekly(reply: WireReply): WireSocWeeklySummary {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a SOC weekly read');
+}
+
+/** Map an engine `WireReply` to `WireSettings` (SETTINGS_READ, crdb SET.1). */
+export function replyToSettings(reply: WireReply): WireSettings {
+  if (typeof reply === 'object' && 'Settings' in reply) return reply.Settings;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a settings read');
 }
 
 /** Map an engine `WireReply` to `WireSocSettings` (SOC_SETTINGS_READ, crdb C.9c). */
@@ -867,6 +876,16 @@ export class WireCrucibleClient implements CrucibleClient {
   ): Promise<WireSocWeeklySummary> {
     return this.call(
       async (transport) => replyToSocWeekly(await dispatch(transport, { SocWeekly: request })),
+      opts,
+    );
+  }
+
+  async settingsRead(
+    request: Parameters<CrucibleClient['settingsRead']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSettings> {
+    return this.call(
+      async (transport) => replyToSettings(await dispatch(transport, { SettingsRead: request })),
       opts,
     );
   }

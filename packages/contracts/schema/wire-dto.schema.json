@@ -1127,6 +1127,22 @@
         "Workspace"
       ]
     },
+    "WireEgressSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "ceiling": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "ceiling"
+      ],
+      "type": "object"
+    },
     "WireEntityConnections": {
       "additionalProperties": false,
       "properties": {
@@ -2097,6 +2113,46 @@
         "sessions_unchanged",
         "counters_bumped",
         "buckets_advanced"
+      ],
+      "type": "object"
+    },
+    "WireLugExposureSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_confirm_threshold_permille": {
+          "type": "integer"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "last_seen_bucket_hours": {
+          "type": "integer"
+        },
+        "max_accounts_per_namespace": {
+          "type": "integer"
+        },
+        "max_groups_per_namespace": {
+          "type": "integer"
+        },
+        "max_sessions_per_device": {
+          "type": "integer"
+        },
+        "resolution_enabled": {
+          "type": "boolean"
+        },
+        "snapshot_cadence_hours": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "resolution_enabled",
+        "max_accounts_per_namespace",
+        "max_groups_per_namespace",
+        "max_sessions_per_device",
+        "last_seen_bucket_hours",
+        "binding_confirm_threshold_permille",
+        "snapshot_cadence_hours"
       ],
       "type": "object"
     },
@@ -4435,6 +4491,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "Settings": {
+              "$ref": "#/$defs/WireSettings"
+            }
+          },
+          "required": [
+            "Settings"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SettingsCommitted": {
+              "$ref": "#/$defs/WireSettingsCommitted"
+            }
+          },
+          "required": [
+            "SettingsCommitted"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocSettingsCommitted": {
               "$ref": "#/$defs/WireSocSettingsCommitted"
             }
@@ -5385,6 +5465,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SettingsRead": {
+              "$ref": "#/$defs/WireSettingsQuery"
+            }
+          },
+          "required": [
+            "SettingsRead"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SettingsCommit": {
+              "$ref": "#/$defs/WireSettingsCommit"
+            }
+          },
+          "required": [
+            "SettingsCommit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocSettingsCommit": {
               "$ref": "#/$defs/WireSocSettingsCommit"
             }
@@ -5595,6 +5699,260 @@
       },
       "required": [
         "endpoint_cn"
+      ],
+      "type": "object"
+    },
+    "WireSectionPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "disabled_decoder_families": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dual_control": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "egress_destinations": {
+          "items": {
+            "$ref": "#/$defs/WireEgressSetting"
+          },
+          "type": "array"
+        },
+        "lug_exposure": {
+          "$ref": "#/$defs/WireLugExposureSettings"
+        },
+        "soc_narrative_model_ref": {
+          "type": "string"
+        },
+        "source_format_map": {
+          "items": {
+            "$ref": "#/$defs/WireSourceFormatMapping"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "WireSettingEdit": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "type": "object"
+    },
+    "WireSettingRefusal": {
+      "additionalProperties": false,
+      "properties": {
+        "cause": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "cause"
+      ],
+      "type": "object"
+    },
+    "WireSettingRow": {
+      "additionalProperties": false,
+      "properties": {
+        "bound": {
+          "type": "string"
+        },
+        "change_via": {
+          "type": "string"
+        },
+        "default_value": {
+          "type": "string"
+        },
+        "editable": {
+          "type": "boolean"
+        },
+        "key": {
+          "type": "string"
+        },
+        "live_apply": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "surface": {
+          "type": "string"
+        },
+        "ui_binding": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "value_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "surface",
+        "origin",
+        "value_type",
+        "default_value",
+        "bound",
+        "live_apply",
+        "change_via",
+        "ui_binding",
+        "summary",
+        "editable"
+      ],
+      "type": "object"
+    },
+    "WireSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "dual_control_required": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/WireSettingRow"
+          },
+          "type": "array"
+        },
+        "section_values": {
+          "$ref": "#/$defs/WireSectionPatch"
+        },
+        "surfaces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "rows",
+        "surfaces",
+        "dual_control_required",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSettingsCommit": {
+      "additionalProperties": false,
+      "properties": {
+        "edits": {
+          "items": {
+            "$ref": "#/$defs/WireSettingEdit"
+          },
+          "type": "array"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "sections": {
+          "$ref": "#/$defs/WireSectionPatch"
+        }
+      },
+      "required": [
+        "request_id",
+        "edits"
+      ],
+      "type": "object"
+    },
+    "WireSettingsCommitted": {
+      "additionalProperties": false,
+      "properties": {
+        "dual_control_required": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "needs_restart": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "refused_edits": {
+          "items": {
+            "$ref": "#/$defs/WireSettingRefusal"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "integer"
+        },
+        "violations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "needs_restart",
+        "dual_control_required",
+        "refused_edits",
+        "violations",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSettingsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "surface": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id"
       ],
       "type": "object"
     },
@@ -6660,6 +7018,22 @@
         "episodes_truncated",
         "until_seconds",
         "refused"
+      ],
+      "type": "object"
+    },
+    "WireSourceFormatMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "format"
       ],
       "type": "object"
     },

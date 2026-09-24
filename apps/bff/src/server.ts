@@ -99,6 +99,7 @@ import {
   resolveIncidentNotes,
   resolveIncidentTelemetry,
 } from './engine/soc.js';
+import { SettingsUnavailableError, resolveSettings } from './engine/settings.js';
 import {
   resolveIdamConfigure,
   resolveIdamConnect,
@@ -1976,6 +1977,56 @@ async function handleIdamConfigure(
  * success and never a bare error the form cannot explain. Nothing is cached: settings must read
  * what was just committed.
  */
+/**
+ * The governed settings read (IP-CONSOLE-11 ST.1 over crdb SET.1): `GET /api/settings[?surface=S]`.
+ * The engine gates the tier (a refusal is a 403) and renders every value; nothing is cached.
+ */
+async function handleGovernedSettings(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/settings' || method !== 'GET') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const surfaceParam = new URL(req.url ?? '/', 'http://localhost').searchParams.get('surface');
+  const surface = surfaceParam === null || surfaceParam.trim() === '' ? null : surfaceParam.trim();
+  if (surface !== null && !/^[a-z_]{1,64}$/.test(surface)) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  try {
+    const view = await resolveSettings(deps.operatorEngine, principal, surface, {
+      timeoutMs: deps.config.requestTimeoutMs,
+    });
+    if (view === null) {
+      sendJson(res, 403, { error: 'refused', class: 'Tier' });
+      return true;
+    }
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof SettingsUnavailableError) {
+      sendJson(res, 503, { error: 'unavailable' });
+    } else if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'settings read failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleSocSettings(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -2267,6 +2318,9 @@ async function route(
     return;
   }
   if (await handleIdamSecret(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleGovernedSettings(deps, req, method, path, res)) {
     return;
   }
   if (await handleSocSettings(deps, req, method, path, res)) {
