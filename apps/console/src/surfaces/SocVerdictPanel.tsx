@@ -20,6 +20,8 @@
 //     its three honest states. Still NO currency figure -- exposure in dollars needs an asset-value
 //     plane that does not exist, and a plausible figure on a security surface is worse than a
 //     missing one. The sentence, like the narrative, is always labelled generated and never repaired.
+//   * The CASE controls (S3.12, crdb C.1 + SC.7) live in `SocCaseControls`: assign / acknowledge /
+//     close / disposition, confirm-gated like Approve, reported only as what the engine recorded.
 
 import { useState, type ReactElement } from 'react';
 import { Badge, ConfirmDialog } from '@forge/design';
@@ -38,6 +40,7 @@ import {
 } from '@forge/contracts';
 
 import { ErrorState, LoadingState } from '../states/States.js';
+import { SocCaseControls } from './SocCaseControls.js';
 import { authorityVariant } from './SocDecisionQueue.js';
 import { SocPlanEditor } from './SocPlanEditor.js';
 import { useCognitionRun } from './useCognitionRun.js';
@@ -489,6 +492,8 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
             : 'Approved and recorded. Nothing was carried out: enforcement is off on this deployment, so each containment step is recorded refused with its reason.'}
         </p>
       ) : null}
+
+      <SocCaseControls incidentId={incidentId} />
 
       <ConfirmDialog
         open={confirming}

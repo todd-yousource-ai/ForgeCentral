@@ -1586,3 +1586,79 @@ body {
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* -- SOC case controls + notes pane (S3.12) --------------------------------------------------- */
+
+.fcx-socc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+  margin-top: var(--fc-space-md);
+  padding-top: var(--fc-space-md);
+  border-top: 1px solid var(--fc-color-surface-border);
+}
+
+.fcx-socc__assignee {
+  flex: 1 1 22rem;
+}
+
+.fcx-socc__verdict {
+  display: flex;
+  gap: var(--fc-space-sm);
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-top: var(--fc-space-sm);
+  padding: var(--fc-space-md);
+  border: 1px solid var(--fc-color-surface-border);
+  border-radius: var(--fc-radius-md);
+}
+
+.fcx-socc__verdict .fcx-socv__controls-note {
+  flex-basis: 100%;
+}
+
+.fcx-socn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+}
+
+.fcx-socn__note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--fc-space-sm) 0;
+  border-bottom: 1px solid var(--fc-color-surface-border);
+}
+
+.fcx-socn__meta {
+  font-size: var(--fc-font-size-xs);
+  color: var(--fc-color-text-muted);
+}
+
+.fcx-socn__text {
+  margin: 0;
+  font-size: var(--fc-font-size-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 72ch;
+}
+
+.fcx-socn__composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-sm);
+  margin-top: var(--fc-space-sm);
+}
+
+.fcx-socn__textarea {
+  min-height: 5rem;
+  padding: 6px 8px;
+  border-radius: var(--fc-radius-sm);
+  border: 1px solid var(--fc-color-surface-border);
+  background: var(--fc-color-surface-canvas);
+  color: var(--fc-color-text-primary);
+  font-size: var(--fc-font-size-sm);
+  font-family: inherit;
+  resize: vertical;
+}

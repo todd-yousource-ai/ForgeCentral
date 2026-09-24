@@ -1,6 +1,6 @@
 // apps/console/src/surfaces/SocInvestigationDock.tsx -- the investigation dock (IP-CONSOLE-03 S3.7).
 //
-// Where an analyst checks the surface's claims. Five panes plus the current graph scope, all over the
+// Where an analyst checks the surface's claims. Six panes plus the current graph scope, all over the
 // SAME incident payload the rest of the surface renders from -- switching a tab never refetches.
 //
 // EACH TAB'S BINDING WAS CHECKED BEFORE IT WAS BUILT. All five are LIVE since crdb
@@ -17,18 +17,29 @@
 //                        `restricted`) -- an absence an analyst can act on, never an omission.
 //   * Audit Trail     -- LIVE (crdb ED.3, SOC_INCIDENT_AUDIT). The operator acts recorded against
 //                        this incident: an index into the hash-chained audit record, written in the
-//                        same commit batch as each act. Never assembled from the live stream.
+//                        same commit batch as each act. Never assembled from the live stream. Since
+//                        crdb C.1 it also carries the case acts (assigned / acked / noted / closed)
+//                        and the disposition. ACTS IN THE SAME SECOND ARE ORDERED BY TAG, not by
+//                        submission (the audit key is `(incident, at_seconds, tag, detail)`), so the
+//                        pane never infers a sequence from same-second order and says so.
+//   * Notes           -- LIVE (crdb C.1, SOC_INCIDENT_NOTES; S3.12). The case notes, each written in
+//                        the same transaction as its `noted` audit act, plus the composer. A recorded
+//                        note is RE-READ from the engine, never appended locally.
 
 import { useState, type ReactElement } from 'react';
-import { TabStrip } from '@forge/design';
-import type {
-  IncidentActRow,
-  IncidentTelemetry,
-  SocIncidentDetail,
-  VerdictNarrative,
+import { Badge, ConfirmDialog, TabStrip } from '@forge/design';
+import {
+  MAX_NOTE_CHARS,
+  type IncidentAct,
+  type IncidentActRow,
+  type IncidentNote,
+  type IncidentTelemetry,
+  type SocIncidentDetail,
+  type VerdictNarrative,
 } from '@forge/contracts';
 
-import { useSocAuditTrail, useSocNarrative, useSocTelemetry } from './useSoc.js';
+import { CaseCommandError, useCaseAct } from './useCaseCommand.js';
+import { useSocAuditTrail, useSocNarrative, useSocNotes, useSocTelemetry } from './useSoc.js';
 
 const DOCK_TABS = [
   { id: 'evidence', label: 'Evidence' },
@@ -36,6 +47,7 @@ const DOCK_TABS = [
   { id: 'reasoning', label: 'Model Reasoning' },
   { id: 'raw', label: 'Raw Telemetry' },
   { id: 'audit', label: 'Audit Trail' },
+  { id: 'notes', label: 'Notes' },
 ] as const;
 
 /** An absent pane, naming precisely what is missing. Never a placeholder pretending to be data. */
@@ -247,6 +259,30 @@ function RawTelemetryPane({
   );
 }
 
+/** What each recorded act means, in the operator's words; the wire tag stays visible beside it. */
+export function actGloss(act: IncidentAct): string {
+  switch (act) {
+    case 'plan_proposed':
+      return 'a response plan was proposed';
+    case 'plan_modified':
+      return 'the plan was modified';
+    case 'plan_approved':
+      return 'the plan was approved';
+    case 'contained':
+      return 'a containment step was carried out';
+    case 'dispositioned':
+      return 'a verdict was recorded';
+    case 'assigned':
+      return 'the case was handed to a principal';
+    case 'acked':
+      return 'a human acknowledged the incident';
+    case 'noted':
+      return 'a note was recorded';
+    case 'closed':
+      return 'closed without a verdict';
+  }
+}
+
 /** The Audit Trail pane (crdb ED.3): who acted on this incident, straight off the audit index. */
 function AuditTrailPane({
   trail,
@@ -267,21 +303,154 @@ function AuditTrailPane({
   if (trail.length === 0) {
     return (
       <p className="fcx-socd__note" data-testid="soc-dock-audit-empty">
-        No operator has acted on this incident. The trail records plan and containment acts; reads
-        leave no entry here.
+        No operator has acted on this incident. The trail records plan, containment and case acts;
+        reads leave no entry here.
       </p>
     );
   }
   return (
-    <ul className="fcx-socd__legs" data-testid="soc-dock-audit">
-      {trail.map((act) => (
-        <li key={`${act.act}:${String(act.atSeconds)}`} className="fcx-socd__leg">
-          <span className="fcx-socd__ruling">{act.act}</span> {instant(act.atSeconds)}
-          <span className="fcx-socd__note">by {act.principal}</span>
-          {act.detail === null ? null : <span className="fcx-socd__note">{act.detail}</span>}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="fcx-socd__legs" data-testid="soc-dock-audit">
+        {trail.map((act) => (
+          // Same-second same-act rows differ by detail (the engine's audit key), so detail is part
+          // of the identity here too.
+          <li
+            key={`${act.act}:${String(act.atSeconds)}:${act.detail ?? ''}`}
+            className="fcx-socd__leg"
+          >
+            <span className="fcx-socd__ruling">{act.act}</span> {instant(act.atSeconds)}
+            <span className="fcx-socd__note">
+              {actGloss(act.act)} by {act.principal}
+            </span>
+            {act.detail === null ? null : <span className="fcx-socd__note">{act.detail}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="fcx-socd__note" data-testid="soc-dock-audit-order">
+        Acts recorded in the same second are listed by kind, not by the order they were submitted.
+        The trail states what happened, not which of two same-second acts came first.
+      </p>
+    </>
+  );
+}
+
+/**
+ * The Notes pane (crdb C.1, S3.12): the case notes and the composer.
+ *
+ * The composer is confirm-gated like every case act, refuses a blank or over-long note before a
+ * round trip (the engine remains the authority and refuses in-band regardless), and on success
+ * clears the draft and lets the notes READ re-run -- the note shown is the one the engine holds.
+ */
+function NotesPane({ incidentId }: { readonly incidentId: string }): ReactElement {
+  const notes = useSocNotes(incidentId);
+  const record = useCaseAct();
+  const [draft, setDraft] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const trimmed = draft.trim();
+  const overCap = draft.length > MAX_NOTE_CHARS;
+
+  return (
+    <div className="fcx-socn" data-testid="soc-dock-notes">
+      {notes.data === undefined ? (
+        <p className="fcx-socd__note">Loading the notes.</p>
+      ) : notes.data === null ? (
+        <NotAvailable
+          what="The notes cannot be read for this incident."
+          why="The engine refused the read: the incident is unknown, another tenant's, above this session's clearance, or holds more notes than the read admits."
+        />
+      ) : notes.data.length === 0 ? (
+        <p className="fcx-socd__note" data-testid="soc-dock-notes-empty">
+          No notes have been recorded on this incident.
+        </p>
+      ) : (
+        <ul className="fcx-socd__legs" data-testid="soc-dock-notes-list">
+          {notes.data.map((note: IncidentNote) => (
+            <li key={note.noteRef} className="fcx-socn__note">
+              <span className="fcx-socn__meta">
+                {instant(note.atSeconds)} &middot; {note.principal} &middot; {note.noteRef}
+              </span>
+              <p className="fcx-socn__text">{note.text}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form
+        className="fcx-socn__composer"
+        aria-label="Record a case note"
+        data-testid="soc-note-composer"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (trimmed !== '' && !overCap) {
+            setConfirming(true);
+          }
+        }}
+      >
+        <textarea
+          className="fcx-socn__textarea"
+          aria-label="Case note"
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+          }}
+        />
+        <div className="fcx-socv__controls">
+          <button
+            type="submit"
+            className="fcx-socv__control"
+            data-testid="soc-note-record"
+            disabled={trimmed === '' || overCap || record.isPending}
+          >
+            Record note
+          </button>
+          <span className="fcx-socv__controls-note" data-testid="soc-note-count">
+            {overCap
+              ? `${String(draft.length)} of ${String(MAX_NOTE_CHARS)} characters: over the engine's ceiling.`
+              : `${String(draft.length)} of ${String(MAX_NOTE_CHARS)} characters. Accepted on a closed incident too; audited and not deletable.`}
+          </span>
+        </div>
+      </form>
+
+      {record.isError ? (
+        <p className="fcx-socv__refusal" role="alert" data-testid="soc-note-refusal">
+          The note was not recorded.{' '}
+          {record.error instanceof CaseCommandError
+            ? record.error.reason
+            : 'The command did not reach the engine.'}
+        </p>
+      ) : null}
+      {record.data ? (
+        <p className="fcx-socv__outcome" data-testid="soc-note-outcome">
+          <Badge variant="good">Recorded</Badge>{' '}
+          {record.data.noteRef === null
+            ? 'The note was recorded.'
+            : `The note was recorded as ${record.data.noteRef}.`}
+        </p>
+      ) : null}
+
+      <ConfirmDialog
+        open={confirming}
+        title="Record this note?"
+        description="The note is audited under your principal and cannot be deleted."
+        confirmLabel="Record"
+        tone="critical"
+        onConfirm={() => {
+          setConfirming(false);
+          record.mutate(
+            { incidentId, draft: { act: 'noted', note: trimmed } },
+            {
+              // Only clear on success: a refusal leaves the operator's text on screen.
+              onSuccess: () => {
+                setDraft('');
+              },
+            },
+          );
+        }}
+        onCancel={() => {
+          setConfirming(false);
+        }}
+      />
+    </div>
   );
 }
 
@@ -326,6 +495,9 @@ export function SocInvestigationDock({
           <RawTelemetryPane telemetry={telemetry.data} scopedNode={scopedNode} />
         ) : null}
         {tab === 'audit' ? <AuditTrailPane trail={auditTrail.data} /> : null}
+        {/* Notes are read only when the pane is open: the other five cost no read to switch to,
+            and a note's landing drops this key so the pane re-reads rather than appends. */}
+        {tab === 'notes' ? <NotesPane incidentId={incidentId} /> : null}
       </div>
     </section>
   );
