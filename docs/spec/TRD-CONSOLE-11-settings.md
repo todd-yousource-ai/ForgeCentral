@@ -1,6 +1,6 @@
 # TRD-CONSOLE-11 -- Settings (administration)
 
-**Status:** DRAFT (authored 2026-07-07). Inherits `TRD-CONSOLE-00`. Settings is the platform
+**Status:** DRAFT (authored 2026-07-07; amended 2026-09-24, Section 9, against the engine's shipped admin surface). Inherits `TRD-CONSOLE-00`. Settings is the platform
 administration surface -- the operator config for HA/DR, keys, federation, security posture, FIPS, RBAC,
 observability, and policy defaults. It is the primary consumer of the **admin access plane**
 (`TRD-CONSOLE-00` Section 8.5). Mock target: `shot-12`.
@@ -98,3 +98,97 @@ Cross-module gap: admin status/command view models typed in `@forge/contracts`. 
 unauthorized-admin, failed-test, sub-CNSA-1.0-refusal, `PENDING` tested. Security: the whole surface is
 tier-gated + served on the hardened admin plane; commands are audited; no admin secret reaches the
 browser. Dead code: every admin action maps to a real (or `PENDING`) command binding.
+
+## 9. Amendment 2026-09-24: the engine's real admin surface, the Step 1 slice, and the two missing tabs
+
+Sections 3 and 4 were authored against the mock before the engine's administration surface existed.
+This section corrects them against what Crucible ships today (IP-ADMIN-SPINE / CONFIG / AUTHORITY /
+KNOB-COVERAGE / RUNTIME-CLI, IP-CONSOLE-CONTROL-PLANE, IP-AISOC-STEP1 C.9c). Where a row below
+disagrees with Section 3, this section wins; the implementing plan is `IP-CONSOLE-11-settings`.
+
+### 9.1 What the engine actually exposes (the binding truth)
+
+- **The governed configuration document** is the platform's one administration lever: 20 committed
+  sections (`sso_group_roles`, `admins`, `egress_destinations`, `api_exposure`, `aig_exposure`,
+  `lug_exposure`, `idam_connector`, `key_issuing`, `disabled_decoder_families`, `source_format_map`,
+  `searchable_attributes`, `build_search`, `embedder`, `served_models`, `detection_posture`,
+  `soc_narrative`, `detection_retention`, `credibility_weights`, `soc`, `siem_writeback`) plus 27
+  scalar knobs (admin endpoint classification and payload, dual control, session lifetimes,
+  maintenance cadence, retention windows, leases, quotas, query and graph budgets, workers, cognition
+  admission, result chunking), every one described by the config registry (`REGISTRY`, 56 settings:
+  key, type, default, bound, live-apply, verb, Console binding `console:settings/<surface>/...`,
+  summary). Commits are validated (`ConfigDocument::validate`, fail-closed), versioned in the MVCC
+  history (diff and rollback by version), and, when the committed `dual_control` set names
+  `tenant-config`, two-person (propose by one principal, approve by a distinct one).
+- **Status reports** the admin plane serves: node-status, server, connectivity (listener, mutual TLS,
+  identities bound, post-quantum key exchange), security (classification, audit head and chain
+  verification, artifact spot checks, retention), telemetry (OTLP and flow planes), egress,
+  key-issuing, api-exposure, aig, inference, content-pack, read-surface, detection, storage.
+- **Operations**: server drain, maintenance run, storage gc, egress register / revoke / ceiling,
+  model register / revoke, normalization family and format, build pin / cadence, search enablement,
+  ingest reconfigure, legal hold, agent-grant provision, connector enable / disable.
+- **What the engine does NOT expose today** (each is `PENDING` with its owning work named in the
+  plan): a Raft cluster view with leader and per-node lag (single-node nodes; TRD-07 cluster
+  status is not an admin report yet), any DR target, failover or quorum-loss test, a key-hierarchy
+  rotation command (TRD-04 SignatureEnvelope rotation is not an admin verb), a FIPS runtime toggle
+  (FIPS 140-3 is a BUILD posture: `scripts/enable-fips.sh` selects the AWS-LC FIPS module at build
+  time; a running node is or is not FIPS and cannot be toggled), and an observability exporter
+  configuration (telemetry is a boot stanza plus a report; `detection_trace` is the one runtime
+  observability knob).
+- **The Console reaches all of it over `:7878` only** (Section 2). The engine's admin plane
+  (`:7440`, loopback mTLS, the `cdb-actl` client) is NOT reachable from the Console sidecar, so every
+  Settings binding is a wire operation on `:7878`, tier-gated engine-side (Admin / SecurityAudit),
+  routed through the SAME validation, store, dual-control policy and audit the admin plane uses.
+  `SOC_SETTINGS_READ` / `SOC_SETTINGS_COMMIT` (crdb C.9c) are the first two; the plan generalizes
+  them (crdb `IP-CONSOLE-SETTINGS-WIRE`).
+
+### 9.2 The tab set, corrected
+
+Two tabs the mock did not have are REQUIRED, because they are where the engine's real levers live;
+two of the mock's tabs are read-only status until named engine work lands; one of the mock's actions
+is removed as impossible by construction.
+
+| Tab | Content | Real backend (today) | State |
+|-----|---------|----------------------|-------|
+| **SOC** (new) | response tiers, SIEM write-back, narrative model ref | `SOC_SETTINGS_READ` / `SOC_SETTINGS_COMMIT` | LIVE (S3.18) |
+| **Configuration** (new) | every committed section and knob by surface, with the registry's definition beside each value; edit and commit per section; version history, diff and rollback; propose / approve under dual control | the governed document over the wire (crdb `IP-CONSOLE-SETTINGS-WIRE`) | PENDING engine, then LIVE |
+| **RBAC** | the engine's admin assignments (`admins`: identity, roles, clearance) and the SSO group-to-role map (`sso_group_roles`); the Console's own operator roles (`global-admin` / `tenant-admin` / `tenant-user`, BFF `rbac.ts`) shown read-only with their source | committed sections via the Configuration ops; the BFF RBAC map is installer config | PENDING engine, then LIVE |
+| **Federation** | the IdAM connectors (Auth0 today; shared with `Users -> External IDAM`), the `sso_group_roles` enrollment map | `IDAM_CONNECTORS` / `IDAM_CONFIGURE` / `IDAM_CONNECT` / `IDAM_SYNC` (LIVE); the map via Configuration | LIVE for connectors; map PENDING engine |
+| **Security** | the connectivity report (listener, mutual TLS, identities, post-quantum key exchange), the security report (classification, audit chain verified, artifact spot checks, retention), `key_issuing` and `egress_destinations`, the admin endpoint knobs, and the admin-plane crypto posture (the negotiated group for THIS session: hybrid or the P-384 floor) | reports over the wire (PENDING engine); the sidecar must surface the negotiated group to the BFF (PENDING Console) | PENDING, then LIVE |
+| **KeyLock** | the key-issuing report and section (enabled, dual control, validity), the signing key ids the audit chain names | key-issuing report over the wire (PENDING engine) | read-only; **rotation is PENDING** (TRD-04 rotation as an admin verb, owning repo crdb) |
+| **Policy** | the detection posture, detection retention, credibility weights (read-only: a weight set is versioned and replay-pinned), served models and the narrative model ref; the tiers link to the SOC tab | Configuration ops | PENDING engine, then LIVE |
+| **Observability** | the telemetry report (OTLP / flow planes, bound tenants, datagram counts) and the two observability knobs | telemetry report over the wire (PENDING engine); knobs via Configuration | PENDING, then LIVE |
+| **HA & Topology** | this node: shards, serving, durable, maintenance cadence, version (node-status / server report); the configured regions and shard placement | node-status over the wire (PENDING engine) | read-only; **cluster leader / lag, Rotate Leadership, Test Quorum Loss are PENDING** (TRD-07 cluster status and leadership as admin verbs, owning repo crdb) |
+| **Failover & DR** | the configured regions and residency tags | boot config, read-only | **DR targets, RPO / RTO, Test Failover are PENDING** (TRD-07 DR as admin verbs, owning repo crdb) |
+| **FIPS Mode** | the build posture: FIPS module present or not, the crypto provider, the enable procedure | security / connectivity reports over the wire | read-only by construction; **the toggle in Section 3 is REMOVED** (a FIPS build is selected at build time, never at runtime) |
+
+### 9.3 Step 1 scope
+
+Step 1 (IP-AISOC-STEP1 C.9) ships the SOC tab. The full build-out is `IP-CONSOLE-11-settings`
+(this TRD's implementing plan), engine-first: the crdb rows land the wire operations, then each
+Console tab binds them. A tab whose engine binding has not landed is ABSENT from the strip, never
+a placeholder (`INV-CONSOLE-NO-STUB`); the plan names the row that adds it.
+
+### 9.4 Additional acceptance (amends Section 7)
+
+- Every value on every tab is the engine's committed document, a report it served, or the
+  installer's boot configuration, each labelled with its source and, for a committed value, its
+  version. No fabricated status; no derived number the engine did not return.
+- A commit is refused by the engine's validation with the engine's own violations shown verbatim.
+- Under dual control the Console offers PROPOSE (and shows the pending proposals) and APPROVE (by a
+  distinct principal); it never commits directly and never fakes an approval. A self-approval is
+  refused and the refusal shown.
+- A boot-bound setting (the registry says `boot-bound`) is shown with that label and no edit
+  control; the Console never offers a change that cannot apply.
+- The FIPS tab shows the build posture and offers no toggle. HA, DR and KeyLock offer no
+  Rotate / Test / Rotate-key control until the engine verb exists; the absence is stated, not filled.
+- The admin-plane crypto panel shows the group negotiated for the current session as the sidecar
+  reports it; it never infers it.
+
+### 9.5 Failure semantics (amends Section 7)
+
+- `dual_control_required`: the commit control is replaced by Propose; the reason is stated.
+- A proposal approved by its proposer: the engine refuses (`SelfApproval`); shown as such.
+- A stale edit (the committed version moved under the operator): the engine's validation still
+  governs, but the Console re-reads on every commit and shows the version it read; a conflicting
+  concurrent commit is surfaced by the version change, never silently overwritten.
