@@ -336,3 +336,125 @@ describe('knob edits on the Configuration tab (ST.2a)', () => {
     expect(screen.getByTestId('settings-configuration-version')).toHaveTextContent('dual control');
   });
 });
+
+const sectionRow = (key: string, surface: string, editable: boolean) => ({
+  key,
+  surface,
+  origin: key === 'governance.dual_control' ? ('knob' as const) : ('section' as const),
+  value: '[]',
+  valueType: key === 'governance.dual_control' ? 'CapabilitySet' : 'Struct',
+  defaultValue: '',
+  bound: 'b',
+  liveApply: editable ? 'live (x)' : 'boot-bound (a change needs a restart)',
+  changeVia: 'config-commit / config-apply',
+  uiBinding: `console:settings/${surface}`,
+  summary: 's.',
+  editable,
+});
+
+const WITH_SECTIONS: SettingsView = {
+  ...GOVERNED,
+  rows: [
+    ...GOVERNED.rows,
+    sectionRow('governance.dual_control', 'governance', true),
+    sectionRow('egress.destinations', 'egress', true),
+    sectionRow('soc_narrative.model_ref', 'soc_narrative', true),
+    sectionRow('lug.exposure', 'lug', false),
+  ],
+  sectionValues: {
+    dualControl: [],
+    egressDestinations: [{ id: 'frontier', ceiling: 'internal' }],
+    lugExposure: {
+      enabled: true,
+      resolutionEnabled: true,
+      maxAccountsPerNamespace: 1,
+      maxGroupsPerNamespace: 1,
+      maxSessionsPerDevice: 1,
+      lastSeenBucketHours: 1,
+      bindingConfirmThresholdPermille: 900,
+      snapshotCadenceHours: 24,
+    },
+    disabledDecoderFamilies: [],
+    sourceFormatMap: [],
+    socNarrativeModelRef: 'gemma4@2026-07',
+  },
+};
+
+const COMMITTED = {
+  version: 11,
+  needsRestart: [],
+  dualControlRequired: false,
+  refusedEdits: [],
+  violations: [],
+  refused: false,
+  explanation: null,
+};
+
+describe('the typed section forms on the Configuration tab (ST.2b)', () => {
+  async function openSections(view: SettingsView, posted: unknown[] = []): Promise<void> {
+    mockGoverned(view, COMMITTED, posted);
+    renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Configuration' }));
+    await screen.findByTestId('settings-configuration');
+  }
+
+  it('shows a form only for a section the engine marks editable', async () => {
+    await openSections(WITH_SECTIONS);
+    const sections = screen.getByTestId('settings-sections');
+    expect(within(sections).getByText('Dual control')).toBeInTheDocument();
+    expect(within(sections).getByText('Egress destinations')).toBeInTheDocument();
+    expect(within(sections).getByText('Narrative model')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-section-lugExposure')).toBeNull();
+  });
+
+  it('commits only its own section after a confirm that names it', async () => {
+    const posted: unknown[] = [];
+    await openSections(WITH_SECTIONS, posted);
+    const dual = within(screen.getByTestId('settings-section-dualControl'));
+    fireEvent.click(dual.getByLabelText('audit-export'));
+    fireEvent.click(dual.getByRole('button', { name: 'Commit dual control' }));
+    expect(posted).toHaveLength(0);
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('Commit Dual control?');
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toEqual({ edits: [], sections: { dualControl: ['audit-export'] } });
+    expect(await screen.findByTestId('settings-configuration-receipt')).toHaveTextContent(
+      'Committed at version 11',
+    );
+  });
+
+  it('adds an egress destination and unbinds the narrative model', async () => {
+    const posted: unknown[] = [];
+    await openSections(WITH_SECTIONS, posted);
+    const egress = within(screen.getByTestId('settings-section-egressDestinations'));
+    fireEvent.click(egress.getByRole('button', { name: 'Add destination' }));
+    expect(egress.getByRole('button', { name: 'Commit egress destinations' })).toBeDisabled();
+    fireEvent.change(egress.getByLabelText('Destination 2 id'), { target: { value: 'grok' } });
+    fireEvent.change(egress.getByLabelText('Destination 2 ceiling'), {
+      target: { value: 'internal' },
+    });
+    fireEvent.click(egress.getByRole('button', { name: 'Commit egress destinations' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toEqual({
+      edits: [],
+      sections: {
+        egressDestinations: [
+          { id: 'frontier', ceiling: 'internal' },
+          { id: 'grok', ceiling: 'internal' },
+        ],
+      },
+    });
+    const model = within(screen.getByTestId('settings-section-socNarrativeModelRef'));
+    fireEvent.change(model.getByLabelText('Narrative model ref'), { target: { value: '' } });
+    fireEvent.click(model.getByRole('button', { name: 'Commit narrative model' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }));
+    await waitFor(() => expect(posted).toHaveLength(2));
+    expect(posted[1]).toEqual({ edits: [], sections: { socNarrativeModelRef: '' } });
+  });
+
+  it('shows no section forms under dual control', async () => {
+    await openSections({ ...WITH_SECTIONS, dualControlRequired: true });
+    expect(screen.queryByTestId('settings-sections')).toBeNull();
+  });
+});

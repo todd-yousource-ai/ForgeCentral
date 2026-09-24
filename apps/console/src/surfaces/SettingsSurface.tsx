@@ -4,7 +4,7 @@
 // TRD-CONSOLE-11 Section 9 (amended 2026-09-24) sets the tab set against the engine's real admin
 // surface. A tab is present only when its engine binding is live (INV-CONSOLE-NO-STUB); the others
 // land with their IP-CONSOLE-11 rows. Live now: SOC (S3.18, crdb C.9c) and Configuration (ST.1 read,
-// crdb SET.1; ST.2a knob edits, crdb SET.2 -- the section forms land in ST.2b).
+// crdb SET.1; ST.2a knob edits, crdb SET.2; ST.2b section forms, crdb SET.2b).
 //
 // Every value shown is the engine's committed document. A commit is confirm-gated and goes to the
 // engine's config store through the same validation its admin plane applies; the engine's receipt is
@@ -16,7 +16,6 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { Badge, ConfirmDialog, DataTable, GlassPanel, TabStrip } from '@forge/design';
 import type {
   SettingRow,
-  SettingsReceipt,
   SettingsView,
   SocSettings,
   SocSettingsPatch,
@@ -26,12 +25,12 @@ import {
   CLASSIFICATION_TAGS,
   SIEM_VENDORS,
   isKeyEditable,
-  refusalCauseLabel,
   settingApplyClass,
   settingSourceLabel,
 } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { GovernedReceipt, SectionForms } from './SettingsSectionForms.js';
 import {
   useCommitGovernedSettings,
   useCommitSocSettings,
@@ -292,41 +291,6 @@ function applyLabel(row: SettingRow): string {
   }
 }
 
-/** The engine's receipt for a Configuration commit, verbatim: version and restarts, or every cause. */
-function GovernedReceipt({ receipt }: { readonly receipt: SettingsReceipt }): ReactElement {
-  if (!receipt.refused) {
-    return (
-      <div className="fcx-settings__receipt" data-testid="settings-configuration-receipt">
-        <Badge variant="good">Committed</Badge> Committed at version {String(receipt.version)}.
-        {receipt.needsRestart.length > 0
-          ? ` Committed but not applied until a restart: ${receipt.needsRestart.join(', ')}.`
-          : ' Applied live.'}
-      </div>
-    );
-  }
-  return (
-    <div className="fcx-settings__receipt" data-testid="settings-configuration-receipt">
-      <Badge variant="caution">Refused</Badge>{' '}
-      {receipt.dualControlRequired
-        ? 'Tenant-config is under dual control: propose and approve instead.'
-        : (receipt.explanation ?? 'Refused by the engine; nothing was committed.')}
-      {receipt.refusedEdits.length > 0 || receipt.violations.length > 0 ? (
-        <ul className="fcx-settings__violations" data-testid="settings-configuration-refusals">
-          {receipt.refusedEdits.map((r) => (
-            <li key={`${r.key}-${r.causeTag}`}>
-              <code>{r.key}</code>: {refusalCauseLabel(r)}
-              {r.detail === null ? '' : ` (${r.detail})`}
-            </li>
-          ))}
-          {receipt.violations.map((v) => (
-            <li key={v}>{v}</li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
 function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactElement {
   const surfaces = view.surfaces.filter((s) => view.rows.some((r) => r.surface === s));
   const [surface, setSurface] = useState(surfaces[0] ?? '');
@@ -474,6 +438,7 @@ function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactEle
         }}
         onCancel={() => setConfirming(false)}
       />
+      <SectionForms view={view} />
     </div>
   );
 }
