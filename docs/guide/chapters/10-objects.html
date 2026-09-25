@@ -2,19 +2,19 @@
 
 <p class="lead">An object gives a name to something a policy can refer to: a user group, a server pattern, a network range, a script, a data store. Policies use objects as their subjects and targets (<a class="xref" href="#ch-policies"></a>), so you describe your estate once, by name, and reuse it.</p>
 
-<h2 id="obj-availability">Availability</h2>
+<h2 id="obj-availability" data-covers="objects.list objects.governingPolicies">Availability</h2>
 <div class="tablewrap" id="tab-obj-availability" data-title="Objects: availability">
 <table class="data">
 <tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
 <tr><td>Object catalog, search and kind filter</td><td><span class="pill ok">AVAILABLE</span></td><td>Cards grouped by kind.</td></tr>
 <tr><td>Create, edit and delete objects</td><td><span class="pill ok">AVAILABLE</span></td><td>Name, kind, selector, value, description.</td></tr>
-<tr><td>Current members</td><td><span class="pill ok">AVAILABLE</span></td><td>The entities an object matches, resolved when you open it.</td></tr>
+<tr><td>Current members</td><td><span class="pill ok">AVAILABLE</span></td><td>The entities an object matches, resolved when you open it (at most 500). Application, Certificate, Script and Data Store objects have no members yet.</td></tr>
 <tr><td>Publish an object; author tags and attributes</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Objects created in ForgeCentral stay drafts.</td></tr>
 <tr><td>Policies that use an object</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>The object's detail says <b class="ui">Not yet available</b>.</td></tr>
 </table>
 </div>
 
-<h2 id="obj-concepts">How objects work</h2>
+<h2 id="obj-concepts" data-covers="objects.detail">How objects work</h2>
 <p>An object has a <b>kind</b> (what it is), a <b>selector</b> (how it matches) and a <b>value</b> (what it matches). When you open an object, the Forge engine resolves its value against what it knows right now and lists the matching entities as members. When you use an object in a policy rule, the policy keeps its own copy of the object's selector.</p>
 
 <figure id="fig-obj-resolve" data-title="An object resolves its members at read time; a policy keeps a copy" class="wide">
@@ -36,7 +36,7 @@
   <text x="296" y="214" font-size="10.5" fill="#5a6477" text-anchor="end">when a policy is saved</text>
   <rect x="304" y="140" width="200" height="92" rx="8" fill="#ffffff" stroke="#123a6b" stroke-width="1.6"/>
   <text x="404" y="164" font-size="12.5" font-weight="700" fill="#0c2748" text-anchor="middle">Policy rule</text>
-  <text x="320" y="186" font-size="11" fill="#1b2434">target: Server:prod-web</text>
+  <text x="320" y="186" font-size="11" fill="#1b2434">target: server:prod-web</text>
   <text x="320" y="204" font-size="11" fill="#1b2434">holds its own copy of</text>
   <text x="320" y="222" font-size="11" fill="#1b2434">glob <tspan font-family="DejaVu Sans Mono, monospace" font-size="10.5">prod-web-*</tspan></text>
   <rect x="540" y="140" width="210" height="92" rx="8" fill="#fdf3e1" stroke="#e8a33d" stroke-width="1.4"/>
@@ -63,14 +63,14 @@
 
 <h2 id="obj-restrictions">Restrictions</h2>
 <ul>
-  <li>An object's name is unique and cannot be changed after the object is created. Policies show an object as <code>kind:name</code>, for example <code>Server:prod-web</code>.</li>
+  <li>An object's name is unique and cannot be changed after the object is created. The policy form lists an object as <code>kind:name</code> in lower case, for example <code>server:prod-web</code>; the policy list shows the kind and the selector value, for example <code>server:prod-web-*</code>. Two objects with the same selector value appear as one in the policy form.</li>
   <li>Changing the kind resets the selector to that kind's default; check the selector and value before saving.</li>
 </ul>
 <div class="note limit"><p>Objects you create in ForgeCentral stay drafts: there is no publish action, and policies can still use them. Tags cannot be added from ForgeCentral.</p></div>
-<div class="note limit"><p>Saving an edit replaces the object's whole record, and clears any attributes set elsewhere (for example by the engine). Check the object's detail after editing an object that had attributes.</p></div>
+<div class="note limit"><p>Saving an edit replaces the object's whole record, and clears any attributes the object carried. Check the object's detail after editing an object that had attributes.</p></div>
 <div class="note limit"><p>A failed delete shows no error message: check that the card has gone.</p></div>
 
-<h2 id="obj-create">Create an object</h2>
+<h2 id="obj-create" data-covers="objects.create">Create an object</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -81,7 +81,7 @@
 </ol>
 </div>
 
-<h2 id="obj-edit">Edit or delete an object</h2>
+<h2 id="obj-edit" data-covers="objects.edit objects.delete">Edit or delete an object</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -96,14 +96,15 @@
 <table class="data">
 <tr><th style="width:46%">Message</th><th>Meaning</th></tr>
 <tr><td>An object with that name already exists.</td><td>Choose another name. When editing, this can also mean the object was deleted meanwhile.</td></tr>
-<tr><td>The form is incomplete or the selector does not fit the kind.</td><td>Fill in the name and value, and choose a selector the kind accepts.</td></tr>
+<tr><td>The form is incomplete or the selector does not fit the kind.</td><td>Fill in the name and value, choose a selector the kind accepts, and check the value's format, for example a network written with its prefix (<code>10.8.0.0/16</code>).</td></tr>
 <tr><td>The engine refused the command.</td><td>The Forge engine declined the change.</td></tr>
-<tr><td>The command could not reach the engine.</td><td>A connection problem; reload and check before retrying.</td></tr>
+<tr><td>Your session has expired. Sign in again; nothing was committed.</td><td>Sign in again and repeat the change.</td></tr>
+<tr><td>The command could not reach the engine.</td><td>ForgeCentral could not reach the Forge engine, or your browser could not reach ForgeCentral. Reload and check before retrying: a change can have landed before the connection failed.</td></tr>
 </table>
 </div>
 
-<h2 id="obj-verify">Verify</h2>
+<h2 id="obj-verify" data-covers="objects.list objects.detail">Verify</h2>
 <ul>
   <li>Find the object with <b class="ui">Search objects...</b> (name, value, description or tags) or the <b class="ui">Kind</b> filter.</li>
-  <li>Choose the object's name to open it in the entity drawer. Its tags list the selector, the lifecycle, and one <code>member=</code> entry for each entity it matches right now; none means nothing matches yet.</li>
+  <li>Choose the object's name to open it in the entity drawer. Its tags list the selector, the lifecycle, any tags and attributes, and one <code>member=</code> entry for each entity it matches right now (at most 500). No <code>member=</code> entry means nothing matches yet, or the object is an Application, Certificate, Script or Data Store, which have no members in this release.</li>
 </ul>
