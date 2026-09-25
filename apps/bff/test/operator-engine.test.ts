@@ -289,6 +289,11 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         refused: false,
       });
     },
+    settingsReports: (req) => {
+      calls.push(`settingsReports:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ admin_plane: true, refused: false });
+    },
     settingsRead: (req) => {
       calls.push(`settingsRead:${String(req.request_id)}`);
       reads.push(req);

@@ -8,6 +8,7 @@ import {
   SettingsUnavailableError,
   resolveSettings,
   resolveSettingsCommit,
+  resolveSettingsReports,
 } from '../src/engine/settings.js';
 
 const PRINCIPAL = {
@@ -114,5 +115,44 @@ describe('the settings commit resolver (ST.2a, crdb SET.2)', () => {
     ]);
     expect(receipt.refused).toBe(true);
     expect(receipt.refusedEdits[0]?.cause).toBe('boot_bound');
+  });
+});
+
+describe('the settings reports resolver (crdb SET.4)', () => {
+  it('asks for exactly the named reports and projects them; a refusal is null', async () => {
+    const seen: unknown[] = [];
+    const engine = {
+      settingsReports: (_principal: OperatorPrincipal, request: unknown) => {
+        seen.push(request);
+        return Promise.resolve({
+          admin_plane: true,
+          refused: false,
+          connectivity: {
+            listen_addr: '127.0.0.1:7440',
+            mutual_tls: true,
+            identities_bound: 2,
+            post_quantum_kx: true,
+            crypto_provider: 'aws-lc-rs',
+            fips_module: false,
+          },
+        });
+      },
+    } as unknown as OperatorEngine;
+    const view = await resolveSettingsReports(engine, PRINCIPAL, ['connectivity']);
+    expect((seen[0] as { reports: string[] }).reports).toEqual(['connectivity']);
+    expect(view?.adminPlane).toBe(true);
+    expect(view?.connectivity).toEqual({
+      listenAddr: '127.0.0.1:7440',
+      mutualTls: true,
+      identitiesBound: 2,
+      postQuantumKx: true,
+      cryptoProvider: 'aws-lc-rs',
+      fipsModule: false,
+    });
+    expect(view?.security).toBeNull();
+    const refused = {
+      settingsReports: () => Promise.resolve({ admin_plane: false, refused: true }),
+    } as unknown as OperatorEngine;
+    expect(await resolveSettingsReports(refused, PRINCIPAL, ['server'])).toBeNull();
   });
 });

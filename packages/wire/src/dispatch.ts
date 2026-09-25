@@ -144,6 +144,8 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'SocSettingsCommit' in request ||
       // The governed settings read (SETTINGS_READ, crdb SET.1; IP-CONSOLE-11 ST.1).
       'SettingsRead' in request ||
+      // The admin-plane status reports (SETTINGS_REPORTS, crdb SET.4; IP-CONSOLE-11 report tabs).
+      'SettingsReports' in request ||
       // The governed commit (SETTINGS_COMMIT, crdb SET.2 / SET.2b; IP-CONSOLE-11 ST.2a).
       'SettingsCommit' in request)
   ) {

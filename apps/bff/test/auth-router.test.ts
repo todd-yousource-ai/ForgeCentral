@@ -59,6 +59,7 @@ const unusedClient: CrucibleClient = {
   socSettingsRead: () => Promise.reject(new Error('unused')),
   settingsRead: () => Promise.reject(new Error('unused')),
   settingsCommit: () => Promise.reject(new Error('unused')),
+  settingsReports: () => Promise.reject(new Error('unused')),
   socSettingsCommit: () => Promise.reject(new Error('unused')),
   socCognitionRun: () => Promise.reject(new Error('unused')),
   socIncidentAct: () => Promise.reject(new Error('unused')),

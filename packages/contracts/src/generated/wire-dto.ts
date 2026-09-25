@@ -179,6 +179,15 @@ export interface WireConnectivityQuery {
   until?: number | null;
 }
 
+export interface WireConnectivityReport {
+  crypto_provider: string;
+  fips_module: boolean;
+  identities_bound: number;
+  listen_addr: string;
+  mutual_tls: boolean;
+  post_quantum_kx: boolean;
+}
+
 export interface WireContain {
   operator?: OperatorDelegation | null;
   request: ContainmentRequest;
@@ -438,6 +447,12 @@ export interface WireIncidentRow {
   rule_id: string;
   subject: string;
   subject_name?: string;
+}
+
+export interface WireKeyIssuingReport {
+  dual_control_required: boolean;
+  enabled: boolean;
+  key_validity_secs: number;
 }
 
 export interface WireLineageEdge {
@@ -934,6 +949,7 @@ export type WireReply =
   | { SocWeekly: WireSocWeeklySummary; }
   | { SocSettings: WireSocSettings; }
   | { Settings: WireSettings; }
+  | { SettingsReports: WireSettingsReports; }
   | { SettingsCommitted: WireSettingsCommitted; }
   | { SocSettingsCommitted: WireSocSettingsCommitted; }
   | { SocRunState: WireSocRunState; }
@@ -1008,6 +1024,7 @@ export type WireRequest =
   | { SocWeekly: WireSocWeeklyQuery; }
   | { SocSettingsRead: WireSocSettingsQuery; }
   | { SettingsRead: WireSettingsQuery; }
+  | { SettingsReports: WireSettingsReportsQuery; }
   | { SettingsCommit: WireSettingsCommit; }
   | { SocSettingsCommit: WireSocSettingsCommit; }
   | { SocCognitionRun: WireSocCognitionRun; }
@@ -1043,6 +1060,26 @@ export interface WireSectionPatch {
   lug_exposure?: WireLugExposureSettings;
   soc_narrative_model_ref?: string;
   source_format_map?: Array<WireSourceFormatMapping>;
+}
+
+export interface WireSecurityReport {
+  artifact_spot_failures: number;
+  artifacts_spot_checked: number;
+  audit_chain_verified: boolean;
+  audit_entries: number;
+  audit_head_version: number;
+  classification: string;
+  template_artifacts: number;
+}
+
+export interface WireServerReport {
+  durable: boolean;
+  maintenance_cadence_secs: number;
+  maintenance_enabled: boolean;
+  max_payload: number;
+  serving: boolean;
+  shards: number;
+  version: string;
 }
 
 export interface WireSettingEdit {
@@ -1103,6 +1140,24 @@ export interface WireSettingsQuery {
   operator?: OperatorDelegation;
   request_id: number;
   surface?: string;
+}
+
+export interface WireSettingsReports {
+  admin_plane: boolean;
+  connectivity?: WireConnectivityReport;
+  egress?: Array<WireEgressSetting>;
+  explanation?: string;
+  key_issuing?: WireKeyIssuingReport;
+  refused: boolean;
+  security?: WireSecurityReport;
+  server?: WireServerReport;
+  telemetry?: WireTelemetryReport;
+}
+
+export interface WireSettingsReportsQuery {
+  operator?: OperatorDelegation;
+  reports: Array<string>;
+  request_id: number;
 }
 
 export interface WireSiemWritebackSettings {
@@ -1446,6 +1501,14 @@ export interface WireTechniqueSummary {
   muted_fp_feedback: number;
   muted_ratified: number;
   raised: number;
+}
+
+export interface WireTelemetryReport {
+  enabled: boolean;
+  grpc_addr: string;
+  http_addr: string;
+  queue_capacity: number;
+  tenants_bound: number;
 }
 
 export interface WireUebaAnomaly {

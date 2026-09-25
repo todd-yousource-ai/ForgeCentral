@@ -115,6 +115,8 @@ import type {
   WireSocSettingsQuery,
   WireSettings,
   WireSettingsQuery,
+  WireSettingsReports,
+  WireSettingsReportsQuery,
   WireSettingsCommit,
   WireSettingsCommitted,
 } from '@forge/contracts';
@@ -142,6 +144,7 @@ export type EngineAction =
   | 'socWeekly'
   | 'socSettingsRead'
   | 'settingsRead'
+  | 'settingsReports'
   | 'settingsCommit'
   | 'socSettingsCommit'
   | 'socCognitionRun'
@@ -353,6 +356,12 @@ export interface OperatorEngine {
     request: WireSettingsQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSettings>;
+  /** Read the admin plane's status reports (SETTINGS_REPORTS, crdb SET.4) on behalf of `principal`. */
+  settingsReports(
+    principal: OperatorPrincipal,
+    request: WireSettingsReportsQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsReports>;
   /** Read the committed SOC settings (SOC_SETTINGS_READ, crdb C.9c) on behalf of `principal`. */
   socSettingsRead(
     principal: OperatorPrincipal,
@@ -738,6 +747,11 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'settingsRead', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.settingsRead({ ...request, operator }, opts);
+    },
+    settingsReports: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'settingsReports', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.settingsReports({ ...request, operator }, opts);
     },
     settingsCommit: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsCommit', request.request_id));

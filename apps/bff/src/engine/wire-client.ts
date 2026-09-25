@@ -67,6 +67,7 @@ import type {
   WireSocSettings,
   WireSocSettingsCommitted,
   WireSettings,
+  WireSettingsReports,
   WireSettingsCommitted,
 } from '@forge/contracts';
 
@@ -277,6 +278,14 @@ export function replyToSettings(reply: WireReply): WireSettings {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a settings read');
+}
+
+/** Map an engine `WireReply` to `WireSettingsReports` (SETTINGS_REPORTS, crdb SET.4). */
+export function replyToSettingsReports(reply: WireReply): WireSettingsReports {
+  if (typeof reply === 'object' && 'SettingsReports' in reply) return reply.SettingsReports;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a settings reports read');
 }
 
 /** Map an engine `WireReply` to `WireSocSettings` (SOC_SETTINGS_READ, crdb C.9c). */
@@ -896,6 +905,17 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToSettingsCommitted(await dispatch(transport, { SettingsCommit: request })),
+      opts,
+    );
+  }
+
+  async settingsReports(
+    request: Parameters<CrucibleClient['settingsReports']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsReports> {
+    return this.call(
+      async (transport) =>
+        replyToSettingsReports(await dispatch(transport, { SettingsReports: request })),
       opts,
     );
   }

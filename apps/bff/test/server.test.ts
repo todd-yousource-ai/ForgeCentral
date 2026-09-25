@@ -78,6 +78,7 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     socSettingsRead: unused,
     settingsRead: unused,
     settingsCommit: unused,
+    settingsReports: unused,
     socSettingsCommit: unused,
     socCognitionRun: unused,
     socIncidentAct: unused,
@@ -166,6 +167,7 @@ function operatorEngineWith(soc: Partial<OperatorEngine> = {}): OperatorEngine {
     socSettingsRead: unused,
     settingsRead: unused,
     settingsCommit: unused,
+    settingsReports: unused,
     socSettingsCommit: unused,
     socCognitionRun: unused,
     socIncidentAct: unused,
@@ -1274,6 +1276,28 @@ describe('BFF HTTP surface', () => {
     expect(await names(other)).toEqual(['ten-b']);
     // The second ten-a read was served warm; ten-b never saw ten-a's projection.
     expect(seen).toEqual(['ten-a', 'ten-b']);
+  });
+
+  it('GET /api/settings/reports refuses a bad name before the engine and serves the named reports', async () => {
+    const asked: unknown[] = [];
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      settingsReports: (_principal, request) => {
+        asked.push(request.reports);
+        return Promise.resolve({ admin_plane: true, refused: false });
+      },
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    expect((await fetch(`${base}/api/settings/reports`)).status).toBe(400);
+    expect((await fetch(`${base}/api/settings/reports?names=server,warp`)).status).toBe(400);
+    expect(asked).toEqual([]);
+    const ok = await fetch(`${base}/api/settings/reports?names=server,security,server`);
+    expect(ok.status).toBe(200);
+    expect(asked).toEqual([['server', 'security']]);
+    expect(((await ok.json()) as { adminPlane: boolean }).adminPlane).toBe(true);
   });
 
   it('GET /api/settings/console-rbac serves the role map to a global admin only (ST.3)', async () => {

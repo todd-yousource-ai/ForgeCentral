@@ -17,6 +17,8 @@ import { toConsoleRbacView } from '@forge/contracts';
 import type {
   ConsoleRbacView,
   SettingsCommitRequest,
+  SettingsReportName,
+  SettingsReportsView,
   SettingsReceipt,
   SettingsView,
   SocSettings,
@@ -147,6 +149,36 @@ export function useConsoleRbac(): UseQueryResult<ConsoleRbacView | null> {
   return useQuery({
     queryKey: ['settings', 'console-rbac'],
     queryFn: fetchConsoleRbac,
+    staleTime: 0,
+  });
+}
+
+/**
+ * Fetch the admin plane's status reports by name (crdb SET.4, `GET /api/settings/reports`). A 403 is
+ * the engine's tier refusal and resolves to `null`.
+ */
+export async function fetchSettingsReports(
+  names: readonly SettingsReportName[],
+): Promise<SettingsReportsView | null> {
+  const res = await fetch(`/api/settings/reports?names=${names.join(',')}`, {
+    credentials: 'include',
+  });
+  if (res.status === 403) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`settings reports failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as SettingsReportsView;
+}
+
+/** One tab's reports; each tab asks only for what it shows (the security report verifies the chain). */
+export function useSettingsReports(
+  names: readonly SettingsReportName[],
+): UseQueryResult<SettingsReportsView | null> {
+  return useQuery({
+    queryKey: ['settings', 'reports', names.join(',')],
+    queryFn: () => fetchSettingsReports(names),
     staleTime: 0,
   });
 }

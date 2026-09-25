@@ -1,7 +1,7 @@
 // apps/console/src/test/settings-surface.test.tsx -- IP-CONSOLE-11 S3.18 the Settings tab's SOC section.
 
 import type { SettingsView, SocSettings, SocSettingsReceipt } from '@forge/contracts';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SettingsSurface } from '../surfaces/SettingsSurface.js';
@@ -209,7 +209,17 @@ describe('the Settings tab strip and the Configuration tab (ST.1)', () => {
     renderWithProviders(<SettingsSurface />, { route: '/settings' });
     const strip = await screen.findByRole('tablist', { name: 'Settings' });
     const tabs = within(strip).getAllByRole('tab');
-    expect(tabs.map((t) => t.textContent)).toEqual(['SOC', 'Configuration', 'RBAC', 'Federation']);
+    expect(tabs.map((t) => t.textContent)).toEqual([
+      'SOC',
+      'Configuration',
+      'RBAC',
+      'Federation',
+      'Security',
+      'KeyLock',
+      'Observability',
+      'HA & Topology',
+      'FIPS Mode',
+    ]);
     await screen.findByTestId('settings-soc');
   });
 
@@ -562,3 +572,184 @@ describe('the RBAC and Federation tabs (ST.3 / ST.4)', () => {
     });
   });
 });
+
+const REPORTS = {
+  adminPlane: true,
+  server: {
+    shards: 1,
+    serving: true,
+    durable: true,
+    maintenanceEnabled: true,
+    maintenanceCadenceSecs: 120,
+    maxPayload: 262_144,
+    version: '0.0.0',
+  },
+  connectivity: {
+    listenAddr: '127.0.0.1:7440',
+    mutualTls: true,
+    identitiesBound: 2,
+    postQuantumKx: true,
+    cryptoProvider: 'aws-lc-rs',
+    fipsModule: false,
+  },
+  security: {
+    classification: 'confidential',
+    auditHeadVersion: 42,
+    auditEntries: 7,
+    auditChainVerified: true,
+    artifactsSpotChecked: 3,
+    artifactSpotFailures: 0,
+    templateArtifacts: 0,
+  },
+  telemetry: {
+    enabled: true,
+    grpcAddr: '0.0.0.0:4317',
+    httpAddr: '0.0.0.0:4318',
+    queueCapacity: 1024,
+    tenantsBound: 1,
+  },
+  keyIssuing: { enabled: false, dualControlRequired: true, keyValiditySecs: 86_400 },
+  egress: [{ id: 'frontier', ceiling: 'internal' }],
+};
+
+const OBSERVABILITY_VIEW: SettingsView = {
+  ...IDENTITY_VIEW,
+  identity: null,
+  rows: [
+    {
+      key: 'observability.trace_sample_permille',
+      surface: 'observability',
+      origin: 'knob',
+      value: '100',
+      valueType: 'permille',
+      defaultValue: '0',
+      bound: '0..=1000',
+      liveApply: 'live (the tracer)',
+      changeVia: 'config-commit / config-apply',
+      uiBinding: 'console:settings/observability/trace_sample_permille',
+      summary: 'The trace sampling rate.',
+      editable: true,
+    },
+  ],
+};
+
+function mockReports(reports: unknown, asked: string[] = []): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      const reply = (status: number, body: unknown) =>
+        Promise.resolve({
+          ok: status === 200,
+          status,
+          json: () => Promise.resolve(body),
+        } as Response);
+      if (url.startsWith('/api/settings/reports')) {
+        asked.push(url);
+        return reply(reports === null ? 403 : 200, reports);
+      }
+      if (url === '/api/settings') return reply(200, OBSERVABILITY_VIEW);
+      return reply(200, SETTINGS);
+    }),
+  );
+}
+
+async function openTab(name: string): Promise<void> {
+  renderWithProviders(<SettingsSurface />, { route: '/settings' });
+  fireEvent.click(await screen.findByRole('tab', { name }));
+}
+
+describe('the report-backed tabs (crdb SET.4)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('Security asks for its three reports and shows each with its source', async () => {
+    const asked: string[] = [];
+    mockReports(REPORTS, asked);
+    await openTab('Security');
+    const endpoint = await screen.findByRole('table', {
+      name: 'Admin endpoint (the engine connectivity report)',
+    });
+    expect(within(endpoint).getByText('127.0.0.1:7440')).toBeInTheDocument();
+    expect(within(endpoint).getByText('Offered')).toBeInTheDocument();
+    const security = screen.getByRole('table', {
+      name: 'Server security (the engine security report)',
+    });
+    expect(within(security).getByText('Verified')).toBeInTheDocument();
+    expect(within(security).getByText('confidential')).toBeInTheDocument();
+    expect(screen.getByText('frontier')).toBeInTheDocument();
+    expect(screen.getByText(/ST\.5b/)).toBeInTheDocument();
+    expect(asked).toEqual(['/api/settings/reports?names=connectivity,security,egress']);
+    expect(screen.queryByRole('button', { name: /rotate|edit|commit/i })).toBeNull();
+  });
+
+  it('shows a failed audit chain as a failure and a node without an admin plane as such', async () => {
+    mockReports({
+      ...REPORTS,
+      security: { ...REPORTS.security, auditChainVerified: false },
+    });
+    await openTab('Security');
+    expect(await screen.findByText('Failed verification')).toBeInTheDocument();
+    cleanupAndReset();
+    mockReports({
+      adminPlane: false,
+      server: null,
+      connectivity: null,
+      security: null,
+      telemetry: null,
+      keyIssuing: null,
+      egress: null,
+    });
+    await openTab('Security');
+    expect(await screen.findByText('This node runs no admin endpoint')).toBeInTheDocument();
+    cleanupAndReset();
+    mockReports(null);
+    await openTab('KeyLock');
+    expect(await screen.findByText('Admin or SecurityAudit tier required')).toBeInTheDocument();
+  });
+
+  it('KeyLock shows the key-issuing report and states rotation as unavailable', async () => {
+    mockReports(REPORTS);
+    await openTab('KeyLock');
+    const keys = await screen.findByRole('table', {
+      name: 'Agent key issuing (the engine key-issuing report)',
+    });
+    expect(within(keys).getByText('1 d')).toBeInTheDocument();
+    expect(screen.getByText(/SET\.6c/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rotate/i })).toBeNull();
+  });
+
+  it('Observability shows the telemetry report and the committed observability settings', async () => {
+    mockReports(REPORTS);
+    await openTab('Observability');
+    const telemetry = await screen.findByRole('table', {
+      name: 'Telemetry ingest (the engine telemetry report)',
+    });
+    expect(within(telemetry).getByText('0.0.0.0:4317')).toBeInTheDocument();
+    expect(await screen.findByText('observability.trace_sample_permille')).toBeInTheDocument();
+    expect(screen.getByText(/SET\.6d/)).toBeInTheDocument();
+  });
+
+  it('HA & Topology and FIPS Mode read their reports and offer no control', async () => {
+    mockReports(REPORTS);
+    await openTab('HA & Topology');
+    const node = await screen.findByRole('table', { name: 'This node (the engine server report)' });
+    expect(within(node).getByText('every 120 s')).toBeInTheDocument();
+    expect(screen.getByText(/SET\.6a/)).toBeInTheDocument();
+    cleanupAndReset();
+    mockReports(REPORTS);
+    await openTab('FIPS Mode');
+    const fips = await screen.findByRole('table', {
+      name: 'Crypto build posture (the engine connectivity report)',
+    });
+    expect(within(fips).getByText('aws-lc-rs')).toBeInTheDocument();
+    expect(within(fips).getByText('No')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+  });
+});
+
+function cleanupAndReset(): void {
+  cleanup();
+  vi.unstubAllGlobals();
+}

@@ -109,6 +109,8 @@ import type {
   WireSocSettingsQuery,
   WireSettings,
   WireSettingsQuery,
+  WireSettingsReports,
+  WireSettingsReportsQuery,
   WireSettingsCommit,
   WireSettingsCommitted,
 } from '@forge/contracts';
@@ -210,6 +212,11 @@ export interface CrucibleClient {
   socWeekly(request: WireSocWeeklyQuery, opts?: EngineCallOptions): Promise<WireSocWeeklySummary>;
   /** Read the governed settings of one registry surface, or all (SETTINGS_READ, crdb SET.1). */
   settingsRead(request: WireSettingsQuery, opts?: EngineCallOptions): Promise<WireSettings>;
+  /** Read the admin plane's status reports by name (SETTINGS_REPORTS, crdb SET.4). */
+  settingsReports(
+    request: WireSettingsReportsQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsReports>;
   /** Commit knob edits / section patches (SETTINGS_COMMIT, crdb SET.2 / SET.2b). */
   settingsCommit(
     request: WireSettingsCommit,
