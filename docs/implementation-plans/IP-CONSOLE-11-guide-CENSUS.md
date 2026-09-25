@@ -119,7 +119,7 @@ updates the guide entry it affects (`IP-CONSOLE-11-guide` rule R4).
 | CD-03 | S1 | crdb + FC | No per-operator role or tier check on any non-Settings command; the Console peer's configured clearance is dropped (every delegated call runs at Internal); Settings runs at a Console-asserted tier, uncapped | `crdb-console-ops.md` F1-F2; `crdb-settings-plane.md` 7.1 item 2; crdb `DEF-RBAC-PERMISSION-MAP` | code-read; deferred by ruling 2026-09-25 |
 | CD-04 | S1 | FC | The sidecar's loopback services (sign, secret, session) trust any local process; no timeouts, connection caps or logging | `fc-platform-config.md` 3.9, 6.10 | code-read |
 | CD-05 | S2 | FC + torch | Lease units: the Console stamps the bundle lease in unix milliseconds, torchd compares it with unix nanoseconds, so every Console bundle is refused `StaleLease` | `forgecentral/apps/bff/src/engine/distribute.ts:27-34, 95`; `torch/crates/torch-edge/src/bin/torchd.rs:335-342, 1042-1048, 1723-1725`; `torch/crates/torch-forge/src/apply.rs:192-195` | VERIFIED |
-| CD-06 | S2 | crdb | `BUNDLE_CONVERGENCE` carries no delegation, reads the reserved service tenant and always answers "no bundle" | `crdb-console-ops.md` F3 | code-read |
+| CD-06 | S2 | FC + crdb | `BUNDLE_CONVERGENCE` carries no delegation (the BFF passes the request without the operator, although its comment says it injects it), so the engine reads the session's reserved service tenant and always answers "no bundle"; the re-distribute control, shown only when a bundle is found, never appears | `forgecentral/apps/bff/src/engine/operator-engine.ts:1018-1022`; `crucible/crates/cdb-server/src/handler.rs:6938-6955`; `crdb-console-ops.md` F3 | VERIFIED |
 | CD-07 | S2 | FC | A first distribution cannot be started from the UI; Applied To is ignored; re-distribute targets only the endpoints already in the stored bundle | `fc-governance.md` DIST-02, DIST-03 | code-read |
 | CD-08 | S2 | torch | The endpoint installer never provisions the policy lane (`TORCH_POLICY_ANCHOR`, `TORCH_POLICY_ENDPOINT_CN`) and rewrites `torchd.env` on every run | `torch-endpoint.md` 0.1 item 1; dev-box journal `policy lane disabled (TORCH_POLICY_ANCHOR unset)` | VERIFIED (dev box) |
 | CD-09 | S2 | torch | Of 30 authored policy dimensions only `allow_ordinary_internet` has a host effect; rules (objects, actions, protocols, ports, logging) are verified but never read; schedule, geo, tags and the active window are never sent | `torch-endpoint.md` 0.1 item 4, 3.10 | code-read |
@@ -158,6 +158,8 @@ updates the guide entry it affects (`IP-CONSOLE-11-guide` rule R4).
 | CD-42 | S4 | FC | Console docs drift: `deploy/README.md` documents a retired enrollment flow and omits `CONSOLE_PEER_TENANT`; `:7878` vs `:7879`; `config.example.env` defaults differ from the code; `tier.ts` claims a configurable role-to-tier map; the OpenAPI documents a few paths only | `fc-platform-config.md` 6.12 | code-read |
 | CD-43 | S4 | crdb | The Configuration Guide is count-gated only: three nonexistent env vars, a wrong memtable default, a 14-row validation table against 40 real errors; the PDF is two months older than the HTML. Not a safe source for the in-app guide | `crdb-settings-plane.md` section 6 | code-read |
 | CD-44 | S4 | FC | Surface TRD drift (register below) and ledger drift in `IP-CONSOLE-11-settings` and `IP-CONSOLE-03-soc-ops` | `fc-soc-logs-reports-settings.md` Part 6; `fc-governance.md` J | code-read |
+| CD-45 | S3 | FC | Operator-facing copy exposes internal names and plan ids, against the Forge naming ruling: the KeyLock, Observability and HA "Not available" notes cite TRD numbers and crdb plan steps; the Security tab names "the Console sidecar"; the drawer's pending sections say "not queryable in crdb" | `fc-soc-logs-reports-settings.md` SET-KEY-02, SET-OBS-03, SET-HA-02, SET-SEC-04; `fc-governance.md` DRW-02 | code-read (found 2026-09-25 while writing the guide) |
+| CD-46 | S3 | FC | Isolate's success message says the disposition is "distributed to the endpoint"; no endpoint path exists for it (the engine only records it) | `forgecentral/apps/console/src/shell/DrawerHost.tsx:195-200`; `torch-endpoint.md` 0.1 item 6 | VERIFIED (copy) |
 
 ## TRD drift register
 
@@ -199,7 +201,7 @@ from; the plan's decisions (naming, defect handling) are in `IP-CONSOLE-11-guide
 ## Verification log (2026-09-25)
 
 Re-read by hand against the cited lines: CD-01, CD-02 (code path; the dev box's lane is disabled and
-its host has no `torch_vtz` table), CD-05, CD-08 (dev box), CD-10, CD-11 (BFF side), CD-12, CD-13,
+its host has no `torch_vtz` table), CD-05, CD-06, CD-46 (copy), CD-08 (dev box), CD-10, CD-11 (BFF side), CD-12, CD-13,
 CD-18 (sessions), CD-19, CD-32, CD-41. The torch gate's egress tests attach the same default-deny
 ruleset to whatever network namespace runs them; the operator's gate recipe already runs them in a
 private namespace (`unshare -n`), so a gate run cannot black-hole the dev box.
