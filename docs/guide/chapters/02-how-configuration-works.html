@@ -1,0 +1,217 @@
+<h1>How Configuration Works in Forge</h1>
+
+<p class="lead">Every setting, zone, policy and response control you change in ForgeCentral becomes an operation on the Forge engine. This chapter explains where each kind of configuration lives, how and when a change takes effect, who can make it, what is recorded, and what reaches an endpoint today. Every later chapter builds on it.</p>
+
+<h2 id="cfg-availability">Availability</h2>
+<div class="tablewrap" id="tab-cfg-availability" data-title="How configuration works: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Governed configuration</td><td><span class="pill ok">AVAILABLE</span></td><td>Validated, versioned, audited changes to the Forge engine's settings, made on the Settings surface.</td></tr>
+<tr><td>History and rollback</td><td><span class="pill ok">AVAILABLE</span></td><td>Every committed version is listed with who committed it; you can roll back to an earlier version.</td></tr>
+<tr><td>Two-person change control</td><td><span class="pill ok">AVAILABLE</span></td><td>When dual control is on, a change is proposed by one administrator and approved by another. See the Limitation for SOC response settings.</td></tr>
+<tr><td>Boot configuration</td><td><span class="pill ro">READ-ONLY</span></td><td>Values the Forge engine reads when it starts. ForgeCentral shows them; they are changed on the host.</td></tr>
+<tr><td>Role-based restriction of governance, identity and SOC actions</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Any signed-in operator can perform these actions today.</td></tr>
+<tr><td>Enforcement on endpoints</td><td><span class="pill off">RECORDED ONLY</span></td><td>Forge detects, records and recommends. Nothing is blocked on an endpoint yet.</td></tr>
+</table>
+</div>
+
+<h2 id="cfg-where">Where configuration lives</h2>
+<p>Forge keeps configuration in four places. Only the first two are changed from ForgeCentral; ForgeCentral shows the others so you can see what is in force and where it is changed.</p>
+
+<figure id="fig-cfg-where" data-title="Where Forge configuration lives" class="wide">
+<svg viewBox="0 0 760 410" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <defs>
+    <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#123a6b"/></marker>
+    <linearGradient id="g-eng" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6f5ef"/><stop offset="1" stop-color="#e8eef6"/></linearGradient>
+  </defs>
+  <!-- operator -->
+  <circle cx="52" cy="54" r="13" fill="#123a6b"/>
+  <path d="M30,96 C30,74 74,74 74,96 z" fill="#123a6b"/>
+  <text x="52" y="116" font-size="13" text-anchor="middle" fill="#0c2748" font-weight="700">You</text>
+  <line x1="80" y1="70" x2="126" y2="70" stroke="#123a6b" stroke-width="2" marker-end="url(#ah1)"/>
+  <!-- ForgeCentral -->
+  <rect x="130" y="28" width="300" height="84" rx="6" fill="#123a6b"/>
+  <text x="150" y="60" font-size="18" font-weight="700" fill="#ffffff">ForgeCentral</text>
+  <text x="150" y="82" font-size="12.5" fill="#cfe9df">the console: every change starts here</text>
+  <text x="150" y="99" font-size="12.5" fill="#cfe9df">stores no configuration of its own</text>
+  <!-- installation settings -->
+  <rect x="470" y="28" width="262" height="84" rx="6" fill="#ffffff" stroke="#8a95a8" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="486" y="54" font-size="13.5" font-weight="700" fill="#0c2748">ForgeCentral installation settings</text>
+  <text x="486" y="74" font-size="12" fill="#5a6477">sign-in, operator roles, ports</text>
+  <text x="486" y="92" font-size="12" fill="#5a6477">set by the installer; read-only here</text>
+  <line x1="430" y1="70" x2="470" y2="70" stroke="#8a95a8" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <!-- down arrow -->
+  <line x1="280" y1="112" x2="280" y2="152" stroke="#123a6b" stroke-width="2" marker-end="url(#ah1)"/>
+  <text x="290" y="137" font-size="11.5" fill="#5a6477">every change is an engine operation</text>
+  <!-- engine -->
+  <rect x="130" y="156" width="300" height="152" rx="8" fill="url(#g-eng)" stroke="#3fbe96" stroke-width="2"/>
+  <text x="148" y="180" font-size="16" font-weight="700" fill="#0c2748">Forge engine</text>
+  <rect x="146" y="190" width="268" height="52" rx="4" fill="#ffffff" stroke="#123a6b" stroke-width="1.2"/>
+  <text x="160" y="212" font-size="13" font-weight="700" fill="#0c2748">Governed configuration</text>
+  <text x="160" y="230" font-size="11.5" fill="#5a6477">Settings: validated, versioned, audited</text>
+  <rect x="146" y="248" width="268" height="52" rx="4" fill="#ffffff" stroke="#123a6b" stroke-width="1.2"/>
+  <text x="160" y="270" font-size="13" font-weight="700" fill="#0c2748">Records</text>
+  <text x="160" y="288" font-size="11.5" fill="#5a6477">zones, objects, policies, users, incidents</text>
+  <!-- boot config -->
+  <rect x="470" y="176" width="262" height="96" rx="6" fill="#ffffff" stroke="#8a95a8" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="486" y="202" font-size="13.5" font-weight="700" fill="#0c2748">Boot configuration</text>
+  <text x="486" y="222" font-size="12" fill="#5a6477">read by the engine when it starts</text>
+  <text x="486" y="240" font-size="12" fill="#5a6477">changed on the host, then restart</text>
+  <text x="486" y="258" font-size="12" fill="#5a6477">shown read-only in Settings</text>
+  <line x1="430" y1="224" x2="470" y2="224" stroke="#8a95a8" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <!-- endpoints -->
+  <line x1="280" y1="308" x2="280" y2="344" stroke="#123a6b" stroke-width="2" marker-end="url(#ah1)"/>
+  <text x="290" y="331" font-size="11.5" fill="#5a6477">policy only, pulled by the agent</text>
+  <g fill="#ffffff" stroke="#123a6b" stroke-width="1.4">
+    <rect x="150" y="350" width="70" height="42" rx="4"/><rect x="245" y="350" width="70" height="42" rx="4"/><rect x="340" y="350" width="70" height="42" rx="4"/>
+  </g>
+  <g fill="#3fbe96"><rect x="158" y="382" width="54" height="4"/><rect x="253" y="382" width="54" height="4"/><rect x="348" y="382" width="54" height="4"/></g>
+  <text x="185" y="372" font-size="11" text-anchor="middle" fill="#0c2748">host</text>
+  <text x="280" y="372" font-size="11" text-anchor="middle" fill="#0c2748">host</text>
+  <text x="375" y="372" font-size="11" text-anchor="middle" fill="#0c2748">host</text>
+  <rect x="470" y="336" width="262" height="62" rx="6" fill="#ffffff" stroke="#8a95a8" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="486" y="360" font-size="13.5" font-weight="700" fill="#0c2748">Forge endpoint agent settings</text>
+  <text x="486" y="380" font-size="12" fill="#5a6477">set by the endpoint installer</text>
+  <line x1="410" y1="371" x2="470" y2="371" stroke="#8a95a8" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <!-- callouts -->
+  <g font-size="12" font-weight="700" text-anchor="middle">
+    <circle cx="130" cy="28" r="11" fill="#3fbe96"/><text x="130" y="32" fill="#ffffff">1</text>
+    <circle cx="146" cy="190" r="11" fill="#3fbe96"/><text x="146" y="194" fill="#ffffff">2</text>
+    <circle cx="146" cy="248" r="11" fill="#3fbe96"/><text x="146" y="252" fill="#ffffff">3</text>
+    <circle cx="470" cy="176" r="11" fill="#3fbe96"/><text x="470" y="180" fill="#ffffff">4</text>
+    <circle cx="470" cy="28" r="11" fill="#3fbe96"/><text x="470" y="32" fill="#ffffff">5</text>
+    <circle cx="470" cy="336" r="11" fill="#3fbe96"/><text x="470" y="340" fill="#ffffff">6</text>
+  </g>
+</svg>
+</figure>
+
+<ol>
+  <li><b>ForgeCentral</b> is where you make every change. It sends each one to the Forge engine and shows the engine's answer; it keeps no configuration of its own.</li>
+  <li><b>The governed configuration</b> is the Forge engine's settings document: session lifetimes, retention windows, query limits, egress destinations, dual control, SOC response tiers and more. You change it on the Settings surface. Every commit is validated first, stored as a new numbered version, and recorded with your identity.</li>
+  <li><b>Records</b> are the objects you author on the other surfaces: Virtual Trust Zones, objects, policies, local users and groups, and the incidents you act on. Each has its own operation, validation and audit.</li>
+  <li><b>Boot configuration</b> holds the values the Forge engine reads when it starts, such as the engine's administrator assignments and its listening addresses. Settings shows them with a boot-configuration label and no edit control. They are changed on the engine host and take effect after a restart.</li>
+  <li><b>ForgeCentral's installation settings</b> cover sign-in (the identity provider ForgeCentral trusts), the operator role map and network ports. They are set when ForgeCentral is installed. <span class="path">Settings<span class="sep">&gt;</span>RBAC</span> shows the role map read-only.</li>
+  <li><b>Forge endpoint agent settings</b> (which sensors run on a host, how it enrolls) are set by the endpoint installer. The only configuration that travels from Forge to an endpoint is a distributed policy, which the agent pulls; see <a class="xref" href="#ch-policy-distribution"></a>.</li>
+</ol>
+
+<div class="note caution"><p>Re-running the ForgeCentral installer rewrites its installation settings, including the operator role map. Keep your installation inputs with your change records so a re-install reproduces them.</p></div>
+
+<h2 id="cfg-apply">How a change takes effect</h2>
+<p>A change to the governed configuration goes through the same path whoever makes it:</p>
+
+<figure id="fig-cfg-apply" data-title="How a change to the governed configuration takes effect" class="wide">
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#123a6b"/></marker></defs>
+  <rect x="10" y="30" width="138" height="64" rx="6" fill="#123a6b"/>
+  <text x="79" y="58" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">You commit</text>
+  <text x="79" y="77" font-size="11" fill="#cfe9df" text-anchor="middle">one batch of changes</text>
+  <line x1="148" y1="62" x2="186" y2="62" stroke="#123a6b" stroke-width="2" marker-end="url(#ah2)"/>
+  <rect x="190" y="30" width="150" height="64" rx="6" fill="#e6f5ef" stroke="#3fbe96" stroke-width="1.6"/>
+  <text x="265" y="56" font-size="13.5" font-weight="700" fill="#0c2748" text-anchor="middle">Engine validates</text>
+  <text x="265" y="75" font-size="11" fill="#5a6477" text-anchor="middle">the whole document</text>
+  <line x1="340" y1="62" x2="378" y2="62" stroke="#123a6b" stroke-width="2" marker-end="url(#ah2)"/>
+  <polygon points="430,22 480,62 430,102 380,62" fill="#ffffff" stroke="#123a6b" stroke-width="1.6"/>
+  <text x="430" y="66" font-size="12.5" font-weight="700" fill="#0c2748" text-anchor="middle">valid?</text>
+  <line x1="430" y1="102" x2="430" y2="146" stroke="#c2413a" stroke-width="2" marker-end="url(#ah2)"/>
+  <text x="440" y="130" font-size="11.5" font-weight="700" fill="#c2413a">no</text>
+  <rect x="340" y="150" width="180" height="58" rx="6" fill="#fbe9e7" stroke="#c2413a" stroke-width="1.4"/>
+  <text x="430" y="174" font-size="12.5" font-weight="700" fill="#c2413a" text-anchor="middle">Refused</text>
+  <text x="430" y="193" font-size="11" fill="#5a6477" text-anchor="middle">receipt lists every violation</text>
+  <line x1="480" y1="62" x2="518" y2="62" stroke="#123a6b" stroke-width="2" marker-end="url(#ah2)"/>
+  <text x="488" y="54" font-size="11.5" font-weight="700" fill="#17785c">yes</text>
+  <rect x="522" y="30" width="228" height="64" rx="6" fill="#123a6b"/>
+  <text x="636" y="56" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">New version N</text>
+  <text x="636" y="75" font-size="11" fill="#cfe9df" text-anchor="middle">history and rollback on Changes</text>
+  <line x1="636" y1="94" x2="636" y2="120" stroke="#123a6b" stroke-width="2"/>
+  <line x1="566" y1="120" x2="706" y2="120" stroke="#123a6b" stroke-width="2"/>
+  <line x1="566" y1="120" x2="566" y2="146" stroke="#123a6b" stroke-width="2" marker-end="url(#ah2)"/>
+  <line x1="706" y1="120" x2="706" y2="146" stroke="#123a6b" stroke-width="2" marker-end="url(#ah2)"/>
+  <line x1="636" y1="120" x2="636" y2="226" stroke="#123a6b" stroke-width="2" marker-end="url(#ah2)"/>
+  <rect x="530" y="150" width="72" height="58" rx="6" fill="#e6f5ef" stroke="#3fbe96" stroke-width="1.6"/>
+  <text x="566" y="174" font-size="12" font-weight="700" fill="#17785c" text-anchor="middle">Live</text>
+  <text x="566" y="192" font-size="10.5" fill="#5a6477" text-anchor="middle">applies now</text>
+  <rect x="670" y="150" width="80" height="58" rx="6" fill="#fdf3e1" stroke="#e8a33d" stroke-width="1.6"/>
+  <text x="710" y="174" font-size="12" font-weight="700" fill="#b7791f" text-anchor="middle">Restart</text>
+  <text x="710" y="192" font-size="10.5" fill="#5a6477" text-anchor="middle">applies later</text>
+  <rect x="566" y="230" width="140" height="58" rx="6" fill="#e8eef6" stroke="#8a95a8" stroke-width="1.4"/>
+  <text x="636" y="254" font-size="12" font-weight="700" fill="#0c2748" text-anchor="middle">Not active yet</text>
+  <text x="636" y="272" font-size="10.5" fill="#5a6477" text-anchor="middle">stored; feature not built</text>
+  <text x="14" y="140" font-size="12" font-weight="700" fill="#0c2748">Under dual control</text>
+  <text x="14" y="160" font-size="11.5" fill="#5a6477">Your commit becomes a proposal.</text>
+  <text x="14" y="178" font-size="11.5" fill="#5a6477">A second administrator approves it</text>
+  <text x="14" y="196" font-size="11.5" fill="#5a6477">on Changes; then it is validated</text>
+  <text x="14" y="214" font-size="11.5" fill="#5a6477">and committed as shown here.</text>
+  <text x="14" y="252" font-size="12" font-weight="700" fill="#0c2748">Records</text>
+  <text x="14" y="272" font-size="11.5" fill="#5a6477">Zones, objects and policies take effect</text>
+  <text x="14" y="290" font-size="11.5" fill="#5a6477">the next time they are read.</text>
+</svg>
+</figure>
+
+<p>The <b class="ui">Applies</b> column on <span class="path">Settings<span class="sep">&gt;</span>Configuration</span> tells you, for each setting, which of the three outcomes a change has:</p>
+<ul>
+  <li><b>Live</b>: the change takes effect as soon as it is committed.</li>
+  <li><b>Boot-bound</b>: the value is stored now and used after the Forge engine restarts. The commit receipt lists every committed key that needs a restart.</li>
+  <li><b>Pending</b>: the setting belongs to a feature that is not built yet. ForgeCentral shows it read-only.</li>
+</ul>
+<p>Records (zones, objects, policies, users) have no apply step: the engine resolves them each time they are read, so the next read reflects your change.</p>
+
+<div class="note limit"><p>Four settings are labelled live but take effect only after the Forge engine restarts: <code>sessions.standard_lifetime_secs</code>, <code>sessions.break_glass_lifetime_secs</code>, <code>cognition.max_connections</code>, and, for changes made on the engine host rather than in ForgeCentral, <code>governance.dual_control</code>. The commit receipt does not list them as needing a restart. Plan a restart after changing them.</p></div>
+
+<h2 id="cfg-who">Who can change what</h2>
+<p>You sign in to ForgeCentral through your organization's identity provider. Your ForgeCentral role comes from the operator role map (installation settings): <b>global administrator</b>, <b>tenant administrator</b>, or <b>tenant user</b>.</p>
+<div class="tablewrap" id="tab-cfg-who" data-title="Who can change what today">
+<table class="data">
+<tr><th style="width:34%">Surface</th><th style="width:22%">Who can change it</th><th>Notes</th></tr>
+<tr><td>Settings (all tabs)</td><td>Global administrators</td><td>The Forge engine serves Settings to administrators and security auditors only. Other operators see <b class="ui">Admin or SecurityAudit tier required</b> on every tab.</td></tr>
+<tr><td>Virtual Trust Zones, Objects, Policies, policy distribution</td><td>Any signed-in operator</td><td>See the Limitation below.</td></tr>
+<tr><td>Users, groups, identity providers</td><td>Any signed-in operator</td><td>See the Limitation below.</td></tr>
+<tr><td>SOC incidents, response plans, Isolate</td><td>Any signed-in operator</td><td>See the Limitation below.</td></tr>
+<tr><td>ForgeCentral role map, sign-in, ports</td><td>Whoever installs ForgeCentral</td><td>Set by the installer; shown read-only on <span class="path">Settings<span class="sep">&gt;</span>RBAC</span>.</td></tr>
+</table>
+</div>
+<div class="note limit"><p>Forge does not yet restrict governance, identity and SOC actions by role: every signed-in operator can create, publish, distribute, isolate and reconfigure identity providers. Grant ForgeCentral access only to operators who should hold those rights, and review the role map after each installation.</p></div>
+
+<h2 id="cfg-audit">What is recorded</h2>
+<ul>
+  <li><b>Settings commits, proposals, approvals and rollbacks</b> are recorded with your identity. <span class="path">Settings<span class="sep">&gt;</span>Changes</span> lists every committed version, who committed it and which settings changed.</li>
+  <li><b>Zones, objects, policies, users and groups</b>: every create, edit and delete is audited by the Forge engine.</li>
+  <li><b>Incident actions</b> (assign, acknowledge, note, close, disposition, plan changes and approvals) are recorded on the incident's own trail, which you read on the incident's <b class="ui">Audit Trail</b>.</li>
+  <li><b>Log exports</b> produce an audited receipt.</li>
+</ul>
+<div class="note limit"><p>Identity-provider connector changes (configure, connect, sync, and the client secret) are not recorded, and a connector's configuration is held in memory by the Forge engine: it reverts when the engine restarts. Keep the connector's settings with your change records and re-apply them after a restart. See <a class="xref" href="#ch-identity-providers"></a>.</p></div>
+
+<h2 id="cfg-tenants">Tenants</h2>
+<p>ForgeCentral works in the tenant of your sign-in. A global administrator works in the default tenant set in the role map. Two kinds of configuration are shared by every tenant on a Forge node: the governed configuration (Settings) and the identity-provider connector. A change to either affects every tenant.</p>
+<div class="note limit"><p>ForgeCentral has no tenant switcher yet. To work in another tenant, sign in with an identity mapped to it.</p></div>
+
+<h2 id="cfg-endpoints">What reaches an endpoint</h2>
+<p>Forge is advisory today. It detects activity, records it, and recommends a response; it does not block anything on an endpoint.</p>
+
+<figure id="fig-cfg-advisory" data-title="Forge is advisory today: enforcement is off" class="wide">
+<svg viewBox="0 0 760 170" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#123a6b"/></marker></defs>
+  <rect x="10" y="30" width="160" height="80" rx="8" fill="#123a6b"/>
+  <text x="90" y="64" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle">Detect</text>
+  <text x="90" y="86" font-size="11" fill="#cfe9df" text-anchor="middle">endpoint agents + engine</text>
+  <line x1="170" y1="70" x2="198" y2="70" stroke="#123a6b" stroke-width="2" marker-end="url(#ah3)"/>
+  <rect x="202" y="30" width="160" height="80" rx="8" fill="#123a6b"/>
+  <text x="282" y="64" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle">Record</text>
+  <text x="282" y="86" font-size="11" fill="#cfe9df" text-anchor="middle">decisions, incidents, audit</text>
+  <line x1="362" y1="70" x2="390" y2="70" stroke="#123a6b" stroke-width="2" marker-end="url(#ah3)"/>
+  <rect x="394" y="30" width="160" height="80" rx="8" fill="#3fbe96"/>
+  <text x="474" y="64" font-size="16" font-weight="700" fill="#0c2748" text-anchor="middle">Recommend</text>
+  <text x="474" y="86" font-size="11" fill="#0c2748" text-anchor="middle">response plans, verdicts</text>
+  <line x1="554" y1="70" x2="582" y2="70" stroke="#8a95a8" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ah3)"/>
+  <rect x="586" y="30" width="164" height="80" rx="8" fill="#ffffff" stroke="#c2413a" stroke-width="1.8" stroke-dasharray="6 4"/>
+  <text x="668" y="64" font-size="16" font-weight="700" fill="#c2413a" text-anchor="middle">Enforce</text>
+  <text x="668" y="86" font-size="11" fill="#c2413a" text-anchor="middle">off: nothing is blocked</text>
+  <text x="10" y="146" font-size="12" fill="#5a6477">Isolate, an approved containment step and a distributed policy are recorded by the Forge engine; none of them blocks traffic on a host yet.</text>
+</svg>
+</figure>
+
+<ul>
+  <li><b>Isolate</b> (entity drawer) records a quarantine disposition for the entity. The endpoint is not isolated.</li>
+  <li><b>An approved response plan</b> records each step. A containment step is recorded as refused, because enforcement is off.</li>
+  <li><b>Policy distribution</b> is the only configuration that travels from Forge to an endpoint, and it is not effective yet. See the Restrictions in <a class="xref" href="#ch-policy-distribution"></a>.</li>
+</ul>
+<div class="note"><p>ForgeCentral says so wherever a control could suggest otherwise: a response shows that enforcement is not active, and Isolate reports what it recorded rather than claiming the host is isolated.</p></div>

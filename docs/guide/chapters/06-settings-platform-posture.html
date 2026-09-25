@@ -1,0 +1,91 @@
+<h1>Settings: Access and Platform Posture</h1>
+
+<p class="lead">Six Settings tabs report how the platform is secured and run: <b class="ui">RBAC</b>, <b class="ui">Security</b>, <b class="ui">KeyLock</b>, <b class="ui">Observability</b>, <b class="ui">HA &amp; Topology</b> and <b class="ui">FIPS Mode</b>. They are read-only. Each value is the Forge engine's own report or its configuration, labelled with its source, and each tab says where a value is changed.</p>
+
+<h2 id="posture-availability">Availability</h2>
+<div class="tablewrap" id="tab-posture-availability" data-title="Access and platform posture: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Engine administrator assignments</td><td><span class="pill ro">READ-ONLY</span></td><td>Boot configuration; changed on the engine host.</td></tr>
+<tr><td>ForgeCentral operator roles</td><td><span class="pill ro">READ-ONLY</span></td><td>ForgeCentral installation settings; global administrators only.</td></tr>
+<tr><td>Security, KeyLock, Observability, HA &amp; Topology, FIPS reports</td><td><span class="pill ro">READ-ONLY</span></td><td>The engine's own status reports, read when you open the tab.</td></tr>
+<tr><td>Signing-key rotation</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>No rotate control and no key-id list.</td></tr>
+<tr><td>Telemetry exporter configuration</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Set at boot; not shown.</td></tr>
+<tr><td>Cluster leader, lag, leadership rotation, quorum and failover tests</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>This release reports a single node.</td></tr>
+<tr><td>FIPS mode toggle</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Not possible by design: FIPS mode is chosen when the engine is built.</td></tr>
+</table>
+</div>
+
+<h2 id="posture-rbac">RBAC</h2>
+<p><span class="path">Settings<span class="sep">&gt;</span>RBAC</span> shows two independent lists:</p>
+<ul>
+  <li><b class="ui">Engine admin assignments</b>: the identities the Forge engine itself treats as administrators, each with its roles and clearance. This is boot configuration: the tab states the version it was read from and that it changes on the engine host, followed by an engine restart.</li>
+  <li><b class="ui">Console operator roles</b>: ForgeCentral's role map, which turns your identity-provider groups (or, failing a group, your identity itself) into a ForgeCentral role, and names the default tenant for global administrators. It is read when ForgeCentral starts and changes only when ForgeCentral is reinstalled. Only global administrators can see it, because it names every tenant it grants.</li>
+</ul>
+<div class="note"><p>Roles are resolved from your identity-provider groups first; the highest role wins. The per-identity grants apply only when your sign-in carries no group.</p></div>
+<div class="note limit"><p>The ForgeCentral installer writes a role map with one global administrator and no group grants, and reinstalling rewrites the map. Granting a group a role requires editing the installation settings, and the edit is lost on the next install unless it is carried into the installer's inputs.</p></div>
+
+<h2 id="posture-security">Security</h2>
+<p>Your browser reaches the Forge engine over two protected connections, and the Security tab reports on both:</p>
+
+<figure id="fig-posture-legs" data-title="The two protected connections behind every Settings page" class="wide">
+<svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <rect x="10" y="50" width="150" height="80" rx="8" fill="#ffffff" stroke="#123a6b" stroke-width="1.6"/>
+  <text x="85" y="84" font-size="14" font-weight="700" fill="#0c2748" text-anchor="middle">Your browser</text>
+  <text x="85" y="104" font-size="11" fill="#5a6477" text-anchor="middle">signed-in operator</text>
+  <rect x="300" y="50" width="160" height="80" rx="8" fill="#123a6b"/>
+  <text x="380" y="84" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">ForgeCentral</text>
+  <text x="380" y="104" font-size="11" fill="#cfe9df" text-anchor="middle">admin connection, port 8443</text>
+  <rect x="600" y="50" width="150" height="80" rx="8" fill="#e6f5ef" stroke="#3fbe96" stroke-width="1.8"/>
+  <text x="675" y="84" font-size="14" font-weight="700" fill="#0c2748" text-anchor="middle">Forge engine</text>
+  <text x="675" y="104" font-size="11" fill="#5a6477" text-anchor="middle">authorizes every call</text>
+  <line x1="160" y1="90" x2="300" y2="90" stroke="#3fbe96" stroke-width="5"/>
+  <line x1="460" y1="90" x2="600" y2="90" stroke="#123a6b" stroke-width="5"/>
+  <text x="230" y="36" font-size="12" font-weight="700" fill="#17785c" text-anchor="middle">Connection 1: TLS</text>
+  <text x="230" y="150" font-size="11" fill="#1b2434" text-anchor="middle">hybrid post-quantum key exchange</text>
+  <text x="230" y="166" font-size="11" fill="#1b2434" text-anchor="middle">(X25519MLKEM768), or the P-384 floor;</text>
+  <text x="230" y="182" font-size="11" fill="#1b2434" text-anchor="middle">anything weaker is refused</text>
+  <text x="530" y="36" font-size="12" font-weight="700" fill="#123a6b" text-anchor="middle">Connection 2: mutual TLS</text>
+  <text x="530" y="150" font-size="11" fill="#1b2434" text-anchor="middle">both sides present certificates;</text>
+  <text x="530" y="166" font-size="11" fill="#1b2434" text-anchor="middle">every operation carries your identity</text>
+  <text x="530" y="182" font-size="11" fill="#1b2434" text-anchor="middle">and tenant</text>
+  <g font-size="12" font-weight="700" text-anchor="middle">
+    <circle cx="160" cy="50" r="11" fill="#3fbe96"/><text x="160" y="54" fill="#ffffff">1</text>
+    <circle cx="600" cy="50" r="11" fill="#3fbe96"/><text x="600" y="54" fill="#ffffff">2</text>
+  </g>
+</svg>
+</figure>
+
+<ol>
+  <li><b class="ui">This browser session</b> shows the key exchange your browser negotiated with ForgeCentral: the hybrid post-quantum group when your browser supports it, otherwise the P-384 floor. ForgeCentral refuses a browser that offers neither, rather than downgrading.</li>
+  <li><b class="ui">Admin endpoint</b> is the engine's connectivity report for its administration listener: the listen address, whether mutual TLS is required, how many administrator identities are bound, and whether the post-quantum hybrid key exchange is offered.</li>
+</ol>
+<p>The tab also shows <b class="ui">Server security</b>, the engine's security report: its operating classification, the audit chain (<b class="ui">Verified</b> or <b class="ui">Failed verification</b>), the number of audit entries and the head version, and how many stored artifacts were spot-checked and how many failed. The engine verifies the audit chain when you open the tab. <b class="ui">Registered egress destinations</b> lists where the engine may send data for model inference, with each destination's classification ceiling; you add and remove them on <span class="path">Settings<span class="sep">&gt;</span>Configuration</span>.</p>
+<div class="note caution"><p><b class="ui">Failed verification</b> on the audit chain means the engine's audit record does not verify. Treat it as a security incident: do not change configuration, and contact security@yousource.ai.</p></div>
+<div class="note limit"><p>If <b class="ui">This browser session</b> reads <b class="ui">Not available</b>, the session lookup was not set up when ForgeCentral was installed; reinstall ForgeCentral to enable it. The tab also says key issuing is edited on Configuration; it is not editable in this release.</p></div>
+
+<h2 id="posture-keylock">KeyLock</h2>
+<p><b class="ui">Agent key issuing</b> reports whether the engine issues keys to agents, whether enrolling, issuing, rotating and revoking a key needs two people, and how long an issued key is valid. Signing-key rotation is not available in this release: there is no rotate control, and the signing key ids are not shown.</p>
+
+<h2 id="posture-observability">Observability</h2>
+<p><b class="ui">Telemetry ingest</b> is the engine's telemetry report: whether its OpenTelemetry (OTLP) receiver is running, its gRPC and HTTP addresses, the ingest queue capacity, and how many tenants are bound. Below it, <b class="ui">Observability settings</b> mirrors the two observability rows of the governed configuration; the ingest byte budget per window is edited on <span class="path">Settings<span class="sep">&gt;</span>Configuration</span> (surface <code>observability</code>). The telemetry exporter is configured at boot and is not shown.</p>
+
+<h2 id="posture-ha">HA &amp; Topology</h2>
+<p><b class="ui">This node</b> is the engine's server report: shards hosted, whether it is serving, whether storage is durable, the maintenance cadence, the administration frame ceiling and the engine version. Multi-node cluster views, leadership rotation, quorum-loss tests, disaster-recovery targets and failover tests are not available in this release.</p>
+<div class="note limit"><p>The maintenance cadence shown here is the value the engine started with. After you change <code>maintenance.cadence_secs</code> on Configuration, the new cadence is in force but this report shows the old value until the engine restarts.</p></div>
+
+<h2 id="posture-fips">FIPS Mode</h2>
+<p><b class="ui">Crypto build posture</b> shows the cryptographic provider and whether the FIPS 140-3 validated module is linked. FIPS mode is chosen when the engine is built; it cannot be switched on a running node, so the tab has no toggle.</p>
+
+<h2 id="posture-change">Change a posture value</h2>
+<div class="tablewrap" id="tab-posture-where" data-title="Where each posture value is changed">
+<table class="data">
+<tr><th style="width:36%">Value</th><th>Where it changes</th></tr>
+<tr><td>Engine administrators, SSO group to administrator role map</td><td>The engine's boot configuration on the engine host, then an engine restart.</td></tr>
+<tr><td>ForgeCentral operator roles, default tenant, sign-in</td><td>ForgeCentral's installation settings, applied by reinstalling ForgeCentral.</td></tr>
+<tr><td>Egress destinations, ingest budget, maintenance cadence</td><td><span class="path">Settings<span class="sep">&gt;</span>Configuration</span> (<a class="xref" href="#ch-settings-configuration"></a>).</td></tr>
+<tr><td>Administration listener, mutual TLS, telemetry exporter</td><td>The engine's boot configuration on the engine host, then an engine restart.</td></tr>
+<tr><td>Key issuing</td><td>Not changeable in this release.</td></tr>
+<tr><td>FIPS mode</td><td>A FIPS build of the engine, installed in place of the current one.</td></tr>
+</table>
+</div>

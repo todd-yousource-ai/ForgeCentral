@@ -1,0 +1,159 @@
+<h1>SOC Operations</h1>
+
+<p class="lead">SOC Ops is where analysts work incidents: read the ranked queue, investigate an incident's evidence, generate the Forge verdict, shape and approve the response plan, and close the incident with a disposition that teaches Forge what it was. Every action here is recorded on the incident's trail under your identity.</p>
+
+<h2 id="soc-availability">Availability</h2>
+<div class="tablewrap" id="tab-soc-availability" data-title="SOC operations: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Incident queue and investigation</td><td><span class="pill ok">AVAILABLE</span></td><td>Ranked queue with channels; lineage graph; Evidence, Timeline, Model Reasoning, Raw Telemetry, Audit Trail and Notes.</td></tr>
+<tr><td>Generate verdict</td><td><span class="pill ok">AVAILABLE</span></td><td>Runs the narrative and business-impact pipelines on the node's model.</td></tr>
+<tr><td>Modify and approve the response plan</td><td><span class="pill ok">AVAILABLE</span></td><td>Approval is recorded; containment is not carried out.</td></tr>
+<tr><td>Assign, acknowledge, note, close, disposition</td><td><span class="pill ok">AVAILABLE</span></td><td>Recorded on the incident's trail.</td></tr>
+<tr><td>Containment carried out on endpoints</td><td><span class="pill off">RECORDED ONLY</span></td><td>Enforcement is off: approved containment steps are recorded as refused.</td></tr>
+<tr><td>Alerts, Threat Intel, Assets, Analytics, Automation, Exceptions tabs</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Each reads <b class="ui">Not yet built</b>.</td></tr>
+<tr><td>Choosing an assignee from a list</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Enter the assignee's principal id.</td></tr>
+</table>
+</div>
+
+<h2 id="soc-lifecycle">How an incident is worked</h2>
+
+<figure id="fig-soc-lifecycle" data-title="Working an incident from the queue to its disposition" class="wide">
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <defs><marker id="ah14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#123a6b"/></marker></defs>
+  <rect x="10" y="20" width="150" height="70" rx="8" fill="#123a6b"/>
+  <text x="85" y="48" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">Queue</text>
+  <text x="85" y="68" font-size="10.5" fill="#cfe9df" text-anchor="middle">ranked by what blocks you</text>
+  <line x1="160" y1="55" x2="196" y2="55" stroke="#123a6b" stroke-width="2" marker-end="url(#ah14)"/>
+  <rect x="200" y="20" width="150" height="70" rx="8" fill="#ffffff" stroke="#123a6b" stroke-width="1.6"/>
+  <text x="275" y="48" font-size="13.5" font-weight="700" fill="#0c2748" text-anchor="middle">Investigate</text>
+  <text x="275" y="68" font-size="10.5" fill="#5a6477" text-anchor="middle">lineage, evidence, trail</text>
+  <line x1="350" y1="55" x2="386" y2="55" stroke="#123a6b" stroke-width="2" marker-end="url(#ah14)"/>
+  <rect x="390" y="20" width="160" height="70" rx="8" fill="#e6f5ef" stroke="#3fbe96" stroke-width="1.8"/>
+  <text x="470" y="48" font-size="13.5" font-weight="700" fill="#0c2748" text-anchor="middle">Generate verdict</text>
+  <text x="470" y="68" font-size="10.5" fill="#5a6477" text-anchor="middle">narrative + business impact</text>
+  <line x1="550" y1="55" x2="586" y2="55" stroke="#123a6b" stroke-width="2" marker-end="url(#ah14)"/>
+  <rect x="590" y="20" width="160" height="70" rx="8" fill="#ffffff" stroke="#123a6b" stroke-width="1.6"/>
+  <text x="670" y="48" font-size="13.5" font-weight="700" fill="#0c2748" text-anchor="middle">Response plan</text>
+  <text x="670" y="68" font-size="10.5" fill="#5a6477" text-anchor="middle">proposed within its tier</text>
+  <line x1="670" y1="90" x2="670" y2="126" stroke="#123a6b" stroke-width="2" marker-end="url(#ah14)"/>
+  <rect x="590" y="130" width="160" height="70" rx="8" fill="#123a6b"/>
+  <text x="670" y="158" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="middle">Modify / Approve</text>
+  <text x="670" y="178" font-size="10.5" fill="#cfe9df" text-anchor="middle">containment recorded refused</text>
+  <line x1="590" y1="165" x2="554" y2="165" stroke="#123a6b" stroke-width="2" marker-end="url(#ah14)"/>
+  <rect x="330" y="130" width="220" height="70" rx="8" fill="#3fbe96"/>
+  <text x="440" y="158" font-size="13.5" font-weight="700" fill="#0c2748" text-anchor="middle">Record a disposition</text>
+  <text x="440" y="178" font-size="10.5" fill="#0c2748" text-anchor="middle">closes it; teaches calibration</text>
+  <rect x="10" y="130" width="280" height="70" rx="8" fill="#ffffff" stroke="#8a95a8" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="150" y="158" font-size="13" font-weight="700" fill="#0c2748" text-anchor="middle">Close without verdict</text>
+  <text x="150" y="178" font-size="10.5" fill="#5a6477" text-anchor="middle">closes it; calibration learns nothing</text>
+  <rect x="10" y="236" width="740" height="76" rx="8" fill="#f6f8fb" stroke="#d3dae4"/>
+  <text x="26" y="260" font-size="12.5" font-weight="700" fill="#0c2748">At any point</text>
+  <text x="26" y="282" font-size="11.5" fill="#1b2434">Assign (by principal id)  |  Acknowledge  |  Record a note (also after closing)</text>
+  <text x="26" y="300" font-size="11.5" fill="#5a6477">Every action is recorded on the incident's Audit Trail under your identity.</text>
+  <g font-size="12" font-weight="700" text-anchor="middle">
+    <circle cx="10" cy="20" r="11" fill="#3fbe96"/><text x="10" y="24" fill="#ffffff">1</text>
+    <circle cx="200" cy="20" r="11" fill="#3fbe96"/><text x="200" y="24" fill="#ffffff">2</text>
+    <circle cx="390" cy="20" r="11" fill="#3fbe96"/><text x="390" y="24" fill="#ffffff">3</text>
+    <circle cx="590" cy="20" r="11" fill="#3fbe96"/><text x="590" y="24" fill="#ffffff">4</text>
+    <circle cx="590" cy="130" r="11" fill="#3fbe96"/><text x="590" y="134" fill="#ffffff">5</text>
+    <circle cx="330" cy="130" r="11" fill="#3fbe96"/><text x="330" y="134" fill="#ffffff">6</text>
+  </g>
+</svg>
+</figure>
+
+<ol>
+  <li><b>Queue.</b> SOC Ops lists open incidents ranked by what needs a person first. Each card shows the engine's credibility and, on a node with a calibration, how likely the incident is to be real; otherwise it reads <b class="ui">Uncalibrated</b>. The channels <b class="ui">All</b>, <b class="ui">Urgent Review</b> and <b class="ui">Threat Inspection</b> narrow the list.</li>
+  <li><b>Investigate.</b> Select an incident. The lineage graph shows how the evidence connects (<b class="ui">Material path</b>, <b class="ui">Show evidence</b>, <b class="ui">Full story</b>), and the investigation dock holds <b class="ui">Evidence</b>, <b class="ui">Timeline</b>, <b class="ui">Model Reasoning</b>, <b class="ui">Raw Telemetry</b>, <b class="ui">Audit Trail</b> and <b class="ui">Notes</b>.</li>
+  <li><b>Generate the verdict.</b> The Forge verdict panel runs the narrative and business-impact pipelines on the node's model. It takes minutes, not seconds.</li>
+  <li><b>Review the response plan.</b> The engine proposes a plan within the incident's response tier (<a class="xref" href="#soc-set-tiers"></a>).</li>
+  <li><b>Modify or approve it.</b> Approval is recorded; with enforcement off, each containment step is recorded as refused.</li>
+  <li><b>Close the incident</b> with a disposition, which records what the incident was, or without a verdict.</li>
+</ol>
+<p>The page header shows <b class="ui">Detection active</b> (or disabled) and <b class="ui">Enforcement off</b>. The KPI strip shows events analyzed, noise collapsed, material incidents, auto-contained (always zero while enforcement is off), decisions waiting, and how many detection rules are evaluable.</p>
+
+<h2 id="soc-restrictions">Restrictions</h2>
+<ul>
+  <li>A closed incident refuses assign, acknowledge and close; it still accepts notes and a corrected disposition.</li>
+  <li>A note is at most 4,000 characters; text with many accented or non-Latin characters can be refused sooner.</li>
+  <li>A recorded disposition cannot be removed; a later disposition is recorded as a correction on top of it.</li>
+</ul>
+<div class="note limit"><p><b class="ui">Generate verdict</b> and <b class="ui">Save plan</b> act without a confirmation step. After a verdict run starts, the panels do not refresh on their own: select the incident again after a few minutes to see the narrative.</p></div>
+<div class="note limit"><p>If a verdict run is refused, ForgeCentral may say <b class="ui">The run request did not reach the engine.</b> even though the engine answered. Check the incident's Audit Trail before running it again.</p></div>
+
+<h2 id="soc-generate">Generate a verdict</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <b class="ui">SOC Ops</b> and select an incident.</li>
+  <li>In the Forge verdict panel, choose <b class="ui">Generate verdict</b>. <span class="result">The note reads The run is in flight. These panels re-read as the records land. If every record already exists, it reads Every record for this evidence already exists; nothing was re-generated.</span></li>
+  <li>After a few minutes, select the incident again. The verdict header shows <b class="ui">Generated</b>, the model that wrote it, and the evidence it was generated from.</li>
+</ol>
+</div>
+<p>The model that writes verdicts is chosen on <span class="path">Settings<span class="sep">&gt;</span>Configuration</span> (<b class="ui">Narrative model</b>).</p>
+
+<h2 id="soc-plan">Modify or approve the response plan</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Select the incident. Under <b class="ui">Coordinated response</b>, read the proposed steps. <b class="ui">No response plan has been proposed</b> means there is nothing to approve yet.</li>
+  <li>To change the plan, choose <b class="ui">Modify plan</b>. For each step, edit its title and choose its <b class="ui">Action</b>: <b class="ui">Investigate (no containment)</b>, <code>quarantine</code> or <code>deny</code>. Use <b class="ui">Add step</b> and <b class="ui">Remove</b> as needed, then choose <b class="ui">Save plan</b>. <span class="result">Saving replaces the steps and raises the plan's revision, so an approval of the old plan is refused.</span></li>
+  <li>To approve, choose <b class="ui">Approve full response</b> and confirm <b class="ui">Approve the full response?</b> with <b class="ui">Approve</b>. <span class="result">Approved and recorded. Nothing was carried out: enforcement is off on this deployment, so each containment step is recorded refused with its reason.</span></li>
+</ol>
+</div>
+<p>If approval is refused with <b class="ui">The plan changed, was already approved, or does not exist yet</b>, select the incident again to read the current plan.</p>
+
+<h2 id="soc-case">Assign, acknowledge, note</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li><b>Assign:</b> find the assignee's principal id in the <b class="ui">ID</b> column of <span class="path">Users<span class="sep">&gt;</span>All Users</span>. In the incident's <b class="ui">Case</b> section, enter it in <b class="ui">Assign to (principal id)</b>, choose <b class="ui">Assign</b>, and confirm with <b class="ui">Record</b>.</li>
+  <li><b>Acknowledge:</b> choose <b class="ui">Acknowledge</b> and confirm with <b class="ui">Record</b>. It records that a person has seen the incident and changes nothing else.</li>
+  <li><b>Note:</b> in the dock, open <b class="ui">Notes</b>, type in <b class="ui">Case note</b>, choose <b class="ui">Record note</b> and confirm. Notes cannot be deleted.</li>
+</ol>
+</div>
+<p>A principal id has the form <code>00000000-0000-0000-0000-000000000000</code>. The engine records the id you enter as submitted.</p>
+
+<h2 id="soc-disposition">Record a disposition</h2>
+<p>A disposition closes the incident and records what it was. It is the label Forge learns from: only <b>False positive</b> lowers the weight of the detection rule, for the whole tenant.</p>
+<div class="tablewrap" id="tab-soc-verdicts" data-title="Dispositions">
+<table class="data">
+<tr><th style="width:28%">Verdict</th><th style="width:30%">Required field</th><th>Effect</th></tr>
+<tr><td><b class="ui">False positive</b></td><td><b class="ui">Justification</b></td><td>Closes the incident and lowers the rule's weight for the tenant.</td></tr>
+<tr><td><b class="ui">Benign, authorized</b></td><td><b class="ui">Authorized by</b></td><td>Closes the incident; recorded as a calibration label.</td></tr>
+<tr><td><b class="ui">True positive, remediated</b></td><td><b class="ui">Action taken</b>: <code>reimage</code>, <code>credential_rotation</code>, <code>patch</code>, <code>isolate</code> or <code>remove</code></td><td>As above.</td></tr>
+<tr><td><b class="ui">True positive, blocked</b></td><td><b class="ui">Blocking control</b></td><td>As above.</td></tr>
+<tr><td><b class="ui">True positive, risk accepted</b></td><td><b class="ui">Accepting party</b>, and <b class="ui">Acceptance lapses on</b> (a future date)</td><td>As above; the acceptance lapses on that date.</td></tr>
+<tr><td><b class="ui">Duplicate</b></td><td><b class="ui">Predecessor incident id</b></td><td>As above.</td></tr>
+<tr><td><b class="ui">Undetermined</b></td><td>None</td><td>Closes the incident; the trail records that you ruled it undetermined.</td></tr>
+</table>
+</div>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>In the incident's <b class="ui">Case</b> section, under <b class="ui">Record a disposition</b>, choose the <b class="ui">Verdict</b> (it starts at <b class="ui">Undetermined</b>) and fill in its field.</li>
+  <li>Choose <b class="ui">Record disposition</b>, read the confirmation, and choose <b class="ui">Record</b>. <span class="result">Verdict recorded: the verdict. The incident is closed. On an incident already closed, the disposition is recorded as a correction.</span></li>
+</ol>
+</div>
+<div class="note caution"><p>A disposition cannot be un-recorded. Choose <b class="ui">False positive</b> only when the detection was wrong: it lowers the rule's weight for every incident in the tenant.</p></div>
+
+<h2 id="soc-close">Close without a verdict</h2>
+<p>Choose <b class="ui">Close without verdict</b> and confirm. The incident leaves the queue with no verdict, so calibration learns nothing from it; prefer a disposition when you know what the incident was.</p>
+
+<h2 id="soc-messages">Messages</h2>
+<div class="tablewrap" id="tab-soc-messages" data-title="Case action messages">
+<table class="data">
+<tr><th style="width:48%">Message</th><th>Meaning</th></tr>
+<tr><td>Not a principal id. The engine records principal ids only.</td><td>Enter the id from the Users <b class="ui">ID</b> column, not a name.</td></tr>
+<tr><td>The engine refused it: followed by a reason</td><td>For example, the incident is closed.</td></tr>
+<tr><td>The incident is unknown, another tenant's, or above this session's clearance.</td><td>Select the incident again from the queue.</td></tr>
+<tr><td>This operator is not permitted to act on cases.</td><td>The engine declined the action for your identity.</td></tr>
+<tr><td>The command did not reach the engine.</td><td>A connection problem; check the Audit Trail before retrying.</td></tr>
+</table>
+</div>
+
+<h2 id="soc-verify">Verify</h2>
+<ul>
+  <li>The incident's <b class="ui">Audit Trail</b> lists each action with who took it and when, including plan steps the response tier withheld and SIEM write-back outcomes.</li>
+  <li>A closed incident leaves the queue; its disposition appears on the trail.</li>
+</ul>

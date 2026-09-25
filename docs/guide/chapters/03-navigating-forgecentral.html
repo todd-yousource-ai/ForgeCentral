@@ -1,0 +1,130 @@
+<h1>Navigating ForgeCentral</h1>
+
+<p class="lead">ForgeCentral puts every configuration within three clicks of the Overview: choose a destination on the navigation rail, open a tab or a record, then act. This chapter shows the layout, how ForgeCentral reports what the Forge engine said, and how to work safely when something goes wrong.</p>
+
+<h2 id="nav-availability">Availability</h2>
+<div class="tablewrap" id="tab-nav-availability" data-title="Navigating ForgeCentral: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Navigation rail</td><td><span class="pill ok">AVAILABLE</span></td><td>Nine destinations, the same for every operator.</td></tr>
+<tr><td>Account menu</td><td><span class="pill ok">AVAILABLE</span></td><td>Your identity, your engine access tier, and Sign out.</td></tr>
+<tr><td>Entity drawer</td><td><span class="pill ok">AVAILABLE</span></td><td>The shared detail panel for users, hosts, agents and objects.</td></tr>
+<tr><td>Live updates</td><td><span class="pill ro">READ-ONLY</span></td><td>The Overview refreshes every two seconds; other pages refresh when you return to them or after a change.</td></tr>
+<tr><td>Tenant switcher</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>ForgeCentral works in the tenant of your sign-in.</td></tr>
+</table>
+</div>
+
+<h2 id="nav-layout">The ForgeCentral layout</h2>
+
+<figure id="fig-nav-layout" data-title="The ForgeCentral layout" class="wide">
+<svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <rect x="0" y="0" width="760" height="360" rx="8" fill="#0a0e17"/>
+  <!-- rail -->
+  <rect x="0" y="0" width="150" height="360" rx="8" fill="#0d1322"/>
+  <rect x="142" y="0" width="8" height="360" fill="#0d1322"/>
+  <circle cx="30" cy="30" r="11" fill="#3fbe96"/><rect x="48" y="24" width="70" height="10" rx="3" fill="#8a93a5"/>
+  <g font-size="11.5" fill="#c4cddb">
+    <rect x="12" y="60" width="126" height="22" rx="4" fill="#123a6b"/><rect x="12" y="60" width="4" height="22" fill="#3fbe96"/>
+    <text x="24" y="75" fill="#ffffff" font-weight="700">Overview</text>
+    <text x="24" y="104">Virtual Trust Zones</text>
+    <text x="24" y="130">Users</text>
+    <text x="24" y="156">Objects</text>
+    <text x="24" y="182">Policies</text>
+    <text x="24" y="208">SOC Ops</text>
+    <text x="24" y="234">Reports</text>
+    <text x="24" y="260">Logs</text>
+    <text x="24" y="286">Settings</text>
+  </g>
+  <!-- top bar -->
+  <rect x="150" y="0" width="610" height="48" fill="#0d1322"/>
+  <text x="172" y="30" font-size="15" font-weight="700" fill="#f4f7fb">Overview</text>
+  <rect x="520" y="16" width="48" height="18" rx="9" fill="#123a6b" stroke="#2ecc8f"/><text x="544" y="29" font-size="10" text-anchor="middle" fill="#2ecc8f" font-weight="700">Live</text>
+  <rect x="580" y="14" width="164" height="22" rx="4" fill="#111a2e" stroke="#1b2740"/>
+  <text x="592" y="29" font-size="10.5" fill="#c4cddb">operator@example.com</text>
+  <rect x="704" y="18" width="34" height="14" rx="7" fill="#3fbe96"/><text x="721" y="28" font-size="8.5" text-anchor="middle" fill="#0a0e17" font-weight="700">Admin</text>
+  <!-- content -->
+  <rect x="170" y="66" width="380" height="36" rx="5" fill="#111a2e" stroke="#1b2740"/>
+  <g font-size="11" fill="#8a93a5"><text x="186" y="89">Tab</text><text x="236" y="89">Tab</text><text x="286" y="89">Tab</text></g>
+  <rect x="180" y="96" width="30" height="3" fill="#3fbe96"/>
+  <rect x="170" y="114" width="380" height="226" rx="5" fill="#111a2e" stroke="#1b2740"/>
+  <g fill="#1b2740"><rect x="184" y="132" width="352" height="12" rx="3"/><rect x="184" y="156" width="352" height="12" rx="3"/><rect x="184" y="180" width="352" height="12" rx="3"/><rect x="184" y="204" width="352" height="12" rx="3"/><rect x="184" y="228" width="300" height="12" rx="3"/></g>
+  <rect x="184" y="296" width="92" height="26" rx="4" fill="#3fbe96"/><text x="230" y="313" font-size="11" text-anchor="middle" fill="#0a0e17" font-weight="700">Commit</text>
+  <!-- drawer -->
+  <rect x="566" y="66" width="182" height="274" rx="6" fill="#111a2e" stroke="#3fbe96" stroke-width="1.2"/>
+  <text x="580" y="90" font-size="12" font-weight="700" fill="#f4f7fb">Entity drawer</text>
+  <g fill="#1b2740"><rect x="580" y="104" width="154" height="10" rx="3"/><rect x="580" y="124" width="154" height="10" rx="3"/><rect x="580" y="144" width="120" height="10" rx="3"/><rect x="580" y="172" width="154" height="44" rx="4"/><rect x="580" y="226" width="154" height="44" rx="4"/></g>
+  <rect x="580" y="292" width="100" height="24" rx="4" fill="#e8743d"/><text x="630" y="308" font-size="10.5" text-anchor="middle" fill="#0a0e17" font-weight="700">Isolate</text>
+  <!-- callouts -->
+  <g font-size="12" font-weight="700" text-anchor="middle">
+    <circle cx="140" cy="60" r="11" fill="#3fbe96"/><text x="140" y="64" fill="#0a0e17">1</text>
+    <circle cx="258" cy="24" r="11" fill="#3fbe96"/><text x="258" y="28" fill="#0a0e17">2</text>
+    <circle cx="506" cy="25" r="11" fill="#3fbe96"/><text x="506" y="29" fill="#0a0e17">3</text>
+    <circle cx="580" cy="48" r="11" fill="#3fbe96"/><text x="580" y="52" fill="#0a0e17">4</text>
+    <circle cx="170" cy="66" r="11" fill="#3fbe96"/><text x="170" y="70" fill="#0a0e17">5</text>
+    <circle cx="170" cy="310" r="11" fill="#3fbe96"/><text x="170" y="314" fill="#0a0e17">6</text>
+    <circle cx="748" cy="66" r="11" fill="#3fbe96"/><text x="748" y="70" fill="#0a0e17">7</text>
+  </g>
+</svg>
+</figure>
+
+<ol>
+  <li><b>Navigation rail.</b> The nine destinations: Overview, Virtual Trust Zones, Users, Objects, Policies, SOC Ops, Reports, Logs and Settings. The active destination is highlighted.</li>
+  <li><b>Page title.</b> The name of the destination you are on.</li>
+  <li><b>Live indicator.</b> <b class="ui">Live</b> while the Overview is receiving fresh data; <b class="ui">Not live</b> on every other page, which refreshes on demand instead.</li>
+  <li><b>Account menu.</b> Your email address (or identity-provider subject) and your engine access tier: <b class="ui">User</b>, <b class="ui">Developer</b>, <b class="ui">Admin</b> or <b class="ui">SecurityAudit</b>. Open it to sign out.</li>
+  <li><b>Tabs.</b> Most destinations group their content into tabs.</li>
+  <li><b>Actions.</b> Every control that changes something acts on Forge itself; ForgeCentral keeps no copy. Actions with a lasting effect ask you to confirm first.</li>
+  <li><b>Entity drawer.</b> Opens on the right when you select a user, host, agent or object, without leaving the page.</li>
+</ol>
+
+<h2 id="nav-destinations">Where each configuration lives</h2>
+<div class="tablewrap" id="tab-nav-destinations" data-title="Destinations and the configurations they hold">
+<table class="data">
+<tr><th style="width:24%">Destination</th><th>What you configure there</th><th style="width:26%">Chapter</th></tr>
+<tr><td><b class="ui">Overview</b></td><td>Nothing directly; open a zone, a container or an entity from the live graph.</td><td><a class="xref" href="#ch-overview-and-entity-drawer"></a></td></tr>
+<tr><td><b class="ui">Virtual Trust Zones</b></td><td>Create, edit and delete zones.</td><td><a class="xref" href="#ch-virtual-trust-zones"></a></td></tr>
+<tr><td><b class="ui">Users</b></td><td>Local users and groups; identity-provider connectors (<b class="ui">External IDAM</b> tab).</td><td><a class="xref" href="#ch-users-and-groups"></a>, <a class="xref" href="#ch-identity-providers"></a></td></tr>
+<tr><td><b class="ui">Objects</b></td><td>The named objects policies refer to.</td><td><a class="xref" href="#ch-objects"></a></td></tr>
+<tr><td><b class="ui">Policies</b></td><td>Author, publish and delete policies; distribute them to endpoints.</td><td><a class="xref" href="#ch-policies"></a>, <a class="xref" href="#ch-policy-distribution"></a></td></tr>
+<tr><td><b class="ui">SOC Ops</b></td><td>Act on incidents: assign, acknowledge, note, close, record a disposition, generate a verdict, modify and approve a response plan.</td><td><a class="xref" href="#ch-soc-operations"></a></td></tr>
+<tr><td><b class="ui">Reports</b></td><td>Nothing; read the weekly panel and export incident reports.</td><td><a class="xref" href="#ch-reports"></a></td></tr>
+<tr><td><b class="ui">Logs</b></td><td>Filter decisions and create an audited export.</td><td><a class="xref" href="#ch-logs"></a></td></tr>
+<tr><td><b class="ui">Settings</b></td><td>The governed configuration, change control, SOC response, and the platform's posture.</td><td><a class="xref" href="#ch-settings-configuration"></a>, <a class="xref" href="#ch-settings-soc-response"></a>, <a class="xref" href="#ch-settings-platform-posture"></a></td></tr>
+</table>
+</div>
+
+<h2 id="nav-signin">Sign in and sign out</h2>
+<p>You sign in with your organization's identity provider. ForgeCentral maps your identity to a ForgeCentral role (global administrator, tenant administrator or tenant user) and an engine access tier, which the account menu shows.</p>
+<div class="note"><p>A ForgeCentral session lasts one hour; after that, sign in again. Reinstalling ForgeCentral ends every operator's session.</p></div>
+
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>To sign out, choose the account menu in the top-right corner.</li>
+  <li>Choose <b class="ui">Sign out</b>. <span class="result">ForgeCentral returns to the sign-in page.</span></li>
+</ol>
+</div>
+
+<h2 id="nav-states">How ForgeCentral shows what the engine said</h2>
+<p>ForgeCentral never invents a value. Every page shows one of five states, and each tells you something specific:</p>
+<div class="tablewrap" id="tab-nav-states" data-title="Page states">
+<table class="data">
+<tr><th style="width:22%">State</th><th>What it means</th><th style="width:32%">What to do</th></tr>
+<tr><td>Loading</td><td>ForgeCentral is waiting for the Forge engine.</td><td>Wait; the page updates on its own.</td></tr>
+<tr><td>Data</td><td>The values are the engine's own, as of the moment they were read.</td><td>Act on them.</td></tr>
+<tr><td>Empty</td><td>The engine answered and there is nothing to show (for example, no zones yet). The page says what would appear here.</td><td>Create the first item, if the page offers it.</td></tr>
+<tr><td>Refused</td><td>The engine declined the request for your access tier, for example <b class="ui">Admin or SecurityAudit tier required</b> on Settings.</td><td>Ask a global administrator.</td></tr>
+<tr><td>Error</td><td>ForgeCentral could not complete the request.</td><td>Choose <b class="ui">Retry</b> on a page that failed to load. For a change that failed, see below.</td></tr>
+</table>
+</div>
+
+<h2 id="nav-confirm">Confirmations and receipts</h2>
+<p>A change with a lasting effect opens a confirmation dialog that states what will happen. <b class="ui">Cancel</b> is selected when the dialog opens, and <b class="ui">Esc</b> cancels, so a stray keystroke never confirms. After you confirm, ForgeCentral shows the engine's answer as a receipt: what was committed (and at which version), or why it was refused. A refusal changes nothing.</p>
+<div class="note limit"><p>If a change fails with a connection error or a timeout (rather than a refusal), the Forge engine may already have applied it. Reload the page and check before you submit it again; submitting twice can create a duplicate note, a second incident action, or a conflict on a policy that was in fact created.</p></div>
+
+<h2 id="nav-freshness">How current the data is</h2>
+<ul>
+  <li>The Overview reads the engine every two seconds while it is open.</li>
+  <li>Other pages read the engine when you open them, again when you return after a few seconds, and immediately after a change you make there.</li>
+  <li>Settings is never cached: every tab reads the engine each time you open it.</li>
+</ul>

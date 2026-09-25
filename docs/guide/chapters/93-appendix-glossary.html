@@ -1,0 +1,44 @@
+<h1>Glossary</h1>
+
+<h2 id="gloss-terms">Terms</h2>
+<div class="tablewrap wide" id="tab-glossary" data-title="Terms used in this guide">
+<table class="data">
+<tr><th style="width:26%">Term</th><th>Meaning</th></tr>
+<tr><td>Anchor key</td><td>The public key installed on an endpoint that it uses to verify a distributed policy bundle's signature.</td></tr>
+<tr><td>Audit trail</td><td>The engine's tamper-evident record of changes: who did what, when. An incident also has its own trail of actions.</td></tr>
+<tr><td>Boot configuration</td><td>Values the Forge engine reads when it starts. Changed on the engine host, then an engine restart.</td></tr>
+<tr><td>Bundle</td><td>A zone's published policies, composed and signed for distribution to endpoints.</td></tr>
+<tr><td>Calibration</td><td>A fit, from real dispositions, that turns the engine's credibility score into a probability that an incident is real. Until one exists, incidents are uncalibrated.</td></tr>
+<tr><td>Classification</td><td>A data sensitivity level: unclassified, internal, confidential, restricted, secret.</td></tr>
+<tr><td>Credibility</td><td>The engine's score for how well a detection is supported by evidence.</td></tr>
+<tr><td>Decision</td><td>One governed outcome the engine recorded from detection; listed on Logs.</td></tr>
+<tr><td>Disposition</td><td>An analyst's verdict that closes an incident and teaches calibration what it was.</td></tr>
+<tr><td>Dual control (two-person control)</td><td>A rule that a change proposed by one administrator must be approved by another.</td></tr>
+<tr><td>Effective posture</td><td>A zone's restrictions after combining its own with every ancestor's; a restriction anywhere wins.</td></tr>
+<tr><td>Egress destination</td><td>A place the engine may send data for model inference, with the highest classification it may receive.</td></tr>
+<tr><td>Enforcement</td><td>Blocking activity on an endpoint. Off in this release: Forge detects, records and recommends.</td></tr>
+<tr><td>Entity drawer</td><td>ForgeCentral's detail panel for a user, agent, host or object.</td></tr>
+<tr><td>Fixed floor</td><td>The two restrictions no zone can relax: governed egress and execution.</td></tr>
+<tr><td>Forge</td><td>The platform: detection, governance and response for users, hosts and AI agents.</td></tr>
+<tr><td>Forge endpoint agent</td><td>The software on each protected host that reports activity to Forge and fetches distributed policy.</td></tr>
+<tr><td>Forge engine</td><td>The platform's system of record: it stores, validates and audits every configuration, record and decision.</td></tr>
+<tr><td>ForgeCentral</td><td>The Forge console, the web application this guide describes.</td></tr>
+<tr><td>Governed configuration</td><td>The Forge engine's versioned settings document, changed on Settings.</td></tr>
+<tr><td>Identity provider (IdP)</td><td>Your organization's directory and sign-in service, such as Auth0.</td></tr>
+<tr><td>Incident</td><td>A detection the engine promoted for an analyst's attention; worked on SOC Ops.</td></tr>
+<tr><td>Lease</td><td>The freshness window stamped on a distributed bundle; an endpoint refuses a bundle whose lease has expired.</td></tr>
+<tr><td>Local user graph (LUG)</td><td>The Forge user directory's view of the accounts, groups and sessions on each host.</td></tr>
+<tr><td>Mutual TLS</td><td>An encrypted connection in which both sides prove their identity with certificates.</td></tr>
+<tr><td>Object</td><td>A named thing a policy can refer to: a group, server pattern, network range and so on.</td></tr>
+<tr><td>Policy</td><td>What subjects may do to targets in one zone, with one action, versioned and published.</td></tr>
+<tr><td>Post-quantum hybrid key exchange</td><td>A key exchange (X25519MLKEM768) designed to stay secure against future quantum computers, combined with a classical one. P-384 is the classical floor used when a browser lacks it.</td></tr>
+<tr><td>Principal</td><td>An identity the engine authorizes: a person, service account or AI agent. Its id is shown in the Users <b class="ui">ID</b> column.</td></tr>
+<tr><td>Proposal</td><td>A Settings change waiting for a second administrator's approval.</td></tr>
+<tr><td>Response plan</td><td>The steps the engine proposes for an incident, within its response tier.</td></tr>
+<tr><td>Response tier</td><td>Noise, investigate or propose: what the engine may put forward for an incident, decided by <code>p_low</code> and <code>p_high</code>.</td></tr>
+<tr><td>Selector</td><td>How an object matches: <code>exact</code>, <code>glob</code>, <code>cidr</code> or <code>group_ref</code>.</td></tr>
+<tr><td>SIEM</td><td>Security information and event management system, such as Splunk or Microsoft Sentinel.</td></tr>
+<tr><td>Tenant</td><td>An isolated customer or organizational unit within a Forge node.</td></tr>
+<tr><td>Virtual Trust Zone (VTZ)</td><td>A named place in a hierarchy that policies target; it inherits and can only tighten its ancestors' restrictions.</td></tr>
+</table>
+</div>

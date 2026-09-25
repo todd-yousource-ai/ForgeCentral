@@ -1,0 +1,48 @@
+<h1>Read Me First</h1>
+
+<div class="note"><p><b>Forge</b> is the platform. <b>ForgeCentral</b> is its console, the web application this guide describes. The <b>Forge engine</b> is the platform's system of record: it holds every configuration, zone, policy, record and decision, and it validates and audits every change. The <b>Forge endpoint agent</b> runs on each protected host and reports what happens there. Everything you configure in ForgeCentral is stored, validated and audited by the Forge engine; ForgeCentral itself keeps no configuration of its own.</p></div>
+
+<h2 id="rmf-audience">Who this guide is for</h2>
+<p>This guide is for the administrators and security operators who set up and run Forge from ForgeCentral. It covers every configuration ForgeCentral offers: platform settings and change control, identity providers, users and groups, Virtual Trust Zones, objects, policies and their distribution, SOC response, logs and reports, and the actions available from the Overview and the entity drawer.</p>
+<p>Installing Forge, the Forge engine and the Forge endpoint agent is outside this guide. Where a value can only be changed on the host (for example a setting the engine reads when it starts), the guide says so and names the setting, so you know who to ask.</p>
+
+<h2 id="rmf-organization">How this guide is organized</h2>
+<p>Chapters 2 and 3 explain how configuration works in Forge and how to move around ForgeCentral. Read them first; every later chapter assumes them. Each configuration chapter then follows the same pattern:</p>
+<ul>
+  <li><b>Availability</b>: what the chapter covers and whether each part is available, read-only, or not yet available.</li>
+  <li><b>Concepts and How it works</b>: what the feature does, with a figure whose numbered callouts match the numbered steps below it.</li>
+  <li><b>Restrictions</b>: limits and known limitations, stated plainly with a workaround where one exists.</li>
+  <li><b>Configure</b>: one procedure per task, with numbered steps.</li>
+  <li><b>Verify</b>: how to confirm the change took effect.</li>
+</ul>
+<p>Appendix A lists every engine setting ForgeCentral shows, with its default, its bounds and how a change applies. Appendix B collects every known limitation in one place. Appendix C is the glossary.</p>
+
+<h2 id="rmf-conventions">Conventions</h2>
+<div class="tablewrap" id="tab-conventions" data-title="Conventions used in this guide">
+<table class="data">
+<tr><th style="width:32%">Convention</th><th>Meaning</th></tr>
+<tr><td><b class="ui">Save changes</b></td><td>A control, tab, field or label as ForgeCentral shows it.</td></tr>
+<tr><td><span class="path">Settings<span class="sep">&gt;</span>Configuration</span></td><td>A path: choose each item in turn, starting from the navigation rail on the left.</td></tr>
+<tr><td><code>id@version</code></td><td>A value you type exactly as shown, or a value ForgeCentral displays verbatim.</td></tr>
+<tr><td><b>Step 1</b>, <b>Step 2</b></td><td>Procedure steps. Do them in order.</td></tr>
+<tr><td>Note</td><td>Information that helps you use a feature correctly.</td></tr>
+<tr><td>Tip</td><td>A faster or safer way to do something.</td></tr>
+<tr><td>Caution</td><td>A change that is hard to undo, or that affects other operators or tenants.</td></tr>
+<tr><td>Limitation</td><td>Something the feature does not do yet, or does differently from what its label suggests, with the workaround.</td></tr>
+</table>
+</div>
+
+<h2 id="rmf-availability">Availability labels</h2>
+<p>Every chapter opens with an availability table. The labels mean:</p>
+<div class="tablewrap" id="tab-availability-labels" data-title="Availability labels">
+<table class="data">
+<tr><th style="width:32%">Label</th><th>Meaning</th></tr>
+<tr><td><span class="pill ok">AVAILABLE</span></td><td>You can configure it from ForgeCentral today, and the change takes effect as described.</td></tr>
+<tr><td><span class="pill ro">READ-ONLY</span></td><td>ForgeCentral shows the value and where it comes from, but it is changed somewhere else (usually during installation, on the host).</td></tr>
+<tr><td><span class="pill na">NOT YET AVAILABLE</span></td><td>ForgeCentral states that the capability is not built yet, and does not show a control for it.</td></tr>
+<tr><td><span class="pill off">RECORDED ONLY</span></td><td>ForgeCentral records the action in the Forge engine, but nothing is enforced on endpoints yet. Forge detects and recommends; enforcement is off.</td></tr>
+</table>
+</div>
+
+<h2 id="rmf-feedback">Documentation feedback</h2>
+<p>To report an error or suggest an improvement to this guide, write to eng@yousource.ai. Include the chapter and page number.</p>

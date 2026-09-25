@@ -1,0 +1,118 @@
+<h1>Settings: SOC Response and SIEM Write-Back</h1>
+
+<p class="lead"><span class="path">Settings<span class="sep">&gt;</span>SOC</span> holds the two settings that shape how Forge responds to an incident: the response tiers, which decide how much of a response the engine may propose, and SIEM write-back, which sends each incident's enrichment to your security information and event management (SIEM) system.</p>
+
+<h2 id="soc-set-availability">Availability</h2>
+<div class="tablewrap" id="tab-socset-availability" data-title="SOC response settings: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Response tiers</td><td><span class="pill ok">AVAILABLE</span></td><td>The two probability thresholds, <code>p_low</code> and <code>p_high</code>.</td></tr>
+<tr><td>SIEM write-back</td><td><span class="pill ok">AVAILABLE</span></td><td>Splunk, Elastic, QRadar, Microsoft Sentinel, Google Chronicle. See the Limitations.</td></tr>
+<tr><td>SIEM credential</td><td><span class="pill ro">READ-ONLY</span></td><td>The credential reference is boot configuration on the engine host.</td></tr>
+<tr><td>Narrative model</td><td><span class="pill ro">READ-ONLY</span></td><td>Shown here; changed on <span class="path">Settings<span class="sep">&gt;</span>Configuration</span>.</td></tr>
+<tr><td>Changes under two-person control</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>When dual control covers <code>tenant-config</code>, this tab is read-only.</td></tr>
+</table>
+</div>
+
+<h2 id="soc-set-tiers">How the response tiers work</h2>
+<p>When the Forge engine promotes a detection to an incident, it can attach a calibrated probability that the incident is real, from 0 to 1000 (thousandths). Two thresholds divide that range into three tiers, and the tier decides what the engine may put in front of an operator:</p>
+
+<figure id="fig-soc-tiers" data-title="Response tiers: what the engine may propose at each probability" class="wide">
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <rect x="40" y="70" width="170" height="44" fill="#e8eef6" stroke="#8a95a8"/>
+  <rect x="210" y="70" width="330" height="44" fill="#cdebdf" stroke="#3fbe96"/>
+  <rect x="540" y="70" width="180" height="44" fill="#3fbe96" stroke="#17785c"/>
+  <text x="125" y="97" font-size="14" font-weight="700" fill="#0c2748" text-anchor="middle">Noise</text>
+  <text x="375" y="97" font-size="14" font-weight="700" fill="#0c2748" text-anchor="middle">Investigate</text>
+  <text x="630" y="97" font-size="14" font-weight="700" fill="#0c2748" text-anchor="middle">Propose</text>
+  <line x1="210" y1="52" x2="210" y2="124" stroke="#123a6b" stroke-width="2.5"/>
+  <line x1="540" y1="52" x2="540" y2="124" stroke="#123a6b" stroke-width="2.5"/>
+  <text x="210" y="44" font-size="13" font-weight="700" fill="#123a6b" text-anchor="middle">p_low</text>
+  <text x="540" y="44" font-size="13" font-weight="700" fill="#123a6b" text-anchor="middle">p_high</text>
+  <text x="40" y="136" font-size="11" fill="#5a6477" text-anchor="middle">0</text>
+  <text x="720" y="136" font-size="11" fill="#5a6477" text-anchor="middle">1000</text>
+  <text x="380" y="20" font-size="12" fill="#5a6477" text-anchor="middle">calibrated probability that the incident is real (thousandths)</text>
+  <g font-size="11.5" fill="#1b2434">
+    <text x="44" y="160" font-weight="700">Nothing is proposed.</text>
+    <text x="44" y="177">The incident is kept</text>
+    <text x="44" y="194">for calibration.</text>
+    <text x="216" y="160" font-weight="700">Enrich and report.</text>
+    <text x="216" y="177">Investigation steps may be proposed;</text>
+    <text x="216" y="194">containment is withheld.</text>
+    <text x="216" y="214" fill="#17785c" font-weight="700">No probability yet? Investigate.</text>
+    <text x="546" y="160" font-weight="700">The full response is proposed,</text>
+    <text x="546" y="177">containment included.</text>
+    <text x="546" y="194">A person still approves it.</text>
+  </g>
+</svg>
+</figure>
+
+<ul>
+  <li><b>Below <code>p_low</code></b>: noise. The engine proposes nothing and keeps the incident for calibration.</li>
+  <li><b>From <code>p_low</code> up to <code>p_high</code></b>: investigate. The engine may propose steps that enrich and report, and withholds every step that would contain.</li>
+  <li><b>At or above <code>p_high</code></b>: propose. The engine proposes the full response, containment included. Approving it is always a person's decision.</li>
+  <li><b>No probability</b>: until your node holds a calibration fitted from real dispositions, incidents carry no probability and are treated as the investigate tier.</li>
+</ul>
+<p>Both thresholds ship at the fail-closed extreme, <code>p_low = 0</code> and <code>p_high = 1000</code>: nothing is noise, and nothing licenses containment. A threshold pair that is crossed or out of range is treated as that extreme rather than used.</p>
+<div class="note"><p>A containment step is recorded as refused even after approval, because enforcement is off (<a class="xref" href="#cfg-endpoints"></a>). The tiers already govern what an operator is asked to approve.</p></div>
+
+<h2 id="soc-set-siem">How SIEM write-back works</h2>
+<p>When enabled, the Forge engine writes each incident's enrichment row to one SIEM, with a link back to the incident in ForgeCentral. Incidents above the classification ceiling you set are not written. The engine re-reads the setting for every write, so a change applies to the next write.</p>
+<p>The credential the engine presents to the SIEM is not configured here. It lives in the engine's boot configuration on the engine host, so the secret never passes through ForgeCentral.</p>
+<div class="note limit"><p>Nothing is written until the SIEM credential reference is set in the engine's boot configuration, which the Forge installer does not do; your YouSource.ai representative sets it on the engine host.</p></div>
+<div class="note limit"><p>Microsoft Sentinel and Google Chronicle expect a short-lived token. Today the credential must hold a valid token, refreshed by hand before it expires. A write with an expired token is recorded on the incident's trail as failed. Splunk, Elastic and QRadar use the long-lived token the product issues and need no refresh.</p></div>
+
+<h2 id="soc-set-restrictions">Restrictions</h2>
+<ul>
+  <li>Both thresholds are whole numbers from 0 to 1000, and <code>p_low</code> must not exceed <code>p_high</code>.</li>
+  <li>Enabling write-back requires a host, a stream in the vendor's shape (for Sentinel and Chronicle, two parts: <code>a/b</code>) and a case URL base that starts with <code>https://</code>.</li>
+</ul>
+<div class="note limit"><p>Under two-person control (dual control covering <code>tenant-config</code>) this tab shows <b class="ui">Dual control</b> and every control is disabled, and neither setting can be proposed anywhere in ForgeCentral. Change them before turning on two-person control, or ask for the change to be proposed on the engine host.</p></div>
+
+<h2 id="soc-set-configure-tiers">Set the response tiers</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <span class="path">Settings<span class="sep">&gt;</span>SOC</span>.</li>
+  <li>Under <b class="ui">Response tiers</b>, enter <b class="ui">p_low (milli)</b> and <b class="ui">p_high (milli)</b>, each a whole number from 0 to 1000.</li>
+  <li>Choose <b class="ui">Commit tiers</b>.</li>
+  <li>Read the confirmation (<b class="ui">The change applies live.</b>) and choose <b class="ui">Commit</b>.</li>
+  <li>Read the receipt: <b class="ui">Committed at version N</b>, or <b class="ui">Refused</b> with the engine's reasons.</li>
+</ol>
+</div>
+<div class="note tip"><p>Leave the thresholds at 0 and 1000 until your node has a calibration. Without one, every incident is in the investigate tier whatever the thresholds say.</p></div>
+
+<h2 id="soc-set-configure-siem">Configure SIEM write-back</h2>
+<div class="procedure">
+<div class="ptitle">Before you begin</div>
+<ul>
+  <li>Have the SIEM credential set in the engine's boot configuration.</li>
+  <li>Know the ForgeCentral address your analysts use: the case URL base links each SIEM row back to its incident.</li>
+</ul>
+</div>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <span class="path">Settings<span class="sep">&gt;</span>SOC</span> and find <b class="ui">SIEM enrichment write-back</b>.</li>
+  <li>Fill in the fields (<a class="xref" href="#tab-socset-siem"></a>) and check <b class="ui">Enabled</b>.</li>
+  <li>Choose <b class="ui">Commit write-back</b> and confirm.</li>
+  <li>Read the receipt. <b class="ui">Refused</b> with an incomplete-configuration reason means a required field is missing or malformed.</li>
+</ol>
+</div>
+<div class="tablewrap" id="tab-socset-siem" data-title="SIEM write-back fields">
+<table class="data">
+<tr><th style="width:24%">Field</th><th>Values</th></tr>
+<tr><td><b class="ui">Enabled</b></td><td>Write enrichment rows (checked) or not.</td></tr>
+<tr><td><b class="ui">Vendor</b></td><td><code>splunk</code>, <code>sentinel</code>, <code>qradar</code>, <code>elastic</code>, <code>chronicle</code>.</td></tr>
+<tr><td><b class="ui">Host</b></td><td>The SIEM's ingestion host.</td></tr>
+<tr><td><b class="ui">Stream</b></td><td>Where rows land: an index, table or stream name. Sentinel and Chronicle take two parts, <code>a/b</code>.</td></tr>
+<tr><td><b class="ui">Case URL base</b></td><td>The <code>https://</code> address each row links back to.</td></tr>
+<tr><td><b class="ui">Ceiling</b></td><td>The highest classification an incident may carry and still be written: <code>unclassified</code>, <code>internal</code>, <code>confidential</code>, <code>restricted</code>, <code>secret</code>.</td></tr>
+</table>
+</div>
+
+<h2 id="soc-set-verify">Verify</h2>
+<ul>
+  <li><span class="path">Settings<span class="sep">&gt;</span>SOC</span> shows your values; <b class="ui">What these settings are</b> repeats each setting's bound and how it applies.</li>
+  <li>On an incident's <b class="ui">Audit Trail</b> in SOC Ops, each write-back appears as a SIEM enrichment entry with its outcome; a withheld plan step names the tier that withheld it.</li>
+</ul>
