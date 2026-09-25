@@ -7,7 +7,10 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, GD.7 in progress):** GD.7 ON BRANCH `docs/console-11-gd7-identity`: `TRD-CONSOLE-04`
+- **State (2026-09-25):** GD.7 MERGED `fae079b` (operator: "Approve and continue"). NEXT = GD.8 (TRD-CONSOLE-03
+  refresh and the IP-CONSOLE-03 ledger; the SOC Operations chapter re-verified). The GD.6 / GD.7 Console
+  fixes (policy Delete, connector state, form messages) need a Console install on the box to be live.
+- **Earlier (2026-09-25):** GD.7 ON BRANCH `docs/console-11-gd7-identity`: `TRD-CONSOLE-04`
   refreshed (kinds and statuses as built, one node-wide Auth0 connector and its three-step save, bounded
   read, audit and tier facts, a new Section 7 of known gaps); chapters 7 and 8 re-verified (onboarding is
   Configure on a Disabled card, the delta poll reads logs, the nil-tenant limitation, credential checks,
@@ -111,7 +114,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.4 | 11.6 | MERGED `72306ab` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-02 refreshed (Section 8 known gaps); chapter 9 re-verified; coverage gate `vtz.*` |
 | GD.5 | 11.6 | MERGED `7b7676f` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-10 refreshed (Section 8); chapter 10 re-verified; objects failure copy fixed; coverage `objects.*` |
 | GD.6 | 11.6 | MERGED `19db9a4` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-05 refreshed; chapters 11-12 re-verified; policy Delete fixed (CD-52); coverage `policies.*` |
-| GD.7 | 11.6 | ON BRANCH | | TRD-CONSOLE-04 refreshed; chapters 7-8 re-verified; connector Syncing (CD-56) and users copy (CD-55) fixed; coverage users/groups/idam |
+| GD.7 | 11.6 | MERGED `fae079b` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-04 refreshed; chapters 7-8 re-verified; connector Syncing (CD-56) and users copy (CD-55) fixed; coverage users/groups/idam |
 | GD.8 | 11.6 | PLANNED | | TRD-CONSOLE-03 refresh + the IP-CONSOLE-03 ledger; chapter re-verified |
 | GD.9 | 11.6 | PLANNED | | TRD-CONSOLE-09, -08 refresh; chapters re-verified |
 | GD.10 | 11.6 | PLANNED | | TRD-CONSOLE-01, -12, -00 refresh; chapters re-verified |
