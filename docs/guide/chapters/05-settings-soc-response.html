@@ -15,7 +15,7 @@
 </div>
 
 <h2 id="soc-set-tiers" data-covers="soc.settings.read">How the response tiers work</h2>
-<p>When the Forge engine promotes a detection to an incident, it can attach a calibrated probability that the incident is real, from 0 to 1000 (thousandths). Two thresholds divide that range into three tiers, and the tier decides what the engine may put in front of an operator:</p>
+<p>When the Forge engine promotes a detection to an incident, it can attach a calibrated probability that the incident is real, from 0 to <span class="const" data-const="SOC_TIER_MILLI_MAX">1000</span> (thousandths). Two thresholds divide that range into three tiers, and the tier decides what the engine may put in front of an operator:</p>
 
 <figure id="fig-soc-tiers" data-title="Response tiers: what the engine may propose at each probability" class="wide">
 <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
@@ -53,7 +53,7 @@
   <li><b>At or above <code>p_high</code></b>: propose. The engine proposes the full response, containment included. Approving it is always a person's decision.</li>
   <li><b>No probability</b>: until your node holds a calibration fitted from real dispositions, incidents carry no probability and are treated as the investigate tier.</li>
 </ul>
-<p>Both thresholds ship at the fail-closed extreme, <code>p_low = 0</code> and <code>p_high = 1000</code>: nothing is noise, and only an incident at probability 1000 (certainty) reaches the containment proposal. A threshold pair that is crossed or out of range is treated as that extreme rather than used.</p>
+<p>Both thresholds ship at the fail-closed extreme, <code>p_low = 0</code> and <code>p_high = <span class="const" data-const="SOC_TIER_MILLI_MAX">1000</span></code>: nothing is noise, and only an incident at probability <span class="const" data-const="SOC_TIER_MILLI_MAX">1000</span> (certainty) reaches the containment proposal. A threshold pair that is crossed or out of range is treated as that extreme rather than used.</p>
 <div class="note"><p>A containment step is recorded as refused even after approval, because enforcement is off (<a class="xref" href="#cfg-endpoints"></a>). The tiers already govern what an operator is asked to approve.</p></div>
 
 <h2 id="soc-set-siem">How SIEM write-back works</h2>
@@ -64,7 +64,7 @@
 
 <h2 id="soc-set-restrictions">Restrictions</h2>
 <ul>
-  <li>Both thresholds are whole numbers from 0 to 1000, and <code>p_low</code> must not exceed <code>p_high</code>.</li>
+  <li>Both thresholds are whole numbers from 0 to <span class="const" data-const="SOC_TIER_MILLI_MAX">1000</span>, and <code>p_low</code> must not exceed <code>p_high</code>. The rule is shown under the fields, and <b class="ui">Commit tiers</b> stays unavailable until the pair meets it. The <b class="ui">i</b> button beside each field explains that threshold.</li>
   <li>Enabling write-back requires a host, a stream in the vendor's shape (for Sentinel and Chronicle, two parts: <code>a/b</code>) and a case URL base that starts with <code>https://</code>.</li>
 </ul>
 <div class="note limit"><p>Under two-person control (dual control covering <code>tenant-config</code>) this tab shows <b class="ui">Dual control</b> and every control is disabled, and neither setting can be proposed anywhere in ForgeCentral. Change them before turning on two-person control, or ask for the change to be proposed on the engine host.</p></div>
@@ -74,13 +74,13 @@
 <div class="ptitle">Procedure</div>
 <ol class="steps">
   <li>Choose <span class="path">Settings<span class="sep">&gt;</span>SOC</span>.</li>
-  <li>Under <b class="ui">Response tiers</b>, enter <b class="ui">p_low (milli)</b> and <b class="ui">p_high (milli)</b>, each a whole number from 0 to 1000.</li>
+  <li>Under <b class="ui">Response tiers</b>, enter <b class="ui">p_low (milli)</b> and <b class="ui">p_high (milli)</b>, each a whole number from 0 to <span class="const" data-const="SOC_TIER_MILLI_MAX">1000</span>.</li>
   <li>Choose <b class="ui">Commit tiers</b>.</li>
   <li>Read the confirmation (<b class="ui">The change applies live.</b>) and choose <b class="ui">Commit</b>.</li>
   <li>Read the receipt: <b class="ui">Committed at version N</b>, or <b class="ui">Refused</b> with the engine's reasons.</li>
 </ol>
 </div>
-<div class="note tip"><p>Leave the thresholds at 0 and 1000 until your node has a calibration. Without one, every incident is in the investigate tier whatever the thresholds say.</p></div>
+<div class="note tip"><p>Leave the thresholds at 0 and <span class="const" data-const="SOC_TIER_MILLI_MAX">1000</span> until your node has a calibration. Without one, every incident is in the investigate tier whatever the thresholds say.</p></div>
 
 <h2 id="soc-set-configure-siem" data-covers="soc.settings.commit">Configure SIEM write-back</h2>
 <div class="procedure">
