@@ -7,7 +7,11 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, later):** GD.S1 ON BRANCH `docs/console-11-guide-standalone` (stacked on GD.0): the
+- **State (2026-09-25, ~06:30 UTC):** GD.0 MERGED `3c2e3d6` and GD.S1 MERGED `7439ded` on the operator's
+  go-ahead ("Agreed with the approach ... Continue to gd.1 and gd.2"). Decisions N2 (document as built,
+  limitations stated) and N3 (fix the engine labels before the in-app content: GD.E0, after GD.1 and
+  before GD.2) DECIDED. NEXT = GD.1 (the manifest becomes the complete, enforced index).
+- **Earlier (2026-09-25):** GD.S1 ON BRANCH `docs/console-11-guide-standalone` (stacked on GD.0): the
   standalone guide (Cisco configuration-guide format, Forge brand) built by `scripts/build-guide.mjs`
   from `docs/guide/` to an 86-page HTML + PDF, 16 chapters, 3 appendices, 16 figures; AWAITING REVIEW.
   Operator decision N1 (naming) DECIDED. Census updated: CD-06 verified; CD-45, CD-46 added.
@@ -21,9 +25,10 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 | Step | Acceptance | Status | Commit | Notes |
 |------|-----------|--------|--------|-------|
-| GD.0 | TRD 9-11 | ON BRANCH | | the plan, the census, the TRD revision |
-| GD.S1 | 11.3; INV-GUIDE-FORGE-NAMING | ON BRANCH | | the standalone guide: `docs/guide/` + `scripts/build-guide.mjs` -> HTML + PDF |
+| GD.0 | TRD 9-11 | MERGED `3c2e3d6` (2026-09-25; full gate green) | `08a47f2` | the plan, the census, the TRD revision |
+| GD.S1 | 11.3; INV-GUIDE-FORGE-NAMING | MERGED `7439ded` (2026-09-25; full gate green, e2e 40/40) | `651d9f3` | the standalone guide: `docs/guide/` + `scripts/build-guide.mjs` -> HTML + PDF (85 pages) |
 | GD.1 | 9.4; INV-BINDING-ROUTE-COVERAGE | PLANNED | | 17 routes registered; the route-to-binding contract test |
+| GD.E0 | CD-18 (crdb) | PLANNED (decision N3) | | crdb: the registry's live-apply labels and defaults made true, before GD.2 |
 | GD.2 | 11.2 (1), 11.5 | PLANNED | | post the guide into ForgeCentral: the ReadMe tab renders the GD.S1 source |
 | GD.3 | 11.6 | PLANNED (needs N2, N3) | | Settings chapters in the ReadMe with live values |
 | GD.4 | 11.6 | PLANNED | | TRD-CONSOLE-02 refresh; chapter re-verified |
@@ -53,5 +58,5 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | Id | Question | Status |
 |----|----------|--------|
 | N1 | The naming glossary for guide prose | DECIDED 2026-09-25: Forge, ForgeCentral, the Forge engine, the Forge endpoint agent; commands in code |
-| N2 | How the guide treats the census defects (recommended: document as built with known limitations; fix separately) | OPEN |
-| N3 | Correct the registry's live-apply text (crdb, CD-18) before the Settings chapter | OPEN |
+| N2 | How the guide treats the census defects | DECIDED 2026-09-25: document as built, each limitation stated with its workaround; fixes on their own schedule |
+| N3 | Correct the registry's live-apply text (crdb, CD-18) | DECIDED 2026-09-25: fix the engine labels before the content is created in the app (GD.E0, before GD.2) |

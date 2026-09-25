@@ -63,15 +63,19 @@ refreshes; `TypeScript_Dev_Rules.md` Section 17 (the no-stub contract GD.1 makes
   console), "the Forge engine" (the data and detection engine), "the Forge endpoint agent" (the host
   agent). A command or path an operator must type appears verbatim only inside a code block. The
   standalone build enforces it (a content lint that fails on an internal name outside `<code>`).
-- **N2 -- how the guide treats the census defects.** (a) RECOMMENDED: document the product as it
+- **N2 -- how the guide treats the census defects. DECIDED 2026-09-25 (operator: "Agreed with the
+  approach"): option (a).** (a) RECOMMENDED: document the product as it
   behaves, state each broken or missing behaviour as a known limitation with its workaround, and fix
   the defects on their own schedule (each fix updates its entry, rule R4); (b) fix the S1 and S2
   defects first and write the affected chapters after; (c) leave broken configurations out until
   fixed. Needed before GD.3.
-- **N3 -- the registry's live-apply text (CD-18).** The Settings chapter renders the engine registry's
-  text live, and several rows over-claim ("Live" for settings that bind at start). RECOMMENDED: a
-  small crdb correction of those rows before GD.3 (a defect fix, not an engine addition); otherwise
-  GD.3 shows the rows with a caveat.
+- **N3 -- the registry's live-apply text (CD-18). DECIDED 2026-09-25 (operator: "fix the engine labels
+  before the content is created in the app"):** a crdb correction of the registry rows lands as GD.E0,
+  after GD.1 and before GD.2. Expected effect, to confirm at GD.E0's review: a setting relabelled
+  boot-bound leaves the Console's editable set (the engine refuses a wire edit to a boot-bound
+  setting, TRD-CONSOLE-11 9.4), so the two session lifetimes and the cognition connection limit
+  become read-only in ForgeCentral; the alternative is to make them truly live (a larger engine
+  change).
 
 ## Rules
 
@@ -93,6 +97,7 @@ refreshes; `TypeScript_Dev_Rules.md` Section 17 (the no-stub contract GD.1 makes
 | **GD.0** | TRD 9-11 | **The plan (this PR, docs only):** the census and its six slices; `TRD-CONSOLE-11` revised (Section 9 as built, Section 10 the known gaps, Section 11 the guide); this plan and its ledger; the `IP-CONSOLE-11-settings` ledger corrected (ST.7 superseded, the ST.9 note). |
 | **GD.S1** | 11.3; `INV-GUIDE-FORGE-NAMING` | **The standalone guide** (operator ruling 5): `docs/guide/` (chapters as HTML fragments, the Forge print stylesheet, the legal page, the cover data) and `scripts/build-guide.mjs` (content lint, figure and table numbering, cross references, page numbers filled from the rendered PDF, Appendix B assembled from every Limitation note) render the whole guide to HTML and PDF with the console's Playwright Chromium: 16 chapters (one per surface, plus how configuration works and navigation) and three appendices (the settings reference, known limitations, glossary), 16 figures. The content is the census, re-verified against the code; every chapter states its limitations plainly. This is the single source the in-app ReadMe renders (GD.2). |
 | **GD.1** | 9.4; `INV-BINDING-ROUTE-COVERAGE` | **The manifest becomes the complete, enforced index.** Register the 17 unbound routes (the ten Settings operations plus `console-rbac` and `security-session`, the SOC KPI / report / weekly reads, Overview members, the IdAM secret write); `logs.export` becomes an audited command; correct the stale header comments; add the contract test that maps every BFF route to a registered binding and every LIVE binding to a route. No runtime behaviour change. |
+| **GD.E0** | CD-18 (crdb) | **The engine's labels made true** (decision N3; crdb, its own branch and gate): the registry's live-apply text and defaults corrected where the census found them wrong (`sessions.*` and `cognition.max_connections` bind at start; `governance.dual_control` is live for wire commits only; `idam.connector` has no consumer; `detection_retention` is live; `lug.exposure`'s default), with a test that pins each corrected row; the guide's Appendix A and the affected chapter notes updated in the same PR series (rule R4). |
 | **GD.2** | 11.2 (1), 11.5; `INV-GUIDE-ADDRESSABLE` | **Post the guide into ForgeCentral: the ReadMe tab.** The tab renders the reviewed GD.S1 chapter source (one source for the document and the tab; the integration design, converting the fragments to components at build time or rendering them sanitized, is decided in this step), with the contents, the filter and deep links that survive a reload; the Settings reference renders live from `SETTINGS_READ` instead of the document's snapshot. |
 | **GD.3** | 11.6; `INV-GUIDE-ENGINE-VALUES-LIVE` | **Settings chapters in the ReadMe with live values.** The Settings reference renders from `SETTINGS_READ` in the tab (the document keeps its dated snapshot); the registry's live-apply labels corrected first (N3). Needs N2, N3. |
 | **GD.4** | 11.6 | **`TRD-CONSOLE-02` refresh** against the census; the Virtual Trust Zones chapter re-verified against the code. |
