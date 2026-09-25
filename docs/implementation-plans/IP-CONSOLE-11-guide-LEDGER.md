@@ -7,7 +7,8 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25):** GD.12a ON BRANCH `feat/console-11-gd12-infotips`, awaiting review. GD.12 is
+- **State (2026-09-25):** GD.12a MERGED `709efc0` (operator: "Merge and continue"). NEXT = GD.12b.
+- **Earlier (2026-09-25):** GD.12a ON BRANCH `feat/console-11-gd12-infotips`. GD.12 is
   split: 12a = `InfoTip` + `FieldHint` in `@forge/design`, the Settings limits as named constants
   (`MAX_SETTING_VALUE_CHARS`, `MAX_SECTION_TEXT_CHARS`, `MAX_EGRESS_ID_CHARS`, `SOC_TIER_MILLI_MAX`,
   `LUG_THRESHOLD_PERMILLE_MAX`) shown under the Settings fields and enforced before the confirm to
@@ -161,7 +162,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.9 | 11.6 | MERGED `6cc2980` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-09 and -08 refreshed; chapters 14-15 re-verified; Logs offset (CD-13) and export copy fixed; coverage `logs.*` |
 | GD.10 | 11.6 | MERGED `5b5da46` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-01, -12 refreshed, -00 Sections 5 and 12, SUITE; chapters 3 and 16 re-verified; Isolate result fixed (CD-64); coverage overview/entity |
 | GD.11 | 11.2 (2) | MERGED `86835eb` (2026-09-25; full gate green, e2e 42/42) | | Help control -> Drawer at the section for the destination and Settings tab; every destination mapped; INV-GUIDE-CONTEXTUAL contract test |
-| GD.12a | 11.2 (3) | ON BRANCH `feat/console-11-gd12-infotips` | | InfoTip + FieldHint; Settings forms show and enforce the engine limits from named constants; guide `data-const` markers rendered live; INV-GUIDE-ONE-SOURCE contract test |
+| GD.12a | 11.2 (3) | MERGED `709efc0` (2026-09-25; full gate green, e2e 42/42) | | InfoTip + FieldHint; Settings forms show and enforce the engine limits from named constants; guide `data-const` markers rendered live; INV-GUIDE-ONE-SOURCE contract test |
 | GD.12b | 11.2 (3) | PLANNED | | the same for VTZ, Objects, Policies, Users/groups, IdAM, SOC case controls, Logs |
 | GD.13 | INV-GUIDE-DISABLED-EXPLAINED | PLANNED | | state-aware explanations |
 | GD.N | 11.6 | PLANNED | | capstone: global coverage, Playwright journeys, live drive |
