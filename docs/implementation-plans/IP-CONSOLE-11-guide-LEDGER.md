@@ -7,7 +7,14 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, ~07:10 UTC):** GD.1 MERGED `375b6c7` on the operator's approval ("Merge and
+- **State (2026-09-25, ~16:30 UTC):** GD.E0 MERGED crucible `c31d9be4` and DEPLOYED 16:17 UTC on the
+  operator's approval ("Merge and continue"), as presented: the two session lifetimes and the cognition
+  connection limit are read-only in ForgeCentral (the plan's expected effect); every corrected label is
+  served live (`config-describe`). GD.E0b ON BRANCH `docs/console-11-guide-true-labels` (`8e1917b`):
+  the standalone guide stops correcting the engine (rule R4): Appendix A has no red corrections, 16
+  editable settings (was 19), chapter 2's restart limitation replaced by a dual-control note; census
+  CD-18 fixed; TRD gap G6 narrowed to its ForgeCentral half. AWAITING REVIEW. NEXT = GD.2.
+- **Earlier (2026-09-25, ~07:10 UTC):** GD.1 MERGED `375b6c7` on the operator's approval ("Merge and
   continue"), with the dispatch guard kept as presented (the one runtime change the plan row had ruled
   out: an undeclared `/api` request is refused JSON 404, a declared path under another method 405). NEXT =
   GD.E0 (crdb: the registry's labels and defaults made true), then GD.2. At GD.E0's review the operator
@@ -45,7 +52,8 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.0 | TRD 9-11 | MERGED `3c2e3d6` (2026-09-25; full gate green) | `08a47f2` | the plan, the census, the TRD revision |
 | GD.S1 | 11.3; INV-GUIDE-FORGE-NAMING | MERGED `7439ded` (2026-09-25; full gate green, e2e 40/40) | `651d9f3` | the standalone guide: `docs/guide/` + `scripts/build-guide.mjs` -> HTML + PDF (85 pages) |
 | GD.1 | 9.4; INV-BINDING-ROUTE-COVERAGE | MERGED `375b6c7` (2026-09-25; full gate green, e2e 40/40) | `1fb08f4` | 17 bindings registered (89); 67 routes declared in `routes.ts`, undeclared `/api` refused; route-coverage contract test; audit gaps named (CD-01, CD-15) |
-| GD.E0 | CD-18 (crdb) | PLANNED (decision N3) | | crdb: the registry's live-apply labels and defaults made true, before GD.2 |
+| GD.E0 | CD-18 (crdb) | MERGED crucible `c31d9be4` (2026-09-25; full gate green); DEPLOYED 16:17 UTC | crucible `37331f30` | the registry's labels made true: sessions standard + cognition cap boot-bound, break-glass lifetime and the IdAM section pending, retention live, dual control names both planes, LUG default enabled; pinned by a drift test; the three rows are read-only in ForgeCentral |
+| GD.E0b | R4 | ON BRANCH (2026-09-25) | `8e1917b` | the standalone guide states the corrected labels: Appendix A without red corrections, 16 editable settings, the chapter 2 note |
 | GD.2 | 11.2 (1), 11.5 | PLANNED | | post the guide into ForgeCentral: the ReadMe tab renders the GD.S1 source |
 | GD.3 | 11.6 | PLANNED (needs N2, N3) | | Settings chapters in the ReadMe with live values |
 | GD.4 | 11.6 | PLANNED | | TRD-CONSOLE-02 refresh; chapter re-verified |
