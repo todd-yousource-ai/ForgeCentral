@@ -1,0 +1,110 @@
+<h1>Settings Reference</h1>
+
+<p class="lead">Every setting of the Forge engine's governed configuration, grouped by the surfaces of <span class="path">Settings<span class="sep">&gt;</span>Configuration</span>. Values are those of the September 2026 release; on your node, <span class="path">Settings<span class="sep">&gt;</span>Configuration</span> shows the value in force and the engine's own definition.</p>
+
+<h2 id="ref-reading">Reading this appendix</h2>
+<ul>
+  <li><b>Default</b> is the value before anything is committed. Where a default depends on the deployment profile the engine was installed with, the table says so.</li>
+  <li><b>Accepts</b> is the bound the engine checks when you commit.</li>
+  <li><b>Applies</b>: <span class="applies-live">Live</span> takes effect when committed; <span class="applies-restart">Restart</span> takes effect after the engine restarts; <span class="applies-pending">Not active</span> is stored for a feature that is not built yet; <b>Host</b> is read from the engine host's environment when the engine starts.</li>
+  <li><b>In ForgeCentral</b>: <b>Edit</b> on the Configuration table, <b>Form</b> in Section settings, <b>SOC tab</b> on <span class="path">Settings<span class="sep">&gt;</span>SOC</span>, or <b>Read-only</b>.</li>
+  <li>A line in red corrects the label the engine shows, where this release behaves differently.</li>
+</ul>
+
+<h2 id="ref-access">Administration, governance and sessions</h2>
+<div class="tablewrap wide" id="tab-ref-access" data-title="Administration, governance and sessions settings">
+<table class="data ref">
+<tr><th style="width:23%">Setting</th><th style="width:25%">What it controls</th><th style="width:17%">Default</th><th style="width:15%">Accepts</th><th style="width:11%">Applies</th><th style="width:9%">In ForgeCentral</th></tr>
+<tr><td><code>admin_<wbr>endpoint.<wbr>classification</code></td><td>The operating classification of the engine's administration endpoint.</td><td>Unclassified</td><td>A classification</td><td><span class="applies-restart">Restart</span></td><td>Read-only</td></tr>
+<tr><td><code>admin_<wbr>endpoint.<wbr>max_<wbr>payload_<wbr>bytes</code></td><td>The largest administration message, in bytes.</td><td>65536</td><td>1024 or more</td><td><span class="applies-restart">Restart</span></td><td>Read-only</td></tr>
+<tr><td><code>governance.<wbr>dual_<wbr>control</code></td><td>The capabilities that need two people (<a class="xref" href="#setc-dual"></a>).</td><td>Per profile: none (Evaluation); key issue and security policy change (Enterprise); plus audit export (Air-Gapped, Federal)</td><td>Known capabilities</td><td><span class="applies-live">Live</span><span class="fix">Live for ForgeCentral changes; host-side changes need a restart.</span></td><td>Form</td></tr>
+<tr><td><code>sessions.<wbr>standard_<wbr>lifetime_<wbr>secs</code></td><td>How long an administration session lasts, in seconds.</td><td>28800 (8 hours, Evaluation); shorter in hardened profiles</td><td>Not 0</td><td><span class="applies-live">Live</span><span class="fix">Takes effect after a restart.</span></td><td>Edit</td></tr>
+<tr><td><code>sessions.<wbr>break_<wbr>glass_<wbr>lifetime_<wbr>secs</code></td><td>How long an emergency (break-glass) administration session lasts, in seconds.</td><td>3600 (1 hour, Evaluation); shorter in hardened profiles</td><td>Not 0; not more than the standard lifetime</td><td><span class="applies-live">Live</span><span class="fix">Takes effect after a restart.</span></td><td>Edit</td></tr>
+<tr><td><code>identity.<wbr>admins</code></td><td>The engine's administrator assignments: identity, roles, clearance.</td><td>Empty</td><td>Each administrator has at least one role</td><td><span class="applies-restart">Restart</span></td><td>Read-only (RBAC tab)</td></tr>
+<tr><td><code>identity.<wbr>sso_<wbr>group_<wbr>roles</code></td><td>Which identity-provider groups grant which administrator roles.</td><td>Empty</td><td>Each group maps to at least one role</td><td><span class="applies-restart">Restart</span></td><td>Read-only (Federation tab)</td></tr>
+<tr><td><code>key_<wbr>issuing.<wbr>exposure</code></td><td>Whether the engine issues keys to agents, with dual control and validity.</td><td>Disabled</td><td>Dual control required when enabled</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+</table>
+</div>
+
+<h2 id="ref-data">Maintenance, retention, leases and quotas</h2>
+<div class="tablewrap wide" id="tab-ref-data" data-title="Maintenance, retention, lease and quota settings">
+<table class="data ref">
+<tr><th style="width:23%">Setting</th><th style="width:25%">What it controls</th><th style="width:17%">Default</th><th style="width:15%">Accepts</th><th style="width:11%">Applies</th><th style="width:9%">In ForgeCentral</th></tr>
+<tr><td><code>maintenance.<wbr>cadence_<wbr>secs</code></td><td>How often background maintenance runs, in seconds.</td><td>60</td><td>Not 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>maintenance.<wbr>artifact_<wbr>spot_<wbr>check_<wbr>limit</code></td><td>How many stored artifacts each security report spot-checks.</td><td>32</td><td>Any count</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>retention.<wbr>time_<wbr>travel_<wbr>window_<wbr>secs</code></td><td>How far back version history (including configuration history) is kept, in seconds.</td><td>604800 (7 days)</td><td>Not 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>retention.<wbr>log_<wbr>observation_<wbr>window_<wbr>secs</code></td><td>How long a decision-log observation is kept, in seconds.</td><td>2592000 (30 days)</td><td>Not 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>retention.<wbr>raw_<wbr>days</code></td><td>How many days an ingested record's original bytes are kept.</td><td>5</td><td>Not 0</td><td>Host</td><td>Read-only</td></tr>
+<tr><td><code>detection_<wbr>retention.<wbr>horizons</code></td><td>How long detection decisions are kept.</td><td>Disabled (kept indefinitely)</td><td>Each horizon above 0 when enabled</td><td><span class="applies-pending">Not active</span><span class="fix">Live in this release, although labelled pending.</span></td><td>Read-only</td></tr>
+<tr><td><code>leases.<wbr>cursor_<wbr>secs</code></td><td>How long an open paged read stays open, in seconds.</td><td>60</td><td>Not 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>leases.<wbr>session_<wbr>secs</code></td><td>How long an open transaction or workspace session stays open, in seconds.</td><td>60</td><td>Not 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>leases.<wbr>prepared_<wbr>secs</code></td><td>How long a prepared query is kept for re-use, in seconds.</td><td>300</td><td>Not 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>workspace_<wbr>quota.<wbr>per_<wbr>principal</code></td><td>The most workspaces one identity may hold open.</td><td>64</td><td>Not 0; not more than the tenant quota</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>workspace_<wbr>quota.<wbr>per_<wbr>tenant</code></td><td>The most workspaces one tenant may hold open.</td><td>256</td><td>Not 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>workers.<wbr>max</code></td><td>The size of the engine's worker pool.</td><td>0 (automatic: 8 per core, at least 64)</td><td>Any count</td><td><span class="applies-restart">Restart</span></td><td>Read-only</td></tr>
+</table>
+</div>
+
+<h2 id="ref-query">Queries and graph traversal</h2>
+<div class="tablewrap wide" id="tab-ref-query" data-title="Query and graph settings">
+<table class="data ref">
+<tr><th style="width:23%">Setting</th><th style="width:25%">What it controls</th><th style="width:17%">Default</th><th style="width:15%">Accepts</th><th style="width:11%">Applies</th><th style="width:9%">In ForgeCentral</th></tr>
+<tr><td><code>query_<wbr>surface.<wbr>enabled</code></td><td>Whether the engine answers queries at all. Off stops most ForgeCentral reads (<a class="xref" href="#setc-restrictions"></a>).</td><td>On</td><td>When on, the query and result limits above 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>query_<wbr>surface.<wbr>per_<wbr>tenant_<wbr>result_<wbr>limit</code></td><td>The most rows one query may return; a larger read is refused, not cut short.</td><td>10000</td><td>Above 0 when queries are on</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>query_<wbr>surface.<wbr>result_<wbr>chunk_<wbr>rows</code></td><td>Rows per page of a query result.</td><td>256</td><td>Any count</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>query_<wbr>surface.<wbr>max_<wbr>cursors_<wbr>per_<wbr>tenant</code></td><td>The most open paged reads per tenant.</td><td>128</td><td>Any count</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>query_<wbr>surface.<wbr>max_<wbr>retained_<wbr>tail_<wbr>bytes</code></td><td>The node-wide budget for query results waiting to be delivered, in bytes.</td><td>268435456 (256 MiB)</td><td>Any size</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>query_<wbr>surface.<wbr>per_<wbr>tenant_<wbr>query_<wbr>limit</code></td><td>The most queries a tenant may run.</td><td>100000</td><td>Above 0 when queries are on</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>query_<wbr>surface.<wbr>vector_<wbr>search_<wbr>enabled</code></td><td>Whether vector search is offered.</td><td>Off</td><td>On or off</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>query_<wbr>surface.<wbr>bm25_<wbr>search_<wbr>enabled</code></td><td>Whether full-text search is offered.</td><td>Off</td><td>On or off</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>query_<wbr>surface.<wbr>graph_<wbr>traversal_<wbr>enabled</code></td><td>Whether graph traversal is offered.</td><td>Off</td><td>When on, every graph budget above 0</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>graph_<wbr>budgets.<wbr>expand</code></td><td>The most hops a graph traversal may take.</td><td>0 (closed)</td><td>Above 0 when traversal is on</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>graph_<wbr>budgets.<wbr>fanout</code></td><td>The most neighbors per node a traversal may follow.</td><td>0 (closed)</td><td>Above 0 when traversal is on</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>graph_<wbr>budgets.<wbr>as_<wbr>of</code></td><td>The most historical versions a traversal may rebuild.</td><td>0 (closed)</td><td>Above 0 when traversal is on</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+</table>
+</div>
+
+<h2 id="ref-ingest">Ingest, identity data and exposure</h2>
+<div class="tablewrap wide" id="tab-ref-ingest" data-title="Ingest, identity data and exposure settings">
+<table class="data ref">
+<tr><th style="width:23%">Setting</th><th style="width:25%">What it controls</th><th style="width:17%">Default</th><th style="width:15%">Accepts</th><th style="width:11%">Applies</th><th style="width:9%">In ForgeCentral</th></tr>
+<tr><td><code>normalization.<wbr>disabled_<wbr>decoder_<wbr>families</code></td><td>Log decoder families the engine skips.</td><td>None (all enabled)</td><td>Known families only</td><td><span class="applies-live">Live</span></td><td>Form</td></tr>
+<tr><td><code>normalization.<wbr>source_<wbr>format_<wbr>map</code></td><td>Which decoder handles each named source.</td><td><code>tetragon=tetragon</code></td><td>Known formats only</td><td><span class="applies-live">Live</span></td><td>Form</td></tr>
+<tr><td><code>normalization.<wbr>searchable_<wbr>attributes</code></td><td>Extra attributes added to the search index.</td><td>None (core fields only)</td><td>Non-blank names</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>lug.<wbr>exposure</code></td><td>Whether the engine accepts the local user and host inventory endpoint agents report, and its limits (<a class="xref" href="#setc-sections"></a>).</td><td>Disabled<span class="fix">The engine's own default is enabled.</span></td><td>When enabled, caps and bucket above 0; threshold at most 1000</td><td><span class="applies-live">Live</span></td><td>Form</td></tr>
+<tr><td><code>idam.<wbr>connector</code></td><td>The identity-provider connector's schedule.</td><td>Disabled; poll 300 s; full sync 24 h</td><td>Poll 60 to 86400 s; full sync 1 to 168 h</td><td><span class="applies-live">Live</span><span class="fix">Not used: connector changes are made on the Federation tab and held in memory (<a class="xref" href="#idp-restrictions"></a>).</span></td><td>Read-only</td></tr>
+<tr><td><code>aig.<wbr>exposure</code></td><td>Exposure of the agent identity graph.</td><td>Disabled</td><td>Retention above 0 when enabled</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>api.<wbr>exposure</code></td><td>Exposure of the web application programming interface: origin, content policy, rate.</td><td>Closed</td><td>A rate above 0 when an origin is set</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>observability.<wbr>telemetry_<wbr>enabled</code></td><td>Whether the engine emits its own telemetry.</td><td>On</td><td>On or off</td><td>Host</td><td>Read-only</td></tr>
+<tr><td><code>observability.<wbr>otlp_<wbr>ingest_<wbr>bytes_<wbr>per_<wbr>window</code></td><td>Telemetry each connection may send per minute, in bytes; over-budget sends are dropped. 0 drops all.</td><td>67108864 (64 MiB)</td><td>Any size</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+</table>
+</div>
+
+<h2 id="ref-detect">Detection, SOC and models</h2>
+<div class="tablewrap wide" id="tab-ref-detect" data-title="Detection, SOC and model settings">
+<table class="data ref">
+<tr><th style="width:23%">Setting</th><th style="width:25%">What it controls</th><th style="width:17%">Default</th><th style="width:15%">Accepts</th><th style="width:11%">Applies</th><th style="width:9%">In ForgeCentral</th></tr>
+<tr><td><code>detection_<wbr>posture.<wbr>wake_<wbr>specificity_<wbr>floor_<wbr>milli</code></td><td>How much specific evidence about a subject must accumulate before the engine evaluates a technique against it.</td><td>1000</td><td>Not 0</td><td><span class="applies-live">Live</span></td><td>Edit</td></tr>
+<tr><td><code>detection_<wbr>posture.<wbr>watermarks</code></td><td>Tolerance for late and out-of-order events: skew, lateness, idle timeout (seconds).</td><td>300, 120, 600</td><td>Each above 0</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>credibility_<wbr>weights.<wbr>weight_<wbr>set</code></td><td>The versioned weights the engine scores detections with. Every evaluation records the version it used.</td><td>The shipped version 1</td><td>A modified set needs version 2 or later</td><td><span class="applies-live">Live</span></td><td>Read-only</td></tr>
+<tr><td><code>soc.<wbr>tiers</code></td><td>The response tiers, <code>p_low</code> and <code>p_high</code> (<a class="xref" href="#soc-set-tiers"></a>).</td><td>0 and 1000</td><td>0 &lt;= p_low &lt;= p_high &lt;= 1000</td><td><span class="applies-live">Live</span></td><td>SOC tab</td></tr>
+<tr><td><code>siem_<wbr>writeback</code></td><td>SIEM enrichment write-back (<a class="xref" href="#soc-set-siem"></a>).</td><td>Disabled; Splunk; ceiling Unclassified</td><td>Host, stream and https case URL when enabled</td><td><span class="applies-live">Live</span></td><td>SOC tab</td></tr>
+<tr><td><code>soc_<wbr>narrative.<wbr>model_<wbr>ref</code></td><td>The model that writes verdict narratives.</td><td>Unbound</td><td>A registered text-generation model</td><td><span class="applies-live">Live</span></td><td>Form</td></tr>
+<tr><td><code>served_<wbr>models.<wbr>registry</code></td><td>The models registered with the engine.</td><td>Empty</td><td>Complete, unique entries</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+<tr><td><code>embedder.<wbr>binding</code></td><td>The embedding model service the engine uses.</td><td>The built-in reference embedder</td><td>Any endpoint</td><td><span class="applies-restart">Restart</span></td><td>Read-only</td></tr>
+<tr><td><code>build_<wbr>search.<wbr>posture</code></td><td>How search indexes are built: model, dimensions, cadence.</td><td>Local, 1024 dimensions, on demand, search off</td><td>Must match the embedder in use</td><td><span class="applies-pending">Not active</span></td><td>Read-only</td></tr>
+</table>
+</div>
+
+<h2 id="ref-cognition">Model inference and egress</h2>
+<div class="tablewrap wide" id="tab-ref-cognition" data-title="Model inference and egress settings">
+<table class="data ref">
+<tr><th style="width:23%">Setting</th><th style="width:25%">What it controls</th><th style="width:17%">Default</th><th style="width:15%">Accepts</th><th style="width:11%">Applies</th><th style="width:9%">In ForgeCentral</th></tr>
+<tr><td><code>egress.<wbr>destinations</code></td><td>Where the engine may send data for model inference, with each destination's classification ceiling.</td><td>Empty</td><td>Unique ids</td><td><span class="applies-live">Live</span></td><td>Form</td></tr>
+<tr><td><code>cognition.<wbr>add_<wbr>destinations</code></td><td>Destinations added from the engine host's environment, merged into the list above.</td><td>Profile default</td><td><code>id=ceiling</code> pairs</td><td>Host</td><td>Read-only</td></tr>
+<tr><td><code>cognition.<wbr>max_<wbr>connections</code></td><td>The most simultaneous model-inference connections.</td><td>64</td><td>Any count</td><td><span class="applies-live">Live</span><span class="fix">Takes effect after a restart.</span></td><td>Edit</td></tr>
+<tr><td><code>cognition.<wbr>admit_<wbr>enrolled_<wbr>devices</code></td><td>Whether enrolled devices may use model inference.</td><td>Off</td><td>On or off</td><td><span class="applies-restart">Restart</span></td><td>Read-only</td></tr>
+<tr><td><code>cognition.<wbr>context_<wbr>sources</code></td><td>Which sources may supply context to model inference.</td><td>Profile default</td><td>Known source kinds</td><td>Host</td><td>Read-only</td></tr>
+<tr><td><code>cognition.<wbr>frontier_<wbr>providers</code></td><td>External model providers the engine may call.</td><td>Profile default</td><td>Well-formed provider entries</td><td>Host</td><td>Read-only</td></tr>
+</table>
+</div>

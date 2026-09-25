@@ -1,0 +1,279 @@
+/*
+ * ForgeCentral Configuration Guide -- the Forge brand in a Cisco configuration-guide layout.
+ *
+ * Layout model: the Cisco Catalyst SD-WAN Network Configuration Guide (cover with hero band, CONTENTS
+ * page, chapter openers with a mini table of contents, availability table, "How it works" figures with
+ * numbered callouts, Procedure blocks with Step labels in the left gutter, Note call-outs, running
+ * headers and boxed page numbers). Brand model: the Forge mark and the ForgeCentral design tokens
+ * (packages/design/src/tokens/color.ts): teal-green #3FBE96 and deep navy #123A6B, the honeycomb field,
+ * Roboto / Roboto Condensed. Printed on a light page, so text colours are darkened variants of the
+ * brand hues (contrast >= 4.5:1 on white); the pure brand hues are used for fills, bars and marks.
+ *
+ * The build (scripts/build-guide.mjs) adds one @page rule per chapter so each page's running header
+ * names its chapter, and fills every "on page N" reference from the rendered PDF's destinations.
+ */
+
+:root {
+  --teal: #3fbe96;          /* brand primary: marks, bars, rules, figure accents */
+  --teal-ink: #17785c;      /* teal darkened for text and links on white */
+  --teal-tint: #e6f5ef;     /* table headers, note fills */
+  --teal-tint2: #cdebdf;
+  --navy: #123a6b;          /* brand deep: headings, header bars, page-number box */
+  --navy-ink: #0c2748;      /* titles */
+  --navy-tint: #e8eef6;
+  --ink: #1b2434;           /* body text */
+  --muted: #5a6477;         /* captions, running furniture */
+  --rule: #d3dae4;          /* hairlines */
+  --paper: #f6f8fb;         /* code and panel fill */
+  /* semantic hues from the console tokens, for figures and status */
+  --users: #3b82f6;
+  --agents: #8b5cf6;
+  --objects: #e8a33d;
+  --good: #2ecc8f;
+  --caution: #b7791f;       /* amber darkened for text */
+  --caution-fill: #fdf3e1;
+  --critical: #c2413a;      /* red darkened for text */
+  --critical-fill: #fbe9e7;
+  --indent: 1.3in;          /* the body column; headings and Step labels hang into the gutter */
+}
+
+@page {
+  size: letter;
+  margin: 0.85in 0.8in 0.85in 0.8in;
+  @top-right {
+    content: "ForgeCentral Configuration Guide";
+    font: 400 7.5pt 'Roboto', sans-serif;
+    color: var(--muted);
+    vertical-align: bottom;
+    padding-bottom: 10pt;
+  }
+}
+@page :right {
+  @bottom-right {
+    content: counter(page);
+    font: 700 8.5pt 'Roboto Condensed', sans-serif;
+    color: #fff;
+    background: var(--navy);
+    padding: 3pt 0;
+    margin-top: 16pt;
+    height: 12pt;
+    width: 28pt;
+    text-align: center;
+  }
+  @bottom-left {
+    content: "Forge -- configured from ForgeCentral";
+    font: 400 7.5pt 'Roboto', sans-serif;
+    color: var(--muted);
+    vertical-align: top;
+    padding-top: 18pt;
+  }
+}
+@page :left {
+  @bottom-left {
+    content: counter(page);
+    font: 700 8.5pt 'Roboto Condensed', sans-serif;
+    color: #fff;
+    background: var(--navy);
+    padding: 3pt 0;
+    margin-top: 16pt;
+    height: 12pt;
+    width: 28pt;
+    text-align: center;
+  }
+  @bottom-right {
+    content: "Forge -- configured from ForgeCentral";
+    font: 400 7.5pt 'Roboto', sans-serif;
+    color: var(--muted);
+    vertical-align: top;
+    padding-top: 18pt;
+  }
+}
+/* Front matter carries no running furniture. */
+@page front {
+  @top-right { content: none; }
+  @top-left { content: none; }
+  @bottom-left { content: none; background: none; }
+  @bottom-right { content: none; background: none; }
+}
+@page cover {
+  margin: 0;
+  @top-right { content: none; }
+  @top-left { content: none; }
+  @bottom-left { content: none; background: none; }
+  @bottom-right { content: none; background: none; }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Roboto', 'Liberation Sans', Arial, sans-serif;
+  font-size: 9.8pt;
+  line-height: 1.48;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+a { color: var(--teal-ink); text-decoration: none; }
+b.ui, .ui { font-weight: 700; color: var(--navy-ink); }
+code, .mono { font-family: 'DejaVu Sans Mono', 'Liberation Mono', monospace; font-size: 8.4pt; }
+code { background: var(--paper); border-radius: 2pt; padding: 0 2pt; color: var(--navy-ink); }
+.path { font-weight: 700; color: var(--navy-ink); }
+.path .sep { color: var(--teal); font-weight: 700; padding: 0 3pt; }
+
+/* ------------------------------------------------------------------ cover */
+.cover { page: cover; position: relative; height: 11in; width: 8.5in; overflow: hidden; }
+.cover .brandbar { position: absolute; top: 0.55in; left: 0.8in; display: flex; align-items: center; gap: 12pt; }
+.cover .brandbar img { width: 0.78in; height: auto; }
+.cover .brandbar .word { font: 700 20pt 'Roboto Condensed', sans-serif; color: var(--navy-ink); letter-spacing: 0.5pt; }
+.cover .brandbar .word span { color: var(--teal-ink); }
+.cover .hero {
+  position: absolute; top: 1.6in; left: 0.8in; right: 0.8in; height: 3.1in;
+  background-size: cover; background-position: center 62%;
+  border-radius: 3pt;
+}
+.cover .hero::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 5pt;
+  background: linear-gradient(90deg, var(--teal), var(--navy));
+  border-radius: 0 0 3pt 3pt;
+}
+.cover .title { position: absolute; top: 5.05in; left: 1.9in; right: 0.8in; }
+.cover h1 { font: 700 27pt/1.12 'Roboto Condensed', sans-serif; color: var(--navy-ink); margin: 0 0 8pt 0; }
+.cover .subtitle { font: 400 13pt/1.35 'Roboto', sans-serif; color: var(--muted); margin: 0 0 14pt 0; }
+.cover .meta { font: 400 9.5pt 'Roboto', sans-serif; color: var(--ink); }
+.cover .meta b { font-family: 'Roboto Condensed'; }
+.cover .draft {
+  display: inline-block; margin-top: 12pt; padding: 3pt 8pt; border: 1pt solid var(--caution);
+  color: var(--caution); font: 700 8.5pt 'Roboto Condensed', sans-serif; letter-spacing: 1.2pt;
+}
+.cover .company { position: absolute; bottom: 0.8in; left: 1.9in; font: 400 9pt/1.45 'Roboto', sans-serif; color: var(--ink); }
+.cover .company img { height: 0.34in; display: block; margin-bottom: 8pt; }
+.cover .company b { font-family: 'Roboto Condensed'; color: var(--navy-ink); }
+
+/* ------------------------------------------------------------------ legal */
+.legal { page: front; break-before: page; font-size: 7.6pt; line-height: 1.45; color: var(--muted); padding-top: 4.2in; }
+.legal p { margin: 0 0 7pt 0; }
+.legal .strong { color: var(--ink); font-weight: 700; }
+
+/* ------------------------------------------------------------------ hero band (contents, openers) */
+.band {
+  height: 1.55in; margin-left: var(--indent); border-radius: 3pt; position: relative;
+  background-size: cover; background-position: center 58%;
+}
+.band::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4pt;
+  background: linear-gradient(90deg, var(--teal), var(--navy)); border-radius: 0 0 3pt 3pt;
+}
+
+/* ------------------------------------------------------------------ contents */
+.contents { page: front; break-before: page; }
+.contents h1.toc-title {
+  margin: 16pt 0 22pt var(--indent); font: 700 16pt 'Roboto Condensed', sans-serif;
+  letter-spacing: 3.5pt; color: var(--navy-ink);
+}
+.toc-chapter { display: grid; grid-template-columns: var(--indent) 1fr; border-top: 1.2pt solid var(--navy); padding-top: 4pt; margin-top: 12pt; break-inside: avoid; }
+.toc-chapter .label { font: 700 7.8pt 'Roboto Condensed', sans-serif; letter-spacing: 1.6pt; color: var(--navy-ink); padding-top: 2pt; }
+.toc-chapter .entries { font-size: 9.2pt; }
+.toc-line { display: flex; gap: 8pt; margin: 3pt 0; }
+.toc-line a { color: var(--teal-ink); }
+.toc-line.l1 { font-weight: 700; font-size: 10pt; }
+.toc-line.l1 a { color: var(--navy-ink); }
+.toc-line.l2 { padding-left: 14pt; }
+.toc-line.l3 { padding-left: 28pt; font-size: 8.8pt; }
+.toc-line .pn { font: 700 8.5pt 'Roboto Condensed', sans-serif; color: var(--ink); }
+
+/* ------------------------------------------------------------------ chapters */
+section.chapter { break-before: page; }
+.opener .chapnum { margin: 10pt 0 0 var(--indent); text-align: right; font: 700 9pt 'Roboto Condensed', sans-serif; letter-spacing: 3.2pt; color: var(--navy-ink); }
+.opener .chapnum .n { font: 700 40pt/1 'Roboto Condensed', sans-serif; letter-spacing: 0; color: var(--teal); margin-left: 8pt; vertical-align: -6pt; }
+.opener h1 {
+  font: 700 25pt/1.12 'Roboto Condensed', sans-serif; color: var(--navy-ink);
+  margin: 4pt 0 0 0; padding-bottom: 6pt; border-bottom: 3pt solid var(--navy);
+  border-image: linear-gradient(90deg, var(--navy), var(--teal)) 1;
+}
+.minitoc { margin: 12pt 0 18pt var(--indent); padding: 0; list-style: none; font-size: 9.2pt; }
+.minitoc li { margin: 2.5pt 0; padding-left: 10pt; position: relative; }
+.minitoc li::before { content: ""; position: absolute; left: 0; top: 6pt; width: 4pt; height: 4pt; background: var(--teal); }
+.minitoc .on { color: var(--muted); }
+
+h2 { font: 700 17pt/1.18 'Roboto Condensed', sans-serif; color: var(--navy-ink); margin: 20pt 0 8pt 0; break-after: avoid; }
+h3 { font: 700 12.5pt/1.2 'Roboto Condensed', sans-serif; color: var(--navy-ink); margin: 16pt 0 6pt var(--indent); break-after: avoid; }
+h4 { font: 700 9.8pt 'Roboto Condensed', sans-serif; color: var(--navy-ink); margin: 12pt 0 4pt var(--indent); break-after: avoid; }
+section.chapter > :is(p, ul, ol, dl, pre, .note, .callout, .procedure, .tablewrap, figure, .kv) { margin-left: var(--indent); }
+section.chapter p { margin-top: 0; margin-bottom: 7pt; }
+section.chapter ul, section.chapter ol { padding-left: 14pt; margin-top: 0; margin-bottom: 8pt; }
+section.chapter li { margin: 2pt 0; }
+section.chapter ul > li::marker { color: var(--teal); }
+
+/* ------------------------------------------------------------------ procedure (Cisco Step gutter) */
+.procedure { margin-top: 4pt; margin-bottom: 12pt; }
+.procedure > .ptitle { font: 700 9.8pt 'Roboto Condensed', sans-serif; color: var(--navy-ink); border-bottom: 0.8pt solid var(--rule); padding-bottom: 3pt; margin-bottom: 6pt; }
+.procedure ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: step; }
+.procedure ol.steps > li { counter-increment: step; position: relative; margin: 0 0 6pt 0; break-inside: avoid; }
+.procedure ol.steps > li::before {
+  content: "Step " counter(step); position: absolute; left: calc(-1 * var(--indent)); width: calc(var(--indent) - 12pt);
+  font: 700 9.2pt 'Roboto Condensed', sans-serif; color: var(--navy-ink);
+}
+.procedure ol.steps > li > ul { margin-top: 3pt; }
+.procedure .result { color: var(--muted); font-style: italic; }
+
+/* ------------------------------------------------------------------ notes (Cisco Note, gutter label) */
+.note { position: relative; border-top: 0.8pt solid var(--rule); border-bottom: 0.8pt solid var(--rule); padding: 6pt 0 6pt 0; margin-top: 8pt; margin-bottom: 10pt; break-inside: avoid; }
+.note::before {
+  position: absolute; left: calc(-1 * var(--indent)); top: 6pt; width: calc(var(--indent) - 0.52in); text-align: right;
+  font: 700 9pt 'Roboto Condensed', sans-serif; content: "Note"; color: var(--teal-ink);
+}
+.note::after {
+  content: "i"; position: absolute; left: -0.46in; top: 5.5pt; width: 13pt; height: 13pt; border-radius: 50%;
+  background: var(--teal); color: #ffffff; font: 700 8.5pt/13pt 'Roboto Condensed', sans-serif; text-align: center;
+}
+.note.caution::before { content: "Caution"; color: var(--caution); }
+.note.caution::after { content: "!"; background: var(--objects); }
+.note.limit::before { content: "Limitation"; color: var(--critical); }
+.note.limit::after { content: "!"; background: var(--critical); }
+.note.tip::before { content: "Tip"; color: var(--navy-ink); }
+.note.tip::after { content: "+"; background: var(--navy); }
+.note p:last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------------------ tables */
+.tablewrap { margin-top: 4pt; margin-bottom: 12pt; break-inside: auto; }
+.tablewrap .tcap { font: italic 700 8.4pt 'Roboto', sans-serif; color: var(--navy-ink); margin-bottom: 4pt; }
+table.data { width: 100%; border-collapse: collapse; font-size: 8.6pt; line-height: 1.4; }
+table.data th { background: var(--teal-tint); color: var(--navy-ink); text-align: left; font: 700 8.6pt 'Roboto Condensed', sans-serif; border-top: 2pt solid var(--teal); border-bottom: 0.8pt solid var(--teal-tint2); padding: 4pt 6pt; }
+table.data td { border-bottom: 0.6pt solid var(--rule); padding: 4pt 6pt; vertical-align: top; }
+table.data tr { break-inside: avoid; }
+table.data td code { font-size: 7.8pt; }
+table.data.tight td { padding: 2.5pt 5pt; }
+
+.pill { display: inline-block; font: 700 7.4pt 'Roboto Condensed', sans-serif; letter-spacing: 0.4pt; padding: 1pt 5pt; border-radius: 7pt; white-space: nowrap; }
+.pill.ok { background: var(--teal-tint); color: var(--teal-ink); border: 0.6pt solid var(--teal); }
+.pill.ro { background: var(--navy-tint); color: var(--navy-ink); border: 0.6pt solid #9fb3cf; }
+.pill.na { background: var(--caution-fill); color: var(--caution); border: 0.6pt solid #e5b867; }
+.pill.off { background: var(--critical-fill); color: var(--critical); border: 0.6pt solid #e4a19c; }
+
+/* ------------------------------------------------------------------ figures */
+figure { margin-top: 6pt; margin-bottom: 14pt; break-inside: avoid; text-align: center; }
+figure svg { width: 100%; height: auto; display: block; }
+figure figcaption { text-align: left; font: italic 700 8.4pt 'Roboto', sans-serif; color: var(--navy-ink); margin-top: 5pt; }
+figure figcaption .fignum { color: var(--teal-ink); font-style: normal; }
+figure.wide { margin-left: 0 !important; }
+
+/* key/value field list (field reference inside a procedure) */
+.kv { display: grid; grid-template-columns: 1.55in 1fr; gap: 3pt 10pt; font-size: 8.9pt; margin-bottom: 10pt; }
+.kv dt { font-weight: 700; color: var(--navy-ink); }
+.kv dd { margin: 0; }
+
+.lead { font-size: 10.3pt; }
+.small { font-size: 8.4pt; color: var(--muted); }
+.nobreak { break-inside: avoid; }
+
+/* full-width reference tables (appendices) */
+section.chapter > .tablewrap.wide { margin-left: 0; }
+table.data.ref { font-size: 7.7pt; line-height: 1.35; }
+table.data.ref th { font-size: 7.9pt; }
+table.data.ref td code { font-size: 7.2pt; overflow-wrap: anywhere; }
+.applies-live { color: var(--teal-ink); font-weight: 700; }
+.applies-restart { color: var(--caution); font-weight: 700; }
+.applies-pending { color: var(--muted); font-weight: 700; }
+.fix { display: block; color: var(--critical); font-size: 7.2pt; }
+section.chapter ul.limlist { margin-left: var(--indent); font-size: 8.9pt; }
+section.chapter ul.limlist li { margin: 3pt 0 5pt 0; }

@@ -11,6 +11,8 @@ evidence slices in `IP-CONSOLE-11-guide-census/`). Operator rulings, 2026-09-25:
 2. Forge is the platform; the repository names are internal naming only and never appear in the guide.
 3. The ReadMe lives under Settings for now.
 4. The engine additions and the setup wizard are part of this plan but DEFERRED.
+5. Build the guide as a standalone document first, in the Cisco configuration-guide format with the
+   Forge brand and figures that explain the complex parts, then post it into ForgeCentral (GD.S1).
 
 **Named invariants** (TRD-CONSOLE-11 11.6, plus GD.1's):
 - `INV-GUIDE-COVERS-EVERY-CONFIG` -- every command binding in the no-stub manifest and every registry
@@ -56,10 +58,11 @@ refreshes; `TypeScript_Dev_Rules.md` Section 17 (the no-stub contract GD.1 makes
 
 ## Decisions for the operator (open)
 
-- **N1 -- the naming glossary for guide prose.** Proposed: "Forge" (the platform), "ForgeCentral" (the
+- **N1 -- the naming glossary for guide prose. DECIDED 2026-09-25 (operator: "Agreed with the naming
+  convention").** Adopted: "Forge" (the platform), "ForgeCentral" (the
   console), "the Forge engine" (the data and detection engine), "the Forge endpoint agent" (the host
-  agent). A command or path an operator must type appears verbatim only inside a copyable code block.
-  Needed before GD.2 (chapter 1 uses it).
+  agent). A command or path an operator must type appears verbatim only inside a code block. The
+  standalone build enforces it (a content lint that fails on an internal name outside `<code>`).
 - **N2 -- how the guide treats the census defects.** (a) RECOMMENDED: document the product as it
   behaves, state each broken or missing behaviour as a known limitation with its workaround, and fix
   the defects on their own schedule (each fix updates its entry, rule R4); (b) fix the S1 and S2
@@ -74,8 +77,9 @@ refreshes; `TypeScript_Dev_Rules.md` Section 17 (the no-stub contract GD.1 makes
 
 - **R1** One PR per step; branch per PR; the FULL `scripts/ci.sh` (no flags) on the box before every
   push; no-ff merge; docs commits separate from code commits; each PR reviewed before the next.
-- **R2** Each chapter PR refreshes its surface TRD against the census (a docs commit) and writes the
-  chapter with its scoped coverage test (a code commit).
+- **R2** The chapters are written once, in the standalone guide (GD.S1). Each surface step then refreshes
+  its TRD against the census and re-verifies its chapter against the code, correcting the chapter where
+  the code moved.
 - **R3** Chapter content comes from the census slices, re-verified against the code in the chapter's
   PR (the census is dated 2026-09-25; the code moves).
 - **R4** A PR that fixes a census defect updates the guide entry the defect touches.
@@ -87,16 +91,17 @@ refreshes; `TypeScript_Dev_Rules.md` Section 17 (the no-stub contract GD.1 makes
 | Step | Acceptance | Deliverable |
 |------|-----------|-------------|
 | **GD.0** | TRD 9-11 | **The plan (this PR, docs only):** the census and its six slices; `TRD-CONSOLE-11` revised (Section 9 as built, Section 10 the known gaps, Section 11 the guide); this plan and its ledger; the `IP-CONSOLE-11-settings` ledger corrected (ST.7 superseded, the ST.9 note). |
+| **GD.S1** | 11.3; `INV-GUIDE-FORGE-NAMING` | **The standalone guide** (operator ruling 5): `docs/guide/` (chapters as HTML fragments, the Forge print stylesheet, the legal page, the cover data) and `scripts/build-guide.mjs` (content lint, figure and table numbering, cross references, page numbers filled from the rendered PDF, Appendix B assembled from every Limitation note) render the whole guide to HTML and PDF with the console's Playwright Chromium: 16 chapters (one per surface, plus how configuration works and navigation) and three appendices (the settings reference, known limitations, glossary), 16 figures. The content is the census, re-verified against the code; every chapter states its limitations plainly. This is the single source the in-app ReadMe renders (GD.2). |
 | **GD.1** | 9.4; `INV-BINDING-ROUTE-COVERAGE` | **The manifest becomes the complete, enforced index.** Register the 17 unbound routes (the ten Settings operations plus `console-rbac` and `security-session`, the SOC KPI / report / weekly reads, Overview members, the IdAM secret write); `logs.export` becomes an audited command; correct the stale header comments; add the contract test that maps every BFF route to a registered binding and every LIVE binding to a route. No runtime behaviour change. |
-| **GD.2** | 11.2 (1), 11.5; `INV-GUIDE-ADDRESSABLE`, `INV-GUIDE-FORGE-NAMING` | **The ReadMe tab and the content model.** `apps/console/src/guide/`: typed content (sections with stable ids; entries keyed to binding ids and registry keys), rendered by React (no Markdown library, no raw HTML); the contents, the filter, deep links that survive a reload; the naming lint; chapter 1, "How configuration works in Forge" (where configuration lives, how a change applies, who can do what today, what is audited, tenancy, what reaches an endpoint). Needs N1. |
-| **GD.3** | 11.6; `INV-GUIDE-ENGINE-VALUES-LIVE` | **Chapter: Settings** (all ten tabs; the Configuration reference rendered live from `SETTINGS_READ`). The TRD is already current (GD.0). Needs N2, N3. |
-| **GD.4** | 11.6 | **Chapter: Virtual Trust Zones** + `TRD-CONSOLE-02` refresh. |
-| **GD.5** | 11.6 | **Chapter: Objects** + `TRD-CONSOLE-10` refresh. |
-| **GD.6** | 11.6 | **Chapter: Policies and distribution** + `TRD-CONSOLE-05` refresh. States plainly what reaches an endpoint today (census fact 7). |
-| **GD.7** | 11.6 | **Chapter: Users, groups and identity providers** + `TRD-CONSOLE-04` refresh. |
-| **GD.8** | 11.6 | **Chapter: SOC operations** + `TRD-CONSOLE-03` refresh + the `IP-CONSOLE-03-soc-ops` ledger corrections (census L-03). |
-| **GD.9** | 11.6 | **Chapter: Logs and reports** + `TRD-CONSOLE-09` and `TRD-CONSOLE-08` refresh. |
-| **GD.10** | 11.6 | **Chapter: Overview, the entity drawer and navigation** + `TRD-CONSOLE-01`, `TRD-CONSOLE-12` and the `TRD-CONSOLE-00` navigation and surface catalog refresh. |
+| **GD.2** | 11.2 (1), 11.5; `INV-GUIDE-ADDRESSABLE` | **Post the guide into ForgeCentral: the ReadMe tab.** The tab renders the reviewed GD.S1 chapter source (one source for the document and the tab; the integration design, converting the fragments to components at build time or rendering them sanitized, is decided in this step), with the contents, the filter and deep links that survive a reload; the Settings reference renders live from `SETTINGS_READ` instead of the document's snapshot. |
+| **GD.3** | 11.6; `INV-GUIDE-ENGINE-VALUES-LIVE` | **Settings chapters in the ReadMe with live values.** The Settings reference renders from `SETTINGS_READ` in the tab (the document keeps its dated snapshot); the registry's live-apply labels corrected first (N3). Needs N2, N3. |
+| **GD.4** | 11.6 | **`TRD-CONSOLE-02` refresh** against the census; the Virtual Trust Zones chapter re-verified against the code. |
+| **GD.5** | 11.6 | **`TRD-CONSOLE-10` refresh**; the Objects chapter re-verified. |
+| **GD.6** | 11.6 | **`TRD-CONSOLE-05` refresh**; the Policies and Policy Distribution chapters re-verified. |
+| **GD.7** | 11.6 | **`TRD-CONSOLE-04` refresh**; the Users and Groups and Identity Providers chapters re-verified. |
+| **GD.8** | 11.6 | **`TRD-CONSOLE-03` refresh** and the `IP-CONSOLE-03-soc-ops` ledger corrections (census L-03); the SOC Operations chapter re-verified. |
+| **GD.9** | 11.6 | **`TRD-CONSOLE-09` and `TRD-CONSOLE-08` refresh**; the Logs and Reports chapters re-verified. |
+| **GD.10** | 11.6 | **`TRD-CONSOLE-01`, `TRD-CONSOLE-12` and the `TRD-CONSOLE-00` navigation and surface catalog refresh**; the Navigating and Overview chapters re-verified. |
 | **GD.11** | 11.2 (2); `INV-GUIDE-CONTEXTUAL` | **The contextual side panel.** A help control opens the shared `Drawer` at the section for the active surface and tab (a route-to-section map in the content model), with links to the full chapter and back to the control. Starts on the Settings tabs, then every surface. |
 | **GD.12** | 11.2 (3); `INV-GUIDE-ONE-SOURCE` | **Inline micro-copy and info tips.** An accessible `InfoTip` in `@forge/design`; each configuration field gets its one-line help, default and format; validation constraints visible under the field; the Console's limits exported from the `@forge/contracts` validators as named constants and rendered from them. |
 | **GD.13** | `INV-GUIDE-DISABLED-EXPLAINED` | **State-aware explanations.** Every disabled or locked configuration control states why (dual control, boot-bound, pending subsystem, tier refusal, signer or secret plane not provisioned, enforcement off) and links to the cause (the setting, the tab or the guide section). |
@@ -121,6 +126,6 @@ refreshes; `TypeScript_Dev_Rules.md` Section 17 (the no-stub contract GD.1 makes
 
 The scheduled steps change ForgeCentral only. The deferred engine rows (GD.E1 to GD.E3) become a crdb
 plan when the operator schedules them. The census defects (`IP-CONSOLE-11-guide-CENSUS.md`, CD-01 to
-CD-44) span all three repos and are scheduled separately; the S1 items are the operator's first call
+CD-46) span all three repos and are scheduled separately; the S1 items are the operator's first call
 (the IdAM secret write, the host-wide egress attach on bundle apply, the missing operator
 authorization, the sidecar's loopback trust).

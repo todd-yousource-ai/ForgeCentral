@@ -1,0 +1,45 @@
+<h1>Logs</h1>
+
+<p class="lead">The Logs surface is the decision log: every governed decision the Forge engine made from detection, with why it fired. You filter it, follow it live, read a decision's rationale, and create an audited export.</p>
+
+<h2 id="log-availability">Availability</h2>
+<div class="tablewrap" id="tab-log-availability" data-title="Logs: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Decision log with filters</td><td><span class="pill ok">AVAILABLE</span></td><td>Search, confidence, outcome, time range.</td></tr>
+<tr><td>Live refresh</td><td><span class="pill ok">AVAILABLE</span></td><td>Every two seconds, with Pause and Resume.</td></tr>
+<tr><td>Decision rationale</td><td><span class="pill ok">AVAILABLE</span></td><td>Why a decision fired, and the acting entity.</td></tr>
+<tr><td>Audited export</td><td><span class="pill ok">AVAILABLE</span></td><td>A JSON file with an audit receipt. See the Limitation on size.</td></tr>
+<tr><td>Saved filters; filters by technique, tactic or rule</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Filters reset when you leave the page.</td></tr>
+</table>
+</div>
+
+<h2 id="log-read">Read the decision log</h2>
+<p>Each row is one decision: <b class="ui">Time (UTC)</b>; <b class="ui">Decision</b> (the finding and the rule that fired); <b class="ui">ATT&amp;CK</b> (the technique); <b class="ui">Confidence</b> (the engine's confidence tier); and <b class="ui">Outcome</b>, the posture the engine gave it:</p>
+<ul>
+  <li><b class="ui">Escalate</b>: raised for a person to act on.</li>
+  <li><b class="ui">Candidate</b>: promoted as a possible incident.</li>
+  <li><b class="ui">Observe only</b>: recorded and watched, not raised.</li>
+</ul>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <b class="ui">Logs</b>.</li>
+  <li>Narrow the list with the filter bar: <b class="ui">Search</b> (a finding, rule or evidence), <b class="ui">Confidence</b> (<b class="ui">High</b>, <b class="ui">Medium</b>, <b class="ui">Low</b>, <b class="ui">Contested</b>; an exact tier, not a minimum), <b class="ui">Outcome</b>, and <b class="ui">Time range</b> (<b class="ui">All time</b>, <b class="ui">Last 24h</b>, <b class="ui">Last 7 days</b>, <b class="ui">Last 30 days</b>).</li>
+  <li>To stop the list moving while you read, choose <b class="ui">Pause</b>; choose <b class="ui">Resume</b> to follow it again. The badge reads <b class="ui">Live</b>, <b class="ui">Paused</b>, or <b class="ui">Reconnecting</b> after a missed refresh.</li>
+  <li>Choose a row's <b class="ui">Decision</b> to open <b class="ui">Why this decision fired</b>: the finding, rule, ATT&amp;CK technique and tactics, scope and evidence. Choose <b class="ui">View</b> beside the acting entity to open it in the entity drawer.</li>
+</ol>
+</div>
+<div class="note limit"><p>The log shows up to 100 decisions for the current filter, newest first. To reach older decisions, narrow the time range or the search.</p></div>
+
+<h2 id="log-export">Export decisions</h2>
+<p>An export is an audited engine operation: the Forge engine records a receipt on its audit chain and returns the rows, which your browser saves as <code>decision-log-</code><i>receipt</i><code>.json</code>.</p>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Set the filters. Choose the <b class="ui">Time range</b> again just before you export, so the range ends now.</li>
+  <li>Choose <b class="ui">Export</b>. There is no confirmation step. <span class="result">The page reads Exported N decision(s); audit receipt ... recorded at version V, and the file downloads. A repeated export of the same request reads (already recorded).</span></li>
+</ol>
+</div>
+<div class="note limit"><p>An export contains at most the 100 decisions the current filter shows, not every decision that matches. For a larger export, export in several narrower time ranges.</p></div>
+<p>If the export fails, the page reads <b class="ui">The export was refused or unavailable. Nothing was recorded.</b></p>

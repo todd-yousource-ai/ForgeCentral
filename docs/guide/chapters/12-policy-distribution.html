@@ -1,0 +1,117 @@
+<h1>Policy Distribution</h1>
+
+<p class="lead">Distribution is how a zone's published policies reach the endpoints that should apply them: ForgeCentral composes the zone's policies into a signed bundle, the Forge engine holds it, and each endpoint's agent fetches, verifies and applies it, then reports back. This chapter explains that loop and what ForgeCentral shows. In this release the loop is not yet usable from ForgeCentral; the Restrictions say exactly where it stops.</p>
+
+<h2 id="dist-availability">Availability</h2>
+<div class="tablewrap" id="tab-dist-availability" data-title="Policy distribution: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Distribution status per zone</td><td><span class="pill ro">READ-ONLY</span></td><td>The <b class="ui">Policy distribution</b> panel under each zone's policies.</td></tr>
+<tr><td>First distribution to chosen endpoints</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>There is no endpoint picker yet.</td></tr>
+<tr><td>Re-distribute a zone</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Offered only when a zone already has a bundle; see the Limitations.</td></tr>
+<tr><td>Applying a policy on an endpoint</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Endpoints refuse ForgeCentral bundles in this release.</td></tr>
+<tr><td>Enforcement</td><td><span class="pill off">RECORDED ONLY</span></td><td>Even an applied bundle blocks nothing yet.</td></tr>
+</table>
+</div>
+
+<h2 id="dist-how">How distribution works</h2>
+
+<figure id="fig-dist-loop" data-title="The distribution loop, and where it stops in this release" class="wide">
+<svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <defs><marker id="ah13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#123a6b"/></marker></defs>
+  <rect x="10" y="30" width="200" height="86" rx="8" fill="#123a6b"/>
+  <text x="110" y="58" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">ForgeCentral</text>
+  <text x="110" y="80" font-size="11" fill="#cfe9df" text-anchor="middle">composes the zone's published</text>
+  <text x="110" y="96" font-size="11" fill="#cfe9df" text-anchor="middle">policies; signs the bundle</text>
+  <line x1="210" y1="73" x2="276" y2="73" stroke="#123a6b" stroke-width="2" marker-end="url(#ah13)"/>
+  <rect x="280" y="30" width="200" height="86" rx="8" fill="#e6f5ef" stroke="#3fbe96" stroke-width="2"/>
+  <text x="380" y="58" font-size="14" font-weight="700" fill="#0c2748" text-anchor="middle">Forge engine</text>
+  <text x="380" y="80" font-size="11" fill="#5a6477" text-anchor="middle">holds the newest bundle for</text>
+  <text x="380" y="96" font-size="11" fill="#5a6477" text-anchor="middle">the zone and its endpoints</text>
+  <path d="M480,73 L560,73 L560,150" fill="none" stroke="#123a6b" stroke-width="2" marker-end="url(#ah13)"/>
+  <text x="552" y="98" font-size="11" fill="#5a6477" text-anchor="end">fetched every</text>
+  <text x="552" y="114" font-size="11" fill="#5a6477" text-anchor="end">5 minutes</text>
+  <rect x="460" y="154" width="290" height="110" rx="8" fill="#ffffff" stroke="#123a6b" stroke-width="1.8"/>
+  <text x="605" y="180" font-size="14" font-weight="700" fill="#0c2748" text-anchor="middle">Forge endpoint agent</text>
+  <text x="476" y="204" font-size="11" fill="#1b2434">checks the signature against its anchor key,</text>
+  <text x="476" y="222" font-size="11" fill="#1b2434">the 24-hour freshness lease, and that it is</text>
+  <text x="476" y="240" font-size="11" fill="#1b2434">in scope; then applies and reports</text>
+  <path d="M460,209 L380,209 L380,120" fill="none" stroke="#3fbe96" stroke-width="2" marker-end="url(#ah13)"/>
+  <text x="300" y="200" font-size="11" fill="#17785c" font-weight="700">outcome reported</text>
+  <path d="M280,100 L240,100 L240,150" fill="none" stroke="#3fbe96" stroke-width="2" marker-end="url(#ah13)"/>
+  <rect x="10" y="154" width="290" height="80" rx="8" fill="#ffffff" stroke="#3fbe96" stroke-width="1.6"/>
+  <text x="155" y="180" font-size="13" font-weight="700" fill="#0c2748" text-anchor="middle">Policy distribution panel</text>
+  <text x="155" y="202" font-size="11" fill="#1b2434" text-anchor="middle">Applied / Rejected: reason /</text>
+  <text x="155" y="220" font-size="11" fill="#1b2434" text-anchor="middle">No confirmation, per endpoint</text>
+  <g font-size="12" font-weight="700" text-anchor="middle">
+    <circle cx="10" cy="30" r="11" fill="#3fbe96"/><text x="10" y="34" fill="#ffffff">1</text>
+    <circle cx="280" cy="30" r="11" fill="#3fbe96"/><text x="280" y="34" fill="#ffffff">2</text>
+    <circle cx="460" cy="154" r="11" fill="#3fbe96"/><text x="460" y="158" fill="#ffffff">3</text>
+    <circle cx="10" cy="154" r="11" fill="#3fbe96"/><text x="10" y="158" fill="#ffffff">4</text>
+  </g>
+  <g font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">
+    <rect x="60" y="120" width="100" height="22" rx="11" fill="#c2413a"/><text x="110" y="135">A: no picker</text>
+    <rect x="186" y="244" width="120" height="22" rx="11" fill="#c2413a"/><text x="246" y="259">B: status unseen</text>
+    <rect x="560" y="272" width="130" height="22" rx="11" fill="#c2413a"/><text x="625" y="287">C: lease refused</text>
+    <rect x="578" y="110" width="140" height="22" rx="11" fill="#c2413a"/><text x="648" y="125">D: lane not set up</text>
+  </g>
+  <text x="10" y="320" font-size="11.5" fill="#1b2434">Red markers: where the loop stops in this release (see Restrictions A to D).</text>
+  <text x="10" y="340" font-size="11.5" fill="#1b2434">Even when a bundle applies, enforcement is off: the endpoint acts only on whether ordinary internet access is allowed.</text>
+</svg>
+</figure>
+
+<ol>
+  <li><b>Compose and sign.</b> ForgeCentral gathers the zone's <em>published</em> policies into one bundle, stamps it with a 24-hour freshness lease, and signs it with the node's policy-signing key. Draft policies are never distributed.</li>
+  <li><b>Commit.</b> The Forge engine stores the bundle for the zone, addressed to the endpoints in its scope, and records who distributed it.</li>
+  <li><b>Fetch, verify, apply.</b> Each endpoint's agent asks the engine for its newest bundle every five minutes. It checks the signature against the anchor key installed on the endpoint, that the lease has not expired, and that the endpoint is in the bundle's scope; then it applies the bundle and reports the outcome.</li>
+  <li><b>Report.</b> The <b class="ui">Policy distribution</b> panel shows each endpoint's outcome.</li>
+</ol>
+
+<h3 id="dist-bundle">What a bundle carries</h3>
+<ul>
+  <li>The rules of every published policy in the zone, with their protocols, ports, schedules, geography and tags.</li>
+  <li>Whether ordinary internet access is allowed, taken from the zone's effective posture for ordinary network traffic. A zone authored in ForgeCentral denies it unless an ancestor zone permits it.</li>
+  <li>The endpoints in scope, and the 24-hour lease.</li>
+</ul>
+
+<h2 id="dist-restrictions">Restrictions</h2>
+<div class="note limit"><p><b>A. No first distribution.</b> A zone that has never been distributed shows <b class="ui">No policy distributed yet</b>: choosing endpoints for a first distribution is not built. <b class="ui">Applied To</b> on a policy is stored but not used for distribution.</p></div>
+<div class="note limit"><p><b>B. Status not visible.</b> In this release the panel cannot find a zone's bundle, so it shows <b class="ui">No policy distributed yet</b> even after a bundle was committed, and <b class="ui">Commit &amp; re-distribute</b>, which appears only when a bundle is found, is not offered.</p></div>
+<div class="note limit"><p><b>C. Endpoints refuse the bundle.</b> In this release an endpoint rejects every bundle ForgeCentral produces as expired; its status would read <b class="ui">Rejected: StaleLease</b>.</p></div>
+<div class="note limit"><p><b>D. Endpoints not set up.</b> An endpoint fetches policy only when its agent has been given the node's anchor key and its own endpoint name. The endpoint installer does not do this; your YouSource.ai representative sets it up per endpoint. An endpoint that is not set up never reports, and shows <b class="ui">No confirmation</b>.</p></div>
+<div class="note caution"><p>When distribution becomes usable, applying a bundle whose zone does not allow ordinary internet access blocks new outbound connections from the whole endpoint, not only from governed agents. Test on a non-production endpoint first, and author the ordinary-network posture deliberately.</p></div>
+<ul>
+  <li>A bundle's rules (objects, actions, protocols, ports), schedules and geography are carried and signed but not yet applied on the host. Enforcement is off.</li>
+  <li>An endpoint keeps the policy it applied only in memory: after its agent restarts, it fetches and applies the newest bundle again.</li>
+  <li>An endpoint named in the bundles of two zones applies only the one with the higher version; the other zone shows it as <b class="ui">No confirmation</b>.</li>
+  <li>Deleting a policy or a zone does not withdraw a bundle already distributed. Re-distribute the zone after deleting its policies.</li>
+</ul>
+
+<h2 id="dist-panel">Read the distribution panel</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <b class="ui">Policies</b> and expand a zone. The <b class="ui">Policy distribution</b> panel is under the zone's policy table. A zone with no policies has no panel.</li>
+  <li>Read the panel: <b class="ui">Bundle v</b> and the version when a bundle exists, then one row per endpoint with its outcome (<a class="xref" href="#tab-dist-states"></a>).</li>
+</ol>
+</div>
+<div class="tablewrap" id="tab-dist-states" data-title="Endpoint outcomes">
+<table class="data">
+<tr><th style="width:26%">Outcome</th><th>Meaning</th></tr>
+<tr><td><b class="ui">Applied</b></td><td>The endpoint verified and applied the bundle.</td></tr>
+<tr><td><b class="ui">Rejected:</b> reason</td><td>The endpoint refused it: <code>SignatureInvalid</code> (the signature does not verify against the endpoint's anchor key), <code>StaleLease</code> (the lease has expired), <code>ScopeMismatch</code> (the endpoint is not in the bundle's scope), <code>DowngradeRejected</code> (it already applied a newer version), <code>VtzCannotRealize</code> (the host cannot realize the zone).</td></tr>
+<tr><td><b class="ui">No confirmation</b></td><td>The endpoint has not reported. It may not be set up for policy, may be offline, or may not have fetched yet. Never read this as delivered.</td></tr>
+</table>
+</div>
+
+<h2 id="dist-redistribute">Re-distribute a zone</h2>
+<p>When the panel finds a zone's bundle (see Restriction B), it offers <b class="ui">Commit &amp; re-distribute to N endpoint(s)</b>. The new bundle goes to the same endpoints as the current one, and carries the zone's published policies as they are now.</p>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Publish the policy versions you want to send (<a class="xref" href="#pol-edit"></a>).</li>
+  <li>In the zone's <b class="ui">Policy distribution</b> panel, choose <b class="ui">Commit &amp; re-distribute to N endpoint(s)</b>, and confirm <b class="ui">Distribute to N endpoint(s)?</b> with <b class="ui">Distribute</b>.</li>
+  <li>Wait at least one fetch interval (five minutes), then reopen the zone to read each endpoint's outcome.</li>
+</ol>
+</div>
+<p>If the distribution fails, the panel says <b class="ui">The re-distribution failed. Nothing changed on the endpoints; try again.</b> A failure can also mean that ForgeCentral's policy-signing service is not set up on this node.</p>

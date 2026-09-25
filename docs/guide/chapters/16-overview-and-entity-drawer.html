@@ -1,0 +1,89 @@
+<h1>Overview and the Entity Drawer</h1>
+
+<p class="lead">The Overview is ForgeCentral's home: a live graph of who and what is connecting to what, grouped through trust zones. You configure nothing on it directly; it is where you notice something and open it. The entity drawer is the detail panel that opens from the Overview, Users, Objects and Logs, and it carries the one action available from anywhere: Isolate.</p>
+
+<h2 id="ovw-availability">Availability</h2>
+<div class="tablewrap" id="tab-ovw-availability" data-title="Overview and entity drawer: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Live connectivity graph</td><td><span class="pill ro">READ-ONLY</span></td><td>Refreshed every two seconds; up to three zones per page.</td></tr>
+<tr><td>Entity drawer</td><td><span class="pill ro">READ-ONLY</span></td><td>Status, information, capabilities, recent decisions, connections.</td></tr>
+<tr><td>Isolate from network</td><td><span class="pill off">RECORDED ONLY</span></td><td>Records a quarantine disposition; nothing is isolated.</td></tr>
+<tr><td>Change an entity's zone, view remediation, open a full report</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Not shown in the drawer.</td></tr>
+<tr><td>Zone membership and effective policies in the drawer</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>The sections say <b class="ui">Not yet available</b>.</td></tr>
+</table>
+</div>
+
+<h2 id="ovw-graph">Read the Overview</h2>
+
+<figure id="fig-ovw-graph" data-title="How the Overview graph is laid out" class="wide">
+<svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <rect x="0" y="0" width="760" height="270" rx="8" fill="#0a0e17"/>
+  <g font-size="12" font-weight="700">
+    <rect x="20" y="30" width="150" height="50" rx="6" fill="#111a2e" stroke="#8b5cf6" stroke-width="2"/><text x="95" y="60" fill="#f4f7fb" text-anchor="middle">AI Agents</text>
+    <rect x="20" y="110" width="150" height="50" rx="6" fill="#111a2e" stroke="#3b82f6" stroke-width="2"/><text x="95" y="140" fill="#f4f7fb" text-anchor="middle">Users</text>
+    <rect x="20" y="190" width="150" height="50" rx="6" fill="#111a2e" stroke="#3fbe96" stroke-width="2"/><text x="95" y="220" fill="#f4f7fb" text-anchor="middle">Devices</text>
+  </g>
+  <g fill="none" stroke-width="10" stroke-opacity="0.45">
+    <path d="M170,55 C250,55 250,80 320,80" stroke="#8b5cf6"/>
+    <path d="M170,135 C250,135 250,135 320,135" stroke="#3b82f6"/>
+    <path d="M170,215 C250,215 250,190 320,190" stroke="#3fbe96"/>
+    <path d="M440,80 C510,80 510,50 580,50" stroke="#e8a33d"/>
+    <path d="M440,135 C510,135 510,110 580,110" stroke="#e8a33d"/>
+    <path d="M440,135 C510,135 510,170 580,170" stroke="#e8a33d"/>
+    <path d="M440,190 C510,190 510,230 580,230" stroke="#e8a33d"/>
+  </g>
+  <g font-size="11.5" font-weight="700" fill="#f4f7fb" text-anchor="middle">
+    <circle cx="380" cy="80" r="34" fill="#0d1322" stroke="#3fbe96" stroke-width="3"/><text x="380" y="84">zone</text>
+    <circle cx="380" cy="135" r="30" fill="#0d1322" stroke="#e8c14a" stroke-width="3"/><text x="380" y="139">zone</text>
+    <circle cx="380" cy="190" r="30" fill="#0d1322" stroke="#3fbe96" stroke-width="3"/><text x="380" y="194">zone</text>
+  </g>
+  <g font-size="11.5" fill="#f4f7fb" text-anchor="middle">
+    <rect x="584" y="32" width="150" height="36" rx="18" fill="#111a2e" stroke="#e8a33d"/><text x="659" y="55">Network</text>
+    <rect x="584" y="92" width="150" height="36" rx="18" fill="#111a2e" stroke="#e8a33d"/><text x="659" y="115">SaaS Apps</text>
+    <rect x="584" y="152" width="150" height="36" rx="18" fill="#111a2e" stroke="#e8a33d"/><text x="659" y="175">Private Apps</text>
+    <rect x="584" y="212" width="150" height="36" rx="18" fill="#111a2e" stroke="#e8a33d"/><text x="659" y="235">Data Stores</text>
+  </g>
+  <g font-size="12" font-weight="700" text-anchor="middle">
+    <circle cx="20" cy="30" r="11" fill="#3fbe96"/><text x="20" y="34" fill="#0a0e17">1</text>
+    <circle cx="346" cy="50" r="11" fill="#3fbe96"/><text x="346" y="54" fill="#0a0e17">2</text>
+    <circle cx="584" cy="32" r="11" fill="#3fbe96"/><text x="584" y="36" fill="#0a0e17">3</text>
+  </g>
+</svg>
+</figure>
+
+<ol>
+  <li><b>Sources</b>: AI agents, users and devices. Select a lane to list its members.</li>
+  <li><b>Trust zones</b>: each ring is a zone, colored by its risk band. Select a ring to open the zone on <span class="path">Virtual Trust Zones<span class="sep">&gt;</span>Configure</span>. When there are more than three zones, use <b class="ui">Previous zones</b> and <b class="ui">More zones</b>.</li>
+  <li><b>Destinations</b>: network, SaaS apps, private apps and data stores. Select one to list what reaches it.</li>
+</ol>
+<p>Hover over a source or destination to highlight its paths. The header shows the worst risk band across the zones (<b class="ui">Risk: Nominal</b>, <b class="ui">Elevated</b> or <b class="ui">Critical</b>), <b class="ui">Live</b> while refreshes succeed, <b class="ui">Partial graph</b> when the engine's scan reached its limit, and a banner when a refresh failed and the last graph is still shown.</p>
+<div class="note limit"><p>In this release, the Overview places entities in three built-in demonstration zones (<code>Demo.Users.Public</code>, <code>Demo.Private.Agent</code>, <code>Demo.Public.Agent</code>) by matching entity names, and adds the zones you authored as extra rings. The grouping is not operator configuration and does not reflect zone membership you set; zone membership is not available yet.</p></div>
+
+<h2 id="ovw-drawer">The entity drawer</h2>
+<p>The drawer opens from a row on <span class="path">Users<span class="sep">&gt;</span>All Users</span>, an object's name on Objects, a member of an Overview list, or a decision on Logs. Close it with its close button, <b class="ui">Esc</b>, or a click outside it; when you opened it from an Overview list, <b class="ui">Back</b> returns to the list.</p>
+<div class="tablewrap" id="tab-ovw-sections" data-title="Entity drawer sections">
+<table class="data">
+<tr><th style="width:24%">Section</th><th>Shows</th></tr>
+<tr><td><b class="ui">Status</b></td><td>The entity's name, kind and status.</td></tr>
+<tr><td><b class="ui">Information</b></td><td>Role, clearance, when it enrolled, and its tags (for users: origin, email, organization, groups, privileges; for objects: selector, lifecycle and current members).</td></tr>
+<tr><td><b class="ui">Capabilities</b></td><td>For AI agents: what the agent is built from and can do, from its signed construction report.</td></tr>
+<tr><td><b class="ui">Recent decisions</b></td><td>For users and agents: the latest decisions involving them.</td></tr>
+<tr><td><b class="ui">Connections</b></td><td>When opened from the Overview: where the entity connects.</td></tr>
+<tr><td><b class="ui">Connected VTZs</b>, <b class="ui">Effective policies</b></td><td><b class="ui">Not yet available</b>.</td></tr>
+</table>
+</div>
+<div class="note limit"><p>An object's drawer shows <b class="ui">Enrolled</b> as 1970-01-01; objects do not enroll, so ignore the value. Recent decisions cannot be opened from the drawer; find them on Logs.</p></div>
+
+<h2 id="ovw-isolate">Isolate an entity</h2>
+<p><b class="ui">Isolate from network</b> records, under your identity, that the entity should be moved into a quarantine posture. The record is audited. Because enforcement is off, nothing is blocked and nothing is sent to the entity's endpoint.</p>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Open the entity in the drawer.</li>
+  <li>Under <b class="ui">Quick actions</b>, choose <b class="ui">Isolate from network</b>.</li>
+  <li>Read the confirmation, which states that live enforcement is off, and choose <b class="ui">Isolate</b>. <span class="result">The drawer reads Isolation recorded (quarantine).</span></li>
+</ol>
+</div>
+<div class="note limit"><p>The success message adds that the disposition is distributed to the endpoint. In this release it is not: the disposition is recorded by the Forge engine only. There is no action to lift an isolation, and <b class="ui">Isolate from network</b> is offered for objects and network destinations too, where it records a disposition that has no endpoint.</p></div>
+<p>If recording fails, the drawer reads <b class="ui">Isolation could not be recorded (refused or unavailable).</b></p>

@@ -1,0 +1,136 @@
+<h1>Users and Groups</h1>
+
+<p class="lead">The Users surface is the Forge user directory: every person, service account and AI agent the Forge engine knows about, whether you added it, an endpoint agent reported it, or your identity provider synced it. You manage the records you add, and you create groups. Identity-provider connectors, on the <b class="ui">External IDAM</b> tab, are covered in <a class="xref" href="#ch-identity-providers"></a>.</p>
+
+<h2 id="usr-availability">Availability</h2>
+<div class="tablewrap" id="tab-usr-availability" data-title="Users and groups: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>User directory with search and filters</td><td><span class="pill ok">AVAILABLE</span></td><td>Type, status and origin filters; search across names, ids, email, organization and groups.</td></tr>
+<tr><td>Add and edit local users</td><td><span class="pill ok">AVAILABLE</span></td><td>Human users and service accounts.</td></tr>
+<tr><td>Suspend, activate, revoke</td><td><span class="pill ok">AVAILABLE</span></td><td>Local users only. A status change is never a delete.</td></tr>
+<tr><td>Create a group</td><td><span class="pill ok">AVAILABLE</span></td><td>Name and description.</td></tr>
+<tr><td>Observed and synced users</td><td><span class="pill ro">READ-ONLY</span></td><td>Changed at their source: the host or the identity provider.</td></tr>
+<tr><td>Edit a group, set group members</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>No control in this release.</td></tr>
+<tr><td>Add an AI agent</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>AI agents appear when Forge observes them.</td></tr>
+</table>
+</div>
+
+<h2 id="usr-concepts">Users, origins and status</h2>
+<p>Each directory entry has a <b>type</b>, an <b>origin</b> and a <b>status</b>:</p>
+<ul>
+  <li><b>Type</b>: <b class="ui">Human</b>, <b class="ui">Service Account</b> or <b class="ui">AI Agent</b>.</li>
+  <li><b>Origin</b>: <b class="ui">Local</b> for a record you added in ForgeCentral; the connector's name (for example <b class="ui">Auth0</b>) for an account synced from your identity provider; <b class="ui">Observed</b> for an account an endpoint agent reported. The <b class="ui">Origin</b> filter offers <b class="ui">Local</b> and <b class="ui">Observed</b>, and includes synced accounts under <b class="ui">Observed</b>. Only local records can be changed here.</li>
+  <li><b>Status</b>: <code>active</code>, <code>suspended</code>, <code>revoked</code>, <code>disabled</code> or <code>compromised</code>. You set the first three on local users; the others come from the record's source.</li>
+</ul>
+
+<figure id="fig-usr-lifecycle" data-title="The status of a local user" class="wide">
+<svg viewBox="0 0 760 190" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
+  <defs><marker id="ah8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#123a6b"/></marker></defs>
+  <rect x="10" y="60" width="120" height="56" rx="8" fill="#123a6b"/>
+  <text x="70" y="93" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">Add user</text>
+  <line x1="130" y1="88" x2="196" y2="88" stroke="#123a6b" stroke-width="2" marker-end="url(#ah8)"/>
+  <rect x="200" y="60" width="130" height="56" rx="28" fill="#e6f5ef" stroke="#3fbe96" stroke-width="2"/>
+  <text x="265" y="93" font-size="14" font-weight="700" fill="#17785c" text-anchor="middle">active</text>
+  <rect x="440" y="10" width="130" height="56" rx="28" fill="#fdf3e1" stroke="#e8a33d" stroke-width="2"/>
+  <text x="505" y="43" font-size="14" font-weight="700" fill="#b7791f" text-anchor="middle">suspended</text>
+  <rect x="440" y="120" width="130" height="56" rx="28" fill="#fbe9e7" stroke="#c2413a" stroke-width="2"/>
+  <text x="505" y="153" font-size="14" font-weight="700" fill="#c2413a" text-anchor="middle">revoked</text>
+  <path d="M330,74 C380,40 400,38 436,38" fill="none" stroke="#123a6b" stroke-width="2" marker-end="url(#ah8)"/>
+  <text x="352" y="36" font-size="11.5" font-weight="700" fill="#0c2748">Suspend</text>
+  <path d="M440,56 C400,70 370,80 334,84" fill="none" stroke="#3fbe96" stroke-width="2" marker-end="url(#ah8)"/>
+  <text x="372" y="96" font-size="11.5" font-weight="700" fill="#17785c">Activate</text>
+  <path d="M330,104 C380,140 400,148 436,148" fill="none" stroke="#123a6b" stroke-width="2" marker-end="url(#ah8)"/>
+  <text x="352" y="168" font-size="11.5" font-weight="700" fill="#0c2748">Revoke</text>
+  <path d="M570,38 C640,60 640,120 574,142" fill="none" stroke="#123a6b" stroke-width="2" marker-end="url(#ah8)"/>
+  <text x="630" y="95" font-size="11.5" font-weight="700" fill="#0c2748">Revoke</text>
+  <path d="M440,136 C400,126 372,112 334,100" fill="none" stroke="#c2413a" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#ah8)"/>
+  <text x="10" y="186" font-size="11" fill="#c2413a">Dashed: Activate is also offered on a revoked user and restores it (see the Limitation).</text>
+</svg>
+</figure>
+<p>A status change updates the user's record in the Forge user directory and is shown wherever the user appears. Enforcement is off, so a status does not block the user anywhere yet. No action deletes a user: the record and its history remain.</p>
+
+<h2 id="usr-restrictions">Restrictions</h2>
+<ul>
+  <li>Only local users have <b class="ui">Edit</b>, <b class="ui">Suspend</b>, <b class="ui">Activate</b> and <b class="ui">Revoke</b>. Change an observed or synced account at its source.</li>
+  <li>The user name is the record's key: it must be unique, and it cannot be changed after the user is created.</li>
+  <li>You can add <b class="ui">Human</b> users and <b class="ui">Service Account</b>s; AI agents are added by observation only.</li>
+</ul>
+<div class="note limit"><p>A failed <b class="ui">Suspend</b>, <b class="ui">Activate</b> or <b class="ui">Revoke</b> shows no error message. After changing a status, check the user's <b class="ui">Status</b> column.</p></div>
+<div class="note limit"><p><b class="ui">Activate</b> is offered on a revoked user and restores it. Do not rely on revocation being permanent; restrict who can use ForgeCentral instead (<a class="xref" href="#cfg-who"></a>).</p></div>
+
+<h2 id="usr-find">Find users</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <span class="path">Users<span class="sep">&gt;</span>All Users</span>.</li>
+  <li>Type in <b class="ui">Search users...</b> to match user names, principal ids (the <b class="ui">ID</b> column), email addresses, organizations and group names.</li>
+  <li>Narrow the list with <b class="ui">Type</b>, <b class="ui">Status</b> and <b class="ui">Origin</b>.</li>
+  <li>Select a row to open the user in the entity drawer.</li>
+</ol>
+</div>
+
+<h2 id="usr-add">Add a user</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <span class="path">Users<span class="sep">&gt;</span>All Users</span>, then <b class="ui">+ Add</b>.</li>
+  <li>Enter the fields (<a class="xref" href="#tab-usr-fields"></a>).</li>
+  <li>Choose <b class="ui">Create User</b>. <span class="result">The button reads Committing... until the engine answers; the user appears in the list with origin Local.</span></li>
+</ol>
+</div>
+<div class="tablewrap" id="tab-usr-fields" data-title="User fields">
+<table class="data">
+<tr><th style="width:26%">Field</th><th>Value</th></tr>
+<tr><td><b class="ui">User Name</b></td><td>Required and unique. Cannot be changed later.</td></tr>
+<tr><td><b class="ui">Type</b></td><td><b class="ui">Human</b> (default) or <b class="ui">Service Account</b>.</td></tr>
+<tr><td><b class="ui">Email Address</b></td><td>Optional; must be a valid email address.</td></tr>
+<tr><td><b class="ui">Organization</b></td><td>Optional.</td></tr>
+</table>
+</div>
+<div class="tablewrap" id="tab-usr-errors" data-title="Add and edit messages">
+<table class="data">
+<tr><th style="width:46%">Message</th><th>Meaning</th></tr>
+<tr><td>A principal with that username already exists.</td><td>Choose another user name.</td></tr>
+<tr><td>The form is incomplete or malformed.</td><td>A required field is empty or a value is invalid.</td></tr>
+<tr><td>The engine refused the command.</td><td>The Forge engine declined the change.</td></tr>
+<tr><td>The command could not reach the engine.</td><td>A connection problem; reload and check before retrying (<a class="xref" href="#nav-confirm"></a>).</td></tr>
+</table>
+</div>
+
+<h2 id="usr-edit">Edit a user</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>On a local user's row, choose <b class="ui">Edit</b>.</li>
+  <li>Change the type, email address or organization. The user name is read-only.</li>
+  <li>Choose <b class="ui">Save</b>.</li>
+</ol>
+</div>
+
+<h2 id="usr-status">Suspend, activate or revoke a user</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>On a local user's row, choose <b class="ui">Suspend</b> (for an active user), <b class="ui">Activate</b> (for any other status) or <b class="ui">Revoke</b>.</li>
+  <li>Confirm, for example <b class="ui">Suspend jsmith?</b>, with <b class="ui">Commit</b>.</li>
+  <li>Check that the <b class="ui">Status</b> column shows the new status.</li>
+</ol>
+</div>
+
+<h2 id="usr-groups">Create a group</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <span class="path">Users<span class="sep">&gt;</span>Groups</span>, then <b class="ui">+ Create Group</b>.</li>
+  <li>Enter a <b class="ui">Name</b> (required, unique) and, optionally, a <b class="ui">Description</b>.</li>
+  <li>Choose <b class="ui">Create</b>. <span class="result">The group's card appears. A duplicate name is refused with A group with that name already exists.</span></li>
+</ol>
+</div>
+<p>On a group's card, choose its member count to list its members on the All Users tab.</p>
+
+<h2 id="usr-verify">Verify</h2>
+<ul>
+  <li>The user or group appears in its list with the values you entered; a local user shows origin <b class="ui">Local</b>.</li>
+  <li>Select the user to open the entity drawer and check its details.</li>
+</ul>

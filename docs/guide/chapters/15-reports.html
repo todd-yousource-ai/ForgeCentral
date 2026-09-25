@@ -1,0 +1,37 @@
+<h1>Reports</h1>
+
+<p class="lead">The Reports surface has two parts: a twelve-week view of detection volume and coverage, and the incident report, the shaped write-up of one open incident that you can download.</p>
+
+<h2 id="rep-availability">Availability</h2>
+<div class="tablewrap" id="tab-rep-availability" data-title="Reports: availability">
+<table class="data">
+<tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
+<tr><td>Weekly volume and coverage</td><td><span class="pill ro">READ-ONLY</span></td><td>The last twelve weeks; no range control.</td></tr>
+<tr><td>Incident report</td><td><span class="pill ok">AVAILABLE</span></td><td>For incidents in the open queue.</td></tr>
+<tr><td>Download as text or JSON</td><td><span class="pill ok">AVAILABLE</span></td><td>Saved by your browser; not audited.</td></tr>
+<tr><td>Reports on closed incidents; other report types; sharing</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td></td></tr>
+</table>
+</div>
+
+<h2 id="rep-weekly">Weekly volume and coverage</h2>
+<p>The table lists, for each of the last twelve weeks: <b class="ui">Firings</b>, <b class="ui">Opened</b>, <b class="ui">Promoted</b>, <b class="ui">Muted</b>, <b class="ui">Techniques fired</b>, <b class="ui">Incidents opened</b> and <b class="ui">Incidents closed</b>. Above it, <b class="ui">Corpus coverage now</b> says how many detection rules can be evaluated against the sources this node receives. That figure is the current reading, not a per-week value. If the line adds that incident counts may undercount, the engine's scan reached its limit for the period.</p>
+
+<h2 id="rep-incident">Produce an incident report</h2>
+<div class="procedure">
+<div class="ptitle">Procedure</div>
+<ol class="steps">
+  <li>Choose <b class="ui">Reports</b>. Under <b class="ui">Incident report</b>, choose the incident from <b class="ui">Incident</b>. Only open incidents are listed.</li>
+  <li>Read the report. A line at the top says where the narrative came from, and each of the six sections is labelled by its source (<a class="xref" href="#tab-rep-sources"></a>).</li>
+  <li>To keep a copy, choose <b class="ui">Export as text</b> or <b class="ui">Export as JSON</b>.</li>
+</ol>
+</div>
+<div class="tablewrap" id="tab-rep-sources" data-title="Where each report section comes from">
+<table class="data">
+<tr><th style="width:32%">Label</th><th>Meaning</th></tr>
+<tr><td><b class="ui">model (adjudicated)</b></td><td>Written by the narrative model and checked against the evidence.</td></tr>
+<tr><td><b class="ui">engine (record)</b></td><td>Taken from the Forge engine's record of the incident.</td></tr>
+<tr><td><b class="ui">template (declared fallback)</b></td><td>No model output exists for the section, so the declared template is shown. This happens when no narrative model is bound (<a class="xref" href="#setc-sections"></a>) or no narrative has been generated (<a class="xref" href="#soc-generate"></a>).</td></tr>
+</table>
+</div>
+<p>A report marked <b class="ui">needs human review</b> should be read by an analyst before it is shared.</p>
+<div class="note limit"><p>Downloads are made by your browser from the report on screen. They are not recorded in the audit trail. For an audited record of decisions, use the Logs export (<a class="xref" href="#log-export"></a>).</p></div>
