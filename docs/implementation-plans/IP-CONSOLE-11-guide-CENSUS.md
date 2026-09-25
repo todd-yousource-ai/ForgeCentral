@@ -112,6 +112,10 @@ omits a safeguard); **S4** documentation drift. Owner is the repo whose code mus
 NOT part of `IP-CONSOLE-11-guide`; each fix is its own PR when the operator schedules it, and a fix PR
 updates the guide entry it affects (`IP-CONSOLE-11-guide` rule R4).
 
+The open rows are planned in `IP-CONSOLE-11-defect-remediation.md` (re-verified 2026-09-25 against the
+merged guide work; ledger `IP-CONSOLE-11-defect-remediation-LEDGER.md`). A fix flips its row here to FIXED
+with the merge hash.
+
 | ID | Sev | Owner | Defect | Evidence | Status |
 |----|-----|-------|--------|----------|--------|
 | CD-01 | S1 | FC | `POST /api/idam/secret` needs only a session: any role can overwrite the node's Auth0 connector secret; no engine authorization, no audit record | `forgecentral/apps/bff/src/server.ts:2399-2444` | VERIFIED |
