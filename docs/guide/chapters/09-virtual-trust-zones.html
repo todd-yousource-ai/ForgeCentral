@@ -2,7 +2,7 @@
 
 <p class="lead">A Virtual Trust Zone (VTZ) is a named place in a hierarchy that policies target. You create the zones that describe how your estate is divided, such as departments, sensitive enclaves, quarantine and isolation zones; policies then attach to them (<a class="xref" href="#ch-policies"></a>). A zone inherits the restrictions of every zone above it and can only tighten them.</p>
 
-<h2 id="vtz-availability">Availability</h2>
+<h2 id="vtz-availability" data-covers="vtz.memberCounts vtz.policyCount vtz.setMembership">Availability</h2>
 <div class="tablewrap" id="tab-vtz-availability" data-title="Virtual Trust Zones: availability">
 <table class="data">
 <tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
@@ -80,16 +80,16 @@
 
 <h2 id="vtz-restrictions">Restrictions</h2>
 <ul>
-  <li>A zone name is 1 to 16 labels separated by dots, at most 255 characters in all. Each label is 1 to 63 letters, digits or hyphens, and starts and ends with a letter or digit. Labels are stored in lower case.</li>
-  <li>Session duration is a whole number of hours from 1 to 24 (default 8). A description is at most 1,024 characters.</li>
+  <li>A zone name is 1 to 16 labels separated by dots, at most 255 bytes in all. Each label is 1 to 63 ASCII letters, digits or hyphens, and starts and ends with a letter or digit. Labels are stored in lower case.</li>
+  <li>Session duration is a whole number of hours from 1 to 24 (default 8). A description is at most 1,024 bytes (text outside ASCII uses more than one byte per character).</li>
   <li>A zone that has sub-zones cannot be moved or deleted; its <b class="ui">Parent VTZ</b> is disabled.</li>
 </ul>
-<div class="note limit"><p>Moving or renaming a zone is refused in this release: <b class="ui">Save changes</b> with a new name or parent fails with <b class="ui">The engine refused this change: the zone already exists, no longer exists, or still has sub-zones.</b>, and nothing is committed. To restructure, create the zone under its new name, author its policies, then delete the old zone and its policies.</p></div>
+<div class="note limit"><p>Moving or renaming a zone does not work in this release: ForgeCentral saves the settings under the new name before it moves the zone. Usually <b class="ui">Save changes</b> with a new name or parent fails with <b class="ui">The engine refused this change: the zone already exists, no longer exists, or still has sub-zones.</b>, and nothing is committed. If the new name belongs to another zone, that zone's settings are overwritten with this form and the move is then refused with <b class="ui">The settings were committed; the zone was NOT moved and stays where it was.</b> The same happens if you retype the zone's own name in different capitals. Do not use a new name or parent on <b class="ui">Save changes</b>. To restructure, create the zone under its new name, author its policies, then delete the old zone and its policies.</p></div>
 <div class="note limit"><p>Session duration, telemetry mode, micro-segmentation and lifecycle are recorded with the zone but do not yet change behavior, and a draft zone can receive a distributed policy like a published one. Record your intent in them; do not rely on them.</p></div>
 <div class="note limit"><p>Deleting a zone does not delete the policies that target it, or withdraw a policy already distributed for it. Delete those policies first (<a class="xref" href="#ch-policies"></a>).</p></div>
 <div class="note caution"><p>ForgeCentral cannot show a zone's stored description. When you edit a zone, the <b class="ui">Description</b> field starts empty, and saving replaces the stored description with whatever the field holds. Enter the description again each time you save.</p></div>
 
-<h2 id="vtz-create">Create a zone</h2>
+<h2 id="vtz-create" data-covers="vtz.create">Create a zone</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -97,7 +97,7 @@
   <li>Enter the fields (<a class="xref" href="#tab-vtz-fields"></a>). Under <b class="ui">VTZ name</b>, ForgeCentral previews the full name: <b class="ui">Commits as</b> <code>corp.sales.reps</code>.</li>
   <li>Choose <b class="ui">Create zone</b>, then confirm <b class="ui">Create corp.sales.reps?</b> with <b class="ui">Commit</b>.</li>
 </ol>
-<p class="result">The new zone appears on the Active tab and stays selected.</p>
+<p class="result">The new zone stays open on the Configure tab; on the Active tab its card is highlighted.</p>
 </div>
 <div class="tablewrap" id="tab-vtz-fields" data-title="Zone fields">
 <table class="data">
@@ -105,7 +105,7 @@
 <tr><td><b class="ui">VTZ name</b></td><td>The zone's own label. Typing a dot adds levels.</td></tr>
 <tr><td><b class="ui">Parent VTZ (optional)</b></td><td><b class="ui">None (top-level zone)</b>, or the zone to nest under.</td></tr>
 <tr><td><b class="ui">VTZ type</b></td><td><a class="xref" href="#tab-vtz-types"></a>.</td></tr>
-<tr><td><b class="ui">Description</b></td><td>Free text, up to 1,024 characters.</td></tr>
+<tr><td><b class="ui">Description</b></td><td>Free text, up to 1,024 bytes.</td></tr>
 <tr><td><b class="ui">Session duration (hours)</b></td><td>How long before a member must sign in again: 1 to 24.</td></tr>
 <tr><td><b class="ui">Telemetry mode</b></td><td><b class="ui">Full</b>, <b class="ui">Sampled</b> or <b class="ui">Off</b>.</td></tr>
 <tr><td><b class="ui">Micro-segmentation</b></td><td>On by default.</td></tr>
@@ -113,7 +113,7 @@
 </table>
 </div>
 
-<h2 id="vtz-edit">Edit a zone</h2>
+<h2 id="vtz-edit" data-covers="vtz.detail vtz.edit vtz.rescope">Edit a zone</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -123,7 +123,7 @@
 </ol>
 </div>
 
-<h2 id="vtz-delete">Delete a zone</h2>
+<h2 id="vtz-delete" data-covers="vtz.delete">Delete a zone</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -136,16 +136,17 @@
 <div class="tablewrap" id="tab-vtz-messages" data-title="Zone editor messages">
 <table class="data">
 <tr><th style="width:46%">Message</th><th>Meaning</th></tr>
-<tr><td>That zone definition was rejected before it reached the engine. Nothing was committed.</td><td>A field is missing or out of range, for example a session duration outside 1 to 24.</td></tr>
+<tr><td>That zone definition was rejected before it reached the engine. Nothing was committed.</td><td>A field ForgeCentral checks is missing or out of range, for example a session duration outside 1 to 24. ForgeCentral does not check the name or the description length; the engine does (next rows).</td></tr>
 <tr><td>The engine refused this change: the zone already exists, no longer exists, or still has sub-zones.</td><td>A zone with that name exists; the zone was deleted meanwhile; it has sub-zones; or you changed its name or parent (see the Limitation).</td></tr>
-<tr><td>The engine refused this change: it contradicts a rule the platform enforces on every zone.</td><td>The change would loosen an inherited restriction, or the name breaks the naming rules above.</td></tr>
+<tr><td>The engine refused this change: it contradicts a rule the platform enforces on every zone.</td><td>The name breaks the naming rules above, or the description is longer than 1,024 bytes.</td></tr>
 <tr><td>The zone could not be reached. Nothing was committed.</td><td>A connection problem. Reload and check before retrying: in rare cases the change was saved.</td></tr>
 </table>
 </div>
 
-<h2 id="vtz-verify">Verify</h2>
+<h2 id="vtz-verify" data-covers="vtz.tree vtz.riskBand">Verify</h2>
 <ul>
   <li>The zone's card shows its name, type and, for a draft, the Draft badge. <b class="ui">Search zones</b> finds it by any part of its name.</li>
-  <li><b class="ui">Total VTZs</b> counts it. <b class="ui">High-sensitivity zones</b> counts zones whose effective posture denies at least one domain beyond the fixed floor.</li>
+  <li><b class="ui">Total VTZs</b> counts it. <b class="ui">High-sensitivity zones</b> counts zones whose effective posture explicitly denies at least one domain beyond the fixed floor.</li>
+  <li>A zone that recent detections have touched carries a risk badge: <b class="ui">Critical</b> when a recent decision recommends escalation, <b class="ui">Elevated</b> when one recommends a candidate response, otherwise <b class="ui">Nominal</b>. A zone no decision has touched carries no badge.</li>
   <li>On the Overview, a zone's ring opens it on the Configure tab.</li>
 </ul>
