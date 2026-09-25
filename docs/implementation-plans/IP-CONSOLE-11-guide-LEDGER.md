@@ -7,7 +7,9 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, GD.3 in progress):** GD.3 ON BRANCH `docs/console-11-gd3-settings-chapters`: the three
+- **State (2026-09-25):** GD.3 MERGED `9e95522` (operator: "Approve and continue"). NEXT = GD.4 (TRD-CONSOLE-02
+  refresh; the Virtual Trust Zones chapter re-verified).
+- **Earlier (2026-09-25):** GD.3 ON BRANCH `docs/console-11-gd3-settings-chapters`: the three
   Settings chapters re-verified against the code (rule R3; a read-only agent checked ~115 claims, 12 were
   wrong and are corrected: version numbering, history limit, principal ids, refusal meanings and texts,
   stale proposals, button labels, tier scope, SIEM token refresh needs a restart, p_high = 1000, the
@@ -71,7 +73,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.E0 | CD-18 (crdb) | MERGED crucible `c31d9be4` (2026-09-25; full gate green); DEPLOYED 16:17 UTC | crucible `37331f30` | the registry's labels made true: sessions standard + cognition cap boot-bound, break-glass lifetime and the IdAM section pending, retention live, dual control names both planes, LUG default enabled; pinned by a drift test; the three rows are read-only in ForgeCentral |
 | GD.E0b | R4 | MERGED `93a9984` (2026-09-25; full gate green, e2e 40/40) | `8e1917b` | the standalone guide states the corrected labels: Appendix A without red corrections, 16 editable settings, the chapter 2 note |
 | GD.2 | 11.2 (1), 11.5 | MERGED `08b6496` (2026-09-25; full gate green, e2e 41/41) | `844fb63` | the ReadMe tab: generated typed tree of the GD.S1 chapters (build-time sanitized), contents, filter, reload-safe deep links, live Settings reference |
-| GD.3 | 11.6 | ON BRANCH | | Settings chapters re-verified (12 corrections, CD-47); live values delivered by GD.2; Settings-scoped coverage gate |
+| GD.3 | 11.6 | MERGED `9e95522` (2026-09-25; full gate green, e2e 41/41) | | Settings chapters re-verified (12 corrections, CD-47); live values delivered by GD.2; Settings-scoped coverage gate |
 | GD.4 | 11.6 | PLANNED | | TRD-CONSOLE-02 refresh; chapter re-verified |
 | GD.5 | 11.6 | PLANNED | | TRD-CONSOLE-10 refresh; chapter re-verified |
 | GD.6 | 11.6 | PLANNED | | TRD-CONSOLE-05 refresh; chapters re-verified |
