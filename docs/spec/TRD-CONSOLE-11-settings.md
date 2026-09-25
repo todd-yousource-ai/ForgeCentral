@@ -224,7 +224,7 @@ in-app guide states each one plainly until it is fixed.
 | G3 | The operator's tier governs Settings (9.1) | the tier is asserted by the Console for global admins and accepted uncapped by the engine; recorded stopgap | CD-03 | crdb (`DEF-RBAC-PERMISSION-MAP`) |
 | G4 | Propose and approve for every editable setting under dual control (9.4, 9.5) | the SOC tiers and SIEM write-back cannot be proposed anywhere in the Console; section-form buttons still read Commit under dual control; proposals are memory-only | CD-17 | crdb + FC |
 | G5 | A moved base is refused, never overwritten (9.5) | commits carry no base version; last writer wins | CD-16 | crdb + FC |
-| G6 | Source and apply labels are true (9.4) | the registry's live-apply text over-claims for several rows the Console shows verbatim; the SOC tab fields and the Observability mirror carry no source label | CD-18 | crdb + FC |
+| G6 | Source and apply labels are true (9.4) | the registry's labels were made true by GD.E0 (crdb `c31d9be4`); still open: the SOC tab fields and the Observability mirror carry no source label | CD-18 | FC |
 | G7 | A failed commit's Retry resends (9.5) | Retry only clears the message | CD-36 | FC |
 | G8 | Copy is true | the Security tab says key issuing is edited on Configuration (it is pending, no form) | CD-33 | FC |
 | G9 | Every Console mutation is authorized and audited by the engine (TRD-CONSOLE-00) | the IdAM connector operations are unaudited, untiered and memory-only; the IdAM secret write needs only a session | CD-15, CD-01 | crdb + FC |
