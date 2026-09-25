@@ -7,8 +7,16 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25):** GD.12b MERGED `3e0aa13` (operator: "Approve and continue"). NEXT = GD.13
-  (disabled-state explanations).
+- **State (2026-09-25):** GD.13 ON BRANCH `feat/console-11-gd13-disabled-explained`, awaiting review.
+  `DisabledReason` in `@forge/design` and `GuideLink` in the Console; every one of the 33 controls
+  disabled for a reason other than an in-flight request names its reason with `aria-describedby`
+  (missing fields listed, limits, dual control, no bundle, no plan, a run in flight, the list not yet
+  loaded); the locks that remove a control link to their cause (tier refusal -> `cfg-who` via
+  `TierRequired`, read-only settings -> `cfg-apply` or `setc-sections`, not-yet-available features ->
+  the posture section, enforcement off -> `cfg-endpoints`). INV-GUIDE-DISABLED-EXPLAINED contract test
+  scans the source: an unexplained `disabled={...}` or a link to a missing section fails the gate.
+  NEXT after review = GD.N (capstone).
+- **Earlier (2026-09-25):** GD.12b MERGED `3e0aa13` (operator: "Approve and continue").
 - **Earlier (2026-09-25):** GD.12b ON BRANCH `feat/console-11-gd12b-field-help`: the
   VTZ editor (name rule checked as typed via `vtzNameProblem`, description counted in UTF-8 bytes,
   session duration bounded), the policy form (name and description byte limits, the port range as
@@ -174,7 +182,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.11 | 11.2 (2) | MERGED `86835eb` (2026-09-25; full gate green, e2e 42/42) | | Help control -> Drawer at the section for the destination and Settings tab; every destination mapped; INV-GUIDE-CONTEXTUAL contract test |
 | GD.12a | 11.2 (3) | MERGED `709efc0` (2026-09-25; full gate green, e2e 42/42) | | InfoTip + FieldHint; Settings forms show and enforce the engine limits from named constants; guide `data-const` markers rendered live; INV-GUIDE-ONE-SOURCE contract test |
 | GD.12b | 11.2 (3) | MERGED `3e0aa13` (2026-09-25; full gate green, e2e 42/42) | | the same for VTZ, Objects, Policies, Users/groups, IdAM, SOC case controls, Logs |
-| GD.13 | INV-GUIDE-DISABLED-EXPLAINED | PLANNED | | state-aware explanations |
+| GD.13 | INV-GUIDE-DISABLED-EXPLAINED | ON BRANCH `feat/console-11-gd13-disabled-explained` | | DisabledReason + GuideLink; 33 disabled controls state why; hidden locks link to their cause; source-scanning contract test |
 | GD.N | 11.6 | PLANNED | | capstone: global coverage, Playwright journeys, live drive |
 | GD.E1 | -- | DEFERRED (ruling 2026-09-25) | | crdb: setting tier on the wire |
 | GD.E2 | -- | DEFERRED (ruling 2026-09-25) | | crdb: deployment profiles on the wire |
