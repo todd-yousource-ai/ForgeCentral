@@ -669,6 +669,22 @@ function delegationFor(
 }
 
 /** Build the operator-scoped engine facade over the raw client + a delegation sink. */
+/**
+ * The delegation for a SETTINGS operation: the operator plus, for a global admin, the tier the engine
+ * runs Settings at (crdb `settings_tier`). Every other operation keeps the plain delegation.
+ */
+function settingsDelegation(principal: OperatorPrincipal): {
+  principal: string;
+  tenant: string;
+  settings_tier?: string;
+} {
+  return {
+    principal: principal.principalId,
+    tenant: principal.tenant,
+    ...(principal.settingsTier !== undefined ? { settings_tier: principal.settingsTier } : {}),
+  };
+}
+
 export function createOperatorEngine(
   client: CrucibleClient,
   delegation: DelegationSink,
@@ -782,52 +798,52 @@ export function createOperatorEngine(
     },
     socSettingsRead: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'socSettingsRead', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.socSettingsRead({ ...request, operator }, opts);
     },
     settingsRead: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsRead', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.settingsRead({ ...request, operator }, opts);
     },
     settingsPropose: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsPropose', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.settingsPropose({ ...request, operator }, opts);
     },
     settingsApprovals: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsApprovals', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.settingsApprovals({ ...request, operator }, opts);
     },
     settingsApprove: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsApprove', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.settingsApprove({ ...request, operator }, opts);
     },
     settingsHistory: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsHistory', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.settingsHistory({ ...request, operator }, opts);
     },
     settingsRollback: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsRollback', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.settingsRollback({ ...request, operator }, opts);
     },
     settingsReports: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsReports', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.settingsReports({ ...request, operator }, opts);
     },
     settingsCommit: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsCommit', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.settingsCommit({ ...request, operator }, opts);
     },
     socSettingsCommit: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'socSettingsCommit', request.request_id));
-      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      const operator = settingsDelegation(principal);
       return client.socSettingsCommit({ ...request, operator }, opts);
     },
     socCognitionRun: (principal, request, opts) => {

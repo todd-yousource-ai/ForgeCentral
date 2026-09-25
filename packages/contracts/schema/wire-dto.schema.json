@@ -82,6 +82,9 @@
         "principal": {
           "type": "string"
         },
+        "settings_tier": {
+          "type": "string"
+        },
         "tenant": {
           "type": "string"
         }

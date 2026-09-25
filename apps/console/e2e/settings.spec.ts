@@ -324,8 +324,7 @@ test('the no-stub sweep: every tab reads real routes, boot-bound identity is rea
   const bff = await mockBff(page);
   await page.goto('/settings');
   const tabs = page.getByRole('tab');
-  const names = await tabs.allTextContents();
-  expect(names).toEqual([
+  const names = [
     'SOC',
     'Configuration',
     'RBAC',
@@ -336,7 +335,9 @@ test('the no-stub sweep: every tab reads real routes, boot-bound identity is rea
     'Observability',
     'HA & Topology',
     'FIPS Mode',
-  ]);
+  ];
+  // Web-first: waits for the strip to render (reading text contents directly raced the first paint).
+  await expect(tabs).toHaveText(names);
   const expectations: Record<string, RegExp> = {
     SOC: /tier/i,
     Configuration: /Committed configuration at version 12/,

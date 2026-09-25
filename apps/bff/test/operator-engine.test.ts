@@ -610,6 +610,50 @@ describe('principalFromSession', () => {
   });
 });
 
+describe('the Settings tier (operator ruling 2026-09-25: every global admin administers Settings)', () => {
+  const session = (role: OperatorSession['role']): OperatorSession => ({
+    sessionId: 'x',
+    subject: 'auth0|op',
+    tier: 'Admin',
+    principalId: 'principal-op',
+    tenant: 'tenant-op',
+    role,
+    expiresAt: 1,
+  });
+
+  it('is set for a global-admin session only, from that session', () => {
+    expect(principalFromSession(session('global-admin')).settingsTier).toBe('Admin');
+    // A tenant-admin also holds the Admin tier but is NOT a global admin: no Settings tier.
+    expect(principalFromSession(session('tenant-admin')).settingsTier).toBeUndefined();
+    expect(principalFromSession(session('tenant-user')).settingsTier).toBeUndefined();
+  });
+
+  it('rides on the Settings calls only; every other call keeps the plain delegation', async () => {
+    const { client, reads, requests } = recordingClient();
+    const { sink } = capturingSink();
+    const engine = createOperatorEngine(client, sink);
+    const globalAdmin = principalFromSession(session('global-admin'));
+    const tenantAdmin = principalFromSession(session('tenant-admin'));
+
+    await engine.settingsRead(globalAdmin, { request_id: 1 });
+    await engine.settingsRead(tenantAdmin, { request_id: 2 });
+    await engine.querySubmit(globalAdmin, { request_id: 3, text: 'SELECT 1', params: [] });
+
+    const settingsOps = reads.filter(
+      (r): r is { operator: unknown } =>
+        typeof r === 'object' && r !== null && 'operator' in r && !('text' in r),
+    );
+    expect(settingsOps[0]?.operator).toEqual({
+      principal: 'principal-op',
+      tenant: 'tenant-op',
+      settings_tier: 'Admin',
+    });
+    expect(settingsOps[1]?.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
+    // The same global admin's NON-Settings call carries no Settings tier: nothing else widens.
+    expect(requests[0]?.operator).toEqual({ principal: 'principal-op', tenant: 'tenant-op' });
+  });
+});
+
 describe('createOperatorEngine', () => {
   const submit: WireQuerySubmit = { request_id: 7, text: 'SELECT 1', params: [] };
 
