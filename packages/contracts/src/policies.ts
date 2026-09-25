@@ -200,6 +200,15 @@ export interface PolicyMutation {
   readonly breaking: boolean;
 }
 
+/**
+ * A delete receipt. The engine's POLICY_DELETE ack names the tombstoned policy and carries no version or
+ * lifecycle (a deleted policy has neither), so it is not a `PolicyMutation`.
+ */
+export interface PolicyDeleted {
+  readonly id: string;
+  readonly deleted: true;
+}
+
 // -- fail-closed narrowers (an unknown engine tag returns null) --------------------------------------
 
 function toAction(tag: string): PolicyAction | null {
@@ -453,6 +462,11 @@ export function toWirePolicySpec(draft: PolicyDraft): WirePolicySpec {
     }));
   }
   return spec;
+}
+
+/** Project a delete acknowledgment. FAIL-CLOSED on an ack that names no policy. */
+export function toPolicyDeleted(reply: WirePolicyMutated): PolicyDeleted | null {
+  return reply.id === '' ? null : { id: reply.id, deleted: true };
 }
 
 /** Project a command acknowledgment. FAIL-CLOSED on an unknown lifecycle; a null `breaking` is `false`. */

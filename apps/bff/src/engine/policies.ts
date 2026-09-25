@@ -12,6 +12,7 @@
 // tenant is an honest empty zone list, never an error.
 
 import type {
+  PolicyDeleted,
   PolicyDetailView,
   PolicyDraft,
   PolicyMutation,
@@ -20,6 +21,7 @@ import type {
   WirePolicyListQuery,
 } from '@forge/contracts';
 import {
+  toPolicyDeleted,
   toPolicyDetail,
   toPolicyMutation,
   toPolicyZones,
@@ -144,7 +146,13 @@ export async function resolveDeletePolicy(
   vtz: string,
   id: string,
   opts?: EngineCallOptions,
-): Promise<PolicyMutation> {
+): Promise<PolicyDeleted> {
   const reply = await engine.policyDelete(principal, { request_id: requestId(), vtz, id }, opts);
-  return mutation(reply);
+  // The delete ack carries no version or lifecycle (the policy is tombstoned), so it is projected as a
+  // delete receipt; reading it as a lifecycle change refused every successful delete.
+  const receipt = toPolicyDeleted(reply);
+  if (receipt === null) {
+    throw new PoliciesUnavailableError('the delete ack names no policy');
+  }
+  return receipt;
 }

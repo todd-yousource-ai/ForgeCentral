@@ -188,7 +188,7 @@ function operatorEngineWith(soc: Partial<OperatorEngine> = {}): OperatorEngine {
     policyEdit: () => Promise.resolve({ id: 'p-1', version: '1.1.0', lifecycle: 'draft' }),
     policyPublish: () =>
       Promise.resolve({ id: 'p-1', version: '2.0.0', lifecycle: 'published', breaking: true }),
-    policyDelete: () => Promise.resolve({ id: 'p-1', version: '1.0.0', lifecycle: 'published' }),
+    policyDelete: () => Promise.resolve({ id: 'p-1', version: '', lifecycle: '' }),
     querySubmit: () =>
       Promise.resolve({
         rows: [
