@@ -7,7 +7,23 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25):** GD.13 MERGED `047726e` (operator: "Approve and continue"). NEXT = GD.N (capstone).
+- **State (2026-09-25):** GD.N ON BRANCH `feat/console-11-gdn-capstone`, awaiting review. Coverage is
+  global (all 89 manifest bindings have a declaring section; the per-surface scope list is gone);
+  three Playwright journeys added (the filter narrows to a hit that opens its section and says so on no
+  match; Help follows the active Settings tab; the tier refusal's link opens `cfg-who`), beside the
+  GD.2/GD.11 ones (three clicks, reload, Help panel). LIVE: Console installed on the box from main
+  `5e25720` at 20:26 UTC (`deploy/install.sh`, validate ALL PASSED); the served bundle carries the
+  GD.11-GD.13 code (reason lines, guide links, `data-const` markers, the filter); `/api/settings`
+  unauthenticated = 401. LIVE WALK 20:31 UTC (operator approved the device code; headless Chromium on the
+  box, read-only): PASS Help on SOC and Changes, the SOC tier hint and info tip, filter -> section ->
+  reload, `data-const` renders 64, the read-only why link -> `#cfg-apply`, the VTZ name rule and reason,
+  the policy byte counts and save reason. Two findings: CD-65 (one slow Overview read fails every queued
+  engine read on the shared connection; a 502 at 20:31:14; not fixed, outside this plan) and CD-66 (a
+  disabled primary button kept its fill; FIXED here with an e2e check). The settings-reference check was
+  a script bug (counted rows before the read landed); re-run owed after this merges and is installed,
+  together with the CD-66 fix. Merging GD.N closes the plan's PR rows; GD.E1-E3 and GD.D1 stay DEFERRED
+  by ruling.
+- **Earlier (2026-09-25):** GD.13 MERGED `047726e` (operator: "Approve and continue").
 - **Earlier (2026-09-25):** GD.13 ON BRANCH `feat/console-11-gd13-disabled-explained`.
   `DisabledReason` in `@forge/design` and `GuideLink` in the Console; every one of the 33 controls
   disabled for a reason other than an in-flight request names its reason with `aria-describedby`
@@ -184,7 +200,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.12a | 11.2 (3) | MERGED `709efc0` (2026-09-25; full gate green, e2e 42/42) | | InfoTip + FieldHint; Settings forms show and enforce the engine limits from named constants; guide `data-const` markers rendered live; INV-GUIDE-ONE-SOURCE contract test |
 | GD.12b | 11.2 (3) | MERGED `3e0aa13` (2026-09-25; full gate green, e2e 42/42) | | the same for VTZ, Objects, Policies, Users/groups, IdAM, SOC case controls, Logs |
 | GD.13 | INV-GUIDE-DISABLED-EXPLAINED | MERGED `047726e` (2026-09-25; full gate green, e2e 42/42) | | DisabledReason + GuideLink; 33 disabled controls state why; hidden locks link to their cause; source-scanning contract test |
-| GD.N | 11.6 | PLANNED | | capstone: global coverage, Playwright journeys, live drive |
+| GD.N | 11.6; INV-GUIDE-COVERS-EVERY-CONFIG | ON BRANCH `feat/console-11-gdn-capstone` | | capstone: global coverage (89/89), Playwright journeys, Console installed live + bundle verified; logged-in walk owed to the operator |
 | GD.E1 | -- | DEFERRED (ruling 2026-09-25) | | crdb: setting tier on the wire |
 | GD.E2 | -- | DEFERRED (ruling 2026-09-25) | | crdb: deployment profiles on the wire |
 | GD.E3 | -- | DEFERRED (ruling 2026-09-25) | | crdb: detection report + enrolled-endpoint read |

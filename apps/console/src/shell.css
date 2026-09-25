@@ -478,6 +478,14 @@ body {
   cursor: default;
 }
 
+/* A disabled primary action drops its brand fill: at reduced opacity the fill still read as available
+   (seen live on the policy form, GD.N). */
+.fcx-btn--primary:disabled {
+  background: transparent;
+  color: var(--fc-color-text-muted);
+  border-color: var(--fc-color-surface-border);
+}
+
 /* ---- login + boot -------------------------------------------------------- */
 
 .fcx-boot,

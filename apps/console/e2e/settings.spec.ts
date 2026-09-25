@@ -416,6 +416,47 @@ test('Help opens the guide section for the active tab in a full-height side pane
   await expect(page).toHaveURL(/\/settings\?tab=readme#ch-settings-configuration$/);
 });
 
+test('the ReadMe filter narrows the contents to matching sections, and a hit opens its section (GD.N)', async ({
+  page,
+}) => {
+  await mockBff(page);
+  await page.goto('/settings?tab=readme');
+  await page.getByRole('searchbox', { name: 'Filter the guide' }).fill('dual control');
+  const hits = page.getByTestId('guide-hits');
+  await expect(
+    hits.getByRole('link', { name: 'Turn on two-person control for Settings', exact: true }),
+  ).toBeVisible();
+  await hits
+    .getByRole('link', { name: 'Turn on two-person control for Settings', exact: true })
+    .click();
+  await expect(page.locator('#setc-dual')).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\?tab=readme#setc-dual$/);
+  // A filter that matches nothing says so rather than showing an empty list.
+  await page.getByRole('searchbox', { name: 'Filter the guide' }).fill('zzqqxx');
+  await expect(page.getByText('No section matches that filter')).toBeVisible();
+});
+
+test('Help follows the active Settings tab (GD.N)', async ({ page }) => {
+  await mockBff(page);
+  await page.goto('/settings?tab=soc');
+  await page.getByRole('button', { name: 'Help' }).click();
+  await expect(page.getByRole('dialog', { name: 'How the response tiers work' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('tab', { name: 'Changes', exact: true }).click();
+  await page.getByRole('button', { name: 'Help' }).click();
+  await expect(page.getByRole('dialog', { name: 'Approve a proposal' })).toBeVisible();
+});
+
+test('a lock links to its cause: the tier refusal opens who can configure what (GD.13, GD.N)', async ({
+  page,
+}) => {
+  await mockBff(page, { tierBelow: true });
+  await page.goto('/settings?tab=configuration');
+  await page.getByRole('link', { name: 'Who can configure what' }).click();
+  await expect(page).toHaveURL(/\/settings\?tab=readme#cfg-who$/);
+  await expect(page.locator('#cfg-who')).toBeVisible();
+});
+
 test('the tier below Admin / SecurityAudit is an honest empty state on every engine tab', async ({
   page,
 }) => {
