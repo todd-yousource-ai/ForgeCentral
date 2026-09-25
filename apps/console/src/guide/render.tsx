@@ -23,6 +23,7 @@ const RENAMED: Readonly<Record<string, string>> = {
 function propName(name: string): string {
   const renamed = RENAMED[name];
   if (renamed !== undefined) return renamed;
+  if (name.startsWith('data-') || name.startsWith('aria-')) return name;
   // SVG presentation attributes (stroke-width, text-anchor, ...) are camelCase props in React.
   return name.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
 }

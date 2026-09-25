@@ -80,7 +80,16 @@ const SVG_TAGS = new Set([
   'tspan',
   'title',
 ]);
-const HTML_ATTRS = new Set(['class', 'id', 'href', 'colspan', 'rowspan', 'style', 'title']);
+const HTML_ATTRS = new Set([
+  'class',
+  'id',
+  'href',
+  'colspan',
+  'rowspan',
+  'style',
+  'title',
+  'data-covers',
+]);
 const SVG_ATTRS = new Set([
   'class',
   'id',
@@ -235,6 +244,7 @@ function sectionize(nodes, isReference, referenceKeys) {
     if (typeof node !== 'string' && node.t === 'h2') {
       sections.push({
         id: node.a?.id ?? '',
+        covers: (node.a?.['data-covers'] ?? '').split(' ').filter((b) => b !== ''),
         title: plainText(node).replace(/\s+/g, ' ').trim(),
         subsections: [],
         nodes: [],
@@ -258,6 +268,8 @@ function sectionize(nodes, isReference, referenceKeys) {
       continue;
     }
     if (typeof kept !== 'string' && kept.t === 'h3') {
+      for (const b of (kept.a?.['data-covers'] ?? '').split(' '))
+        if (b !== '') current.covers.push(b);
       current.subsections.push({
         id: kept.a?.id ?? '',
         title: plainText(kept).replace(/\s+/g, ' ').trim(),
