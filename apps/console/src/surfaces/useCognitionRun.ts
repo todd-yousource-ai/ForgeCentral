@@ -25,8 +25,12 @@ export function runRefusalReason(status: number): string {
   switch (status) {
     case 403:
       return 'This operator is not permitted to start a run.';
+    case 401:
+      return 'Your session has expired. Sign in again; nothing was started.';
+    case 502:
+      return 'The engine could not complete the request.';
     case 503:
-      return 'The engine answered with something the Console will not render.';
+      return 'The engine is unavailable, or answered with something the Console will not render.';
     default:
       return 'The run request did not reach the engine.';
   }

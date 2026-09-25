@@ -31,11 +31,15 @@ export function planRefusalReason(status: number): string {
     case 409:
       return 'The plan changed, was already approved, or does not exist yet. Re-read the incident and try again.';
     case 400:
-      return 'The engine would not accept this plan.';
+      return 'The plan was not accepted as sent (malformed, or too large).';
     case 403:
       return 'This operator is not permitted to act on this plan.';
+    case 401:
+      return 'Your session has expired. Sign in again; nothing was committed.';
+    case 502:
+      return 'The engine could not complete the request.';
     case 503:
-      return 'The engine answered with something the Console will not render.';
+      return 'The engine is unavailable, or answered with something the Console will not render.';
     default:
       return 'The command did not reach the engine.';
   }

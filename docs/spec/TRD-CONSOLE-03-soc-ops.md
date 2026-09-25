@@ -1,6 +1,8 @@
 # TRD-CONSOLE-03 -- SOC Operations
 
-**Status:** DRAFT (authored 2026-07-25). Inherits `TRD-CONSOLE-00`. **Supersedes
+**Status:** BUILT (authored 2026-07-25; refreshed 2026-09-25 by `IP-CONSOLE-11-guide` GD.8 against
+ForgeCentral `a0412f2` and crucible `c5590958`; Section 0b records the as-built surface and wins where
+Sections 2 to 8 disagree). Inherits `TRD-CONSOLE-00`. **Supersedes
 `TRD-CONSOLE-03-dashboards.md`** (the 2026-07-07 Dashboards draft), which the 2026-07-24 operator IA
 revision renamed to `SOC Ops`. Grounding: the operator-supplied `Crucible Command` dynamic demo
 package (`preview/clean-layout-preview.png` + `src/`), used as the framework for layout and behavior;
@@ -40,6 +42,48 @@ Four operator directives are carried into this revision:
    implementing IP chooses libraries against `DEPENDENCY-POLICY.md`.
 
 ---
+
+## 0b. As built (2026-09-25)
+
+This section records the built surface. Where Sections 2 to 8 describe the 2026-07-25 design
+differently, this section wins; every requirement not built is kept in Section 9.
+
+- **Narrative model.** The headline and write-up come from the model bound at `soc_narrative.model_ref`
+  (Settings > Configuration, the Narrative model form; Gemma 4 on the reference node), through the governed
+  inference plane, only when an operator presses **Generate verdict**. Opening an incident never generates.
+- **Model (Section 2), seven regions.** Header: the `Forge Central` mark, `SOC Operations`, a detection
+  posture pill (`Detection active` / `Detection disabled` / `Posture unknown`, from `DETECT_SUMMARY`) and an
+  `Enforcement off` pill (a constant string, not a read; Section 9). Seven focus tabs, of which only
+  `Incidents` is built. KPI strip of six tiles: Events Analyzed, Noise Collapsed, Material Incidents,
+  Auto-Contained, Decision Waiting, Rules Evaluable. The dock's six panes plus the current graph scope.
+- **Decision Queue (Section 3).** Each card carries an authority chip (`Automatic`, `Approval required`,
+  `Review required`, `Contained`), the finding, the entity path, the engine's recorded credibility (with a
+  probability only where a calibration is committed; otherwise `Uncalibrated`), posture, confidence, the
+  cited-leg count and the incident id. The queue renders the engine's order as returned (authority state
+  first); the Console computes no score, and there is no exposure field. The channel strip (All / Urgent
+  Review / Threat Inspection) narrows without re-sorting.
+- **Lineage (Section 4).** Nodes are laid out left to right by causal depth within the three lanes; the six
+  semantic columns are not drawn. Node kinds: subject, network, process, evidence, decision, response; a
+  node shows a label and a sublabel, no state chips. The legend names the four edge states; `verified` is
+  unreachable while enforcement is off. Toolbar: `Material path` / `Show evidence` / `Full story`.
+- **FORGE VERDICT (Section 5).** Adds the `Generate verdict` control and its state note, a `Flagged for
+  human review` badge, and Business impact as band + factors + sentence (no currency). The panel shows
+  `modelRef` and `inputHash`. CONSENSUS is the confidence tier plus "one detection gate, corroborated by N
+  cited legs"; CONTRADICTIONS is false-positive feedback plus the ratified baseline for the technique.
+- **Case controls (new).** Assign (a typed principal id), Acknowledge, Close without verdict, and Record
+  disposition (seven verdicts, each with its field); all confirm-gated and audited on the incident's trail.
+  The three true-positive verdicts and false positive teach calibration; a false positive also down-weights
+  the tenant's incidents that share the technique; a later disposition replaces the earlier one.
+- **Investigation dock (Section 6).** Evidence lists the cited leg references (narrowed to a scoped node);
+  Timeline shows the two instants the engine records (opened, last fired); Raw Telemetry is
+  `SOC_INCIDENT_TELEMETRY` (resolved / aged out / restricted); Audit Trail is `SOC_INCIDENT_AUDIT`; Notes
+  is `SOC_INCIDENT_NOTES` plus a composer. A verdict run is recorded on the engine's audit chain, not the
+  incident's trail.
+- **Three-click paths (Section 8).** No card is selected on load (triage is select -> read); there is no
+  Open-entity path to the drawer. Generate verdict: select -> Generate. Case acts: control -> confirm.
+  Record disposition: verdict -> field -> Record -> confirm. Add a note: Notes -> Save.
+- **Built under this IP, specified elsewhere.** The Reports tab's incident report and weekly panel
+  (S3.16 / S3.17, `TRD-CONSOLE-08` scope) and the Settings SOC tab (S3.18, `TRD-CONSOLE-11`).
 
 ## 1. Purpose
 
@@ -218,23 +262,24 @@ Every value binds to a real engine operation or it does not ship.
 
 | Element | Binding | State |
 |---|---|---|
-| KPI: Events Analyzed | `DETECT_SUMMARY.events_analyzed` (crdb SS.3 + the SS.3a ingest-admission producer) | **LIVE** (2026-07-26) |
-| KPI: Noise Collapsed | `DETECT_SUMMARY.muted_total` + `techniques_lit` (FV.5/FV.6) | **LIVE** |
-| KPI: Material Incidents | `DETECT_SUMMARY.active_alerts` (FV.4) | **LIVE** |
-| KPI: Auto-Contained | `DETECT_SUMMARY.auto_contained` (crdb SS.3) | **LIVE** (2026-07-26). Counts EXECUTION, so it reads **0** while enforcement is OFF -- a fact, rendered as a value with its reason, never as an unavailable tile |
-| KPI: Decision Waiting | the queue's `AuthorityState` (crdb SS.1), counted Console-side | **LIVE** (2026-07-26). Derived from the SAME field the queue orders by, so the tile and the queue cannot disagree |
-| Decision Queue | `LOG_QUERY` episode working set (SQ.8a), newest-first, bounded | **LIVE** |
-| Queue score | the episode's confidence + posture rank | **LIVE** |
+| KPI strip (six tiles) | `soc.kpis` (`DETECT_SUMMARY` + the queue counts) | **LIVE** |
+| KPI: Auto-Contained | `DETECT_SUMMARY.auto_contained` | **LIVE**; reads 0 while enforcement is off |
+| KPI: Rules Evaluable | `DETECT_SUMMARY.coverage` | **LIVE** |
+| Decision Queue | `soc.incidents` -> `SOC_INCIDENT_LIST` (engine order, authority state first) | **LIVE** |
+| Incident detail | `soc.incident.detail` -> `SOC_INCIDENT_DETAIL` | **LIVE** |
+| Response plan | `soc.plan.propose` (rides the detail; the crdb proposer, SS.6) | **LIVE** |
+| Verdict narrative | `soc.narrative` | **LIVE** |
+| Business impact | `soc.impact` | **LIVE** |
+| Evidence and Raw Telemetry | the detail's leg references + `soc.telemetry.raw` | **LIVE** |
+| Audit Trail | `soc.audit.trail` -> `SOC_INCIDENT_AUDIT` | **LIVE** |
+| Notes | `soc.notes` | **LIVE** |
+| Generate verdict | `soc.cognition.run` | **LIVE** |
+| Approve / Modify plan | `soc.plan.approve` / `soc.plan.modify` | **LIVE** (Modify is not confirm-gated, CD-30) |
+| Case acts | `soc.case.assign` / `soc.case.ack` / `soc.case.note` / `soc.case.close` (`SOC_INCIDENT_ACT`) | **LIVE** |
+| Disposition | `soc.disposition` | **LIVE** |
+| Posture: Enforcement | a constant string on the surface | **NOT BOUND** (Section 9) |
 | Queue exposure / blast radius | business-context enrichment | **PENDING** (Section 9) |
-| Lineage nodes/edges | the decision's attribution window + LEG edges (`Executes`, `ConnectsTo`) | **LIVE** |
-| Edge state | LEG relation provenance + the gate's evidence class | **LIVE** |
-| Evidence dock | `LOG_EXPLAIN` + the decision's evidence ids | **LIVE** |
-| Audit Trail | the TRD-04 hash-chained audit entries | **LIVE** |
-| Verdict narrative | governed inference over the incident record (Section 5) | **PENDING** -- prerequisites in Section 9 |
-| Verdict: Already enforced | the decision's enforced actions + apply reports | **PARTIAL** |
-| Verdict: Coordinated response | the response plan | **PENDING** -- no response-plan record exists |
-| Approve Full Response | an audited command | **PENDING** -- gated on the response-plan record |
-| Posture: Enforcement | the platform enforcement toggle (`AG.7`) | **LIVE** |
+| UEBA per incident | `SOC_INCIDENT_UEBA` (engine op exists) | **no Console consumer** |
 
 A `PENDING` binding renders its element in an explicit unavailable state. It is never filled with a
 plausible number.
@@ -273,6 +318,21 @@ plausible number.
 6. **Events-analyzed counter** -- needs a bounded per-window ingest count.
 7. **Multi-model consensus** -- see Section 5.3; deferred rather than faked.
 
+Resolved since authoring: items 1 (authority state, crdb SS.1), 3 (the response plan record and its
+proposer, crdb SS.2 / SS.5 / SS.6), 4 (governed serving; the model is configurable) and 6 (the events
+counter, SS.3 / SS.3a). **Known gaps recorded 2026-09-25 (kept as requirements):**
+- The header's tenant / shift line, `ELEVATED`, search, and the coverage and shift-lead readouts (D-03).
+- Six of the seven focus tabs render `Not yet built` (SOC-10).
+- No first-card auto-select and no Open-entity path to the drawer (D-03).
+- R-SOC-3's `output_hash`, `model_version` and `policy_version` are not shown; CONTRADICTIONS lacks the
+  overlapping benign attribution (D-03).
+- Confirm steps are missing on Modify plan and Generate (CD-30).
+- The `Enforcement off` pill, the Auto-Contained badge and the "Already enforced" copy are constants, not
+  reads, and will be wrong on an enforcement-on node.
+- The plan-step reversibility / rollback display (S3.14) is not built, although the wire field exists.
+- No assignee picker: a principal id must be typed.
+- The S3.N capstone (Playwright journeys per Section 8 and the live drive) has not run.
+
 ---
 
 ## 10. Acceptance and failure semantics
@@ -289,7 +349,7 @@ plausible number.
 | A8 | The narrative's artifact carries `input_hash`/`output_hash`/`model_version`; regeneration is idempotent |
 | A9 | A narrative never renders above the operator's clearance |
 | A10 | Only `@forge/design` tokens are used; no literal hex in surface code |
-| A11 | Approve/Modify are confirm-gated and audited; refusal maps to a typed error, never a silent no-op |
+| A11 | Approve/Modify are confirm-gated and audited; refusal maps to a typed error, never a silent no-op (NOT MET: Modify has no confirm, CD-30) |
 | A12 | Every task in Section 8 completes within its click budget |
 
 **Failure semantics.** Engine unavailable -> the surface renders its shell with an explicit

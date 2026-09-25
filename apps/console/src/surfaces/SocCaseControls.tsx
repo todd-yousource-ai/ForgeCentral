@@ -145,8 +145,8 @@ function pendingCopy(pending: Pending): { readonly title: string; readonly descr
       title: `Record the verdict "${dispositionLabel(pending.draft.disposition)}"?`,
       description:
         pending.draft.disposition === 'false_positive'
-          ? 'This closes the incident and DOWN-WEIGHTS the rule for this tenant. It is audited under your principal and cannot be un-recorded; a later verdict is a correction on top of it.'
-          : 'This closes the incident and records the verdict as a calibration label. It is audited under your principal and cannot be un-recorded; a later verdict is a correction on top of it.',
+          ? 'This closes the incident and DOWN-WEIGHTS every incident in this tenant with the same ATT&CK technique. It is audited under your principal; a later verdict replaces it, and the trail keeps both.'
+          : 'This closes the incident and records the verdict (a true-positive verdict also teaches calibration). It is audited under your principal; a later verdict replaces it, and the trail keeps both.',
     };
   }
   switch (pending.draft.act) {
@@ -399,12 +399,12 @@ export function SocCaseControls({ incidentId }: SocCaseControlsProps): ReactElem
           {form.disposition === 'undetermined'
             ? 'Closes the incident with no verdict label; unlike a plain close, the trail records that an operator ruled it undetermined.'
             : form.disposition === 'false_positive'
-              ? 'The one verdict that down-weights the rule tenant-wide. It needs your justification.'
+              ? "The one verdict that down-weights the tenant's incidents with the same technique. It needs your justification."
               : dispositionDraft === null
                 ? form.disposition === 'true_positive_risk_accepted'
                   ? 'Needs the accepting party and a lapse date in the future; the engine refuses an expiry that has passed.'
                   : `Needs ${fieldLabel === null ? 'its field' : fieldLabel.toLowerCase()}.`
-                : 'Recorded as a calibration label and closes the incident.'}
+                : "Recorded as the incident's verdict; closes the incident."}
         </span>
       </form>
 

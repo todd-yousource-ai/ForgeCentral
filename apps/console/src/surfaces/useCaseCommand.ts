@@ -47,11 +47,15 @@ export function caseRefusalReason(status: number, explanation: string | null): s
     case 404:
       return 'The incident is unknown, another tenant’s, or above this session’s clearance.';
     case 400:
-      return 'The engine would not accept the request as sent.';
+      return 'The request was not accepted as sent (malformed, or too large).';
     case 403:
       return 'This operator is not permitted to act on cases.';
+    case 401:
+      return 'Your session has expired. Sign in again; nothing was committed.';
+    case 502:
+      return 'The engine could not complete the request.';
     case 503:
-      return 'The engine answered with something the Console will not render.';
+      return 'The engine is unavailable, or answered with something the Console will not render.';
     default:
       return 'The command did not reach the engine.';
   }
