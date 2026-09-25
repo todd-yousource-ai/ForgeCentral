@@ -1278,6 +1278,49 @@ describe('BFF HTTP surface', () => {
     expect(seen).toEqual(['ten-a', 'ten-b']);
   });
 
+  it('GET /api/settings/security-session reports this session, or that the lookup is unconfigured', async () => {
+    const unconfigured = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession) },
+    );
+    const plain = await fetch(`${unconfigured}/api/settings/security-session`);
+    expect(await plain.json()).toEqual({ status: 'unconfigured' });
+
+    // A fake sidecar lookup that knows exactly one port: whatever port this test's request came from.
+    const { createServer: createNetServer } = await import('node:net');
+    const asked: number[] = [];
+    const sidecar = createNetServer((socket) => {
+      socket.on('data', (chunk: Buffer) => {
+        const { port } = JSON.parse(chunk.toString('utf8').trim()) as { port: number };
+        asked.push(port);
+        socket.write('{"group":"X25519MLKEM768"}\n');
+      });
+    });
+    await new Promise<void>((resolve) => sidecar.listen(0, '127.0.0.1', resolve));
+    const sidecarAddress = sidecar.address();
+    if (sidecarAddress === null || typeof sidecarAddress === 'string')
+      throw new Error('no address');
+    const cache = new EphemeralCache<unknown>(config.cacheTtlMs, config.cacheMaxEntries);
+    const server = createServer({
+      config: { ...config, engineHost: '127.0.0.1', sessionPort: sidecarAddress.port },
+      log: silentLog,
+      cache,
+      client: mockClient(() => Promise.resolve()),
+      authRouter: authRouterWith(operatorSession),
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('no address');
+    const res = await fetch(
+      `http://127.0.0.1:${String(address.port)}/api/settings/security-session`,
+    );
+    expect(await res.json()).toEqual({ status: 'negotiated', group: 'X25519MLKEM768' });
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toBeGreaterThan(0);
+    await new Promise<void>((r) => sidecar.close(() => r()));
+  });
+
   it('GET /api/settings/reports refuses a bad name before the engine and serves the named reports', async () => {
     const asked: unknown[] = [];
     const engine: OperatorEngine = {

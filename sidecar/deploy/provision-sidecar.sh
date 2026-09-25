@@ -25,6 +25,7 @@ BFF_HTTP_PORT="${BFF_HTTP_PORT:-8787}"          # the BFF admin http (the sideca
 EGRESS_PORT="${EGRESS_PORT:-8789}"              # the sidecar egress the BFF dials (loopback)
 SIGN_PORT="${SIGN_PORT:-8790}"                  # the FD.2 bundle-signing service (loopback)
 SECRET_PORT="${SECRET_PORT:-8791}"              # the IdAM secret-set service (loopback, ID.4)
+SESSION_PORT="${SESSION_PORT:-8792}"            # the admin-session lookup (loopback, IP-CONSOLE-11 ST.5b)
 SECRET_PATH="${SECRET_PATH:-/etc/cdb/secrets/auth0-management.secret}"  # the client_secret_ref target
 CDB_USER="${CDB_USER:-cdb}"                     # the engine user that must READ the secret file
 # The sidecar binary path -- the SAME binary the units run, so seed generation uses the deployed code
@@ -168,7 +169,8 @@ cat > "$CONFIG" <<EOF
   "engine_key": "$ENGINE_KEY",
   "egress_addr": "127.0.0.1:$EGRESS_PORT",
   "admin_cert": "$ADMIN_CERT",
-  "admin_key": "$ADMIN_KEY"$sign_lines$secret_lines
+  "admin_key": "$ADMIN_KEY"$sign_lines$secret_lines,
+  "session_addr": "127.0.0.1:$SESSION_PORT"
 }
 EOF
 chmod 0644 "$CONFIG"
@@ -183,6 +185,7 @@ echo "provision-sidecar: engine identity = the software Console-CA leaf (engine_
 if [ -n "$SIGN_SEED" ]; then
     echo "provision-sidecar: Forge signing plane on 127.0.0.1:$SIGN_PORT -- set FC_SIGNER_PORT=$SIGN_PORT in the BFF env and deliver $ANCHOR to endpoints."
 fi
+echo "provision-sidecar: admin-session lookup on 127.0.0.1:$SESSION_PORT -- set FC_SIDECAR_SESSION_PORT=$SESSION_PORT in the BFF env so the Security tab shows the session key exchange."
 echo "provision-sidecar: IdAM secret-set plane on 127.0.0.1:$SECRET_PORT (writes $SECRET_PATH) -- set FC_IDAM_SECRET_PORT=$SECRET_PORT in the BFF env so connector onboarding works."
 echo "provision-sidecar: next -> install + enable the units:"
 echo "    install -m0644 sidecar/deploy/console-crypto-sidecar.service /etc/systemd/system/"

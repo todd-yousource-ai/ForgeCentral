@@ -113,6 +113,7 @@ SIDECAR_BIN_ARG="$BIN_PREFIX/console-crypto-sidecar"
 [ "${CONSOLE_SKIP_SIGN:-0}" = "1" ] && SIDECAR_BIN_ARG=""
 OUT_DIR="$SIDECAR_ETC" NODE_IP="$NODE_IP" SIDECAR_BIN="$SIDECAR_BIN_ARG" \
   ENGINE_CA="$ENGINE_CA" ENGINE_CERT="$ENGINE_CERT" ENGINE_KEY="$ENGINE_KEY" \
+  SESSION_PORT="${CONSOLE_SESSION_PORT:-8792}" \
   bash "$repo_root/sidecar/deploy/provision-sidecar.sh"
 
 # ---- [4] deliver the engine identity (IP-CONSOLE-CONTROL-PLANE F2): copy the node installer's software
@@ -208,11 +209,13 @@ sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_SPA_DIST=/d' "$BFF_ETC/config.env"
 printf 'FC_SPA_DIST=%s\n' "$BFF_LIB/spa" >>"$BFF_ETC/config.env"
 # Pin the sidecar plane ports so the standard capabilities work out of the box (idempotent): the FD.N
 # Forge signing plane (FC_SIGNER_PORT) and the IdAM connector secret-set plane (FC_IDAM_SECRET_PORT).
-# These MUST match provision-sidecar.sh (SIGN_PORT / SECRET_PORT). Overridable via CONSOLE_SIGNER_PORT /
-# CONSOLE_IDAM_SECRET_PORT.
-sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_SIGNER_PORT=/d;/^[[:space:]]*#?[[:space:]]*FC_IDAM_SECRET_PORT=/d' "$BFF_ETC/config.env"
+# These MUST match provision-sidecar.sh (SIGN_PORT / SECRET_PORT / SESSION_PORT). Overridable via
+# CONSOLE_SIGNER_PORT / CONSOLE_IDAM_SECRET_PORT / CONSOLE_SESSION_PORT. The admin-session lookup
+# (FC_SIDECAR_SESSION_PORT, IP-CONSOLE-11 ST.5b) lets the Security tab show the session's key exchange.
+sed -i -E '/^[[:space:]]*#?[[:space:]]*FC_SIGNER_PORT=/d;/^[[:space:]]*#?[[:space:]]*FC_IDAM_SECRET_PORT=/d;/^[[:space:]]*#?[[:space:]]*FC_SIDECAR_SESSION_PORT=/d' "$BFF_ETC/config.env"
 printf 'FC_SIGNER_PORT=%s\n' "${CONSOLE_SIGNER_PORT:-8790}" >>"$BFF_ETC/config.env"
 printf 'FC_IDAM_SECRET_PORT=%s\n' "${CONSOLE_IDAM_SECRET_PORT:-8791}" >>"$BFF_ETC/config.env"
+printf 'FC_SIDECAR_SESSION_PORT=%s\n' "${CONSOLE_SESSION_PORT:-8792}" >>"$BFF_ETC/config.env"
 chown -R console-bff:console-bff "$BFF_ETC"
 install -m 0644 "$repo_root/sidecar/deploy/console-crypto-sidecar.service" /etc/systemd/system/
 install -m 0644 "$repo_root/apps/bff/deploy/console-bff.service"           /etc/systemd/system/

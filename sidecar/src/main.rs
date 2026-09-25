@@ -13,6 +13,7 @@ use console_crypto_sidecar::bind::SidecarError;
 use console_crypto_sidecar::config::SidecarConfig;
 use console_crypto_sidecar::engine::EngineOriginator;
 use console_crypto_sidecar::secret_service::SecretService;
+use console_crypto_sidecar::session_service::{SessionRegistry, SessionService};
 use console_crypto_sidecar::sign_service::SignService;
 use console_crypto_sidecar::signing::BundleSigner;
 use console_crypto_sidecar::tls::admin_server_config;
@@ -113,6 +114,16 @@ async fn main() -> Result<(), SidecarError> {
         admin_config,
     )
     .await?;
+    // The admin-session lookup (IP-CONSOLE-11 ST.5b): the terminator registers each live tunnel's
+    // negotiated group, and the BFF asks by the tunnel's loopback source port.
+    let (admin, session) = match &config.session_addr {
+        Some(addr) => {
+            let registry = SessionRegistry::new();
+            let service = SessionService::bind(addr, std::sync::Arc::clone(&registry)).await?;
+            (admin.with_sessions(registry), Some(service))
+        }
+        None => (admin, None),
+    };
 
     // Build the engine mTLS client config from the software Console-CA leaf the node installer generates
     // for the dedicated control plane (:7879, IP-CONSOLE-CONTROL-PLANE D2), signing in-process. This is the
@@ -149,32 +160,26 @@ async fn main() -> Result<(), SidecarError> {
         _ => None,
     };
 
-    // Serve every configured leg; the first listener error, or a shutdown signal, ends the process.
-    match (sign, secret) {
-        (Some(sign), Some(secret)) => tokio::select! {
-            result = admin.run() => result,
-            result = engine.run() => result,
-            result = sign.run() => result,
-            result = secret.run() => result,
-            result = shutdown_signal() => result,
-        },
-        (Some(sign), None) => tokio::select! {
-            result = admin.run() => result,
-            result = engine.run() => result,
-            result = sign.run() => result,
-            result = shutdown_signal() => result,
-        },
-        (None, Some(secret)) => tokio::select! {
-            result = admin.run() => result,
-            result = engine.run() => result,
-            result = secret.run() => result,
-            result = shutdown_signal() => result,
-        },
-        (None, None) => tokio::select! {
-            result = admin.run() => result,
-            result = engine.run() => result,
-            result = shutdown_signal() => result,
-        },
+    // Serve every configured leg; the first listener error, or a shutdown signal, ends the process. An
+    // unconfigured optional leg never completes, so one select covers every combination.
+    tokio::select! {
+        result = admin.run() => result,
+        result = engine.run() => result,
+        result = optional(sign.map(SignService::run)) => result,
+        result = optional(secret.map(SecretService::run)) => result,
+        result = optional(session.map(SessionService::run)) => result,
+        result = shutdown_signal() => result,
+    }
+}
+
+/// Run an optional leg, or wait forever when it is not configured.
+async fn optional<F>(leg: Option<F>) -> Result<(), SidecarError>
+where
+    F: std::future::Future<Output = Result<(), SidecarError>>,
+{
+    match leg {
+        Some(run) => run.await,
+        None => std::future::pending().await,
     }
 }
 

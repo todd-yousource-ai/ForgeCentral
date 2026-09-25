@@ -57,6 +57,9 @@ const ConfigSchema = z.object({
   // The sidecar IdAM secret-set service port (ID.4), loopback-only; absent = the connector
   // onboarding secret step answers 503 (provisioned with the sidecar's secret_addr/secret_path).
   secretPort: z.coerce.number().int().positive().optional(),
+  // The sidecar admin-session lookup port (IP-CONSOLE-11 ST.5b), loopback-only; absent = the Security
+  // tab states the session's key exchange is not available.
+  sessionPort: z.coerce.number().int().positive().optional(),
   /** Engine heartbeat interval in ms. The wire client sends a PING within this cadence to refresh the
    * engine session lease (TRD-04a 3.1: a client must heartbeat within the lease window or the engine
    * closes the connection; the crdb default lease is 60s). Keep it well under the lease so a missed beat
@@ -117,6 +120,8 @@ export interface BffConfig {
   readonly signerPort?: number;
   /** The loopback port of the sidecar's IdAM secret-set service (ID.4), or undefined when unprovisioned. */
   readonly secretPort?: number;
+  /** The loopback port of the sidecar's admin-session lookup (ST.5b), or undefined when unprovisioned. */
+  readonly sessionPort?: number;
   /** Engine heartbeat cadence in ms (PING keeps the engine session lease alive; see the schema note). */
   readonly heartbeatIntervalMs: number;
   /** Path to the built Console SPA served behind the admin plane; absent -> the BFF is API-only. */
@@ -204,6 +209,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     requestTimeoutMs: env['FC_REQUEST_TIMEOUT_MS'],
     signerPort: env['FC_SIGNER_PORT'],
     secretPort: env['FC_IDAM_SECRET_PORT'],
+    sessionPort: env['FC_SIDECAR_SESSION_PORT'],
     engineHeartbeatMs: env['FC_ENGINE_HEARTBEAT_MS'],
     spaDir: env['FC_SPA_DIST'],
     sessionTtlMs: env['FC_SESSION_TTL_MS'],
@@ -262,6 +268,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BffConfig {
     rbac: resolveRbac(env),
     ...(raw.signerPort !== undefined ? { signerPort: raw.signerPort } : {}),
     ...(raw.secretPort !== undefined ? { secretPort: raw.secretPort } : {}),
+    ...(raw.sessionPort !== undefined ? { sessionPort: raw.sessionPort } : {}),
     ...(raw.spaDir !== undefined ? { spaDir: raw.spaDir } : {}),
     ...(oidc !== undefined ? { oidc } : {}),
   };

@@ -807,3 +807,25 @@ export function toSettingsReportsView(wire: WireSettingsReports): SettingsReport
         : wire.egress.map((e: WireEgressSetting) => ({ id: e.id, ceiling: e.ceiling })),
   };
 }
+
+/**
+ * The key exchange THIS operator's admin session negotiated (IP-CONSOLE-11 ST.5b), from the crypto
+ * sidecar's record of the tunnel the request arrived on. `unconfigured`: the sidecar lookup is not
+ * provisioned. `not-tunnelled`: the request did not come through the admin terminator.
+ */
+export type AdminSessionKx =
+  | { readonly status: 'negotiated'; readonly group: string }
+  | { readonly status: 'not-tunnelled' }
+  | { readonly status: 'unconfigured' };
+
+/** The group in the operator's words: the hybrid post-quantum exchange, the P-384 floor, or other. */
+export function sessionGroupLabel(group: string): string {
+  switch (group) {
+    case 'X25519MLKEM768':
+      return 'Hybrid post-quantum (X25519MLKEM768)';
+    case 'secp384r1':
+      return 'Classical P-384 floor (CNSA 1.0)';
+    default:
+      return `Other (${group})`;
+  }
+}

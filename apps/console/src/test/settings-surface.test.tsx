@@ -633,7 +633,11 @@ const OBSERVABILITY_VIEW: SettingsView = {
   ],
 };
 
-function mockReports(reports: unknown, asked: string[] = []): void {
+function mockReports(
+  reports: unknown,
+  asked: string[] = [],
+  session: unknown = { status: 'negotiated', group: 'X25519MLKEM768' },
+): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) => {
@@ -643,6 +647,7 @@ function mockReports(reports: unknown, asked: string[] = []): void {
           status,
           json: () => Promise.resolve(body),
         } as Response);
+      if (url === '/api/settings/security-session') return reply(200, session);
       if (url.startsWith('/api/settings/reports')) {
         asked.push(url);
         return reply(reports === null ? 403 : 200, reports);
@@ -678,7 +683,7 @@ describe('the report-backed tabs (crdb SET.4)', () => {
     expect(within(security).getByText('Verified')).toBeInTheDocument();
     expect(within(security).getByText('confidential')).toBeInTheDocument();
     expect(screen.getByText('frontier')).toBeInTheDocument();
-    expect(screen.getByText(/ST\.5b/)).toBeInTheDocument();
+    expect(await screen.findByText('Hybrid post-quantum (X25519MLKEM768)')).toBeInTheDocument();
     expect(asked).toEqual(['/api/settings/reports?names=connectivity,security,egress']);
     expect(screen.queryByRole('button', { name: /rotate|edit|commit/i })).toBeNull();
   });
@@ -746,6 +751,28 @@ describe('the report-backed tabs (crdb SET.4)', () => {
     expect(within(fips).getByText('No')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('switch')).toBeNull();
+  });
+});
+
+describe("the Security tab's own-session key exchange (ST.5b)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('names the P-384 floor, an unprovisioned lookup, and a request that bypassed the terminator', async () => {
+    mockReports(REPORTS, [], { status: 'negotiated', group: 'secp384r1' });
+    await openTab('Security');
+    expect(await screen.findByText('Classical P-384 floor (CNSA 1.0)')).toBeInTheDocument();
+    cleanupAndReset();
+    mockReports(REPORTS, [], { status: 'unconfigured' });
+    await openTab('Security');
+    expect(await screen.findByText(/session lookup is not provisioned/)).toBeInTheDocument();
+    cleanupAndReset();
+    mockReports(REPORTS, [], { status: 'not-tunnelled' });
+    await openTab('Security');
+    expect(
+      await screen.findByText(/did not arrive through the admin TLS terminator/),
+    ).toBeInTheDocument();
   });
 });
 

@@ -15,12 +15,14 @@ use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::TlsAcceptor;
 
 use crate::bind::{assert_node_ip_bind, SidecarError};
+use crate::session_service::{group_name, SessionRegistry};
 
 /// The bound admin terminator: a TLS-terminating loopback proxy for the browser -> Console admin leg.
 pub struct AdminTerminator {
     listener: TcpListener,
     acceptor: TlsAcceptor,
     upstream: String,
+    sessions: Option<Arc<SessionRegistry>>,
 }
 
 impl AdminTerminator {
@@ -44,7 +46,17 @@ impl AdminTerminator {
             listener,
             acceptor: TlsAcceptor::from(Arc::new(config)),
             upstream,
+            sessions: None,
         })
+    }
+
+    /// Register every live tunnel's negotiated key-exchange group in `registry` under the tunnel's
+    /// loopback source port, for the BFF's session lookup (IP-CONSOLE-11 ST.5b). The tunnelled bytes
+    /// are still never inspected.
+    #[must_use]
+    pub fn with_sessions(mut self, registry: Arc<SessionRegistry>) -> Self {
+        self.sessions = Some(registry);
+        self
     }
 
     /// The address actually bound (useful when `port` was 0).
@@ -70,17 +82,23 @@ impl AdminTerminator {
                 .map_err(|e| SidecarError::Listen(format!("admin accept: {e}")))?;
             let acceptor = self.acceptor.clone();
             let upstream = self.upstream.clone();
+            let sessions = self.sessions.clone();
             tokio::spawn(async move {
                 // A single connection's failure (a stray probe, a client that drops mid-handshake) must
                 // not take the listener down; it is dropped here. CS.5 adds structured logging.
-                let _ = serve(&acceptor, tcp, &upstream).await;
+                let _ = serve(&acceptor, tcp, &upstream, sessions.as_ref()).await;
             });
         }
     }
 }
 
 /// Terminate one connection's TLS and tunnel it to the BFF admin listener.
-async fn serve(acceptor: &TlsAcceptor, tcp: TcpStream, upstream: &str) -> Result<(), SidecarError> {
+async fn serve(
+    acceptor: &TlsAcceptor,
+    tcp: TcpStream,
+    upstream: &str,
+    sessions: Option<&Arc<SessionRegistry>>,
+) -> Result<(), SidecarError> {
     let mut tls = acceptor
         .accept(tcp)
         .await
@@ -88,6 +106,23 @@ async fn serve(acceptor: &TlsAcceptor, tcp: TcpStream, upstream: &str) -> Result
     let mut up = TcpStream::connect(upstream)
         .await
         .map_err(|e| SidecarError::Serve(format!("admin upstream {upstream}: {e}")))?;
+    // Registered BEFORE any byte is forwarded, removed when the tunnel ends (the guard drops), so the
+    // BFF's lookup for a request on this tunnel always finds this session's group.
+    let _session = match sessions {
+        Some(registry) => {
+            let group = tls
+                .get_ref()
+                .1
+                .negotiated_key_exchange_group()
+                .map_or("other", |g| group_name(g.name()));
+            let port = up
+                .local_addr()
+                .map_err(|e| SidecarError::Serve(format!("admin upstream local addr: {e}")))?
+                .port();
+            Some(registry.register(port, group))
+        }
+        None => None,
+    };
     copy_bidirectional(&mut tls, &mut up)
         .await
         .map_err(|e| SidecarError::Serve(format!("admin tunnel: {e}")))?;
@@ -237,5 +272,79 @@ mod tests {
         let config = admin_server_config_from_pem(&leaf, &key).unwrap();
         let result = AdminTerminator::bind("0.0.0.0", 0, "127.0.0.1:1".to_owned(), config).await;
         assert!(result.is_err(), "a wildcard admin bind must be refused");
+    }
+
+    /// A stand-in BFF that tells the client which loopback port the tunnel reached it from (what the
+    /// BFF reads as the request's remote port), then holds the connection until the client closes.
+    async fn spawn_port_reporter() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        tokio::spawn(async move {
+            while let Ok((mut sock, peer)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let line = format!("{}\n", peer.port());
+                    if sock.write_all(line.as_bytes()).await.is_err() {
+                        return;
+                    }
+                    let mut buf = [0u8; 64];
+                    while let Ok(n) = sock.read(&mut buf).await {
+                        if n == 0 {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        addr
+    }
+
+    #[tokio::test]
+    async fn each_live_tunnel_is_registered_with_its_negotiated_group() {
+        use crate::session_service::SessionRegistry;
+        let (leaf, key) = mint_p384_leaf();
+        let upstream = spawn_port_reporter().await;
+        let config = admin_server_config_from_pem(&leaf, &key).unwrap();
+        let registry = SessionRegistry::new();
+        let terminator = AdminTerminator::bind("127.0.0.1", 0, upstream, config)
+            .await
+            .unwrap()
+            .with_sessions(Arc::clone(&registry));
+        let addr = terminator.local_addr().unwrap().to_string();
+        tokio::spawn(terminator.run());
+
+        for (group, expected) in [
+            (aws_lc_rs::kx_group::X25519MLKEM768, "X25519MLKEM768"),
+            (aws_lc_rs::kx_group::SECP384R1, "secp384r1"),
+        ] {
+            let tcp = TcpStream::connect(&addr).await.unwrap();
+            let name = ServerName::IpAddress(Ipv4Addr::LOCALHOST.into());
+            let mut tls = client_with_group(group, &leaf)
+                .connect(name, tcp)
+                .await
+                .unwrap();
+            let mut line = Vec::new();
+            let mut byte = [0u8; 1];
+            while tls.read_exact(&mut byte).await.is_ok() && byte[0] != b'\n' {
+                line.push(byte[0]);
+            }
+            let port: u16 = String::from_utf8(line).unwrap().parse().unwrap();
+            assert_eq!(
+                registry.lookup(port),
+                Some(expected),
+                "live tunnel names its group"
+            );
+
+            tls.shutdown().await.unwrap();
+            drop(tls);
+            let mut gone = false;
+            for _ in 0..200 {
+                if registry.lookup(port).is_none() {
+                    gone = true;
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            assert!(gone, "an ended tunnel is forgotten");
+        }
     }
 }

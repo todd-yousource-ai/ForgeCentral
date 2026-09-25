@@ -66,6 +66,12 @@ pub struct SidecarConfig {
     /// 3), or absent. See `secret_addr`. MUST match the path the BFF names to `IDAM_CONNECT`.
     #[serde(default)]
     pub secret_path: Option<PathBuf>,
+    /// The loopback `ip:port` of the admin-session lookup service (IP-CONSOLE-11 ST.5b), or absent.
+    ///
+    /// OPTIONAL: without it the terminator registers nothing and the BFF states that the session's
+    /// key exchange is not available. A single field, not a pair: the service holds no material.
+    #[serde(default)]
+    pub session_addr: Option<String>,
 }
 
 impl SidecarConfig {
@@ -121,6 +127,9 @@ impl SidecarConfig {
                     "secret_addr and secret_path must be set together".to_owned(),
                 ))
             }
+        }
+        if let Some(addr) = &self.session_addr {
+            assert_loopback_addr(addr)?;
         }
         Ok(())
     }
@@ -198,6 +207,23 @@ mod tests {
     fn rejects_a_routable_internal_hop() {
         let json = valid_json().replace("127.0.0.1:8789", "10.0.0.5:8789");
         assert!(SidecarConfig::from_json_str(&json).is_err());
+    }
+
+    #[test]
+    fn the_session_lookup_address_is_optional_and_loopback_only() {
+        let with = |addr: &str| {
+            valid_json().replace(
+                "\"admin_port\": 8443,",
+                &format!("\"admin_port\": 8443, \"session_addr\": \"{addr}\","),
+            )
+        };
+        let config = SidecarConfig::from_json_str(&with("127.0.0.1:8792")).unwrap();
+        assert_eq!(config.session_addr.as_deref(), Some("127.0.0.1:8792"));
+        assert!(SidecarConfig::from_json_str(&with("10.0.0.5:8792")).is_err());
+        assert!(SidecarConfig::from_json_str(&valid_json())
+            .unwrap()
+            .session_addr
+            .is_none());
     }
 
     #[test]
