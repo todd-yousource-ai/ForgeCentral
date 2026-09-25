@@ -1,7 +1,11 @@
-import { useId, useState } from 'react';
+import { Suspense, lazy, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import { Badge } from '@forge/design';
 
+import { helpSectionFor } from '../guide/helpMap.js';
+import { destinationForPath } from '../ia/destinations.js';
 import { useLive } from '../live/LiveProvider.js';
 import { useLogout } from '../auth/useSession.js';
 import type { OperatorDto } from '../auth/api.js';
@@ -21,6 +25,50 @@ function LiveIndicator(): ReactElement {
     <span title={live.reason}>
       <Badge variant={variant}>Not live</Badge>
     </span>
+  );
+}
+
+// The contextual help panel (IP-CONSOLE-11-guide GD.11) loads with the guide content, only when opened.
+const HelpPanel = lazy(() => import('../guide/HelpPanel.js'));
+
+/** The Help control: opens the guide section for the active surface and Settings tab. */
+function HelpButton(): ReactElement | null {
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const destination = destinationForPath(location.pathname);
+  const sectionId =
+    destination === undefined ? undefined : helpSectionFor(destination.id, location.search);
+  if (sectionId === undefined) return null;
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className="fcx-help-trigger"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+      >
+        Help
+      </button>
+      {/* Portalled to the body: the top bar's glass styling would otherwise confine the drawer's
+          fixed-position overlay to the bar itself. */}
+      {open
+        ? createPortal(
+            <Suspense fallback={null}>
+              <HelpPanel
+                sectionId={sectionId}
+                onClose={() => {
+                  setOpen(false);
+                  // Back to the control the operator came from.
+                  trigger.current?.focus();
+                }}
+              />
+            </Suspense>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 
@@ -68,6 +116,7 @@ export function TopBar({ title, operator }: TopBarProps): ReactElement {
       <h1 className="fcx-topbar__title">{title}</h1>
       <div className="fcx-topbar__right">
         <LiveIndicator />
+        <HelpButton />
         <AccountMenu operator={operator} />
       </div>
     </header>
