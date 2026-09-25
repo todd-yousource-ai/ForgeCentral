@@ -14,10 +14,15 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
   GD.2/GD.11 ones (three clicks, reload, Help panel). LIVE: Console installed on the box from main
   `5e25720` at 20:26 UTC (`deploy/install.sh`, validate ALL PASSED); the served bundle carries the
   GD.11-GD.13 code (reason lines, guide links, `data-const` markers, the filter); `/api/settings`
-  unauthenticated = 401. OWED (operator, needs the Auth0 sign-in): the logged-in walk -- Help on each
-  Settings tab, the ReadMe filter and a deep link across a reload, a field limit and its reason line on
-  the VTZ editor and the policy form, the dual-control and tier-refusal links. Merging GD.N closes the
-  plan's PR rows; GD.E1-E3 and GD.D1 stay DEFERRED by ruling.
+  unauthenticated = 401. LIVE WALK 20:31 UTC (operator approved the device code; headless Chromium on the
+  box, read-only): PASS Help on SOC and Changes, the SOC tier hint and info tip, filter -> section ->
+  reload, `data-const` renders 64, the read-only why link -> `#cfg-apply`, the VTZ name rule and reason,
+  the policy byte counts and save reason. Two findings: CD-65 (one slow Overview read fails every queued
+  engine read on the shared connection; a 502 at 20:31:14; not fixed, outside this plan) and CD-66 (a
+  disabled primary button kept its fill; FIXED here with an e2e check). The settings-reference check was
+  a script bug (counted rows before the read landed); re-run owed after this merges and is installed,
+  together with the CD-66 fix. Merging GD.N closes the plan's PR rows; GD.E1-E3 and GD.D1 stay DEFERRED
+  by ruling.
 - **Earlier (2026-09-25):** GD.13 MERGED `047726e` (operator: "Approve and continue").
 - **Earlier (2026-09-25):** GD.13 ON BRANCH `feat/console-11-gd13-disabled-explained`.
   `DisabledReason` in `@forge/design` and `GuideLink` in the Console; every one of the 33 controls
