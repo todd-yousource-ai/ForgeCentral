@@ -40,6 +40,10 @@ import type {
   WireSocSettingsQuery,
   WireSettingsQuery,
   WireSettingsReportsQuery,
+  WireSettingsApprovalsQuery,
+  WireSettingsApprove,
+  WireSettingsHistoryQuery,
+  WireSettingsRollback,
   WireSettingsCommit,
   WireSocNarrativeQuery,
   WireSocTelemetryQuery,
@@ -711,6 +715,40 @@ function settingsReportsToCbor(request: WireSettingsReportsQuery): unknown {
   return out;
 }
 
+/** `SETTINGS_APPROVALS` (crdb SET.3). Rust struct order: request_id, operator?. */
+function settingsApprovalsToCbor(request: WireSettingsApprovalsQuery): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SETTINGS_APPROVE` (crdb SET.3). Rust struct order: request_id, proposal, operator?. */
+function settingsApproveToCbor(request: WireSettingsApprove): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    proposal: request.proposal,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SETTINGS_HISTORY` (crdb SET.5). Rust struct order: request_id, limit, operator?. */
+function settingsHistoryToCbor(request: WireSettingsHistoryQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    limit: request.limit ?? 0,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/** `SETTINGS_ROLLBACK` (crdb SET.5). Rust struct order: request_id, to, operator?. */
+function settingsRollbackToCbor(request: WireSettingsRollback): unknown {
+  const out: Record<string, unknown> = { request_id: request.request_id, to: request.to };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SETTINGS_COMMIT` (crdb SET.2 / SET.2b). Rust struct order: request_id, edits, sections?, operator?. */
 function settingsCommitToCbor(request: WireSettingsCommit): unknown {
   const out: Record<string, unknown> = {
@@ -1049,6 +1087,22 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SettingsRead' in request) {
     return encode({ SettingsRead: settingsReadToCbor(request.SettingsRead) });
+  }
+  if ('SettingsPropose' in request) {
+    // The same body as a commit (crdb SET.3 reuses `WireSettingsCommit`).
+    return encode({ SettingsPropose: settingsCommitToCbor(request.SettingsPropose) });
+  }
+  if ('SettingsApprovals' in request) {
+    return encode({ SettingsApprovals: settingsApprovalsToCbor(request.SettingsApprovals) });
+  }
+  if ('SettingsApprove' in request) {
+    return encode({ SettingsApprove: settingsApproveToCbor(request.SettingsApprove) });
+  }
+  if ('SettingsHistory' in request) {
+    return encode({ SettingsHistory: settingsHistoryToCbor(request.SettingsHistory) });
+  }
+  if ('SettingsRollback' in request) {
+    return encode({ SettingsRollback: settingsRollbackToCbor(request.SettingsRollback) });
   }
   if ('SettingsReports' in request) {
     return encode({ SettingsReports: settingsReportsToCbor(request.SettingsReports) });

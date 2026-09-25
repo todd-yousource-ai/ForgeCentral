@@ -117,6 +117,13 @@ import type {
   WireSettingsQuery,
   WireSettingsReports,
   WireSettingsReportsQuery,
+  WireSettingsProposed,
+  WireSettingsApprovals,
+  WireSettingsApprovalsQuery,
+  WireSettingsApprove,
+  WireSettingsHistory,
+  WireSettingsHistoryQuery,
+  WireSettingsRollback,
   WireSettingsCommit,
   WireSettingsCommitted,
 } from '@forge/contracts';
@@ -145,6 +152,11 @@ export type EngineAction =
   | 'socSettingsRead'
   | 'settingsRead'
   | 'settingsReports'
+  | 'settingsPropose'
+  | 'settingsApprovals'
+  | 'settingsApprove'
+  | 'settingsHistory'
+  | 'settingsRollback'
   | 'settingsCommit'
   | 'socSettingsCommit'
   | 'socCognitionRun'
@@ -356,6 +368,36 @@ export interface OperatorEngine {
     request: WireSettingsQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSettings>;
+  /** Propose a settings change (SETTINGS_PROPOSE, crdb SET.3) on behalf of `principal`. */
+  settingsPropose(
+    principal: OperatorPrincipal,
+    request: WireSettingsCommit,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsProposed>;
+  /** The pending config proposals (SETTINGS_APPROVALS, crdb SET.3) on behalf of `principal`. */
+  settingsApprovals(
+    principal: OperatorPrincipal,
+    request: WireSettingsApprovalsQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsApprovals>;
+  /** Approve a pending proposal (SETTINGS_APPROVE, crdb SET.3) as `principal`. */
+  settingsApprove(
+    principal: OperatorPrincipal,
+    request: WireSettingsApprove,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsCommitted>;
+  /** The configuration history (SETTINGS_HISTORY, crdb SET.5) on behalf of `principal`. */
+  settingsHistory(
+    principal: OperatorPrincipal,
+    request: WireSettingsHistoryQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsHistory>;
+  /** Restore a prior configuration version (SETTINGS_ROLLBACK, crdb SET.5) as `principal`. */
+  settingsRollback(
+    principal: OperatorPrincipal,
+    request: WireSettingsRollback,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsCommitted>;
   /** Read the admin plane's status reports (SETTINGS_REPORTS, crdb SET.4) on behalf of `principal`. */
   settingsReports(
     principal: OperatorPrincipal,
@@ -747,6 +789,31 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'settingsRead', request.request_id));
       const operator = { principal: principal.principalId, tenant: principal.tenant };
       return client.settingsRead({ ...request, operator }, opts);
+    },
+    settingsPropose: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'settingsPropose', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.settingsPropose({ ...request, operator }, opts);
+    },
+    settingsApprovals: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'settingsApprovals', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.settingsApprovals({ ...request, operator }, opts);
+    },
+    settingsApprove: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'settingsApprove', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.settingsApprove({ ...request, operator }, opts);
+    },
+    settingsHistory: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'settingsHistory', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.settingsHistory({ ...request, operator }, opts);
+    },
+    settingsRollback: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'settingsRollback', request.request_id));
+      const operator = { principal: principal.principalId, tenant: principal.tenant };
+      return client.settingsRollback({ ...request, operator }, opts);
     },
     settingsReports: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsReports', request.request_id));

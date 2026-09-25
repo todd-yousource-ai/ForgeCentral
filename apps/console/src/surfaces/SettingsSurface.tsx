@@ -30,7 +30,8 @@ import {
 } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { GovernedReceipt, SectionForms } from './SettingsSectionForms.js';
+import { ChangeReceipt, SectionForms } from './SettingsSectionForms.js';
+import { ChangesTab } from './SettingsChangesTab.js';
 import { FederationTab, RbacTab } from './SettingsIdentityTabs.js';
 import {
   FipsTab,
@@ -40,8 +41,8 @@ import {
   TopologyTab,
 } from './SettingsReportTabs.js';
 import {
-  useCommitGovernedSettings,
   useCommitSocSettings,
+  useGovernedChange,
   useGovernedSettings,
   useSocSettings,
 } from './useSettings.js';
@@ -305,15 +306,14 @@ function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactEle
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(null);
   const [staged, setStaged] = useState<Readonly<Record<string, string>>>({});
   const [confirming, setConfirming] = useState(false);
-  const commit = useCommitGovernedSettings();
+  // Under dual control every change is a PROPOSAL a different Admin approves (ST.9, crdb SET.3).
+  const propose = view.dualControlRequired;
+  const commit = useGovernedChange(propose);
   const rows = view.rows.filter((r) => r.surface === surface);
   const byKey = new Map(view.rows.map((r) => [r.key, r]));
   const stagedKeys = Object.keys(staged);
-  // Under dual control the engine refuses a direct commit; the surface does not offer one.
-  const locked = view.dualControlRequired;
-
   const changeCell = (r: SettingRow): ReactElement => {
-    if (!isKeyEditable(r) || locked) {
+    if (!isKeyEditable(r)) {
       return <span>read-only</span>;
     }
     if (editing?.key === r.key) {
@@ -359,8 +359,8 @@ function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactEle
         {view.version === 0
           ? 'Nothing is committed: every value is the fail-closed default.'
           : `Committed configuration at version ${String(view.version)}.`}
-        {locked
-          ? ' Tenant-config is under dual control: the Console reads these settings but does not commit them.'
+        {propose
+          ? ' Tenant-config is under dual control: every change here is a proposal a different Admin approves on the Changes tab.'
           : ''}
       </p>
       <label className="fcx-reports__picker">
@@ -410,33 +410,38 @@ function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactEle
             engine applies them together or not at all.
           </p>
           <button type="button" className="fcx-btn" onClick={() => setConfirming(true)}>
-            Commit {String(stagedKeys.length)} change{stagedKeys.length === 1 ? '' : 's'}
+            {propose ? 'Propose' : 'Commit'} {String(stagedKeys.length)} change
+            {stagedKeys.length === 1 ? '' : 's'}
           </button>{' '}
           <button type="button" className="fcx-btn" onClick={() => setStaged({})}>
             Discard staged
           </button>
         </div>
       ) : null}
-      {commit.isPending ? <LoadingState label="Committing" /> : null}
+      {commit.isPending ? <LoadingState label={propose ? 'Proposing' : 'Committing'} /> : null}
       {commit.isError ? (
-        <ErrorState title="The commit could not be sent" onRetry={() => commit.reset()} />
+        <ErrorState title="The change could not be sent" onRetry={() => commit.reset()} />
       ) : null}
-      {commit.isSuccess ? <GovernedReceipt receipt={commit.data} /> : null}
+      {commit.isSuccess ? <ChangeReceipt result={commit.data} /> : null}
       <ConfirmDialog
         open={confirming}
-        title="Commit these settings?"
+        title={propose ? 'Propose these settings?' : 'Commit these settings?'}
         description={stagedKeys
           .map((k) => `${k}: ${byKey.get(k)?.value ?? '(unset)'} -> ${staged[k] ?? ''}`)
           .join('; ')
-          .concat('. The engine validates the batch and commits it under your principal.')}
-        confirmLabel="Commit"
+          .concat(
+            propose
+              ? '. Tenant-config is under dual control: the engine validates the batch and records it as a proposal a different Admin must approve.'
+              : '. The engine validates the batch and commits it under your principal.',
+          )}
+        confirmLabel={propose ? 'Propose' : 'Commit'}
         tone="critical"
         onConfirm={() => {
           commit.mutate(
             { edits: stagedKeys.map((key) => ({ key, value: staged[key] ?? '' })) },
             {
-              onSuccess: (receipt) => {
-                if (!receipt.refused) {
+              onSuccess: (result) => {
+                if (!result.receipt.refused) {
                   setStaged({});
                 }
               },
@@ -505,6 +510,7 @@ const SETTINGS_TABS = [
   { id: 'configuration', label: 'Configuration' },
   { id: 'rbac', label: 'RBAC' },
   { id: 'federation', label: 'Federation' },
+  { id: 'changes', label: 'Changes' },
   { id: 'security', label: 'Security' },
   { id: 'keylock', label: 'KeyLock' },
   { id: 'observability', label: 'Observability' },
@@ -526,6 +532,8 @@ export function SettingsSurface(): ReactElement {
         <RbacTab />
       ) : tab === 'federation' ? (
         <FederationTab />
+      ) : tab === 'changes' ? (
+        <ChangesTab />
       ) : tab === 'security' ? (
         <SecurityTab />
       ) : tab === 'keylock' ? (

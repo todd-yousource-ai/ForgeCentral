@@ -2,17 +2,24 @@
 // tab (IP-CONSOLE-11 ST.2b over crdb IP-CONSOLE-SETTINGS-WIRE SET.2b, INV-SETTINGS-ONE-WRITE-PATH).
 //
 // One form per LIVE section the engine lets the Console patch. A form is present only when the
-// engine marks its section editable (the registry row's `editable`), and none are present under dual
-// control. Each form starts from the engine's typed current values, commits ONLY its own section
-// behind a confirm that names it, and shows the engine's receipt verbatim.
+// engine marks its section editable (the registry row's `editable`). Each form starts from the
+// engine's typed current values, commits ONLY its own section behind a confirm that names it, and
+// shows the engine's receipt verbatim. Under dual control the same form PROPOSES instead (ST.9): a
+// different Admin approves it on the Changes tab.
 
 import { useState, type ReactElement } from 'react';
 import { Badge, ConfirmDialog } from '@forge/design';
-import type { SectionPatch, SectionValues, SettingsReceipt, SettingsView } from '@forge/contracts';
+import type {
+  SectionPatch,
+  SectionValues,
+  SettingsProposalReceipt,
+  SettingsReceipt,
+  SettingsView,
+} from '@forge/contracts';
 import { ADMIN_CAPABILITIES, CLASSIFICATION_TAGS, refusalCauseLabel } from '@forge/contracts';
 
 import { ErrorState, LoadingState } from '../states/States.js';
-import { useCommitGovernedSettings } from './useSettings.js';
+import { useGovernedChange, type GovernedChangeResult } from './useSettings.js';
 
 /** The engine's receipt for a Configuration commit, verbatim: version and restarts, or every cause. */
 export function GovernedReceipt({ receipt }: { readonly receipt: SettingsReceipt }): ReactElement {
@@ -46,6 +53,50 @@ export function GovernedReceipt({ receipt }: { readonly receipt: SettingsReceipt
         </ul>
       ) : null}
     </div>
+  );
+}
+
+/** The engine's receipt for a proposal (crdb SET.3): the id a different Admin approves, or why not. */
+export function ProposalReceipt({
+  receipt,
+}: {
+  readonly receipt: SettingsProposalReceipt;
+}): ReactElement {
+  if (receipt.proposal !== null) {
+    return (
+      <div className="fcx-settings__receipt" data-testid="settings-configuration-receipt">
+        <Badge variant="neutral">Proposed</Badge> Proposal {String(receipt.proposal)} recorded.
+        Nothing is committed until a different Admin approves it on the Changes tab.
+      </div>
+    );
+  }
+  return (
+    <div className="fcx-settings__receipt" data-testid="settings-configuration-receipt">
+      <Badge variant="caution">Refused</Badge>{' '}
+      {receipt.explanation ?? 'Refused by the engine; nothing was proposed.'}
+      {receipt.refusedEdits.length > 0 || receipt.violations.length > 0 ? (
+        <ul className="fcx-settings__violations" data-testid="settings-configuration-refusals">
+          {receipt.refusedEdits.map((r) => (
+            <li key={`${r.key}-${r.causeTag}`}>
+              <code>{r.key}</code>: {refusalCauseLabel(r)}
+              {r.detail === null ? '' : ` (${r.detail})`}
+            </li>
+          ))}
+          {receipt.violations.map((v) => (
+            <li key={v}>{v}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+/** A commit's or a proposal's receipt, whichever the change produced. */
+export function ChangeReceipt({ result }: { readonly result: GovernedChangeResult }): ReactElement {
+  return result.kind === 'commit' ? (
+    <GovernedReceipt receipt={result.receipt} />
+  ) : (
+    <ProposalReceipt receipt={result.receipt} />
   );
 }
 
@@ -367,14 +418,15 @@ const FORMS: Readonly<
   socNarrativeModelRef: ModelRefForm,
 };
 
-/** The section forms for every section the engine marks editable; absent under dual control. */
+/** The section forms for every section the engine marks editable; they propose under dual control. */
 export function SectionForms({ view }: { readonly view: SettingsView }): ReactElement | null {
-  const commit = useCommitGovernedSettings();
+  const propose = view.dualControlRequired;
+  const commit = useGovernedChange(propose);
   const [pending, setPending] = useState<{ section: SectionName; patch: SectionPatch } | null>(
     null,
   );
   const values = view.sectionValues;
-  if (values === null || view.dualControlRequired) {
+  if (values === null) {
     return null;
   }
   const editable = new Set(view.rows.filter((r) => r.editable).map((r) => r.key));
@@ -409,16 +461,24 @@ export function SectionForms({ view }: { readonly view: SettingsView }): ReactEl
           </details>
         );
       })}
-      {commit.isPending ? <LoadingState label="Committing" /> : null}
+      {commit.isPending ? <LoadingState label={propose ? 'Proposing' : 'Committing'} /> : null}
       {commit.isError ? (
-        <ErrorState title="The commit could not be sent" onRetry={() => commit.reset()} />
+        <ErrorState title="The change could not be sent" onRetry={() => commit.reset()} />
       ) : null}
-      {commit.isSuccess ? <GovernedReceipt receipt={commit.data} /> : null}
+      {commit.isSuccess ? <ChangeReceipt result={commit.data} /> : null}
       <ConfirmDialog
         open={pending !== null}
-        title={pending === null ? '' : `Commit ${SECTION_TITLES[pending.section]}?`}
-        description="The engine validates this section and commits it to the governed configuration under your principal. The change applies live."
-        confirmLabel="Commit"
+        title={
+          pending === null
+            ? ''
+            : `${propose ? 'Propose' : 'Commit'} ${SECTION_TITLES[pending.section]}?`
+        }
+        description={
+          propose
+            ? 'Tenant-config is under dual control. The engine validates this section and records it as a proposal under your principal; a different Admin must approve it before it applies.'
+            : 'The engine validates this section and commits it to the governed configuration under your principal. The change applies live.'
+        }
+        confirmLabel={propose ? 'Propose' : 'Commit'}
         tone="critical"
         onConfirm={() => {
           if (pending !== null) commit.mutate({ edits: [], sections: pending.patch });

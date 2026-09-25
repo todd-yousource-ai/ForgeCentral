@@ -146,6 +146,12 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'SettingsRead' in request ||
       // The admin-plane status reports (SETTINGS_REPORTS, crdb SET.4; IP-CONSOLE-11 report tabs).
       'SettingsReports' in request ||
+      // Dual control + history (crdb SET.3 / SET.5; IP-CONSOLE-11 ST.9).
+      'SettingsPropose' in request ||
+      'SettingsApprovals' in request ||
+      'SettingsApprove' in request ||
+      'SettingsHistory' in request ||
+      'SettingsRollback' in request ||
       // The governed commit (SETTINGS_COMMIT, crdb SET.2 / SET.2b; IP-CONSOLE-11 ST.2a).
       'SettingsCommit' in request)
   ) {

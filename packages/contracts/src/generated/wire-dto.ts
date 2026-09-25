@@ -951,6 +951,9 @@ export type WireReply =
   | { Settings: WireSettings; }
   | { SettingsReports: WireSettingsReports; }
   | { SettingsCommitted: WireSettingsCommitted; }
+  | { SettingsProposed: WireSettingsProposed; }
+  | { SettingsApprovals: WireSettingsApprovals; }
+  | { SettingsHistory: WireSettingsHistory; }
   | { SocSettingsCommitted: WireSocSettingsCommitted; }
   | { SocRunState: WireSocRunState; }
   | { SocPlanMutated: WireSocPlanEffect; }
@@ -1026,6 +1029,11 @@ export type WireRequest =
   | { SettingsRead: WireSettingsQuery; }
   | { SettingsReports: WireSettingsReportsQuery; }
   | { SettingsCommit: WireSettingsCommit; }
+  | { SettingsPropose: WireSettingsCommit; }
+  | { SettingsApprovals: WireSettingsApprovalsQuery; }
+  | { SettingsApprove: WireSettingsApprove; }
+  | { SettingsHistory: WireSettingsHistoryQuery; }
+  | { SettingsRollback: WireSettingsRollback; }
   | { SocSettingsCommit: WireSocSettingsCommit; }
   | { SocCognitionRun: WireSocCognitionRun; }
   | { SocPlanApprove: WireSocPlanApprove; }
@@ -1119,6 +1127,23 @@ export interface WireSettings {
   version: number;
 }
 
+export interface WireSettingsApprovals {
+  explanation?: string;
+  proposals: Array<WireSettingsProposal>;
+  refused: boolean;
+}
+
+export interface WireSettingsApprovalsQuery {
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
+export interface WireSettingsApprove {
+  operator?: OperatorDelegation;
+  proposal: number;
+  request_id: number;
+}
+
 export interface WireSettingsCommit {
   edits: Array<WireSettingEdit>;
   operator?: OperatorDelegation;
@@ -1127,12 +1152,43 @@ export interface WireSettingsCommit {
 }
 
 export interface WireSettingsCommitted {
+  approval_refused?: string;
   dual_control_required: boolean;
   explanation?: string;
   needs_restart: Array<string>;
+  proposal?: number;
   refused: boolean;
   refused_edits: Array<WireSettingRefusal>;
   version: number;
+  violations: Array<string>;
+}
+
+export interface WireSettingsHistory {
+  complete: boolean;
+  explanation?: string;
+  refused: boolean;
+  versions: Array<WireSettingsVersion>;
+}
+
+export interface WireSettingsHistoryQuery {
+  limit?: number;
+  operator?: OperatorDelegation;
+  request_id: number;
+}
+
+export interface WireSettingsProposal {
+  changed_keys: Array<string>;
+  proposal: number;
+  proposed_at_ms: number;
+  proposer: string;
+  stale: boolean;
+}
+
+export interface WireSettingsProposed {
+  explanation?: string;
+  proposal: number;
+  refused: boolean;
+  refused_edits: Array<WireSettingRefusal>;
   violations: Array<string>;
 }
 
@@ -1158,6 +1214,19 @@ export interface WireSettingsReportsQuery {
   operator?: OperatorDelegation;
   reports: Array<string>;
   request_id: number;
+}
+
+export interface WireSettingsRollback {
+  operator?: OperatorDelegation;
+  request_id: number;
+  to: number;
+}
+
+export interface WireSettingsVersion {
+  at_ms?: number;
+  changed_keys: Array<string>;
+  principal?: string;
+  version: number;
 }
 
 export interface WireSiemWritebackSettings {
