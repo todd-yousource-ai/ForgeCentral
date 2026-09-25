@@ -509,6 +509,28 @@ export function componentStyles(): string {
     transparent 65%
   );
 }
+/* InfoTip (GD.12): a toggle-tip button and its note; FieldHint: the visible constraint line. */
+.fc-infotip { position: relative; display: inline-flex; align-items: center; vertical-align: middle; margin-left: var(--fc-space-xs); }
+.fc-infotip__button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.25em; height: 1.25em; padding: 0;
+  border: 1px solid var(--fc-color-surface-border); border-radius: var(--fc-radius-pill);
+  background: transparent; color: var(--fc-color-text-muted);
+  font-family: var(--fc-font-fontFamily-sans); font-size: var(--fc-font-size-xs); font-weight: var(--fc-font-weight-semibold);
+  cursor: pointer;
+}
+.fc-infotip__button:hover, .fc-infotip__button[aria-expanded="true"] { color: var(--fc-color-text-primary); border-color: var(--fc-color-status-info); }
+.fc-infotip__button:focus-visible { outline: 2px solid var(--fc-color-status-info); outline-offset: 2px; }
+.fc-infotip__note:empty { display: none; }
+.fc-infotip__note {
+  position: absolute; top: calc(100% + var(--fc-space-xs)); left: 0; z-index: 20;
+  width: max-content; max-width: 22rem; padding: var(--fc-space-sm) var(--fc-space-md);
+  border: 1px solid var(--fc-color-surface-border); border-radius: var(--fc-radius-md);
+  background: var(--fc-color-surface-card); color: var(--fc-color-text-primary);
+  font-size: var(--fc-font-size-sm); font-weight: normal; line-height: var(--fc-font-lineHeight-normal); box-shadow: var(--fc-elevation-popover);
+}
+.fc-field-hint { display: block; margin-top: var(--fc-space-xs); color: var(--fc-color-text-muted); font-size: var(--fc-font-size-xs); }
+
 /* Content above the ambient: the hosting surface sets position:relative and lifts its children. */
 .fc-ambient-host { position: relative; }
 .fc-ambient-host > :not(.fc-ambient) { position: relative; z-index: 1; }

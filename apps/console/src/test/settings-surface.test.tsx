@@ -1,6 +1,13 @@
 // apps/console/src/test/settings-surface.test.tsx -- IP-CONSOLE-11 S3.18 the Settings tab's SOC section.
 
 import type { SettingsView, SocSettings, SocSettingsReceipt } from '@forge/contracts';
+import {
+  LUG_THRESHOLD_PERMILLE_MAX,
+  MAX_EGRESS_ID_CHARS,
+  MAX_SECTION_TEXT_CHARS,
+  MAX_SETTING_VALUE_CHARS,
+  SOC_TIER_MILLI_MAX,
+} from '@forge/contracts';
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -943,6 +950,93 @@ describe('the Changes tab: approvals and history (ST.9)', () => {
     expect((await screen.findAllByText('Admin or SecurityAudit tier required')).length).toBe(1);
   });
 });
+
+describe('field help and visible limits (GD.12)', () => {
+  it('shows the tier rule from the named bound, explains each bar, and refuses an out-of-order pair', async () => {
+    mockSettings(SETTINGS, ACCEPTED);
+    renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    await screen.findByTestId('settings-soc');
+    const low = screen.getByTestId('settings-p-low');
+    expect(low).toHaveAccessibleDescription(
+      `Whole numbers from 0 to ${String(SOC_TIER_MILLI_MAX)}; p_low may not exceed p_high.`,
+    );
+    expect(low).toHaveAttribute('max', String(SOC_TIER_MILLI_MAX));
+    fireEvent.click(screen.getByRole('button', { name: 'About p_low' }));
+    expect(screen.getByText(/treated as noise/)).toBeInTheDocument();
+    const commit = screen.getByRole('button', { name: 'Commit tiers' });
+    fireEvent.change(low, { target: { value: '900' } });
+    fireEvent.change(screen.getByTestId('settings-p-high'), { target: { value: '800' } });
+    expect(commit).toBeDisabled();
+    fireEvent.change(screen.getByTestId('settings-p-high'), {
+      target: { value: String(SOC_TIER_MILLI_MAX + 1) },
+    });
+    expect(commit).toBeDisabled();
+    fireEvent.change(screen.getByTestId('settings-p-high'), {
+      target: { value: String(SOC_TIER_MILLI_MAX) },
+    });
+    expect(commit).toBeEnabled();
+  });
+
+  it('names the value limit under a knob edit', async () => {
+    mockGoverned(GOVERNED, COMMITTED);
+    renderWithProviders(<SettingsSurface />, { route: '/settings' });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Configuration' }));
+    await screen.findByTestId('settings-configuration');
+    fireEvent.change(screen.getByTestId('settings-surface-picker'), {
+      target: { value: 'maintenance' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: /^Edit / })[0] as HTMLElement);
+    const input = screen.getByRole('textbox', { name: /^New value for / });
+    expect(input).toHaveAttribute('maxLength', String(MAX_SETTING_VALUE_CHARS));
+    expect(input).toHaveAccessibleDescription(
+      new RegExp(`at most ${String(MAX_SETTING_VALUE_CHARS)} characters`),
+    );
+  });
+
+  it('holds the section forms to the engine limits and says so under each', async () => {
+    const lugEditable: SettingsView = {
+      ...WITH_SECTIONS,
+      rows: WITH_SECTIONS.rows.map((r) =>
+        r.key === 'lug.exposure' ? { ...r, editable: true } : r,
+      ),
+    };
+    await openSections(lugEditable);
+    const lug = within(screen.getByTestId('settings-section-lugExposure'));
+    const submitLug = lug.getByRole('button', { name: 'Commit LUG exposure' });
+    expect(submitLug).toBeEnabled();
+    const threshold = lug.getByLabelText('Binding confirm threshold (permille)');
+    expect(threshold).toHaveAccessibleDescription(
+      new RegExp(`0 to ${String(LUG_THRESHOLD_PERMILLE_MAX)} permille`),
+    );
+    fireEvent.change(threshold, { target: { value: String(LUG_THRESHOLD_PERMILLE_MAX + 1) } });
+    expect(submitLug).toBeDisabled();
+    fireEvent.change(threshold, { target: { value: '900' } });
+    fireEvent.change(lug.getByLabelText('Max sessions per device'), { target: { value: '0' } });
+    expect(submitLug).toBeDisabled();
+    // Disabling LUG ingest lifts the bounded-caps rule, as the engine does.
+    fireEvent.click(lug.getByLabelText('LUG ingest enabled'));
+    expect(submitLug).toBeEnabled();
+
+    const egress = within(screen.getByTestId('settings-section-egressDestinations'));
+    const id = egress.getByLabelText('Destination 1 id');
+    expect(id).toHaveAttribute('maxLength', String(MAX_EGRESS_ID_CHARS));
+    fireEvent.change(id, { target: { value: 'x'.repeat(MAX_EGRESS_ID_CHARS + 1) } });
+    expect(egress.getByRole('button', { name: 'Commit egress destinations' })).toBeDisabled();
+
+    const model = within(screen.getByTestId('settings-section-socNarrativeModelRef'));
+    expect(model.getByLabelText('Narrative model ref')).toHaveAttribute(
+      'maxLength',
+      String(MAX_SECTION_TEXT_CHARS),
+    );
+  });
+});
+
+async function openSections(view: SettingsView): Promise<void> {
+  mockGoverned(view, COMMITTED, []);
+  renderWithProviders(<SettingsSurface />, { route: '/settings' });
+  fireEvent.click(await screen.findByRole('tab', { name: 'Configuration' }));
+  await screen.findByTestId('settings-configuration');
+}
 
 function cleanupAndReset(): void {
   cleanup();

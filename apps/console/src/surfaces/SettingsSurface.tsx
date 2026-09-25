@@ -16,7 +16,15 @@ import { Suspense, lazy, useEffect, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { SETTINGS_TABS } from './settingsTabs.js';
-import { Badge, ConfirmDialog, DataTable, GlassPanel, TabStrip } from '@forge/design';
+import {
+  Badge,
+  ConfirmDialog,
+  DataTable,
+  FieldHint,
+  GlassPanel,
+  InfoTip,
+  TabStrip,
+} from '@forge/design';
 import type {
   SettingRow,
   SettingsView,
@@ -26,9 +34,12 @@ import type {
 } from '@forge/contracts';
 import {
   CLASSIFICATION_TAGS,
+  MAX_SETTING_VALUE_CHARS,
   SIEM_VENDORS,
+  SOC_TIER_MILLI_MAX,
   isKeyEditable,
   settingApplyClass,
+  socTiersOrdered,
   settingSourceLabel,
 } from '@forge/contracts';
 
@@ -96,7 +107,9 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
     tiers: { pLowMilli: Number.parseInt(pLow, 10), pHighMilli: Number.parseInt(pHigh, 10) },
   });
   const siemPatch = (): SocSettingsPatch => ({ siemWriteback: { ...siem } });
-  const tiersValid = Number.isInteger(Number(pLow)) && Number.isInteger(Number(pHigh));
+  // The engine's rule, checked before the confirm so an out-of-order pair is never sent.
+  const tiersValid =
+    pLow.trim() !== '' && pHigh.trim() !== '' && socTiersOrdered(Number(pLow), Number(pHigh));
 
   return (
     <div data-testid="settings-soc">
@@ -139,25 +152,36 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
           <input
             type="number"
             min={0}
-            max={1000}
+            max={SOC_TIER_MILLI_MAX}
             value={pLow}
             disabled={locked}
+            aria-describedby="settings-tiers-hint"
             onChange={(e) => setPLow(e.target.value)}
             data-testid="settings-p-low"
           />
         </label>
+        <InfoTip label="p_low">
+          A firing whose calibrated probability is below p_low is treated as noise. Default 0.
+        </InfoTip>
         <label>
           p_high (milli)
           <input
             type="number"
             min={0}
-            max={1000}
+            max={SOC_TIER_MILLI_MAX}
             value={pHigh}
             disabled={locked}
+            aria-describedby="settings-tiers-hint"
             onChange={(e) => setPHigh(e.target.value)}
             data-testid="settings-p-high"
           />
         </label>
+        <InfoTip label="p_high">
+          At or above p_high the engine proposes the whole response. Default {SOC_TIER_MILLI_MAX}.
+        </InfoTip>
+        <FieldHint id="settings-tiers-hint">
+          Whole numbers from 0 to {SOC_TIER_MILLI_MAX}; p_low may not exceed p_high.
+        </FieldHint>
         <button type="submit" className="fcx-btn" disabled={locked || !tiersValid}>
           Commit tiers
         </button>
@@ -325,9 +349,15 @@ function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactEle
           <input
             type="text"
             aria-label={`New value for ${r.key}`}
+            aria-describedby="settings-edit-hint"
+            maxLength={MAX_SETTING_VALUE_CHARS}
             value={editing.value}
             onChange={(e) => setEditing({ key: r.key, value: e.target.value })}
           />
+          <FieldHint id="settings-edit-hint">
+            {r.valueType}; default {r.defaultValue}; bound {r.bound}; at most{' '}
+            {MAX_SETTING_VALUE_CHARS} characters.
+          </FieldHint>
           <button
             type="button"
             className="fcx-btn"

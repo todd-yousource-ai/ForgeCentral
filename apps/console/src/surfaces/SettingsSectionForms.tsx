@@ -8,7 +8,7 @@
 // different Admin approves it on the Changes tab.
 
 import { useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog } from '@forge/design';
+import { Badge, ConfirmDialog, FieldHint } from '@forge/design';
 import type {
   SectionPatch,
   SectionValues,
@@ -16,7 +16,15 @@ import type {
   SettingsReceipt,
   SettingsView,
 } from '@forge/contracts';
-import { ADMIN_CAPABILITIES, CLASSIFICATION_TAGS, refusalCauseLabel } from '@forge/contracts';
+import {
+  ADMIN_CAPABILITIES,
+  CLASSIFICATION_TAGS,
+  LUG_THRESHOLD_PERMILLE_MAX,
+  MAX_EGRESS_ID_CHARS,
+  MAX_SECTION_ENTRIES,
+  MAX_SECTION_TEXT_CHARS,
+  refusalCauseLabel,
+} from '@forge/contracts';
 
 import { ErrorState, LoadingState } from '../states/States.js';
 import { useGovernedChange, type GovernedChangeResult } from './useSettings.js';
@@ -184,7 +192,9 @@ function EgressForm({
   readonly onCommit: Commit;
 }): ReactElement {
   const [rows, setRows] = useState(values.egressDestinations.map((e) => ({ ...e })));
-  const valid = rows.every((r) => r.id.trim() !== '');
+  const valid =
+    rows.length <= MAX_SECTION_ENTRIES &&
+    rows.every((r) => r.id.trim() !== '' && r.id.length <= MAX_EGRESS_ID_CHARS);
   return (
     <form
       aria-label="Egress destinations"
@@ -201,6 +211,8 @@ function EgressForm({
           <input
             type="text"
             aria-label={`Destination ${String(i + 1)} id`}
+            aria-describedby="settings-egress-hint"
+            maxLength={MAX_EGRESS_ID_CHARS}
             value={r.id}
             onChange={(e) =>
               setRows(rows.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)))
@@ -228,9 +240,14 @@ function EgressForm({
           </button>
         </div>
       ))}
+      <FieldHint id="settings-egress-hint">
+        Each id is required and at most {MAX_EGRESS_ID_CHARS} characters; at most{' '}
+        {MAX_SECTION_ENTRIES} destinations.
+      </FieldHint>
       <button
         type="button"
         className="fcx-btn"
+        disabled={rows.length >= MAX_SECTION_ENTRIES}
         onClick={() => setRows([...rows, { id: '', ceiling: 'unclassified' }])}
       >
         Add destination
@@ -249,6 +266,14 @@ const LUG_NUMBERS = [
   ['snapshotCadenceHours', 'Snapshot cadence (hours)'],
 ] as const;
 
+/** The caps an enabled LUG must bound (the engine refuses any of them at 0). */
+const LUG_CAPS = [
+  'maxAccountsPerNamespace',
+  'maxGroupsPerNamespace',
+  'maxSessionsPerDevice',
+  'lastSeenBucketHours',
+] as const;
+
 function LugForm({
   values,
   onCommit,
@@ -257,7 +282,12 @@ function LugForm({
   readonly onCommit: Commit;
 }): ReactElement {
   const [lug, setLug] = useState({ ...values.lugExposure });
-  const valid = LUG_NUMBERS.every(([k]) => Number.isInteger(lug[k]) && lug[k] >= 0);
+  // The engine's rules: whole numbers, the threshold within its scale, and an enabled LUG bounded
+  // (its four caps above 0).
+  const valid =
+    LUG_NUMBERS.every(([k]) => Number.isInteger(lug[k]) && lug[k] >= 0) &&
+    lug.bindingConfirmThresholdPermille <= LUG_THRESHOLD_PERMILLE_MAX &&
+    (!lug.enabled || LUG_CAPS.every((k) => lug[k] > 0));
   return (
     <form
       aria-label="LUG exposure"
@@ -288,15 +318,30 @@ function LugForm({
           <input
             type="number"
             min={0}
+            max={k === 'bindingConfirmThresholdPermille' ? LUG_THRESHOLD_PERMILLE_MAX : undefined}
+            aria-describedby="settings-lug-hint"
             value={String(lug[k])}
             onChange={(e) => setLug({ ...lug, [k]: Number.parseInt(e.target.value, 10) })}
           />
         </label>
       ))}
+      <FieldHint id="settings-lug-hint">
+        Whole numbers. The threshold is 0 to {LUG_THRESHOLD_PERMILLE_MAX} permille. With LUG ingest
+        enabled, the three maximums and the last-seen bucket must be at least 1.
+      </FieldHint>
       <Submit label="LUG exposure" disabled={!valid} />
     </form>
   );
 }
+
+/** The engine-bound limits on a list section: entry count and each entry's length. */
+function listWithinLimits(lines: readonly string[]): boolean {
+  return (
+    lines.length <= MAX_SECTION_ENTRIES && lines.every((l) => l.length <= MAX_SECTION_TEXT_CHARS)
+  );
+}
+
+const listLimitsLine = `At most ${String(MAX_SECTION_ENTRIES)} lines, each at most ${String(MAX_SECTION_TEXT_CHARS)} characters.`;
 
 function linesOf(text: string): string[] {
   return text
@@ -313,23 +358,27 @@ function FamiliesForm({
   readonly onCommit: Commit;
 }): ReactElement {
   const [text, setText] = useState(values.disabledDecoderFamilies.join('\n'));
+  const lines = linesOf(text);
+  const valid = listWithinLimits(lines);
   return (
     <form
       aria-label="Disabled decoder families"
       onSubmit={(e) => {
         e.preventDefault();
-        onCommit('disabledDecoderFamilies', { disabledDecoderFamilies: linesOf(text) });
+        if (valid) onCommit('disabledDecoderFamilies', { disabledDecoderFamilies: lines });
       }}
     >
       <label>
         One decoder family per line; the engine refuses a family it does not have.
         <textarea
           aria-label="Disabled decoder families"
+          aria-describedby="settings-families-hint"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
       </label>
-      <Submit label="decoder families" />
+      <FieldHint id="settings-families-hint">{listLimitsLine}</FieldHint>
+      <Submit label="decoder families" disabled={!valid} />
     </form>
   );
 }
@@ -350,7 +399,7 @@ function SourceMapForm({
       ? null
       : { source: l.slice(0, at).trim(), format: l.slice(at + 1).trim() };
   });
-  const valid = parsed.every((p) => p !== null);
+  const valid = parsed.every((p) => p !== null) && listWithinLimits(linesOf(text));
   return (
     <form
       aria-label="Source-format overrides"
@@ -364,13 +413,14 @@ function SourceMapForm({
         One <code>source=format</code> per line; the engine refuses a format it does not have.
         <textarea
           aria-label="Source-format overrides"
+          aria-describedby="settings-sourcemap-hint"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
       </label>
-      {valid ? null : (
-        <p className="fcx-settings__hint">Every line needs a source and a format around one =.</p>
-      )}
+      <FieldHint id="settings-sourcemap-hint">
+        Every line needs a source and a format around one =. {listLimitsLine}
+      </FieldHint>
       <Submit label="source-format overrides" disabled={!valid} />
     </form>
   );
@@ -398,10 +448,15 @@ function ModelRefForm({
         <input
           type="text"
           aria-label="Narrative model ref"
+          aria-describedby="settings-modelref-hint"
+          maxLength={MAX_SECTION_TEXT_CHARS}
           value={ref}
           onChange={(e) => setRef(e.target.value)}
         />
       </label>
+      <FieldHint id="settings-modelref-hint">
+        Format <code>id@version</code>, at most {MAX_SECTION_TEXT_CHARS} characters; empty unbinds.
+      </FieldHint>
       <Submit label="narrative model" />
     </form>
   );

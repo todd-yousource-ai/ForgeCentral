@@ -89,6 +89,8 @@ const HTML_ATTRS = new Set([
   'style',
   'title',
   'data-covers',
+  // A Console constant the renderer fills from the code (GD.12, INV-GUIDE-ONE-SOURCE).
+  'data-const',
 ]);
 const SVG_ATTRS = new Set([
   'class',
