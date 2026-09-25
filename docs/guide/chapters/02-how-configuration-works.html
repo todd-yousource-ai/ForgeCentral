@@ -155,7 +155,7 @@
 </ul>
 <p>Records (zones, objects, policies, users) have no apply step: the engine resolves them each time they are read, so the next read reflects your change.</p>
 
-<div class="note limit"><p>Four settings are labelled live but take effect only after the Forge engine restarts: <code>sessions.standard_lifetime_secs</code>, <code>sessions.break_glass_lifetime_secs</code>, <code>cognition.max_connections</code>, and, for changes made on the engine host rather than in ForgeCentral, <code>governance.dual_control</code>. The commit receipt does not list them as needing a restart. Plan a restart after changing them.</p></div>
+<div class="note"><p>Dual control (<code>governance.dual_control</code>) is live for ForgeCentral: a change applies to the next commit made here. The engine host's own administration endpoint reads it when the engine starts, so there a change applies after a restart.</p></div>
 
 <h2 id="cfg-who">Who can change what</h2>
 <p>You sign in to ForgeCentral through your organization's identity provider. Your ForgeCentral role comes from the operator role map (installation settings): <b>global administrator</b>, <b>tenant administrator</b>, or <b>tenant user</b>.</p>
