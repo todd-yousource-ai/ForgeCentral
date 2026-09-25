@@ -8,7 +8,7 @@ hashes are recorded here with the repo named.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25):** plan authored; 54 open rows re-verified against FC `17650f1`, crucible
+- **State (2026-09-25):** plan MERGED `58d8fc7` (operator: "Merge then stop there"); 54 open rows re-verified against FC `17650f1`, crucible
   `c5590958`, torch `d8f03ca`. Nothing scheduled yet. Operator decisions D1 to D7 open (plan Section 2).
 - **Suggested first PR:** RM.1 CD-01 (FC: refuse a non-admin secret write, audit line), then RM.2 CD-65
   (seen live) and CD-12.
