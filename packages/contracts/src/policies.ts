@@ -70,6 +70,17 @@ export const POLICY_CLASSIFICATIONS = [
 export type PolicyClassification = (typeof POLICY_CLASSIFICATIONS)[number];
 
 /** One end of a rule (a source or a destination): a TRD-32 v2 ObjectRef rendered read-only. */
+/**
+ * The engine's policy text bounds, in UTF-8 bytes (crdb `cdb-types` forge_v2 `POLICY_NAME_MAX_BYTES`,
+ * `POLICY_DESCRIPTION_MAX_BYTES`, PS.3). Mirrored so the form states and checks them.
+ */
+export const POLICY_NAME_MAX_BYTES = 128;
+export const POLICY_DESCRIPTION_MAX_BYTES = 1024;
+
+/** The port range a policy's port list may name. */
+export const POLICY_PORT_MIN = 1;
+export const POLICY_PORT_MAX = 65535;
+
 export interface RuleEndpoint {
   /** The object kind (the shared TRD-32 v2 ObjectKind registry). */
   readonly kind: ObjectKind;

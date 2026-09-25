@@ -19,10 +19,13 @@ import type { DecisionStatus, LogQueryFilter, LogRow } from '@forge/contracts';
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { useDrawer } from '../shell/DrawerHost.js';
 import { downloadExport, exportFailure, useExportLogs } from './useExportLogs.js';
-import { fetchLogExplain, logExplainQueryKey, useLogExplain, useLogs } from './useLogs.js';
-
-/** The default page size (matches the BFF default; the engine clamps to its per-tenant ceiling). */
-const PAGE_LIMIT = 100;
+import {
+  LOG_PAGE_LIMIT,
+  fetchLogExplain,
+  logExplainQueryKey,
+  useLogExplain,
+  useLogs,
+} from './useLogs.js';
 
 /** A time-range preset -> a `since` lower bound (unix ms), or undefined for "all time". */
 const RANGES: Readonly<Record<string, number | undefined>> = {
@@ -81,7 +84,7 @@ export function LogsSurface(): ReactElement {
       ...(confidence !== '' ? { confidence } : {}),
       ...(action !== '' ? { action } : {}),
       ...(window !== undefined ? { since: Date.now() - window } : {}),
-      limit: PAGE_LIMIT,
+      limit: LOG_PAGE_LIMIT,
     };
   }, [search, confidence, action, range]);
 

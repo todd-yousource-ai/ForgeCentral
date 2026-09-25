@@ -1133,6 +1133,12 @@ export function isPrincipalId(value: string): boolean {
 export const MAX_NOTE_CHARS = 4000;
 
 /**
+ * The furthest a risk acceptance may lapse, in days from when it is recorded (crdb `cdb-cyber`
+ * detect_feedback `RISK_ACCEPTANCE_MAX_SECONDS`, 365 days). The engine refuses a later expiry.
+ */
+export const RISK_ACCEPTANCE_MAX_DAYS = 365;
+
+/**
  * Parse a case-act request body FAIL-CLOSED: an unknown act, a missing or malformed required field
  * (`assignee` must be a principal id, `note` must be non-blank), or a field the act does not take is
  * `null`, so a bad body never reaches the engine and a stray field is never silently recorded.

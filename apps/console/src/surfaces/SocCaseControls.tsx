@@ -22,10 +22,11 @@
 // the id the Console submits (crdb rider C.1r validates it engine-side once that store exists).
 
 import { useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog } from '@forge/design';
+import { Badge, ConfirmDialog, FieldHint } from '@forge/design';
 import {
   DISPOSITIONS,
   REMEDIATION_ACTIONS,
+  RISK_ACCEPTANCE_MAX_DAYS,
   isPrincipalId,
   type CaseActDraft,
   type CaseActRecorded,
@@ -95,11 +96,21 @@ export function expiryDateToSeconds(expiryDate: string): number | null {
   return Number.isNaN(millis) ? null : Math.floor(millis / 1000);
 }
 
+const DAY_SECONDS = 24 * 3600;
+
+/** The latest lapse date the engine accepts from `nowSeconds` (its 00:00 UTC is within the bound). */
+export function latestExpiryDate(nowSeconds: number): string {
+  return new Date((nowSeconds + RISK_ACCEPTANCE_MAX_DAYS * DAY_SECONDS) * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
 /**
  * Build the disposition draft from the form, or `null` while it cannot be submitted.
  *
  * Mirrors `toDispositionDraft` on the BFF: exactly the SC.7 field per verdict, trimmed and non-blank,
- * an expiry strictly in the future (`nowSeconds` is injected so the rule is testable). A `null` here
+ * an expiry strictly in the future and at most the engine's bound away (`nowSeconds` is injected so the
+ * rule is testable). A `null` here
  * disables the control rather than costing a round trip the engine would refuse.
  */
 export function buildDispositionDraft(
@@ -118,7 +129,12 @@ export function buildDispositionDraft(
       return text === '' ? null : { disposition: form.disposition, blockingControl: text };
     case 'true_positive_risk_accepted': {
       const expirySeconds = expiryDateToSeconds(form.expiryDate);
-      if (text === '' || expirySeconds === null || expirySeconds <= nowSeconds) {
+      if (
+        text === '' ||
+        expirySeconds === null ||
+        expirySeconds <= nowSeconds ||
+        expirySeconds - nowSeconds > RISK_ACCEPTANCE_MAX_DAYS * DAY_SECONDS
+      ) {
         return null;
       }
       return { disposition: form.disposition, acceptingParty: text, expirySeconds };
@@ -217,7 +233,8 @@ export function SocCaseControls({ incidentId }: SocCaseControlsProps): ReactElem
   });
   const busy = act.isPending || disposition.isPending;
   const assigneeValid = isPrincipalId(assignee);
-  const dispositionDraft = buildDispositionDraft(form, Math.floor(Date.now() / 1000));
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const dispositionDraft = buildDispositionDraft(form, nowSeconds);
   const fieldLabel = dispositionFieldLabel(form.disposition);
 
   function confirm(): void {
@@ -379,11 +396,17 @@ export function SocCaseControls({ incidentId }: SocCaseControlsProps): ReactElem
               type="date"
               className="fcx-socp__input"
               aria-label="Acceptance lapses on"
+              aria-describedby="soc-expiry-hint"
+              max={latestExpiryDate(nowSeconds)}
               value={form.expiryDate}
               onChange={(event) => {
                 setForm({ ...form, expiryDate: event.target.value });
               }}
             />
+            <FieldHint id="soc-expiry-hint">
+              A future date at most {RISK_ACCEPTANCE_MAX_DAYS} days away; the acceptance lapses at
+              00:00 UTC that day.
+            </FieldHint>
           </label>
         ) : null}
 
@@ -402,7 +425,7 @@ export function SocCaseControls({ incidentId }: SocCaseControlsProps): ReactElem
               ? "The one verdict that down-weights the tenant's incidents with the same technique. It needs your justification."
               : dispositionDraft === null
                 ? form.disposition === 'true_positive_risk_accepted'
-                  ? 'Needs the accepting party and a lapse date in the future; the engine refuses an expiry that has passed.'
+                  ? `Needs the accepting party and a lapse date in the future, at most ${String(RISK_ACCEPTANCE_MAX_DAYS)} days away; the engine refuses any other.`
                   : `Needs ${fieldLabel === null ? 'its field' : fieldLabel.toLowerCase()}.`
                 : "Recorded as the incident's verdict; closes the incident."}
         </span>

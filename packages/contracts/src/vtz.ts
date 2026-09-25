@@ -345,6 +345,51 @@ export const MIN_REAUTH_INTERVAL_HOURS = 1;
 /** The highest re-authentication interval a zone may carry, in hours (the engine re-validates). */
 export const MAX_REAUTH_INTERVAL_HOURS = 24;
 
+/** The re-authentication interval a new zone starts with in the editor, in hours. */
+export const DEFAULT_REAUTH_INTERVAL_HOURS = 8;
+
+/**
+ * The engine's zone-name bounds (crdb `cdb-types` forge_v2 `VTZ_NAME_MAX_BYTES`, `VTZ_NAME_MAX_LABELS`,
+ * `VTZ_LABEL_MAX_BYTES`, R-FRG-80) and its description bound (`VTZ_DESCRIPTION_MAX_BYTES`). Mirrored so
+ * the editor states and checks them; the engine re-validates and stays the authority.
+ */
+export const VTZ_NAME_MAX_BYTES = 255;
+export const VTZ_NAME_MAX_LABELS = 16;
+export const VTZ_LABEL_MAX_BYTES = 63;
+export const VTZ_DESCRIPTION_MAX_BYTES = 1024;
+
+/** The UTF-8 length of a string: the engine bounds names and descriptions in bytes, not characters. */
+export function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+const VTZ_LABEL_SHAPE = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
+
+/**
+ * Why the engine would refuse a dotted zone name, in the operator's words, or `null` when it would
+ * accept it. The same order of checks as the engine's `VtzName::parse`.
+ */
+export function vtzNameProblem(name: string): string | null {
+  if (name === '') return 'Enter a name.';
+  if (utf8ByteLength(name) > VTZ_NAME_MAX_BYTES) {
+    return `The full name is longer than ${String(VTZ_NAME_MAX_BYTES)} bytes.`;
+  }
+  const labels = name.split('.');
+  if (labels.length > VTZ_NAME_MAX_LABELS) {
+    return `The name has more than ${String(VTZ_NAME_MAX_LABELS)} levels.`;
+  }
+  for (const label of labels) {
+    if (label === '') return 'A level of the name is empty.';
+    if (utf8ByteLength(label) > VTZ_LABEL_MAX_BYTES) {
+      return `A level of the name is longer than ${String(VTZ_LABEL_MAX_BYTES)} characters.`;
+    }
+    if (!VTZ_LABEL_SHAPE.test(label)) {
+      return 'Use only ASCII letters, digits and hyphens, starting and ending with a letter or digit.';
+    }
+  }
+  return null;
+}
+
 /**
  * A zone as the operator authored it (`vtz.create` / `vtz.edit`). The camelCase mirror of `WireVtzSpec`.
  * `name` is the dotted `VtzName` and IS the identity + the hierarchy, so an edit that changes it is a

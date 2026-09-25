@@ -91,6 +91,8 @@ const HTML_ATTRS = new Set([
   'data-covers',
   // A Console constant the renderer fills from the code (GD.12, INV-GUIDE-ONE-SOURCE).
   'data-const',
+  // How the renderer prints that constant (`grouped`: 86,400).
+  'data-format',
 ]);
 const SVG_ATTRS = new Set([
   'class',

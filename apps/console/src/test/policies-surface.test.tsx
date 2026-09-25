@@ -8,6 +8,11 @@
 // confirm; and an empty tenant renders honest empties.
 
 import type { PolicyRow, PolicyZoneGroup } from '@forge/contracts';
+import {
+  POLICY_DESCRIPTION_MAX_BYTES,
+  POLICY_NAME_MAX_BYTES,
+  POLICY_PORT_MAX,
+} from '@forge/contracts';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -386,6 +391,47 @@ describe('portsValid enforces the canonical port form', () => {
     expect(portsValid('70000')).toBe(false);
     expect(portsValid('9000-8000')).toBe(false);
     expect(portsValid('http')).toBe(false);
+  });
+});
+
+describe('field limits on the policy form (GD.12b)', () => {
+  it('shows the engine byte limits and the port range, and disables Save past them', async () => {
+    stubFetch();
+    renderWithProviders(<PoliciesSurface />, { route: '/policies' });
+    await screen.findByRole('button', { name: 'YouSource.Corp, 1 policy' });
+    fireEvent.click(screen.getByRole('button', { name: '+ Create Policy' }));
+    const f = within(await screen.findByRole('form', { name: 'Create a policy' }));
+    const name = f.getByLabelText('Policy Name');
+    fireEvent.change(name, { target: { value: 'ok' } });
+    fireEvent.change(f.getByLabelText('Zone'), { target: { value: 'YouSource.Corp' } });
+    const pick = (label: string, value: string): void => {
+      const select = f.getByLabelText<HTMLSelectElement>(label);
+      for (const opt of select.options) opt.selected = opt.value === value;
+      fireEvent.change(select);
+    };
+    pick('Subjects', 'demo-agent');
+    pick('Targets', '10.8.0.0/16');
+    const save = f.getByRole('button', { name: 'Save as Draft' });
+    expect(save).toBeEnabled();
+    expect(name).toHaveAccessibleDescription(
+      `Unique in its zone; 2 of ${String(POLICY_NAME_MAX_BYTES)} bytes. It cannot be changed later.`,
+    );
+    expect(f.getByLabelText('Ports')).toHaveAccessibleDescription(
+      new RegExp(`from 1 to ${String(POLICY_PORT_MAX)}`),
+    );
+    // Bytes, not characters: 65 two-byte characters are 130 bytes.
+    fireEvent.change(name, { target: { value: '\u00e9'.repeat(65) } });
+    expect(save).toBeDisabled();
+    fireEvent.change(name, { target: { value: 'ok' } });
+    fireEvent.click(f.getByRole('button', { name: /Advanced Settings/ }));
+    fireEvent.change(f.getByLabelText('Description'), {
+      target: { value: 'x'.repeat(POLICY_DESCRIPTION_MAX_BYTES + 1) },
+    });
+    expect(save).toBeDisabled();
+    fireEvent.change(f.getByLabelText('Description'), {
+      target: { value: 'x'.repeat(POLICY_DESCRIPTION_MAX_BYTES) },
+    });
+    expect(save).toBeEnabled();
   });
 });
 

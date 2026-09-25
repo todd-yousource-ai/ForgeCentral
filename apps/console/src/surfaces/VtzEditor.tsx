@@ -24,11 +24,18 @@
 // changes, so there is no state-sync effect to get wrong.
 
 import { useState, type ReactElement } from 'react';
-import { ConfirmDialog } from '@forge/design';
+import { ConfirmDialog, FieldHint } from '@forge/design';
 import {
+  DEFAULT_REAUTH_INTERVAL_HOURS,
   MAX_REAUTH_INTERVAL_HOURS,
   MIN_REAUTH_INTERVAL_HOURS,
   VTZ_ARCHETYPES,
+  VTZ_DESCRIPTION_MAX_BYTES,
+  VTZ_LABEL_MAX_BYTES,
+  VTZ_NAME_MAX_BYTES,
+  VTZ_NAME_MAX_LABELS,
+  utf8ByteLength,
+  vtzNameProblem,
   type VtzArchetype,
   type VtzLifecycle,
   type VtzSpecInput,
@@ -163,7 +170,7 @@ export function VtzEditor({
     telemetry: zone?.telemetry ?? 'full',
     lifecycle: zone?.lifecycle ?? 'draft',
     microSegmentation: zone?.microSegmentation ?? true,
-    reauthIntervalHours: zone?.reauthIntervalHours ?? 8,
+    reauthIntervalHours: zone?.reauthIntervalHours ?? DEFAULT_REAUTH_INTERVAL_HOURS,
   });
   const [pending, setPending] = useState<Pending>(null);
 
@@ -177,7 +184,19 @@ export function VtzEditor({
       : parents.filter((p) => p.name !== zone.name && !p.name.startsWith(`${zone.name}.`));
 
   const composed = composeZoneName(parentName, leaf);
-  const canSubmit = !busy && composed !== '';
+  // The engine's own rules, checked here so a refusal is explained before Save rather than after it.
+  const nameProblem = leaf === '' ? null : vtzNameProblem(composed);
+  const descriptionBytes = utf8ByteLength(form.description);
+  const reauthOk =
+    Number.isInteger(form.reauthIntervalHours) &&
+    form.reauthIntervalHours >= MIN_REAUTH_INTERVAL_HOURS &&
+    form.reauthIntervalHours <= MAX_REAUTH_INTERVAL_HOURS;
+  const canSubmit =
+    !busy &&
+    composed !== '' &&
+    nameProblem === null &&
+    descriptionBytes <= VTZ_DESCRIPTION_MAX_BYTES &&
+    reauthOk;
   // A move is simply the composed name landing somewhere other than where the zone already is.
   const moveTo = mode === 'edit' && zone !== null && composed !== zone.name ? composed : null;
 
@@ -219,6 +238,8 @@ export function VtzEditor({
             type="text"
             className="fcx-input"
             aria-label="VTZ name"
+            aria-describedby="vtz-name-hint"
+            aria-invalid={nameProblem !== null}
             value={leaf}
             disabled={busy}
             placeholder="reps"
@@ -229,6 +250,10 @@ export function VtzEditor({
               Commits as <code>{composed}</code>
             </span>
           ) : null}
+          <FieldHint id="vtz-name-hint">
+            {nameProblem ??
+              `ASCII letters, digits and hyphens, starting and ending with a letter or digit; each level at most ${String(VTZ_LABEL_MAX_BYTES)} characters, at most ${String(VTZ_NAME_MAX_LABELS)} levels and ${String(VTZ_NAME_MAX_BYTES)} bytes in all. Stored in lower case.`}
+          </FieldHint>
         </label>
 
         <label className="fcx-field">
@@ -278,6 +303,8 @@ export function VtzEditor({
             type="text"
             className="fcx-input"
             aria-label="Description"
+            aria-describedby="vtz-description-hint"
+            aria-invalid={descriptionBytes > VTZ_DESCRIPTION_MAX_BYTES}
             value={form.description}
             disabled={busy}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -290,6 +317,10 @@ export function VtzEditor({
               The engine does not return the stored description, so saving replaces it.
             </span>
           ) : null}
+          <FieldHint id="vtz-description-hint">
+            Optional; {String(descriptionBytes)} of {String(VTZ_DESCRIPTION_MAX_BYTES)} bytes (text
+            outside ASCII uses more than one byte per character).
+          </FieldHint>
         </label>
 
         <label className="fcx-field">
@@ -298,6 +329,8 @@ export function VtzEditor({
             type="number"
             className="fcx-input"
             aria-label="Session duration (hours)"
+            aria-describedby="vtz-session-hint"
+            aria-invalid={!reauthOk}
             min={MIN_REAUTH_INTERVAL_HOURS}
             max={MAX_REAUTH_INTERVAL_HOURS}
             value={form.reauthIntervalHours}
@@ -306,9 +339,11 @@ export function VtzEditor({
               setForm((f) => ({ ...f, reauthIntervalHours: Number(e.target.value) }))
             }
           />
-          <span className="fcx-field__note">
-            How long before a member must log in again (1-24).
-          </span>
+          <FieldHint id="vtz-session-hint">
+            How long before a member must sign in again: a whole number of hours from{' '}
+            {MIN_REAUTH_INTERVAL_HOURS} to {MAX_REAUTH_INTERVAL_HOURS}. Default{' '}
+            {DEFAULT_REAUTH_INTERVAL_HOURS}.
+          </FieldHint>
         </label>
 
         <label className="fcx-field">

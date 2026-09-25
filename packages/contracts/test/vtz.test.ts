@@ -22,6 +22,11 @@ import {
   toVtzTelemetry,
   toVtzTree,
   toVtzZone,
+  VTZ_LABEL_MAX_BYTES,
+  VTZ_NAME_MAX_BYTES,
+  VTZ_NAME_MAX_LABELS,
+  utf8ByteLength,
+  vtzNameProblem,
 } from '../src/index.js';
 import type {
   WireDomainPosture,
@@ -328,5 +333,35 @@ describe('the authoring spec (V2.3 write side)', () => {
     expect(
       toVtzSpecInput({ ...body, ownPostures: [{ domain: 'ipc', posture: 'deny' }] }),
     ).toBeNull();
+  });
+});
+
+describe('vtzNameProblem mirrors the engine VtzName::parse (GD.12b)', () => {
+  it('accepts a well-formed dotted name and counts bytes, not characters', () => {
+    expect(vtzNameProblem('YouSource.Corp.Finance-1')).toBeNull();
+    expect(utf8ByteLength('é')).toBe(2);
+  });
+
+  it('refuses each shape the engine refuses', () => {
+    expect(vtzNameProblem('')).toBe('Enter a name.');
+    expect(vtzNameProblem('a..b')).toBe('A level of the name is empty.');
+    expect(vtzNameProblem('-a')).toMatch(/starting and ending/);
+    expect(vtzNameProblem('a-')).toMatch(/starting and ending/);
+    expect(vtzNameProblem('a_b')).toMatch(/ASCII letters/);
+    expect(vtzNameProblem('café')).toMatch(/ASCII letters/);
+    expect(vtzNameProblem('a'.repeat(VTZ_LABEL_MAX_BYTES))).toBeNull();
+    expect(vtzNameProblem('a'.repeat(VTZ_LABEL_MAX_BYTES + 1))).toMatch(/longer than 63/);
+    expect(vtzNameProblem(Array(VTZ_NAME_MAX_LABELS).fill('a').join('.'))).toBeNull();
+    expect(
+      vtzNameProblem(
+        Array(VTZ_NAME_MAX_LABELS + 1)
+          .fill('a')
+          .join('.'),
+      ),
+    ).toMatch(/levels/);
+    // Five 63-byte labels are 319 bytes: over the whole-name bound before any label check.
+    expect(vtzNameProblem(Array(5).fill('a'.repeat(63)).join('.'))).toBe(
+      `The full name is longer than ${String(VTZ_NAME_MAX_BYTES)} bytes.`,
+    );
   });
 });

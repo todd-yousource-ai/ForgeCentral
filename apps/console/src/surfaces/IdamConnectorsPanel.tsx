@@ -4,7 +4,7 @@
 // so the two mounts can never disagree about a connector.
 
 import { useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog, type BadgeVariant } from '@forge/design';
+import { Badge, ConfirmDialog, FieldHint, type BadgeVariant } from '@forge/design';
 import type { IdamConnectorState } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
@@ -13,6 +13,8 @@ import {
   IDAM_FULL_SYNC_HOURS_MIN,
   IDAM_POLL_INTERVAL_SECS_MAX,
   IDAM_POLL_INTERVAL_SECS_MIN,
+  IDAM_POLL_INTERVAL_SECS_DEFAULT,
+  IDAM_FULL_SYNC_HOURS_DEFAULT,
   IdamConnectError,
   IdamSyncError,
   useIdamConnect,
@@ -97,8 +99,17 @@ function IdamConnectForm({
   const [clientId, setClientId] = useState('');
   const [audience, setAudience] = useState('');
   const [secret, setSecret] = useState('');
-  const [pollSecs, setPollSecs] = useState(300);
-  const [fullHours, setFullHours] = useState(24);
+  const [pollSecs, setPollSecs] = useState(IDAM_POLL_INTERVAL_SECS_DEFAULT);
+  const [fullHours, setFullHours] = useState(IDAM_FULL_SYNC_HOURS_DEFAULT);
+  // The engine's cadence bounds, checked here so an out-of-range value disables Save connector.
+  const pollOk =
+    Number.isInteger(pollSecs) &&
+    pollSecs >= IDAM_POLL_INTERVAL_SECS_MIN &&
+    pollSecs <= IDAM_POLL_INTERVAL_SECS_MAX;
+  const fullOk =
+    Number.isInteger(fullHours) &&
+    fullHours >= IDAM_FULL_SYNC_HOURS_MIN &&
+    fullHours <= IDAM_FULL_SYNC_HOURS_MAX;
   const failure = connectFailure(connect.error);
 
   const submit = (): void => {
@@ -172,8 +183,16 @@ function IdamConnectForm({
           value={pollSecs}
           min={IDAM_POLL_INTERVAL_SECS_MIN}
           max={IDAM_POLL_INTERVAL_SECS_MAX}
+          aria-label="Delta poll interval (seconds)"
+          aria-describedby="idam-poll-hint"
+          aria-invalid={!pollOk}
           onChange={(e) => setPollSecs(Number(e.target.value))}
         />
+        <FieldHint id="idam-poll-hint">
+          {IDAM_POLL_INTERVAL_SECS_MIN} to {IDAM_POLL_INTERVAL_SECS_MAX.toLocaleString('en-US')}{' '}
+          seconds; default {IDAM_POLL_INTERVAL_SECS_DEFAULT}. How often the connector asks for
+          changes.
+        </FieldHint>
       </label>
       <label className="fcx-filter">
         Full directory sync (hours)
@@ -183,20 +202,30 @@ function IdamConnectForm({
           value={fullHours}
           min={IDAM_FULL_SYNC_HOURS_MIN}
           max={IDAM_FULL_SYNC_HOURS_MAX}
+          aria-label="Full directory sync (hours)"
+          aria-describedby="idam-full-hint"
+          aria-invalid={!fullOk}
           onChange={(e) => setFullHours(Number(e.target.value))}
         />
+        <FieldHint id="idam-full-hint">
+          {IDAM_FULL_SYNC_HOURS_MIN} to {IDAM_FULL_SYNC_HOURS_MAX} hours; default{' '}
+          {IDAM_FULL_SYNC_HOURS_DEFAULT}. How often the connector re-reads the whole directory.
+        </FieldHint>
       </label>
       <p className="fcx-users-idam-note">
         The secret is written to this node&apos;s protected store and never leaves it; the console
-        never stores it or sends it over the engine wire. Cadences are engine-bounded (poll{' '}
-        {IDAM_POLL_INTERVAL_SECS_MIN}-{IDAM_POLL_INTERVAL_SECS_MAX}s, full sync{' '}
-        {IDAM_FULL_SYNC_HOURS_MIN}-{IDAM_FULL_SYNC_HOURS_MAX}h).
+        never stores it or sends it over the engine wire.
       </p>
       <button
         type="submit"
         className="fcx-btn fcx-btn--primary"
         disabled={
-          connect.isPending || domainValue.trim() === '' || clientId.trim() === '' || secret === ''
+          connect.isPending ||
+          domainValue.trim() === '' ||
+          clientId.trim() === '' ||
+          secret === '' ||
+          !pollOk ||
+          !fullOk
         }
       >
         {connect.isPending ? 'Configuring...' : 'Save connector'}

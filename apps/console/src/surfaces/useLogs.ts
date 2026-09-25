@@ -13,6 +13,10 @@ import type { LogDetailView, LogPage, LogQueryFilter, LogRow } from '@forge/cont
 // behind this same hook without touching the surface. 2 s balances freshness against engine read load.
 const LIVE_POLL_MS = 2000;
 
+/** The page the Logs surface asks for (matches the BFF default; the engine clamps to its per-tenant
+ * ceiling). The guide states it (GD.12). */
+export const LOG_PAGE_LIMIT = 100;
+
 /** Serialize a `LogQueryFilter` into the `/api/logs` query string (only the set fields). */
 export function logsQueryString(filter: LogQueryFilter): string {
   const params = new URLSearchParams();
