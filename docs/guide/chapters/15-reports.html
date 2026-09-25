@@ -30,8 +30,17 @@
 <tr><th style="width:32%">Label</th><th>Meaning</th></tr>
 <tr><td><b class="ui">model (adjudicated)</b></td><td>Written by the narrative model and checked against the evidence.</td></tr>
 <tr><td><b class="ui">engine (record)</b></td><td>Taken from the Forge engine's record of the incident.</td></tr>
-<tr><td><b class="ui">template (declared fallback)</b></td><td>No model output exists for the section, so the declared template is shown. This happens when no narrative model is bound (<a class="xref" href="#setc-sections"></a>) or no narrative has been generated (<a class="xref" href="#soc-generate"></a>).</td></tr>
+<tr><td><b class="ui">template (declared fallback)</b></td><td>No model output exists for the section, so the declared template is shown. This happens when no narrative model is bound (<a class="xref" href="#setc-sections"></a>), no narrative has been generated (<a class="xref" href="#soc-generate"></a>), or the model refused to publish one (the state line then gives the reason).</td></tr>
 </table>
 </div>
-<p>A report marked <b class="ui">needs human review</b> should be read by an analyst before it is shared.</p>
+<div class="tablewrap" id="tab-rep-sections" data-title="The sources each report section can take">
+<table class="data">
+<tr><th style="width:32%">Section</th><th>Source</th></tr>
+<tr><td>Executive summary, What happened</td><td><b>model</b> when a narrative is published; otherwise <b>template</b>.</td></tr>
+<tr><td>Business impact</td><td><b>model</b> when the published narrative includes impact; otherwise <b>engine</b> (the assessed band and its factors, with no currency figure).</td></tr>
+<tr><td>Immediate actions</td><td><b>engine</b> (the response plan's steps); <b>template</b> when no plan has been proposed.</td></tr>
+<tr><td>Severity justification, Confidence explanation</td><td>Always <b>engine</b>.</td></tr>
+</table>
+</div>
+<p>A published narrative is followed by its cited evidence. A report marked <b class="ui">needs human review</b> should be read by an analyst before it is shared.</p>
 <div class="note limit"><p>Downloads are made by your browser from the report on screen. They are not recorded in the audit trail. For an audited record of decisions, use the Logs export (<a class="xref" href="#log-export"></a>).</p></div>
