@@ -158,7 +158,6 @@ export type IdamSyncOutcome = (typeof IDAM_SYNC_OUTCOMES)[number];
 export const IDAM_CONNECTOR_STATES = [
   'disabled',
   'never-synced',
-  'syncing',
   'healthy',
   'partial',
   'error',
@@ -397,17 +396,16 @@ function toIdamSyncOutcome(tag: string | null | undefined): IdamSyncOutcome | nu
 
 /**
  * Derive the connector card's health state from the engine record, CONSERVATIVELY. Precedence:
- * disabled (config off) -> syncing (a walk is in flight) -> error (the engine reported one) ->
- * never-synced (no sync has ever completed) -> the last completeness. The final branch is
+ * disabled (config off) -> error (the engine reported one) -> never-synced (no sync has ever completed)
+ * -> the last completeness. The record's `running` is NOT a sync-in-flight signal: the engine sets it
+ * when the sync loop starts and clears it when the loop exits, so it is true for as long as the
+ * connector lives (census CD-56); no field says a walk is in progress, so no state claims one. The final branch is
  * FAIL-CLOSED: a synced, error-free connector whose completeness the Console does not recognize is
  * `unknown`, NOT `healthy`, so an unparseable record can never render as a green connected card.
  */
 function deriveIdamState(record: WireIdamConnectorRecord): IdamConnectorState {
   if (!record.enabled) {
     return 'disabled';
-  }
-  if (record.running) {
-    return 'syncing';
   }
   if (record.last_error != null) {
     return 'error';

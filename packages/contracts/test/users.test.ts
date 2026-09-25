@@ -267,10 +267,14 @@ describe('IdamConnector projection (INV-CONSOLE-IDAM-CONTRACT)', () => {
     expect(card.state).toBe('never-synced');
   });
 
-  it('derives state fail-closed by precedence: disabled > syncing > error > never-synced', () => {
+  it('derives state fail-closed by precedence: disabled > error > never-synced', () => {
     expect(toIdamConnector(connector({ enabled: false })).state).toBe('disabled');
-    // running wins over a stale last_error/last_completeness: a walk is in flight now.
-    expect(toIdamConnector(connector({ running: true, last_error: 'x' })).state).toBe('syncing');
+    // `running` is the sync loop being alive (always, on a live connector), never a sync in flight:
+    // it must not mask an error or a completed sync (CD-56).
+    expect(toIdamConnector(connector({ running: true, last_error: 'x' })).state).toBe('error');
+    expect(toIdamConnector(connector({ running: true, last_completeness: 'complete' })).state).toBe(
+      'healthy',
+    );
     expect(toIdamConnector(connector({ last_error: 'token expired' })).state).toBe('error');
     expect(toIdamConnector(connector({ last_sync_unix_ms: null })).state).toBe('never-synced');
     expect(toIdamConnector(connector({ last_completeness: 'partial' })).state).toBe('partial');

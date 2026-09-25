@@ -31,7 +31,7 @@
   <text x="110" y="260" font-size="11" fill="#5a6477" text-anchor="middle">local users you add</text>
   <rect x="290" y="20" width="190" height="70" rx="8" fill="#123a6b"/>
   <text x="385" y="48" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">Connector</text>
-  <text x="385" y="66" font-size="10.5" fill="#cfe9df" text-anchor="middle">delta poll + full sync</text>
+  <text x="385" y="66" font-size="10.5" fill="#cfe9df" text-anchor="middle">full directory sync</text>
   <line x1="210" y1="55" x2="286" y2="55" stroke="#123a6b" stroke-width="2" marker-end="url(#ah7)"/>
   <rect x="560" y="95" width="190" height="110" rx="10" fill="#e6f5ef" stroke="#3fbe96" stroke-width="2"/>
   <text x="655" y="130" font-size="14" font-weight="700" fill="#0c2748" text-anchor="middle">Forge user</text>
@@ -52,17 +52,18 @@
 </figure>
 
 <ol>
-  <li><b>Identity provider.</b> The connector polls your Auth0 tenant for changes every <b>delta poll interval</b> and runs a <b>full directory sync</b> on a longer cadence. This chapter configures it.</li>
+  <li><b>Identity provider.</b> The connector runs a <b>full directory sync</b> of your Auth0 tenant on its full-sync cadence; users and groups reach Forge only through that sync. Every <b>delta poll interval</b> it also reads the tenant's sign-in logs into the Forge log plane. This chapter configures it.</li>
   <li><b>Endpoint agents.</b> Each Forge endpoint agent reports its host's local accounts, groups and sessions. The engine accepts them within the limits set by the LUG exposure section (<a class="xref" href="#setc-sections"></a>).</li>
   <li><b>ForgeCentral.</b> You add and manage local user records on the Users surface (<a class="xref" href="#ch-users-and-groups"></a>).</li>
 </ol>
 <p>There is one connector per Forge node. Every tenant on the node sees the same connector, and users it syncs are placed in the tenant named when the Forge engine was installed, whichever operator configured the connector.</p>
+<div class="note limit"><p>If Auth0 was not set up when the Forge engine was installed, the node has no tenant for the connector: a connector set up from ForgeCentral syncs users into no tenant, and they do not appear on <span class="path">Users<span class="sep">&gt;</span>All Users</span>. Have the engine installed with the Auth0 domain, or ask your YouSource.ai representative to set the connector's tenant on the engine host.</p></div>
 
-<h3 id="idp-save">What Save connector does</h3>
+<h3 id="idp-save" data-covers="idam.secret idam.connect idam.configure">What Save connector does</h3>
 <p><b class="ui">Save connector</b> runs three steps in order and stops at the first that fails:</p>
 <ol>
   <li>It stores the client secret in the node's protected secret store. The secret is not sent over ForgeCentral's connection to the engine (the engine reads it from the store), and ForgeCentral never shows it again.</li>
-  <li>It points the connector at your Auth0 domain, client ID and audience. The engine starts a new connector with the new settings before it stops the old one, so a mistake does not leave you without a connector.</li>
+  <li>It points the connector at your Auth0 domain, client ID and audience. The engine starts a new connector with the new settings before it stops the old one, so an unreadable secret leaves the old connector running. The engine does not test the credentials: a wrong domain, client ID or secret replaces the old connector and then fails on its own cycles, which the card shows as an error.</li>
   <li>It enables the connector and sets its two cadences.</li>
 </ol>
 
@@ -87,11 +88,11 @@
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
-  <li>Choose <span class="path">Users<span class="sep">&gt;</span>External IDAM</span> (or <span class="path">Settings<span class="sep">&gt;</span>Federation</span>). <span class="result">With no connector yet, the panel reads No IdAM connector configured.</span></li>
-  <li>Choose <b class="ui">Onboard Auth0</b>.</li>
+  <li>Choose <span class="path">Users<span class="sep">&gt;</span>External IDAM</span> (or <span class="path">Settings<span class="sep">&gt;</span>Federation</span>). <span class="result">A node where Auth0 is not set up shows an <b class="ui">Auth0</b> card reading <b class="ui">Disabled</b> and No tenant configured.</span></li>
+  <li>Choose <b class="ui">Configure</b> on the card.</li>
   <li>Fill in the form (<a class="xref" href="#tab-idp-fields"></a>).</li>
   <li>Choose <b class="ui">Save connector</b>. <span class="result">The button reads Configuring... while the three steps run; on success the form closes and the connector's card appears.</span></li>
-  <li>On the card, choose <b class="ui">Sync Now</b> to run the first full sync without waiting for the cadence.</li>
+  <li>The first full sync starts on the connector's first cycle. To ask for another one, choose <b class="ui">Sync Now</b> (<a class="xref" href="#idp-sync"></a>).</li>
 </ol>
 </div>
 <div class="tablewrap" id="tab-idp-fields" data-title="Connector fields">
@@ -101,7 +102,7 @@
 <tr><td><b class="ui">Client ID</b></td><td>The machine-to-machine application's client ID. Required.</td></tr>
 <tr><td><b class="ui">Audience</b></td><td>Optional; leave empty for the Management API.</td></tr>
 <tr><td><b class="ui">Client Secret</b></td><td>The application's client secret. Required. Written to the node's protected store; never shown again.</td></tr>
-<tr><td><b class="ui">Delta poll interval (seconds)</b></td><td>60 to 86,400. How often the connector asks for changes.</td></tr>
+<tr><td><b class="ui">Delta poll interval (seconds)</b></td><td>60 to 86,400. How often the connector runs its cycle: it reads the sign-in logs each cycle, and a full sync that is due starts on the next cycle.</td></tr>
 <tr><td><b class="ui">Full directory sync (hours)</b></td><td>1 to 168. How often the connector re-reads the whole directory.</td></tr>
 </table>
 </div>
@@ -117,35 +118,39 @@
 </ol>
 </div>
 
-<h2 id="idp-sync">Run a sync now</h2>
+<h2 id="idp-sync" data-covers="idam.sync">Run a sync now</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
-  <li>On the connector's card, choose <b class="ui">Sync Now</b>. <span class="result">The button reads Syncing...; the card refreshes every three seconds while the sync runs.</span></li>
+  <li>On the connector's card, choose <b class="ui">Sync Now</b>, then confirm with <b class="ui">Sync</b>. <span class="result">The button reads Syncing... while ForgeCentral sends the request; the card refreshes every three seconds.</span></li>
   <li>When the sync finishes, read <b class="ui">Last sync</b> and <b class="ui">Objects synced</b>, and check the state.</li>
 </ol>
 </div>
-<p>Sync Now asks the connector to run a full sync on its next cycle; it does not wait for the result.</p>
+<p>Sync Now asks the connector to run a full sync on its next cycle, up to one delta poll interval later; it does not wait for the result. Check <b class="ui">Last sync</b> and <b class="ui">Objects synced</b> afterwards.</p>
 
-<h2 id="idp-verify">Verify</h2>
+<h2 id="idp-verify" data-covers="idam.connectors">Verify</h2>
 <div class="tablewrap" id="tab-idp-states" data-title="Connector states">
 <table class="data">
 <tr><th style="width:22%">State</th><th>Meaning</th></tr>
 <tr><td><b class="ui">Connected</b></td><td>The last full sync completed.</td></tr>
-<tr><td><b class="ui">Syncing</b></td><td>A sync is running now.</td></tr>
 <tr><td><b class="ui">Never synced</b></td><td>The connector is set up but has not completed a sync. Choose Sync Now.</td></tr>
 <tr><td><b class="ui">Partial sync</b></td><td>The last sync completed only in part. Check the last error.</td></tr>
-<tr><td><b class="ui">Error</b></td><td>The last attempt failed; the card shows the provider's error. Check the domain, client ID, secret and the application's permissions.</td></tr>
-<tr><td><b class="ui">Disabled</b></td><td>The connector is not running.</td></tr>
+<tr><td><b class="ui">Error</b></td><td>The last attempt failed; the card shows the provider's or the engine's error. Check the domain, client ID, secret and the application's permissions.</td></tr>
+<tr><td><b class="ui">Disabled</b></td><td>The connector is not set up, or it is turned off on the engine host. Choose <b class="ui">Configure</b>.</td></tr>
 <tr><td><b class="ui">Unknown</b></td><td>The engine reported a state this release does not recognize.</td></tr>
 </table>
 </div>
 <div class="tablewrap" id="tab-idp-errors" data-title="Connector error messages">
 <table class="data">
 <tr><th style="width:44%">Message</th><th>What to do</th></tr>
-<tr><td>The engine rejected the connectivity or the secret.</td><td>Check the domain, client ID and secret, then save again.</td></tr>
+<tr><td>The engine rejected the connectivity or the secret.</td><td>The secret store refused the secret, or the engine could not read it. Check the secret and save again; if it persists, contact your administrator.</td></tr>
+<tr><td>You do not have permission to configure connectors.</td><td>Your role cannot change connectors.</td></tr>
+<tr><td>The request could not reach the server.</td><td>Your browser could not reach ForgeCentral. Reload and check before retrying.</td></tr>
 <tr><td>The secret store is not available on this node.</td><td>The secret store was not set up when ForgeCentral was installed, or the engine is unavailable. Contact your administrator.</td></tr>
 <tr><td>The connector is disabled or not configured.</td><td>Save the connector before syncing.</td></tr>
+<tr><td>You do not have permission to run a sync.</td><td>Your role cannot run a sync.</td></tr>
+<tr><td>The engine refused the sync.</td><td>The Forge engine declined the request.</td></tr>
+<tr><td>The sync could not reach the engine.</td><td>A connection problem. Reload and check before retrying.</td></tr>
 <tr><td>The connector could not be configured.</td><td>A value is out of range (for example a cadence), or the request failed. Check the values and save again.</td></tr>
 </table>
 </div>

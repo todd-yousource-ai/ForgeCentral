@@ -2,7 +2,7 @@
 
 <p class="lead">The Users surface is the Forge user directory: every person, service account and AI agent the Forge engine knows about, whether you added it, an endpoint agent reported it, or your identity provider synced it. You manage the records you add, and you create groups. Identity-provider connectors, on the <b class="ui">External IDAM</b> tab, are covered in <a class="xref" href="#ch-identity-providers"></a>.</p>
 
-<h2 id="usr-availability">Availability</h2>
+<h2 id="usr-availability" data-covers="groups.edit groups.setMembers">Availability</h2>
 <div class="tablewrap" id="tab-usr-availability" data-title="Users and groups: availability">
 <table class="data">
 <tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
@@ -59,7 +59,7 @@
 <div class="note limit"><p>A failed <b class="ui">Suspend</b>, <b class="ui">Activate</b> or <b class="ui">Revoke</b> shows no error message. After changing a status, check the user's <b class="ui">Status</b> column.</p></div>
 <div class="note limit"><p><b class="ui">Activate</b> is offered on a revoked user and restores it. Do not rely on revocation being permanent; restrict who can use ForgeCentral instead (<a class="xref" href="#cfg-who"></a>).</p></div>
 
-<h2 id="usr-find">Find users</h2>
+<h2 id="usr-find" data-covers="users.list users.detail">Find users</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -70,7 +70,7 @@
 </ol>
 </div>
 
-<h2 id="usr-add">Add a user</h2>
+<h2 id="usr-add" data-covers="users.create">Add a user</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -91,24 +91,26 @@
 <div class="tablewrap" id="tab-usr-errors" data-title="Add and edit messages">
 <table class="data">
 <tr><th style="width:46%">Message</th><th>Meaning</th></tr>
-<tr><td>A principal with that username already exists.</td><td>Choose another user name.</td></tr>
+<tr><td>A principal with that username already exists.</td><td>On <b class="ui">Add</b>: choose another user name.</td></tr>
+<tr><td>The change conflicts: the record no longer exists, or an identity provider owns that field.</td><td>On <b class="ui">Edit</b>: reload the list; if the user is still there, its email address or organization comes from an identity provider and cannot be changed here.</td></tr>
 <tr><td>The form is incomplete or malformed.</td><td>A required field is empty or a value is invalid.</td></tr>
 <tr><td>The engine refused the command.</td><td>The Forge engine declined the change.</td></tr>
-<tr><td>The command could not reach the engine.</td><td>A connection problem; reload and check before retrying (<a class="xref" href="#nav-confirm"></a>).</td></tr>
+<tr><td>Your session has expired. Sign in again; nothing was committed.</td><td>Sign in again and repeat the change.</td></tr>
+<tr><td>The command could not reach the engine.</td><td>ForgeCentral could not reach the Forge engine, or your browser could not reach ForgeCentral. Reload and check before retrying (<a class="xref" href="#nav-confirm"></a>).</td></tr>
 </table>
 </div>
 
-<h2 id="usr-edit">Edit a user</h2>
+<h2 id="usr-edit" data-covers="users.edit">Edit a user</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
   <li>On a local user's row, choose <b class="ui">Edit</b>.</li>
-  <li>Change the type, email address or organization. The user name is read-only.</li>
+  <li>Change the type, email address or organization. The user name is read-only. When identity resolution is on, a record bound to an identity-provider account keeps the provider's email address and organization; changing them is refused.</li>
   <li>Choose <b class="ui">Save</b>.</li>
 </ol>
 </div>
 
-<h2 id="usr-status">Suspend, activate or revoke a user</h2>
+<h2 id="usr-status" data-covers="users.setStatus">Suspend, activate or revoke a user</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -118,7 +120,7 @@
 </ol>
 </div>
 
-<h2 id="usr-groups">Create a group</h2>
+<h2 id="usr-groups" data-covers="groups.list groups.detail groups.create">Create a group</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -127,7 +129,7 @@
   <li>Choose <b class="ui">Create</b>. <span class="result">The group's card appears. A duplicate name is refused with A group with that name already exists.</span></li>
 </ol>
 </div>
-<p>On a group's card, choose its member count to list its members on the All Users tab.</p>
+<p>On a group's card, choosing its member count searches the All Users tab for the group's name. The search is by text, so it can also list users whose name, email or other groups contain that text.</p>
 
 <h2 id="usr-verify">Verify</h2>
 <ul>
