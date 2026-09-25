@@ -7,7 +7,9 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25):** GD.12b ON BRANCH `feat/console-11-gd12b-field-help`, awaiting review: the
+- **State (2026-09-25):** GD.12b MERGED `3e0aa13` (operator: "Approve and continue"). NEXT = GD.13
+  (disabled-state explanations).
+- **Earlier (2026-09-25):** GD.12b ON BRANCH `feat/console-11-gd12b-field-help`: the
   VTZ editor (name rule checked as typed via `vtzNameProblem`, description counted in UTF-8 bytes,
   session duration bounded), the policy form (name and description byte limits, the port range as
   `POLICY_PORT_MIN`/`POLICY_PORT_MAX`), the risk-acceptance date (the engine's 365-day bound, which
@@ -171,7 +173,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.10 | 11.6 | MERGED `5b5da46` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-01, -12 refreshed, -00 Sections 5 and 12, SUITE; chapters 3 and 16 re-verified; Isolate result fixed (CD-64); coverage overview/entity |
 | GD.11 | 11.2 (2) | MERGED `86835eb` (2026-09-25; full gate green, e2e 42/42) | | Help control -> Drawer at the section for the destination and Settings tab; every destination mapped; INV-GUIDE-CONTEXTUAL contract test |
 | GD.12a | 11.2 (3) | MERGED `709efc0` (2026-09-25; full gate green, e2e 42/42) | | InfoTip + FieldHint; Settings forms show and enforce the engine limits from named constants; guide `data-const` markers rendered live; INV-GUIDE-ONE-SOURCE contract test |
-| GD.12b | 11.2 (3) | ON BRANCH `feat/console-11-gd12b-field-help` | | the same for VTZ, Objects, Policies, Users/groups, IdAM, SOC case controls, Logs |
+| GD.12b | 11.2 (3) | MERGED `3e0aa13` (2026-09-25; full gate green, e2e 42/42) | | the same for VTZ, Objects, Policies, Users/groups, IdAM, SOC case controls, Logs |
 | GD.13 | INV-GUIDE-DISABLED-EXPLAINED | PLANNED | | state-aware explanations |
 | GD.N | 11.6 | PLANNED | | capstone: global coverage, Playwright journeys, live drive |
 | GD.E1 | -- | DEFERRED (ruling 2026-09-25) | | crdb: setting tier on the wire |
