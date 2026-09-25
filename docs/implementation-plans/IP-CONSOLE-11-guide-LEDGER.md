@@ -7,7 +7,9 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, GD.5 in progress):** GD.5 ON BRANCH `docs/console-11-gd5-objects`: `TRD-CONSOLE-10`
+- **State (2026-09-25):** GD.5 MERGED `7b7676f` (operator: "Approve and continue"). NEXT = GD.6 (TRD-CONSOLE-05
+  refresh; the Policies and distribution chapters re-verified).
+- **Earlier (2026-09-25):** GD.5 ON BRANCH `docs/console-11-gd5-objects`: `TRD-CONSOLE-10`
   refreshed (Kernel is not operator-authored; four kinds have no members; complete bounded catalog; delete
   is live; a new Section 8 keeps 20 unbuilt requirements); chapter 10 re-verified (41 claims confirmed;
   corrected: kind:name case, message meanings, members for four kinds and the 500 cap, drawer tags); the
@@ -89,7 +91,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.2 | 11.2 (1), 11.5 | MERGED `08b6496` (2026-09-25; full gate green, e2e 41/41) | `844fb63` | the ReadMe tab: generated typed tree of the GD.S1 chapters (build-time sanitized), contents, filter, reload-safe deep links, live Settings reference |
 | GD.3 | 11.6 | MERGED `9e95522` (2026-09-25; full gate green, e2e 41/41) | | Settings chapters re-verified (12 corrections, CD-47); live values delivered by GD.2; Settings-scoped coverage gate |
 | GD.4 | 11.6 | MERGED `72306ab` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-02 refreshed (Section 8 known gaps); chapter 9 re-verified; coverage gate `vtz.*` |
-| GD.5 | 11.6 | ON BRANCH | | TRD-CONSOLE-10 refreshed (Section 8); chapter 10 re-verified; objects failure copy fixed; coverage `objects.*` |
+| GD.5 | 11.6 | MERGED `7b7676f` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-10 refreshed (Section 8); chapter 10 re-verified; objects failure copy fixed; coverage `objects.*` |
 | GD.6 | 11.6 | PLANNED | | TRD-CONSOLE-05 refresh; chapters re-verified |
 | GD.7 | 11.6 | PLANNED | | TRD-CONSOLE-04 refresh; chapters re-verified |
 | GD.8 | 11.6 | PLANNED | | TRD-CONSOLE-03 refresh + the IP-CONSOLE-03 ledger; chapter re-verified |
