@@ -92,12 +92,23 @@ function originLabel(row: PrincipalRow): string {
   return row.origin === 'local' ? 'Local' : 'Observed';
 }
 
-/** The typed failure line a command form renders (409 duplicate vs 400 malformed vs a denial). */
-function commandFailure(error: Error | null): string | null {
+/**
+ * The typed failure line a user form renders. A 409 means a duplicate name on Add, but on Edit the engine
+ * maps "not found" and "a field an identity provider owns" to the same conflict, so the line says that.
+ */
+export function commandFailure(error: Error | null, mode: 'add' | 'edit' = 'add'): string | null {
   if (error === null) return null;
   if (error instanceof GroupCreateError) {
-    if (error.status === 409) return 'A principal with that username already exists.';
+    if (error.status === 409)
+      return mode === 'add'
+        ? 'A principal with that username already exists.'
+        : 'The change conflicts: the record no longer exists, or an identity provider owns that field.';
     if (error.status === 400) return 'The form is incomplete or malformed.';
+    if (error.status === 401)
+      return 'Your session has expired. Sign in again; nothing was committed.';
+    // 502 / 503: the gateway could not reach the engine -- a connection failure, not a refusal.
+    if (error.status === 502 || error.status === 503)
+      return 'The command could not reach the engine.';
     return 'The engine refused the command.';
   }
   return 'The command could not reach the engine.';
@@ -135,7 +146,7 @@ function UserForm({
     };
     active.mutate(draft, { onSuccess: onDone });
   };
-  const failure = commandFailure(active.error);
+  const failure = commandFailure(active.error, editing === null ? 'add' : 'edit');
 
   return (
     <form
@@ -422,7 +433,7 @@ function AllUsers({ initialSearch }: { readonly initialSearch: string }): ReactE
         {...(confirming?.status === 'revoked'
           ? {
               description:
-                'Revocation closes access; the record stays in history and is never deleted.',
+                'Revocation marks the user revoked; the record stays in history and is never deleted. Endpoints do not enforce a user status in this release.',
               tone: 'critical' as const,
             }
           : {})}
@@ -502,7 +513,9 @@ function GroupsTab({
         ? 'A group with that name already exists.'
         : create.error.status === 400
           ? 'The group name is required.'
-          : 'The engine refused the command.'
+          : create.error.status === 502 || create.error.status === 503
+            ? 'The command could not reach the engine.'
+            : 'The engine refused the command.'
       : create.isError
         ? 'The command could not reach the engine.'
         : null;
