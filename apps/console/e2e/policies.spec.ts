@@ -271,6 +271,12 @@ test('Create authors a policy through the audited route and it appears as the en
   const form = page.getByRole('form', { name: 'Create a policy' });
   await expect(form).toBeVisible();
 
+  // A disabled primary action must not look available: it drops the brand fill (GD.N, seen live).
+  const publish = form.getByRole('button', { name: 'Save & Publish' });
+  await expect(publish).toBeDisabled();
+  await expect(publish).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(publish).toHaveAccessibleDescription(/^Needs /);
+
   await form.getByLabel('Policy Name').fill('contain-egress');
   await form.getByLabel('Zone').selectOption('YouSource.Corp');
   // Subjects + Targets are real objects from the catalog; the policy authors the cross-product ruleset.
