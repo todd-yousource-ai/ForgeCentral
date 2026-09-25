@@ -7,7 +7,13 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, ~06:55 UTC):** GD.1 ON BRANCH `feat/console-11-gd1-binding-coverage` (code
+- **State (2026-09-25, ~07:10 UTC):** GD.1 MERGED `375b6c7` on the operator's approval ("Merge and
+  continue"), with the dispatch guard kept as presented (the one runtime change the plan row had ruled
+  out: an undeclared `/api` request is refused JSON 404, a declared path under another method 405). NEXT =
+  GD.E0 (crdb: the registry's labels and defaults made true), then GD.2. At GD.E0's review the operator
+  confirms its expected effect (the two session lifetimes and the cognition connection limit become
+  read-only in ForgeCentral) or asks for them to be made truly live.
+- **Earlier (2026-09-25, ~06:55 UTC):** GD.1 ON BRANCH `feat/console-11-gd1-binding-coverage` (code
   `1fb08f4`), full gate green (e2e 40/40), pushed; AWAITING REVIEW. The manifest holds 89 bindings (17
   added); `apps/bff/src/routes.ts` declares the 67 `/api` routes; the route-coverage contract test maps
   them both ways. Beyond the plan row, for the operator's review: (1) one runtime change although the
@@ -38,7 +44,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 |------|-----------|--------|--------|-------|
 | GD.0 | TRD 9-11 | MERGED `3c2e3d6` (2026-09-25; full gate green) | `08a47f2` | the plan, the census, the TRD revision |
 | GD.S1 | 11.3; INV-GUIDE-FORGE-NAMING | MERGED `7439ded` (2026-09-25; full gate green, e2e 40/40) | `651d9f3` | the standalone guide: `docs/guide/` + `scripts/build-guide.mjs` -> HTML + PDF (85 pages) |
-| GD.1 | 9.4; INV-BINDING-ROUTE-COVERAGE | ON BRANCH (2026-09-25; full gate green, e2e 40/40) | `1fb08f4` | 17 bindings registered (89); 67 routes declared in `routes.ts`, undeclared `/api` refused; route-coverage contract test; audit gaps named (CD-01, CD-15) |
+| GD.1 | 9.4; INV-BINDING-ROUTE-COVERAGE | MERGED `375b6c7` (2026-09-25; full gate green, e2e 40/40) | `1fb08f4` | 17 bindings registered (89); 67 routes declared in `routes.ts`, undeclared `/api` refused; route-coverage contract test; audit gaps named (CD-01, CD-15) |
 | GD.E0 | CD-18 (crdb) | PLANNED (decision N3) | | crdb: the registry's live-apply labels and defaults made true, before GD.2 |
 | GD.2 | 11.2 (1), 11.5 | PLANNED | | post the guide into ForgeCentral: the ReadMe tab renders the GD.S1 source |
 | GD.3 | 11.6 | PLANNED (needs N2, N3) | | Settings chapters in the ReadMe with live values |
