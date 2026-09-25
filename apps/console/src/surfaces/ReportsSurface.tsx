@@ -158,8 +158,8 @@ function WeeklyPanel(): ReactElement {
       ) : null}
       {weekly.isSuccess && weekly.data === null ? (
         <EmptyState
-          title="No weekly volume for this tenant"
-          hint="The engine refused the read: nothing is shown in its place."
+          title="The weekly volume could not be derived"
+          hint="The engine could not read its detection records for this tenant; nothing is shown in their place."
         />
       ) : null}
       {weekly.isSuccess && weekly.data !== null ? <WeeklyTable weekly={weekly.data} /> : null}

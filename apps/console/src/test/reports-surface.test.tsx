@@ -172,7 +172,7 @@ describe('the Reports tab (S3.16)', () => {
   it('shows the weekly refusal as an honest empty state, never zeros', async () => {
     mockReads([ROW], REPORT, null);
     renderWithProviders(<ReportsSurface />, { route: '/reports' });
-    await screen.findByText('No weekly volume for this tenant');
+    await screen.findByText('The weekly volume could not be derived');
     expect(screen.queryByTestId('reports-weekly')).not.toBeInTheDocument();
   });
 

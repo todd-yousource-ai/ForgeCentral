@@ -18,7 +18,7 @@ import type { DecisionStatus, LogQueryFilter, LogRow } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { useDrawer } from '../shell/DrawerHost.js';
-import { downloadExport, useExportLogs } from './useExportLogs.js';
+import { downloadExport, exportFailure, useExportLogs } from './useExportLogs.js';
 import { fetchLogExplain, logExplainQueryKey, useLogExplain, useLogs } from './useLogs.js';
 
 /** The default page size (matches the BFF default; the engine clamps to its per-tenant ceiling). */
@@ -216,7 +216,7 @@ export function LogsSurface(): ReactElement {
       ) : null}
       {exportLogs.isError ? (
         <p className="fcx-log-export-result" role="alert">
-          The export was refused or unavailable. Nothing was recorded.
+          {exportFailure(exportLogs.error)}
         </p>
       ) : null}
 
