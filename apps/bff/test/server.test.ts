@@ -13,6 +13,7 @@ import type { WireVtzTreeNode } from '@forge/contracts';
 import type { CrucibleClient } from '../src/engine/client.js';
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import { EngineRefusedError } from '../src/engine/wire-client.js';
+import { SETTINGS_PATHS } from '../src/openapi.js';
 import { createServer, type ServerDeps, type ServerLogger } from '../src/server.js';
 
 const config: BffConfig = {
@@ -437,6 +438,31 @@ describe('BFF HTTP surface', () => {
     const doc = (await res.json()) as { openapi: string; paths: Record<string, unknown> };
     expect(doc.openapi).toBe('3.1.0');
     expect(Object.keys(doc.paths)).toContain('/readyz');
+  });
+
+  it('documents every Settings route the server answers, and each documented one is served', async () => {
+    // IP-CONSOLE-11 ST.N: the OpenAPI document and the router never drift. Each documented Settings
+    // operation must be CLAIMED by the server (401 without a session, never the 404 / 405 of an
+    // unrouted path), and the document lists exactly the routes the surface uses.
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(undefined),
+        operatorEngine: operatorEngineWith(),
+      },
+    );
+    const doc = (await (await fetch(`${base}/openapi.json`)).json()) as {
+      paths: Record<string, Record<string, unknown>>;
+    };
+    const documented = Object.keys(doc.paths).filter((p) => p.startsWith('/api/settings'));
+    expect(documented.sort()).toEqual(Object.keys(SETTINGS_PATHS).sort());
+    for (const path of documented) {
+      for (const method of Object.keys(doc.paths[path] ?? {})) {
+        const concrete = path.replace('{proposal}', '3');
+        const res = await fetch(`${base}${concrete}`, { method: method.toUpperCase() });
+        expect({ path, method, status: res.status }).toEqual({ path, method, status: 401 });
+      }
+    }
   });
 
   it('an unknown path is 404', async () => {
