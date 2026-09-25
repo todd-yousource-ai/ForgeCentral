@@ -7,7 +7,9 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, GD.4 in progress):** GD.4 ON BRANCH `docs/console-11-gd4-vtz`: `TRD-CONSOLE-02` refreshed
+- **State (2026-09-25):** GD.4 MERGED `72306ab` (operator: "Continue"). NEXT = GD.5 (TRD-CONSOLE-10 refresh;
+  the Objects chapter re-verified).
+- **Earlier (2026-09-25):** GD.4 ON BRANCH `docs/console-11-gd4-vtz`: `TRD-CONSOLE-02` refreshed
   to the built surface (posture is two-valued per domain and not authored here; zone settings, the four
   commands, the card grid, refusal classes) with a new Section 8 recording 15 unbuilt requirements with their
   census ids; chapter 9 re-verified (about 60 claims confirmed; corrected: the move/rename limitation can
@@ -80,7 +82,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.E0b | R4 | MERGED `93a9984` (2026-09-25; full gate green, e2e 40/40) | `8e1917b` | the standalone guide states the corrected labels: Appendix A without red corrections, 16 editable settings, the chapter 2 note |
 | GD.2 | 11.2 (1), 11.5 | MERGED `08b6496` (2026-09-25; full gate green, e2e 41/41) | `844fb63` | the ReadMe tab: generated typed tree of the GD.S1 chapters (build-time sanitized), contents, filter, reload-safe deep links, live Settings reference |
 | GD.3 | 11.6 | MERGED `9e95522` (2026-09-25; full gate green, e2e 41/41) | | Settings chapters re-verified (12 corrections, CD-47); live values delivered by GD.2; Settings-scoped coverage gate |
-| GD.4 | 11.6 | ON BRANCH | | TRD-CONSOLE-02 refreshed (Section 8 known gaps); chapter 9 re-verified; coverage gate `vtz.*` |
+| GD.4 | 11.6 | MERGED `72306ab` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-02 refreshed (Section 8 known gaps); chapter 9 re-verified; coverage gate `vtz.*` |
 | GD.5 | 11.6 | PLANNED | | TRD-CONSOLE-10 refresh; chapter re-verified |
 | GD.6 | 11.6 | PLANNED | | TRD-CONSOLE-05 refresh; chapters re-verified |
 | GD.7 | 11.6 | PLANNED | | TRD-CONSOLE-04 refresh; chapters re-verified |
