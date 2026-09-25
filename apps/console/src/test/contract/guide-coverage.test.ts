@@ -11,8 +11,8 @@ import { describe, expect, it } from 'vitest';
 
 import { GUIDE } from '../../guide/generated/guide-content.js';
 
-/** The binding prefixes whose chapters have been verified (GD.3 Settings; GD.4 Virtual Trust Zones). */
-const SCOPE = ['settings.', 'soc.settings.', 'vtz.'];
+/** The binding prefixes whose chapters have been verified (GD.3 Settings; GD.4 VTZ; GD.5 Objects). */
+const SCOPE = ['settings.', 'soc.settings.', 'vtz.', 'objects.'];
 
 const declared = new Map<string, string[]>();
 for (const chapter of GUIDE.chapters) {
