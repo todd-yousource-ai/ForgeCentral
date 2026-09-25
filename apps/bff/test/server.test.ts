@@ -518,7 +518,7 @@ describe('BFF HTTP surface', () => {
             seen.push(request);
             return Promise.resolve({ decisions: [] });
           },
-        } as Partial<OperatorEngine>),
+        }),
       },
     );
     expect((await fetch(`${base}/api/logs?limit=100&offset=200`)).status).toBe(200);
