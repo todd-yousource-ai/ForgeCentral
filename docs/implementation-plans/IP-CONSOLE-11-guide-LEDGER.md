@@ -9,7 +9,9 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 - **State (2026-09-25):** PLAN COMPLETE. GD.N MERGED `0bbc902` (operator: "Approve"); every PR row is merged;
   GD.E1-E3 and GD.D1 stay DEFERRED by ruling. Open outside the plan: CD-65 (engine-connection cascade)
-  and the other open census rows. Post-merge: Console reinstalled from main and the live walk re-run.
+  and the other open census rows. Post-merge: Console reinstalled from main `6f46ce5` at 20:39 UTC
+  (validate ALL PASSED); live walk re-run 20:41 UTC, 11/11 PASS (adds the settings reference: 62 rows
+  with live engine values, and the disabled primary without its fill; no console errors after sign-in).
 - **Earlier (2026-09-25):** GD.N ON BRANCH `feat/console-11-gdn-capstone`. Coverage is
   global (all 89 manifest bindings have a declaring section; the per-surface scope list is gone);
   three Playwright journeys added (the filter narrows to a hit that opens its section and says so on no
