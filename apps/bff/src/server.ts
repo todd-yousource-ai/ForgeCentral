@@ -38,6 +38,7 @@ import type {
 
 import type { AuthRouter } from './auth/router.js';
 import { rbacConfigView } from './auth/rbac.js';
+import { lookupSessionGroup } from './engine/session-client.js';
 import type { BffConfig } from './config.js';
 import type { CrucibleClient } from './engine/client.js';
 import { resolveEntityDetail } from './engine/entity-detail.js';
@@ -2167,6 +2168,55 @@ async function handleSettingsReports(
   return true;
 }
 
+/**
+ * `GET /api/settings/security-session` (IP-CONSOLE-11 ST.5b): the key exchange THIS request's admin
+ * TLS session negotiated, looked up at the crypto sidecar by the request's own loopback source port.
+ * The browser supplies nothing; the answer is the sidecar's record of the tunnel. Not cached.
+ */
+async function handleSecuritySession(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/settings/security-session' || method !== 'GET') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (deps.config.sessionPort === undefined) {
+    sendJson(res, 200, { status: 'unconfigured' });
+    return true;
+  }
+  const remotePort = req.socket.remotePort;
+  if (remotePort === undefined) {
+    sendJson(res, 200, { status: 'not-tunnelled' });
+    return true;
+  }
+  try {
+    const group = await lookupSessionGroup(
+      deps.config.engineHost,
+      deps.config.sessionPort,
+      remotePort,
+      deps.config.requestTimeoutMs,
+    );
+    sendJson(
+      res,
+      200,
+      group === null ? { status: 'not-tunnelled' } : { status: 'negotiated', group },
+    );
+  } catch (err) {
+    deps.log.warn(
+      { err: err instanceof Error ? err.name : 'unknown' },
+      'admin session lookup failed',
+    );
+    sendJson(res, 503, { error: 'unavailable' });
+  }
+  return true;
+}
+
 async function handleSocSettings(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -2467,6 +2517,9 @@ async function route(
     return;
   }
   if (await handleSettingsReports(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleSecuritySession(deps, req, method, path, res)) {
     return;
   }
   if (await handleSocSettings(deps, req, method, path, res)) {

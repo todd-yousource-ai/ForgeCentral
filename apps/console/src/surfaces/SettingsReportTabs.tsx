@@ -9,6 +9,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { Badge, DataTable, GlassPanel } from '@forge/design';
 import {
+  sessionGroupLabel,
   settingApplyClass,
   type SettingRow,
   type SettingsReportName,
@@ -16,7 +17,7 @@ import {
 } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
-import { useGovernedSettings, useSettingsReports } from './useSettings.js';
+import { useGovernedSettings, useSecuritySession, useSettingsReports } from './useSettings.js';
 
 interface Fact {
   readonly label: string;
@@ -91,7 +92,59 @@ function WithReports({
   return children(reports.data);
 }
 
-/** The Security tab (ST.5): connectivity + security reports, egress destinations. */
+/**
+ * This operator's own admin session (ST.5b): the key exchange the crypto sidecar recorded for the TLS
+ * tunnel this request arrived on. The browser asserts nothing; the BFF asks the sidecar by the
+ * request's loopback source port.
+ */
+function SessionKx(): ReactElement {
+  const session = useSecuritySession();
+  if (session.isPending) {
+    return <LoadingState label="Reading this session's key exchange" />;
+  }
+  if (session.isError) {
+    return (
+      <ErrorState
+        title="This session's key exchange could not be read"
+        onRetry={() => void session.refetch()}
+      />
+    );
+  }
+  const kx = session.data;
+  if (kx.status === 'unconfigured') {
+    return (
+      <Pending
+        what="The key exchange negotiated for this browser session is not shown on this install."
+        owner="the Console sidecar's session lookup is not provisioned (re-run the Console installer)"
+      />
+    );
+  }
+  if (kx.status === 'not-tunnelled') {
+    return (
+      <p className="fcx-settings__hint">
+        This request did not arrive through the admin TLS terminator, so there is no admin-plane
+        session to describe.
+      </p>
+    );
+  }
+  return (
+    <Facts
+      caption="This browser session (the Console sidecar's admin TLS terminator)"
+      facts={[
+        {
+          label: 'Key exchange negotiated',
+          value: (
+            <Badge variant={kx.group === 'X25519MLKEM768' ? 'good' : 'caution'}>
+              {sessionGroupLabel(kx.group)}
+            </Badge>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+/** The Security tab (ST.5): connectivity + security reports, egress destinations, this session. */
 export function SecurityTab(): ReactElement {
   return (
     <GlassPanel ariaLabel="Security" header={<span>Security</span>}>
@@ -148,10 +201,7 @@ export function SecurityTab(): ReactElement {
             <p className="fcx-settings__hint">
               Egress destinations and the key-issuing section are edited on the Configuration tab.
             </p>
-            <Pending
-              what="The key exchange negotiated for this browser session (hybrid or the P-384 floor) is not shown yet."
-              owner="the Console sidecar must forward the negotiated group to the BFF (IP-CONSOLE-11 ST.5b)"
-            />
+            <SessionKx />
           </>
         )}
       </WithReports>

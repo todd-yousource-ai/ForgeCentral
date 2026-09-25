@@ -48,6 +48,18 @@ curl -fsS -m 15 "http://127.0.0.1:${BFF_HTTP_PORT}/" 2>/dev/null | grep -qi "<!d
   || fail "the BFF root does not serve the SPA (FC_SPA_DIST missing or empty) -- the operator would get {\"error\":\"not_found\"}"
 ok "SPA served at the root"
 
+echo "==> [2c] admin-session lookup answers on loopback (the Security tab's session key exchange)"
+SESSION_PORT="${CONSOLE_SESSION_PORT:-8792}"
+answer=""
+for _ in 1 2 3 4 5; do
+  # Port 1 never carries a live admin tunnel, so a healthy lookup answers {"group":null}.
+  answer=$(timeout 5 bash -c "exec 3<>/dev/tcp/127.0.0.1/${SESSION_PORT}; printf '{\"port\":1}\\n' >&3; head -n1 <&3" 2>/dev/null || true)
+  [ "$answer" = '{"group":null}' ] && break
+  sleep 2
+done
+[ "$answer" = '{"group":null}' ] || fail "the sidecar session lookup on 127.0.0.1:${SESSION_PORT} did not answer (got: ${answer:-<none>})"
+ok "admin-session lookup answers"
+
 echo "==> [3/4] admin floor: classical P-384 handshake on ${NODE_IP}:${ADMIN_PORT}"
 if printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' \
     | openssl s_client -connect "${NODE_IP}:${ADMIN_PORT}" -groups secp384r1 -tls1_3 -quiet 2>/dev/null \

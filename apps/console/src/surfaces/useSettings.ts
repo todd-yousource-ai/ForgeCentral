@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-query';
 import { toConsoleRbacView } from '@forge/contracts';
 import type {
+  AdminSessionKx,
   ConsoleRbacView,
   SettingsCommitRequest,
   SettingsReportName,
@@ -179,6 +180,23 @@ export function useSettingsReports(
   return useQuery({
     queryKey: ['settings', 'reports', names.join(',')],
     queryFn: () => fetchSettingsReports(names),
+    staleTime: 0,
+  });
+}
+
+/** The key exchange this operator's admin session negotiated (ST.5b, `GET /api/settings/security-session`). */
+export async function fetchSecuritySession(): Promise<AdminSessionKx> {
+  const res = await fetch('/api/settings/security-session', { credentials: 'include' });
+  if (!res.ok) {
+    throw new Error(`security session failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as AdminSessionKx;
+}
+
+export function useSecuritySession(): UseQueryResult<AdminSessionKx> {
+  return useQuery({
+    queryKey: ['settings', 'security-session'],
+    queryFn: fetchSecuritySession,
     staleTime: 0,
   });
 }
