@@ -7,7 +7,9 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, GD.11 in progress):** GD.11 ON BRANCH `feat/console-11-gd11-side-panel`: a Help control in the
+- **State (2026-09-25):** GD.11 MERGED `86835eb` (operator: "Approve and continue"). NEXT = GD.12 (inline
+  micro-copy and info tips; the Console's limits exported as named constants).
+- **Earlier (2026-09-25):** GD.11 ON BRANCH `feat/console-11-gd11-side-panel`: a Help control in the
   top bar opens the shared Drawer at the guide section for the active destination (on Settings, the active
   tab), with links to the full chapter and the section in the ReadMe; closing returns focus to the control.
   Every destination and every Settings tab is mapped (not only Settings); a contract test proves each map
@@ -153,7 +155,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.8 | 11.6 | MERGED `73999e6` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-03 refreshed; IP-CONSOLE-03 ledger corrected; chapter 13 re-verified; SOC copy fixed (CD-60); coverage `soc.*` |
 | GD.9 | 11.6 | MERGED `6cc2980` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-09 and -08 refreshed; chapters 14-15 re-verified; Logs offset (CD-13) and export copy fixed; coverage `logs.*` |
 | GD.10 | 11.6 | MERGED `5b5da46` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-01, -12 refreshed, -00 Sections 5 and 12, SUITE; chapters 3 and 16 re-verified; Isolate result fixed (CD-64); coverage overview/entity |
-| GD.11 | 11.2 (2) | ON BRANCH | | Help control -> Drawer at the section for the destination and Settings tab; every destination mapped; INV-GUIDE-CONTEXTUAL contract test |
+| GD.11 | 11.2 (2) | MERGED `86835eb` (2026-09-25; full gate green, e2e 42/42) | | Help control -> Drawer at the section for the destination and Settings tab; every destination mapped; INV-GUIDE-CONTEXTUAL contract test |
 | GD.12 | 11.2 (3) | PLANNED | | inline micro-copy and info tips |
 | GD.13 | INV-GUIDE-DISABLED-EXPLAINED | PLANNED | | state-aware explanations |
 | GD.N | 11.6 | PLANNED | | capstone: global coverage, Playwright journeys, live drive |
