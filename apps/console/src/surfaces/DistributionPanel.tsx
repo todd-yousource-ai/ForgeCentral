@@ -69,7 +69,7 @@ export function DistributionPanel({
       {convergence.data?.hasBundle === false && (
         <EmptyState
           title="No policy distributed yet"
-          hint="Distributing to endpoints for the first time needs endpoint selection, which is not built yet. Once a bundle exists, it can be re-distributed here."
+          hint="ForgeCentral cannot distribute a zone for the first time yet: it has no way to choose the endpoints. A zone that already has a bundle can be re-distributed here."
         />
       )}
 
@@ -107,7 +107,7 @@ export function DistributionPanel({
           <ConfirmDialog
             open={confirming}
             title={`Distribute to ${String(scope.length)} endpoint${scope.length === 1 ? '' : 's'}?`}
-            description={`The zone's effective published policies are composed, signed in the crypto sidecar, and committed for these endpoints to fetch: ${scope.join(', ')}. Enforcement stays off until separately engaged.`}
+            description={`The zone's effective published policies are composed, signed in the crypto sidecar, and committed for these endpoints to fetch: ${scope.join(', ')}. Endpoints do not enforce policy rules in this release.`}
             confirmLabel="Distribute"
             onConfirm={() => {
               setConfirming(false);

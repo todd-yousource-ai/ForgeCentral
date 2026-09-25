@@ -1,21 +1,21 @@
 <h1>Policies</h1>
 
-<p class="lead">A policy says who may do what inside one Virtual Trust Zone: its subjects and targets are objects, and one action applies to every pairing. Policies are versioned. A published version is never changed; editing mints a new draft, and publishing makes it the zone's policy. Distributing policies to endpoints is covered in <a class="xref" href="#ch-policy-distribution"></a>.</p>
+<p class="lead">A policy says who may do what inside one Virtual Trust Zone: its subjects and targets are objects, and one action applies to every pairing. Policies are versioned. A published version is never changed: editing a published policy mints a new draft (editing a draft replaces it), and publishing makes that version the policy's newest published version. Distributing policies to endpoints is covered in <a class="xref" href="#ch-policy-distribution"></a>.</p>
 
-<h2 id="pol-availability">Availability</h2>
+<h2 id="pol-availability" data-covers="policies.detail policies.enforcement">Availability</h2>
 <div class="tablewrap" id="tab-pol-availability" data-title="Policies: availability">
 <table class="data">
 <tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
 <tr><td>Author, publish and delete policies</td><td><span class="pill ok">AVAILABLE</span></td><td>Grouped by zone, with search and a zone filter.</td></tr>
-<tr><td>Protocols, ports, schedule, geography, tags, Applied To, maximum classification</td><td><span class="pill ok">AVAILABLE</span></td><td>Stored with the policy and carried into distributed bundles. See Restrictions for what an endpoint does with them.</td></tr>
+<tr><td>Protocols, ports, schedule, geography, tags, Applied To, maximum classification</td><td><span class="pill ok">AVAILABLE</span></td><td>Stored with the policy. A distributed bundle carries each rule's protocols and ports; schedule, geography, tags, Applied To and maximum classification stay on the policy. See Restrictions for what an endpoint does.</td></tr>
 <tr><td>Active window (from, until)</td><td><span class="pill ro">READ-ONLY</span></td><td>Shown as <b class="ui">expires</b>; not authored from ForgeCentral.</td></tr>
 <tr><td>Move a policy to another zone</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Refused; see the Limitation.</td></tr>
-<tr><td>Version history view</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>The list shows each policy's current version.</td></tr>
+<tr><td>Version history view</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>The list shows each policy's newest version, which can be a draft; while a draft is pending, the published version in force is not shown.</td></tr>
 <tr><td>Enforcement of a policy on endpoints</td><td><span class="pill off">RECORDED ONLY</span></td><td>Enforcement is off (<a class="xref" href="#cfg-endpoints"></a>).</td></tr>
 </table>
 </div>
 
-<h2 id="pol-concepts">What a policy says</h2>
+<h2 id="pol-concepts" data-covers="policies.byZone">What a policy says</h2>
 
 <figure id="fig-pol-anatomy" data-title="The parts of a policy" class="wide">
 <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
@@ -58,7 +58,7 @@
 
 <ul>
   <li><b>Zone.</b> A policy belongs to exactly one zone. The Policies list groups policies by zone.</li>
-  <li><b>Subjects and targets.</b> Both are objects (<a class="xref" href="#ch-objects"></a>). Every subject paired with every target becomes one rule. When you save, each rule keeps its own copy of the objects' selectors.</li>
+  <li><b>Subjects and targets.</b> Both are objects (<a class="xref" href="#ch-objects"></a>). The engine accepts only some kinds in each role: User, Group and Agent objects cannot be targets, and URI, Network, Registry Key and Data Store objects cannot be subjects. The form lists every object in both, so a wrong pick is refused when you save. Every subject paired with every target becomes one rule. When you save, each rule keeps its own copy of the objects' selectors.</li>
   <li><b>Action.</b> One of <b class="ui">Permit</b>, <b class="ui">Monitor</b>, <b class="ui">Quarantine</b> or <b class="ui">Deny</b>, in increasing order of restriction, applied to every rule.</li>
   <li><b>Network match.</b> Protocols (<b class="ui">TCP</b>, <b class="ui">UDP</b>, <b class="ui">HTTPS</b>, <b class="ui">SSH</b>) and ports; empty means any.</li>
   <li><b>Restrictions.</b> Days of the week and hours, a geography allowlist, and tags for reporting.</li>
@@ -94,17 +94,18 @@
 <h2 id="pol-restrictions">Restrictions</h2>
 <ul>
   <li>You need at least one zone and one object before you can author a policy.</li>
-  <li>A policy name is unique within its zone, at most 128 characters, and cannot be changed later. A description is at most 1,024 characters.</li>
+  <li>A policy name is unique within its zone, at most 128 bytes, and cannot be changed later. A description is at most 1,024 bytes (text outside ASCII uses more than one byte per character).</li>
+  <li>Ports must not repeat or overlap (<code>80, 80</code> and <code>80, 70-90</code> are refused), and an hour window needs both From and To, with From before To on the same day.</li>
   <li>Ports are single ports from 1 to 65535 or ranges such as <code>8080-8090</code>, separated by commas.</li>
   <li>Maximum classification can never widen from one published version to the next.</li>
   <li>Every subject-target pairing is a separate rule, and a request has a size limit: a policy with many pairings can be refused. Split it into several policies.</li>
 </ul>
-<div class="note limit"><p>Enforcement is off, and an endpoint that receives a distributed policy acts only on whether ordinary internet access is allowed. Rules, protocols, ports, schedules and geography are carried but not yet applied on the host (<a class="xref" href="#dist-restrictions"></a>).</p></div>
+<div class="note limit"><p>Enforcement is off, and an endpoint that receives a distributed policy acts only on whether ordinary internet access is allowed. Rules, protocols and ports are carried but not yet applied on the host, and schedules and geography are not carried at all (<a class="xref" href="#dist-restrictions"></a>).</p></div>
 <div class="note limit"><p>A policy cannot move to another zone: changing <b class="ui">Zone</b> on an existing policy is refused with <b class="ui">A policy with that name already exists in the zone, or the version conflicts.</b> Create the policy in the new zone, then delete the old one. The same message appears when an edit raises <b class="ui">Max Classification</b> above the published version.</p></div>
 <div class="note limit"><p>Editing rebuilds the rules from the current object catalog: a rule whose object no longer exists, or whose selector changed, is dropped without warning, and a policy whose rules had different actions takes the first rule's action. Check <b class="ui">Subjects</b>, <b class="ui">Targets</b> and <b class="ui">Action</b> before you save. Editing also clears the policy's active window.</p></div>
 <div class="note limit"><p><b class="ui">Save &amp; Publish</b> saves a draft, then publishes it. If publishing fails, the draft exists but the list does not refresh: reload, then publish the draft with <b class="ui">Edit</b> and <b class="ui">Save &amp; Publish</b> rather than creating it again. A failed <b class="ui">Delete</b> shows no message.</p></div>
 
-<h2 id="pol-create">Create a policy</h2>
+<h2 id="pol-create" data-covers="policies.create policies.publish">Create a policy</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -120,19 +121,19 @@
 </div>
 <p>Both save buttons stay disabled until the policy has a name, a zone, at least one subject, at least one target, and valid ports.</p>
 
-<h2 id="pol-edit">Edit and publish a new version</h2>
+<h2 id="pol-edit" data-covers="policies.edit policies.publish">Edit and publish a new version</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
-  <li>Expand the policy's zone and choose <b class="ui">Edit</b> on its row.</li>
+  <li>Expand the policy's zone (the list names zones by id) and choose <b class="ui">Edit</b> on its row.</li>
   <li>Change the fields you need. Keep the <b class="ui">Zone</b> as it is.</li>
-  <li>Choose <b class="ui">Save as Draft</b> to keep the published version in force while you review, or <b class="ui">Save &amp; Publish</b> to make the new version the zone's policy.</li>
-  <li>If ForgeCentral reports <b class="ui">Published as a breaking change</b>, the new version takes away access the previous one granted. Check that this is intended.</li>
+  <li>Choose <b class="ui">Save as Draft</b> to keep the published version in force while you review, or <b class="ui">Save &amp; Publish</b> to publish the new version.</li>
+  <li>If ForgeCentral reports <b class="ui">Published as a breaking change</b>, the new version may take away access the previous one granted, and it gets a new major version number. The check is cautious: adding a Quarantine or Deny pairing, or narrowing the maximum classification, is also flagged. Check that the change is intended.</li>
   <li>Distribute the zone again so endpoints receive the new version (<a class="xref" href="#ch-policy-distribution"></a>).</li>
 </ol>
 </div>
 
-<h2 id="pol-delete">Delete a policy</h2>
+<h2 id="pol-delete" data-covers="policies.delete">Delete a policy</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -145,16 +146,17 @@
 <div class="tablewrap" id="tab-pol-messages" data-title="Policy messages">
 <table class="data">
 <tr><th style="width:48%">Message</th><th>Meaning</th></tr>
-<tr><td>A policy with that name already exists in the zone, or the version conflicts.</td><td>The name is taken in this zone; or the edit changed the zone or widened the maximum classification (see the Limitations).</td></tr>
-<tr><td>The policy is incomplete or a field does not fit the engine contract.</td><td>A required field is missing or a value is not accepted.</td></tr>
-<tr><td>The port list must be ports or <code>start-end</code> ranges within 1-65535.</td><td>Correct the Ports field.</td></tr>
-<tr><td>The engine refused the command (not authorized).</td><td>The Forge engine declined the change for your identity or tenant.</td></tr>
-<tr><td>The command could not reach the engine.</td><td>A connection problem; reload and check before retrying.</td></tr>
+<tr><td>A policy with that name already exists in the zone, or the version conflicts.</td><td>The name is taken in this zone; the edit changed the zone or widened the maximum classification (see the Limitations); or the policy or version was deleted or published meanwhile. Reload and check.</td></tr>
+<tr><td>The policy is incomplete or a field does not fit the engine contract.</td><td>A required field is missing or a value is not accepted, for example a subject or target of a kind that role does not take, overlapping ports, or an incomplete hour window.</td></tr>
+<tr><td>The port list must be ports or start-end ranges within 1-65535.</td><td>Correct the Ports field.</td></tr>
+<tr><td>The engine refused the command (not authorized).</td><td>The Forge engine declined the change, usually for your identity or tenant; an engine fault shows the same message.</td></tr>
+<tr><td>Your session has expired. Sign in again; nothing was committed.</td><td>Sign in again and repeat the change.</td></tr>
+<tr><td>The command could not reach the engine.</td><td>ForgeCentral could not reach the Forge engine, or your browser could not reach ForgeCentral. Reload and check before retrying: a change can have landed before the connection failed.</td></tr>
 </table>
 </div>
 
-<h2 id="pol-verify">Verify</h2>
+<h2 id="pol-verify" data-covers="policies.byZone">Verify</h2>
 <ul>
   <li>The policy's row shows its version and whether it is a draft or published; the <b class="ui">Restrictions</b> column summarizes its schedule (<b class="ui">scheduled</b>), geography (<b class="ui">geo(n)</b>), tags and any end date (<b class="ui">expires</b>).</li>
-  <li><b class="ui">Search policies...</b> matches names, scopes, protocols, ports and tags.</li>
+  <li><b class="ui">Search policies...</b> matches names, scopes, protocols, ports and tags. For a policy with more than one rule the scope reads <code>N sources -&gt; M targets</code>, so its object names are not searchable.</li>
 </ul>

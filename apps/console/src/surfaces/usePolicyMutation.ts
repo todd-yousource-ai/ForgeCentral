@@ -10,7 +10,7 @@
 // back on the publish ack (surfaced, never guessed client-side).
 
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
-import type { PolicyDraft, PolicyMutation } from '@forge/contracts';
+import type { PolicyDeleted, PolicyDraft, PolicyMutation } from '@forge/contracts';
 
 /** A policy command refusal, typed for the form (409 conflict vs 400 malformed vs a denial). */
 export class PolicyCommandError extends Error {
@@ -20,7 +20,7 @@ export class PolicyCommandError extends Error {
   }
 }
 
-async function post(url: string, body: unknown): Promise<PolicyMutation> {
+async function post<T = PolicyMutation>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
     credentials: 'include',
@@ -30,7 +30,7 @@ async function post(url: string, body: unknown): Promise<PolicyMutation> {
   if (!res.ok) {
     throw new PolicyCommandError(res.status);
   }
-  return (await res.json()) as PolicyMutation;
+  return (await res.json()) as T;
 }
 
 /** What the form asks the hook to do: author (create/edit) and optionally publish the minted version. */
@@ -73,13 +73,13 @@ export function useSavePolicy(): UseMutationResult<PolicyMutation, Error, SavePo
 
 /** Delete a policy (tombstoned engine-side; the list refetches without it). */
 export function useDeletePolicy(): UseMutationResult<
-  PolicyMutation,
+  PolicyDeleted,
   Error,
   { vtz: string; id: string }
 > {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input) => post('/api/policies/delete', input),
+    mutationFn: (input) => post<PolicyDeleted>('/api/policies/delete', input),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['policies'] }),
   });
 }

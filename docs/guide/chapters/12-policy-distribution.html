@@ -14,7 +14,7 @@
 </table>
 </div>
 
-<h2 id="dist-how">How distribution works</h2>
+<h2 id="dist-how" data-covers="policies.distribute">How distribution works</h2>
 
 <figure id="fig-dist-loop" data-title="The distribution loop, and where it stops in this release" class="wide">
 <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
@@ -61,15 +61,15 @@
 </figure>
 
 <ol>
-  <li><b>Compose and sign.</b> ForgeCentral gathers the zone's <em>published</em> policies into one bundle, stamps it with a 24-hour freshness lease, and signs it with the node's policy-signing key. Draft policies are never distributed.</li>
+  <li><b>Compose and sign.</b> ForgeCentral gathers the zone's <em>published</em> policies into one bundle, stamps it with a 24-hour freshness lease (a ForgeCentral setting), and signs it with ForgeCentral's policy-signing key, which its crypto service creates and holds; endpoints hold only the public half. Draft policies are never distributed.</li>
   <li><b>Commit.</b> The Forge engine stores the bundle for the zone, addressed to the endpoints in its scope, and records who distributed it.</li>
-  <li><b>Fetch, verify, apply.</b> Each endpoint's agent asks the engine for its newest bundle every five minutes. It checks the signature against the anchor key installed on the endpoint, that the lease has not expired, and that the endpoint is in the bundle's scope; then it applies the bundle and reports the outcome.</li>
+  <li><b>Fetch, verify, apply.</b> Each endpoint's agent asks the engine for its newest bundle every five minutes by default (the endpoint's own setting). It checks the signature against the anchor key installed on the endpoint, that the lease has not expired, and that the endpoint is in the bundle's scope; then it applies the bundle and reports the outcome.</li>
   <li><b>Report.</b> The <b class="ui">Policy distribution</b> panel shows each endpoint's outcome.</li>
 </ol>
 
 <h3 id="dist-bundle">What a bundle carries</h3>
 <ul>
-  <li>The rules of every published policy in the zone, with their protocols, ports, schedules, geography and tags.</li>
+  <li>The rules of the newest published version of each policy in the zone whose active window has not passed: each rule's source, destination, action, protocols, ports and logging. Schedules, geography and tags stay on the policy and are not in the bundle.</li>
   <li>Whether ordinary internet access is allowed, taken from the zone's effective posture for ordinary network traffic. A zone authored in ForgeCentral denies it unless an ancestor zone permits it.</li>
   <li>The endpoints in scope, and the 24-hour lease.</li>
 </ul>
@@ -79,32 +79,33 @@
 <div class="note limit"><p><b>B. Status not visible.</b> In this release the panel cannot find a zone's bundle, so it shows <b class="ui">No policy distributed yet</b> even after a bundle was committed, and <b class="ui">Commit &amp; re-distribute</b>, which appears only when a bundle is found, is not offered.</p></div>
 <div class="note limit"><p><b>C. Endpoints refuse the bundle.</b> In this release an endpoint rejects every bundle ForgeCentral produces as expired; its status would read <b class="ui">Rejected: StaleLease</b>.</p></div>
 <div class="note limit"><p><b>D. Endpoints not set up.</b> An endpoint fetches policy only when its agent has been given the node's anchor key and its own endpoint name. The endpoint installer does not do this; your YouSource.ai representative sets it up per endpoint. An endpoint that is not set up never reports, and shows <b class="ui">No confirmation</b>.</p></div>
-<div class="note caution"><p>When distribution becomes usable, applying a bundle whose zone does not allow ordinary internet access blocks new outbound connections from the whole endpoint, not only from governed agents. Test on a non-production endpoint first, and author the ordinary-network posture deliberately.</p></div>
+<div class="note caution"><p>When distribution becomes usable, applying a bundle whose zone does not allow ordinary internet access blocks new outbound connections from the whole endpoint, not only from governed agents. Test on a non-production endpoint first. ForgeCentral cannot author a zone's posture, so a zone created here denies ordinary internet access unless an ancestor zone permits it.</p></div>
 <ul>
-  <li>A bundle's rules (objects, actions, protocols, ports), schedules and geography are carried and signed but not yet applied on the host. Enforcement is off.</li>
+  <li>A bundle's rules (objects, actions, protocols, ports) are carried and signed but not yet applied on the host; schedules and geography are not carried at all. Enforcement is off.</li>
   <li>An endpoint keeps the policy it applied only in memory: after its agent restarts, it fetches and applies the newest bundle again.</li>
-  <li>An endpoint named in the bundles of two zones applies only the one with the higher version; the other zone shows it as <b class="ui">No confirmation</b>.</li>
-  <li>Deleting a policy or a zone does not withdraw a bundle already distributed. Re-distribute the zone after deleting its policies.</li>
+  <li>An endpoint named in the bundles of two zones applies only the one with the higher version. <b class="ui">Applied</b> means the endpoint applied that version at some point, not that it is in force now: a zone whose bundle the endpoint later replaced with another zone's still reads <b class="ui">Applied</b>.</li>
+  <li>An endpoint refuses a bundle that is looser, on any axis, than one it already applied (<code>VtzCannotRealize</code>) until its agent restarts.</li>
+  <li>Deleting a policy or a zone does not withdraw a bundle already distributed. Re-distribute the zone after deleting a policy; after deleting a zone's last policy the zone leaves the list, its distribution panel with it, and the old bundle stays served.</li>
 </ul>
 
-<h2 id="dist-panel">Read the distribution panel</h2>
+<h2 id="dist-panel" data-covers="policies.convergence">Read the distribution panel</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
   <li>Choose <b class="ui">Policies</b> and expand a zone. The <b class="ui">Policy distribution</b> panel is under the zone's policy table. A zone with no policies has no panel.</li>
-  <li>Read the panel: <b class="ui">Bundle v</b> and the version when a bundle exists, then one row per endpoint with its outcome (<a class="xref" href="#tab-dist-states"></a>).</li>
+  <li>Read the panel: <b class="ui">Bundle v</b> and the version when a bundle exists (the engine's store version when the bundle was composed, not a per-zone count), then one row per endpoint with its outcome (<a class="xref" href="#tab-dist-states"></a>).</li>
 </ol>
 </div>
 <div class="tablewrap" id="tab-dist-states" data-title="Endpoint outcomes">
 <table class="data">
 <tr><th style="width:26%">Outcome</th><th>Meaning</th></tr>
 <tr><td><b class="ui">Applied</b></td><td>The endpoint verified and applied the bundle.</td></tr>
-<tr><td><b class="ui">Rejected:</b> reason</td><td>The endpoint refused it: <code>SignatureInvalid</code> (the signature does not verify against the endpoint's anchor key), <code>StaleLease</code> (the lease has expired), <code>ScopeMismatch</code> (the endpoint is not in the bundle's scope), <code>DowngradeRejected</code> (it already applied a newer version), <code>VtzCannotRealize</code> (the host cannot realize the zone).</td></tr>
+<tr><td><b class="ui">Rejected:</b> reason</td><td>The endpoint refused it: <code>SignatureInvalid</code> (the signature does not verify against the endpoint's anchor key), <code>StaleLease</code> (the lease has expired), <code>ScopeMismatch</code> (the endpoint is not in the bundle's scope), <code>DowngradeRejected</code> (it already applied a newer version), <code>VtzCannotRealize</code> (the host cannot realize the zone, or the bundle is looser than one it already applied). Other reason names the engine or endpoint reports, for example <code>UnknownRuleKind</code> or <code>AppendFailed</code>, are shown as they are.</td></tr>
 <tr><td><b class="ui">No confirmation</b></td><td>The endpoint has not reported. It may not be set up for policy, may be offline, or may not have fetched yet. Never read this as delivered.</td></tr>
 </table>
 </div>
 
-<h2 id="dist-redistribute">Re-distribute a zone</h2>
+<h2 id="dist-redistribute" data-covers="policies.distribute policies.convergence">Re-distribute a zone</h2>
 <p>When the panel finds a zone's bundle (see Restriction B), it offers <b class="ui">Commit &amp; re-distribute to N endpoint(s)</b>. The new bundle goes to the same endpoints as the current one, and carries the zone's published policies as they are now.</p>
 <div class="procedure">
 <div class="ptitle">Procedure</div>

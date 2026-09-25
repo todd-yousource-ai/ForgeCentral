@@ -74,7 +74,8 @@ function engineWith(parts: {
       lifecycle: 'published',
       breaking: true,
     }),
-    policyDelete: record('delete', { id: 'p-1', version: '1.0.0', lifecycle: 'published' }),
+    // What the engine really acks for a delete: the id, and no version or lifecycle.
+    policyDelete: record('delete', { id: 'p-1', version: '', lifecycle: '' }),
     querySubmit: unused,
   } as unknown as OperatorEngine;
 }
@@ -203,7 +204,9 @@ describe('the P5.4 command resolvers convert the draft + project the ack', () =>
 
   it('delete names vtz+id and returns the ack', async () => {
     const sent: Array<{ op: string; req: Record<string, unknown> }> = [];
-    await resolveDeletePolicy(engineWith({ sent }), PRINCIPAL, 'corp.prod', 'p-1');
+    const receipt = await resolveDeletePolicy(engineWith({ sent }), PRINCIPAL, 'corp.prod', 'p-1');
     expect(sent[0]?.req).toMatchObject({ vtz: 'corp.prod', id: 'p-1' });
+    // The engine's delete ack has no version or lifecycle; it is a delete receipt, not a refusal.
+    expect(receipt).toEqual({ id: 'p-1', deleted: true });
   });
 });
