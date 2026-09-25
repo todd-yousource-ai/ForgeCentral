@@ -7,7 +7,10 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, GD.6 in progress):** GD.6 ON BRANCH `docs/console-11-gd6-policies`: `TRD-CONSOLE-05`
+- **State (2026-09-25):** GD.6 MERGED `19db9a4` (operator: "Approve and continue"). NEXT = GD.7 (TRD-CONSOLE-04
+  refresh; the identity-provider and users chapters re-verified). The policy Delete fix (CD-52) needs a
+  Console install on the box to be live.
+- **Earlier (2026-09-25):** GD.6 ON BRANCH `docs/console-11-gd6-policies`: `TRD-CONSOLE-05`
   refreshed (inline form, LIVE bindings, Applied To stored but unused, active window engine-only, unmet
   acceptance lines marked with their census ids, known gaps added to Section 8); chapters 11 and 12
   re-verified (bundle contents, role rules, byte limits, messages, breaking semantics, Applied meaning,
@@ -99,7 +102,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.3 | 11.6 | MERGED `9e95522` (2026-09-25; full gate green, e2e 41/41) | | Settings chapters re-verified (12 corrections, CD-47); live values delivered by GD.2; Settings-scoped coverage gate |
 | GD.4 | 11.6 | MERGED `72306ab` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-02 refreshed (Section 8 known gaps); chapter 9 re-verified; coverage gate `vtz.*` |
 | GD.5 | 11.6 | MERGED `7b7676f` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-10 refreshed (Section 8); chapter 10 re-verified; objects failure copy fixed; coverage `objects.*` |
-| GD.6 | 11.6 | ON BRANCH | | TRD-CONSOLE-05 refreshed; chapters 11-12 re-verified; policy Delete fixed (CD-52); coverage `policies.*` |
+| GD.6 | 11.6 | MERGED `19db9a4` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-05 refreshed; chapters 11-12 re-verified; policy Delete fixed (CD-52); coverage `policies.*` |
 | GD.7 | 11.6 | PLANNED | | TRD-CONSOLE-04 refresh; chapters re-verified |
 | GD.8 | 11.6 | PLANNED | | TRD-CONSOLE-03 refresh + the IP-CONSOLE-03 ledger; chapter re-verified |
 | GD.9 | 11.6 | PLANNED | | TRD-CONSOLE-09, -08 refresh; chapters re-verified |
