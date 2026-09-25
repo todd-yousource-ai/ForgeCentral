@@ -26,6 +26,14 @@ export interface OperatorPrincipal {
   readonly principalId: string;
   /** The tenant the read is scoped to (resolved by the Console's RBAC). */
   readonly tenant: string;
+  /**
+   * The tier the engine runs this operator's SETTINGS operations at, asserted per request for the
+   * operator's own login session. Set for a `global-admin` only (operator ruling 2026-09-25: every
+   * global admin administers Settings; a stopgap until permissions map to real RBAC controls).
+   * Absent for every other role, so their Settings stay refused and nothing else changes: the engine
+   * reads it in the Settings operations and nowhere else.
+   */
+  readonly settingsTier?: ExplainTier;
 }
 
 /**
@@ -48,5 +56,6 @@ export function principalFromSession(
     tier: session.tier,
     principalId: session.principalId,
     tenant,
+    ...(session.role === 'global-admin' ? { settingsTier: session.tier } : {}),
   };
 }

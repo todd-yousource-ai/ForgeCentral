@@ -27,6 +27,7 @@ export interface ContainmentRequest {
 
 export interface OperatorDelegation {
   principal: string;
+  settings_tier?: string;
   tenant: string;
 }
 

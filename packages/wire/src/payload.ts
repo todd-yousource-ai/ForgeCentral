@@ -105,7 +105,13 @@ function applyOperator(
   operator: OperatorDelegation | null | undefined,
 ): void {
   if (operator != null) {
-    out['operator'] = { principal: operator.principal, tenant: operator.tenant };
+    const delegation: Record<string, unknown> = {
+      principal: operator.principal,
+      tenant: operator.tenant,
+    };
+    // Honored by the engine's Settings operations only (crdb settings_tier, 2026-09-25).
+    if (operator.settings_tier != null) delegation['settings_tier'] = operator.settings_tier;
+    out['operator'] = delegation;
   }
 }
 
