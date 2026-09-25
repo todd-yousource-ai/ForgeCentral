@@ -314,7 +314,7 @@ describe('the FORGE VERDICT panel (S3.6)', () => {
     renderWithProviders(<SocVerdictPanel incidentId="ep-soc-1" detail={DETAIL} kpis={KPIS} />);
 
     const empty = await screen.findByTestId('soc-response-empty');
-    expect(empty).toHaveTextContent(/nothing proposes one yet/i);
+    expect(empty).toHaveTextContent(/proposes a plan when the incident reaches its response tier/i);
     expect(screen.getByRole('button', { name: 'Approve full response' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Modify plan' })).toBeDisabled();
   });

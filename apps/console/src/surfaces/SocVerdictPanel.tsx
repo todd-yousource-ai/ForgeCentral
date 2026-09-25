@@ -371,7 +371,7 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
               : run.data === undefined
                 ? 'Runs the narrative and impact pipelines on the on-box model. Minutes, not seconds.'
                 : run.data.state === 'started' || run.data.state === 'running'
-                  ? 'The run is in flight. These panels re-read as the records land.'
+                  ? 'The run is in flight. Reopen the incident to read its records once they land.'
                   : run.data.state === 'recorded'
                     ? 'Every record for this evidence already exists; nothing was re-generated.'
                     : `The engine refused the run${run.data.detail === null ? '.' : `: ${run.data.detail}`}`}
@@ -391,8 +391,8 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
       <h5 className="fcx-socv__sub">Coordinated response</h5>
       {detail.plan.length === 0 ? (
         <p className="fcx-socv__state-detail" data-testid="soc-response-empty">
-          No response plan has been proposed. The engine records and audits plans, and both operator
-          commands exist, but nothing proposes one yet -- so there is nothing here to approve.
+          No response plan has been proposed. The engine proposes a plan when the incident reaches
+          its response tier; until then there is nothing here to approve.
         </p>
       ) : (
         <ol className="fcx-socv__plan">

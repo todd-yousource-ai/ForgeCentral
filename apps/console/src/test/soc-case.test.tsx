@@ -215,7 +215,9 @@ describe('the case controls (S3.12): the disposition', () => {
     });
     fireEvent.click(screen.getByTestId('soc-disposition'));
     expect(spy).not.toHaveBeenCalled();
-    expect(screen.getByRole('alertdialog')).toHaveTextContent(/DOWN-WEIGHTS the rule/);
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      /DOWN-WEIGHTS every incident in this tenant with the same ATT&CK technique/,
+    );
 
     confirm();
     await waitFor(() => {
