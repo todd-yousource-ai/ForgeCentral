@@ -65,7 +65,8 @@ const AUTH0_CONNECTOR = {
   providerTenant: 'dev-6rcwumbp1tsae8me.us.auth0.com',
   state: 'healthy',
   enabled: true,
-  running: false,
+  // What the engine reports for a live connector: `running` is the sync loop being alive (CD-56).
+  running: true,
   lastSyncAt: 1_700_000_000_000,
   lastSyncOutcome: 'complete',
   objectsSynced: 20,

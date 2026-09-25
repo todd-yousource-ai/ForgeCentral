@@ -25,8 +25,6 @@ function connectorStateBadge(state: IdamConnectorState): { label: string; varian
   switch (state) {
     case 'healthy':
       return { label: 'Connected', variant: 'good' };
-    case 'syncing':
-      return { label: 'Syncing', variant: 'neutral' };
     case 'never-synced':
       return { label: 'Never synced', variant: 'neutral' };
     case 'disabled':
@@ -258,8 +256,9 @@ export function IdamConnectorsPanel(): ReactElement {
         <div className="fcx-users-groups-grid" role="list" aria-label="Identity connectors">
           {(connectors.data ?? []).map((c) => {
             const badge = connectorStateBadge(c.state);
-            const syncingThis =
-              c.running || (sync.isPending && sync.variables?.provider === c.connectorId);
+            // Only this Console's own request is known to be in flight: the engine's `running` means
+            // the sync loop is alive, not that a sync is running (CD-56).
+            const syncingThis = sync.isPending && sync.variables?.provider === c.connectorId;
             return (
               <article key={c.connectorId} role="listitem" className="fcx-users-group-card">
                 <div className="fcx-users-group-card__head">
@@ -320,7 +319,7 @@ export function IdamConnectorsPanel(): ReactElement {
       <ConfirmDialog
         open={confirming !== null}
         title={confirming !== null ? `Run a federation sync for ${confirming}?` : ''}
-        description="This runs a real audited directory sync against the provider."
+        description="This queues a full directory sync against the provider; it starts on the connector's next poll. The engine writes no audit record for it."
         confirmLabel="Sync"
         onConfirm={() => {
           if (confirming !== null) {
