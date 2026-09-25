@@ -94,9 +94,9 @@
 <h2 id="pol-restrictions">Restrictions</h2>
 <ul>
   <li>You need at least one zone and one object before you can author a policy.</li>
-  <li>A policy name is unique within its zone, at most 128 bytes, and cannot be changed later. A description is at most 1,024 bytes (text outside ASCII uses more than one byte per character).</li>
+  <li>A policy name is unique within its zone, at most <span class="const" data-const="POLICY_NAME_MAX_BYTES">128</span> bytes, and cannot be changed later. A description is at most <span class="const" data-const="POLICY_DESCRIPTION_MAX_BYTES" data-format="grouped">1,024</span> bytes (text outside ASCII uses more than one byte per character).</li>
   <li>Ports must not repeat or overlap (<code>80, 80</code> and <code>80, 70-90</code> are refused), and an hour window needs both From and To, with From before To on the same day.</li>
-  <li>Ports are single ports from 1 to 65535 or ranges such as <code>8080-8090</code>, separated by commas.</li>
+  <li>Ports are single ports from <span class="const" data-const="POLICY_PORT_MIN">1</span> to <span class="const" data-const="POLICY_PORT_MAX">65535</span> or ranges such as <code>8080-8090</code>, separated by commas.</li>
   <li>Maximum classification can never widen from one published version to the next.</li>
   <li>Every subject-target pairing is a separate rule, and a request has a size limit: a policy with many pairings can be refused. Split it into several policies.</li>
 </ul>
@@ -119,7 +119,7 @@
   <li>Choose <b class="ui">Save as Draft</b>, or <b class="ui">Save &amp; Publish</b> and confirm <b class="ui">Publish this policy?</b> with <b class="ui">Publish</b>.</li>
 </ol>
 </div>
-<p>Both save buttons stay disabled until the policy has a name, a zone, at least one subject, at least one target, and valid ports.</p>
+<p>Both save buttons stay disabled until the policy has a name, a zone, at least one subject, at least one target, and valid ports, and the name and description are within their limits. The limits and the byte counts are shown under the fields.</p>
 
 <h2 id="pol-edit" data-covers="policies.edit policies.publish">Edit and publish a new version</h2>
 <div class="procedure">
@@ -148,7 +148,7 @@
 <tr><th style="width:48%">Message</th><th>Meaning</th></tr>
 <tr><td>A policy with that name already exists in the zone, or the version conflicts.</td><td>The name is taken in this zone; the edit changed the zone or widened the maximum classification (see the Limitations); or the policy or version was deleted or published meanwhile. Reload and check.</td></tr>
 <tr><td>The policy is incomplete or a field does not fit the engine contract.</td><td>A required field is missing or a value is not accepted, for example a subject or target of a kind that role does not take, overlapping ports, or an incomplete hour window.</td></tr>
-<tr><td>The port list must be ports or start-end ranges within 1-65535.</td><td>Correct the Ports field.</td></tr>
+<tr><td>The port list must be ports or start-end ranges within <span class="const" data-const="POLICY_PORT_MIN">1</span>-<span class="const" data-const="POLICY_PORT_MAX">65535</span>.</td><td>Correct the Ports field.</td></tr>
 <tr><td>The engine refused the command (not authorized).</td><td>The Forge engine declined the change, usually for your identity or tenant; an engine fault shows the same message.</td></tr>
 <tr><td>Your session has expired. Sign in again; nothing was committed.</td><td>Sign in again and repeat the change.</td></tr>
 <tr><td>The command could not reach the engine.</td><td>ForgeCentral could not reach the Forge engine, or your browser could not reach ForgeCentral. Reload and check before retrying: a change can have landed before the connection failed.</td></tr>

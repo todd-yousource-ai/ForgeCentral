@@ -30,7 +30,7 @@
   <li>Choose a row's <b class="ui">Decision</b> to open <b class="ui">Why this decision fired</b>: the finding, rule, ATT&amp;CK technique and tactics, scope and evidence. Choose <b class="ui">View</b> beside the acting entity to open it in the entity drawer. Choosing elsewhere on a row opens the acting entity's drawer directly, or the rationale when the decision has no acting entity.</li>
 </ol>
 </div>
-<div class="note limit"><p>The log shows up to 100 rows for the current filter, newest first (fewer when the engine trims a large page). Every time range ends now, so a shorter range does not reach older rows: to find older ones, narrow the <b class="ui">Search</b>, <b class="ui">Confidence</b> or <b class="ui">Outcome</b>. The live refresh is a poll every two seconds, not a stream.</p></div>
+<div class="note limit"><p>The log shows up to <span class="const" data-const="LOG_PAGE_LIMIT">100</span> rows for the current filter, newest first (fewer when the engine trims a large page). Every time range ends now, so a shorter range does not reach older rows: to find older ones, narrow the <b class="ui">Search</b>, <b class="ui">Confidence</b> or <b class="ui">Outcome</b>. The live refresh is a poll every two seconds, not a stream.</p></div>
 
 <h2 id="log-export" data-covers="logs.export">Export decisions</h2>
 <p>An export is an audited engine operation: the Forge engine records a receipt on its audit chain and returns the rows, which your browser saves as <code>decision-log-</code><i>receipt</i><code>.json</code>.</p>
@@ -41,7 +41,7 @@
   <li>Choose <b class="ui">Export</b>. There is no confirmation step. <span class="result">The page reads Exported N decision(s); audit receipt ... recorded at version V, and the file downloads. Each export is a new request with its own receipt.</span></li>
 </ol>
 </div>
-<div class="note limit"><p>An export contains at most the 100 decisions the current filter shows, not every decision that matches. Narrowing the time range does not reach older rows (every range ends now); narrow the search, confidence or outcome instead. On an installed node the export reads decisions as well as episodes, so it can contain rows the table did not show.</p></div>
+<div class="note limit"><p>An export contains at most the <span class="const" data-const="LOG_PAGE_LIMIT">100</span> decisions the current filter shows, not every decision that matches. Narrowing the time range does not reach older rows (every range ends now); narrow the search, confidence or outcome instead. On an installed node the export reads decisions as well as episodes, so it can contain rows the table did not show.</p></div>
 <div class="tablewrap" id="tab-log-export-errors" data-title="Export failure messages">
 <table class="data">
 <tr><th style="width:50%">Message</th><th>Meaning</th></tr>
