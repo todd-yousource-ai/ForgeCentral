@@ -239,7 +239,7 @@ export function PoliciesSurface(): ReactElement {
       <ConfirmDialog
         open={confirming !== null}
         title={confirming !== null ? `Delete ${confirming.name}?` : ''}
-        description="Deleting a policy tombstones every version (history is preserved) and removes it from future distribution. Enforcement is unaffected until separately engaged."
+        description="Deleting a policy tombstones every version (history is preserved) and removes it from future distribution. Endpoints do not enforce policy rules in this release."
         tone="critical"
         confirmLabel="Delete"
         onConfirm={() => {

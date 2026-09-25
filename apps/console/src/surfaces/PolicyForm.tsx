@@ -67,7 +67,7 @@ function toEndpoint(card: ObjectCard): RuleEndpoint {
 }
 
 /** The typed failure line for the command. */
-function commandFailure(error: Error | null): string | null {
+export function commandFailure(error: Error | null): string | null {
   if (error === null) return null;
   if (error instanceof PolicyCommandError) {
     if (error.status === 409)
@@ -75,6 +75,11 @@ function commandFailure(error: Error | null): string | null {
     if (error.status === 400)
       return 'The policy is incomplete or a field does not fit the engine contract.';
     if (error.status === 403) return 'The engine refused the command (not authorized).';
+    if (error.status === 401)
+      return 'Your session has expired. Sign in again; nothing was committed.';
+    // 502 / 503: the gateway could not reach the engine -- a connection failure, not a refusal.
+    if (error.status === 502 || error.status === 503)
+      return 'The command could not reach the engine.';
     return 'The engine refused the command.';
   }
   return 'The command could not reach the engine.';
@@ -416,7 +421,7 @@ export function PolicyForm({
 
       {!portsOk ? (
         <p role="alert" className="fcx-form-error">
-          The port list must be ports or `start-end` ranges within 1-65535.
+          The port list must be ports or start-end ranges within 1-65535.
         </p>
       ) : null}
       {failure !== null ? (
@@ -456,7 +461,7 @@ export function PolicyForm({
       <ConfirmDialog
         open={confirmPublish}
         title="Publish this policy?"
-        description="Publishing authors the version and makes it available to distribute to its Applied-To endpoints. A breaking change (revoking prior access) is flagged after it commits. Enforcement stays off until separately engaged."
+        description="Publishing authors the version and includes it in the next distribution of its zone (to the endpoints that zone's bundle already names; Applied To is not used for distribution yet). A breaking change (revoking prior access) is flagged after it commits. Endpoints do not enforce policy rules in this release."
         confirmLabel="Publish"
         onConfirm={() => {
           setConfirmPublish(false);
