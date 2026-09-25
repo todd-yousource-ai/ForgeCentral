@@ -25,6 +25,8 @@ export interface GuideSection {
   readonly id: string;
   readonly title: string;
   readonly subsections: readonly GuideSubsection[];
+  /** The console bindings (no-stub manifest ids) this section documents (INV-GUIDE-COVERS-EVERY-CONFIG). */
+  readonly covers: readonly string[];
   readonly nodes: readonly GuideNode[];
   readonly text: string;
 }

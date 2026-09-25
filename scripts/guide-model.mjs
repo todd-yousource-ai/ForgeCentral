@@ -41,13 +41,14 @@ export function loadChapters(guideDir) {
     const isAppendix = /^9\d-appendix-/.test(file);
     const num = isAppendix ? String.fromCharCode(65 + appendixNo++) : String(++chapterNo);
     const body = html.replace(h1[0], '');
-    const sections = [...body.matchAll(/<h([23]) id="([a-z0-9-]+)">([\s\S]*?)<\/h\1>/g)].map(
-      (m) => ({
-        level: Number(m[1]),
-        id: m[2],
-        text: stripTags(m[3]),
-      }),
-    );
+    const sections = [
+      ...body.matchAll(/<h([23]) id="([a-z0-9-]+)"(?: data-covers="([^"]*)")?>([\s\S]*?)<\/h\1>/g),
+    ].map((m) => ({
+      level: Number(m[1]),
+      id: m[2],
+      covers: m[3] === undefined ? [] : m[3].split(' '),
+      text: stripTags(m[4]),
+    }));
     return {
       file,
       id: `ch-${file.slice(3, -5)}`,
@@ -74,6 +75,15 @@ export function lint(chapters, frontFiles) {
         problems.push(`${ch.file}: internal name in prose: "${line.trim().slice(0, 100)}"`);
       if (PROVENANCE.test(line))
         problems.push(`${ch.file}: internal provenance in prose: "${line.trim().slice(0, 100)}"`);
+    }
+  }
+  // A section may declare the console bindings it documents (INV-GUIDE-COVERS-EVERY-CONFIG).
+  for (const ch of chapters) {
+    for (const m of ch.body.matchAll(/data-covers="([^"]*)"/g)) {
+      if (!/^[a-z][A-Za-z.]*[A-Za-z]( [a-z][A-Za-z.]*[A-Za-z])*$/.test(m[1]))
+        problems.push(
+          `${ch.file}: data-covers must list binding ids separated by one space: "${m[1]}"`,
+        );
     }
   }
   for (const [name, text] of frontFiles) {
