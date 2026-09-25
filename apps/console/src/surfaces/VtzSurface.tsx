@@ -16,12 +16,12 @@
 // way the Overview's hover-to-filter is a view over the already-real graph. The count of matches is always
 // stated against the true total so a narrowed grid is never mistaken for the whole store.
 //
-// AUTHORING (V2.5). The Configure tab is the editor: settings, the per-domain posture matrix with the
-// engine-flagged floor rows locked, and a live effective-posture preview composed against the PARENT
-// zone's real effective postures (a second `vtz.detail` read, so the preview is exact rather than
-// guessed). Save / Re-scope / Delete are three separate confirm-gated audited acts, because the engine
-// models them as three separate verbs. Every commit invalidates the tree, so the grid re-reads the system
-// of record instead of trusting the form.
+// AUTHORING. The Configure tab is the editor for a zone's settings (name and parent, description, type,
+// telemetry, micro-segmentation, session duration, lifecycle); a VTZ is the policy edge, so no posture is
+// authored here (the posture matrix and its preview were removed 2026-07-19; TRD-CONSOLE-02 Section 8).
+// Save commits the settings and, when the name or parent changed, then the move; Delete is its own
+// confirm-gated audited act. Every commit invalidates the tree, so the grid re-reads the system of record
+// instead of trusting the form.
 
 import { useMemo, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -58,7 +58,9 @@ const RISK_BADGE: Readonly<Record<RiskLevel, { label: string; variant: BadgeVari
 const MEMBERS_UNAVAILABLE = 'Zone membership is not stored by the engine yet.';
 
 /** Why the policy count is absent. */
-const POLICIES_UNAVAILABLE = 'Policies are not stored by the engine yet.';
+// The policy store is live (POLICY_LIST_BY_ZONE); the per-zone count is not wired to it yet (vtz.policyCount).
+const POLICIES_UNAVAILABLE =
+  "Not counted here yet: this zone's policies are listed on the Policies surface.";
 
 /**
  * A zone is HIGH-SENSITIVITY when its effective posture denies a domain BEYOND the read-only catastrophic
