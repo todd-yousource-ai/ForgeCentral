@@ -23,6 +23,21 @@ chromium`), `pdfinfo` (poppler-utils) and the Roboto fonts (`fonts-roboto`). The
 with Chromium, reads the PDF's named destinations and fills every page number, re-printing until the
 numbers are stable. `FORGE_GUIDE_DIR=<dir>` renders a copy laid out like this folder (a review draft).
 
+## The ReadMe tab (the same chapters, in ForgeCentral)
+
+```bash
+node scripts/generate-guide-content.mjs          # after ANY chapter edit; commit the result
+node scripts/generate-guide-content.mjs --check  # what the gate's contract test runs
+```
+
+Both renderers run the chapters through one model (`scripts/guide-model.mjs`: lint, figure and table
+numbers, cross references, the known-limitations appendix). The generator parses each chapter and
+writes a typed element tree to `apps/console/src/guide/generated/guide-content.ts`; the console renders
+it as React elements (no HTML string reaches the browser). Only allowlisted tags and attributes, and
+only in-guide links, may appear: anything else fails the generation. Appendix A's tables become live
+markers the console fills from the engine's `SETTINGS_READ`. A chapter edit without regenerating fails
+the gate (`apps/console/src/test/contract/guide-content.test.ts`).
+
 ## Layout
 
 | Path | What it holds |

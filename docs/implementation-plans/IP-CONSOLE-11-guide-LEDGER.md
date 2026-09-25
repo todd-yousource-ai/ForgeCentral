@@ -7,7 +7,12 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, ~16:35 UTC):** GD.E0b MERGED `93a9984` on the operator's approval ("Merge and
+- **State (2026-09-25, GD.2 in progress):** GD.2 ON BRANCH `feat/console-11-gd2-readme`: the ReadMe tab
+  (build-time conversion, decided by the operator). Crucible CI was red on `main` (SET.5 assumed version 1
+  holds no configuration; on GitHub CI the configuration is the first commit): fixed `c5590958` (rollback
+  to version 0), pushed. FC GitHub CI needs the `CRUCIBLE_TOKEN` repository secret for the sidecar gate
+  (operator action; the Copilot branch that skips the gate is not merged).
+- **Earlier (2026-09-25, ~16:35 UTC):** GD.E0b MERGED `93a9984` on the operator's approval ("Merge and
   continue"). NEXT = GD.2 (the ReadMe tab renders the guide source inside ForgeCentral).
 - **Earlier (2026-09-25, ~16:30 UTC):** GD.E0 MERGED crucible `c31d9be4` and DEPLOYED 16:17 UTC on the
   operator's approval ("Merge and continue"), as presented: the two session lifetimes and the cognition
@@ -56,7 +61,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.1 | 9.4; INV-BINDING-ROUTE-COVERAGE | MERGED `375b6c7` (2026-09-25; full gate green, e2e 40/40) | `1fb08f4` | 17 bindings registered (89); 67 routes declared in `routes.ts`, undeclared `/api` refused; route-coverage contract test; audit gaps named (CD-01, CD-15) |
 | GD.E0 | CD-18 (crdb) | MERGED crucible `c31d9be4` (2026-09-25; full gate green); DEPLOYED 16:17 UTC | crucible `37331f30` | the registry's labels made true: sessions standard + cognition cap boot-bound, break-glass lifetime and the IdAM section pending, retention live, dual control names both planes, LUG default enabled; pinned by a drift test; the three rows are read-only in ForgeCentral |
 | GD.E0b | R4 | MERGED `93a9984` (2026-09-25; full gate green, e2e 40/40) | `8e1917b` | the standalone guide states the corrected labels: Appendix A without red corrections, 16 editable settings, the chapter 2 note |
-| GD.2 | 11.2 (1), 11.5 | PLANNED | | post the guide into ForgeCentral: the ReadMe tab renders the GD.S1 source |
+| GD.2 | 11.2 (1), 11.5 | ON BRANCH (full gate green, e2e 41/41) | `844fb63` | the ReadMe tab: generated typed tree of the GD.S1 chapters (build-time sanitized), contents, filter, reload-safe deep links, live Settings reference |
 | GD.3 | 11.6 | PLANNED (needs N2, N3) | | Settings chapters in the ReadMe with live values |
 | GD.4 | 11.6 | PLANNED | | TRD-CONSOLE-02 refresh; chapter re-verified |
 | GD.5 | 11.6 | PLANNED | | TRD-CONSOLE-10 refresh; chapter re-verified |
