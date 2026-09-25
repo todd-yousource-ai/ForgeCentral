@@ -1,6 +1,11 @@
 // packages/bindings/test/contract.test.ts -- F0.4 the no-stub contract (INV-CONSOLE-NO-STUB), tier 3.
 
-import { type BindingManifest, type ReadBinding, bindingId } from '@forge/contracts';
+import {
+  type BindingManifest,
+  type CommandBinding,
+  type ReadBinding,
+  bindingId,
+} from '@forge/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { assertReleaseReady, bindings, validateManifest } from '../src/index.js';
@@ -19,20 +24,52 @@ describe('INV-CONSOLE-NO-STUB: the committed binding registry', () => {
     expect(validateManifest(bindings)).toEqual([]);
   });
 
-  it('its only release blocker is the named PENDING deferrals (no structural fault, no mock op)', () => {
-    // The registry now carries real surfaces whose engine work is honestly deferred (INV-CROSS), so a
-    // release build is correctly gated. Prove the ONLY reason it is not release-ready is those tracked
-    // PENDING bindings -- there is no structural violation and no mock op hiding behind the gate.
+  it('its only release blockers are the named PENDING deferrals and audit gaps (no structural fault, no mock op)', () => {
+    // The registry now carries real surfaces whose engine work is honestly deferred (INV-CROSS), and
+    // commands whose missing audit record is a tracked defect, so a release build is correctly gated.
+    // Prove the ONLY reasons it is not release-ready are those tracked entries -- there is no structural
+    // violation and no mock op hiding behind the gate.
     expect(validateManifest(bindings)).toEqual([]);
     const pending = Object.values(bindings).filter((b) => b.status.kind === 'pending');
     expect(pending.length).toBeGreaterThan(0);
     expect(() => assertReleaseReady(bindings)).toThrow(/PENDING bindings must not ship/);
+    expect(() => assertReleaseReady(bindings)).toThrow(/unaudited commands must not ship/);
     for (const binding of pending) {
       if (binding.status.kind === 'pending') {
         expect(binding.status.owningRepo).not.toBe('');
         expect(binding.status.gatingTask).not.toBe('');
       }
     }
+  });
+
+  it('names a census defect for every command the engine does not audit', () => {
+    // An audit gap is a tracked defect, never a free-text excuse: each names its register entry.
+    const gaps = Object.values(bindings).flatMap((b) =>
+      b.kind === 'command' && !b.audited ? [[b.id, b.auditGap] as const] : [],
+    );
+    expect(gaps.map(([id]) => id).sort()).toEqual([
+      'idam.configure',
+      'idam.connect',
+      'idam.secret',
+      'idam.sync',
+    ]);
+    for (const [, gap] of gaps) {
+      expect(gap).toMatch(/^CD-\d{2}: \S/);
+    }
+  });
+
+  it('reserves the console surface for the named ForgeCentral-owned state', () => {
+    // `console` is the gateway's own state (the role map, the admin session lookup, the secret leg), not
+    // an engine op; a new binding on it is a reviewed decision, never an escape from naming the engine op.
+    const consoleOwned = Object.values(bindings)
+      .filter((b) => b.surface === 'console')
+      .map((b) => b.id)
+      .sort();
+    expect(consoleOwned).toEqual([
+      'idam.secret',
+      'settings.consoleRbac',
+      'settings.securitySession',
+    ]);
   });
 });
 
@@ -88,6 +125,8 @@ describe('IP-CONSOLE-12 DR.1: the entity-drawer (entity.*) bindings', () => {
     const isolate = bindings['entity.isolate'];
     expect(isolate?.kind).toBe('command');
     expect(isolate?.status.kind).toBe('live');
+    // The crdb CONTAIN op records the disposition; nothing is sent to an endpoint (census CD-46).
+    expect(isolate?.surface).toBe('cruciblql');
     if (isolate?.kind === 'command') {
       expect(isolate.audited).toBe(true);
       expect(isolate.authz).toBe('operator:contain');
@@ -131,10 +170,15 @@ describe('IP-CONSOLE-09 LG.1: the Logs (logs.*) decision-LOG bindings', () => {
     const explain = bindings['logs.explain'];
     expect(explain?.op).toBe('log_explain_v1');
     expect(explain?.status.kind).toBe('live');
-    // logs.export is a REAL audited engine op (LQ.4), not a client-assembled CSV.
+    // logs.export is a REAL audited engine op (LQ.4), not a client-assembled CSV: a COMMAND, because its
+    // receipt lands on the audit chain.
     const exportBinding = bindings['logs.export'];
+    expect(exportBinding?.kind).toBe('command');
     expect(exportBinding?.op).toBe('log_export_v1');
     expect(exportBinding?.status.kind).toBe('live');
+    if (exportBinding?.kind === 'command') {
+      expect(exportBinding.audited).toBe(true);
+    }
   });
 
   it('defers only tail (the push stream) to its gating engine task, never a fabricated stream', () => {
@@ -150,9 +194,14 @@ describe('IP-CONSOLE-09 LG.1: the Logs (logs.*) decision-LOG bindings', () => {
 describe('IP-CONSOLE-01 O1.1: the Overview (overview.*) connectivity bindings', () => {
   const overviewBindings = Object.values(bindings).filter((b) => b.id.startsWith('overview.'));
 
-  it('registers the three Overview bindings (graph/entityConnections/live)', () => {
+  it('registers the four Overview bindings (graph/entityConnections/members/live)', () => {
     const ids = overviewBindings.map((b) => b.id).sort();
-    expect(ids).toEqual(['overview.entityConnections', 'overview.graph', 'overview.live']);
+    expect(ids).toEqual([
+      'overview.entityConnections',
+      'overview.graph',
+      'overview.live',
+      'overview.members',
+    ]);
   });
 
   it('binds graph + entityConnections LIVE to the crdb CONNECTIVITY_GRAPH / ENTITY_CONNECTIONS producers', () => {
@@ -165,6 +214,9 @@ describe('IP-CONSOLE-01 O1.1: the Overview (overview.*) connectivity bindings', 
     const connections = bindings['overview.entityConnections'];
     expect(connections?.op).toBe('entity_connections_v1');
     expect(connections?.status.kind).toBe('live');
+    const members = bindings['overview.members'];
+    expect(members?.op).toBe('connectivity_members_v1');
+    expect(members?.status.kind).toBe('live');
   });
 
   it('defers only live (the push stream) to its gating engine task, never a fabricated stream', () => {
@@ -229,25 +281,39 @@ describe('IP-CONSOLE-02 V2.1: the Virtual Trust Zones (vtz.*) governance binding
     }
   });
 
-  it('defers only membership + policy counts, each naming its gating engine task', () => {
+  it('defers only membership + policy counts, each naming its owning repo and gating task', () => {
     const pending = vtzBindings.filter((b) => b.status.kind === 'pending').map((b) => b.id);
     expect(pending.sort()).toEqual(['vtz.memberCounts', 'vtz.policyCount', 'vtz.setMembership']);
+    // Membership waits on the engine; the per-zone policy count waits on ForgeCentral itself (the policy
+    // store is live, the zone card is not wired to it).
+    const owners: Record<string, string> = {};
     for (const id of pending) {
       const binding = bindings[id];
       if (binding?.status.kind === 'pending') {
-        expect(binding.status.owningRepo).toBe('crdb');
+        owners[id] = binding.status.owningRepo;
         expect(binding.status.gatingTask).not.toBe('');
       }
     }
+    expect(owners).toEqual({
+      'vtz.memberCounts': 'crdb',
+      'vtz.policyCount': 'forgecentral',
+      'vtz.setMembership': 'crdb',
+    });
   });
 });
 
 describe('IP-CONSOLE-04 ID.1: the External IDAM (idam.*) bindings', () => {
   const idamBindings = Object.values(bindings).filter((b) => b.id.startsWith('idam.'));
 
-  it('registers the four IdAM bindings (connectors/configure/connect/sync)', () => {
+  it('registers the five IdAM bindings (connectors/configure/connect/sync/secret)', () => {
     const ids = idamBindings.map((b) => b.id).sort();
-    expect(ids).toEqual(['idam.configure', 'idam.connect', 'idam.connectors', 'idam.sync']);
+    expect(ids).toEqual([
+      'idam.configure',
+      'idam.connect',
+      'idam.connectors',
+      'idam.secret',
+      'idam.sync',
+    ]);
   });
 
   it('binds the connector list LIVE to the crdb IDAM_CONNECTORS producer (IA.8)', () => {
@@ -259,7 +325,9 @@ describe('IP-CONSOLE-04 ID.1: the External IDAM (idam.*) bindings', () => {
     expect(connectors?.status.kind).toBe('live');
   });
 
-  it('exposes configure + connect + sync as real audited LIVE commands (never a stub)', () => {
+  it('exposes configure + connect + sync as real LIVE commands that name their audit gap (CD-15)', () => {
+    // The engine applies these to in-memory connector state and writes no audit record; the binding says
+    // so rather than claiming an audit the engine does not write.
     for (const [id, op] of [
       ['idam.configure', 'idam_configure_v1'],
       ['idam.connect', 'idam_connect_v1'],
@@ -270,9 +338,21 @@ describe('IP-CONSOLE-04 ID.1: the External IDAM (idam.*) bindings', () => {
       expect(command?.op).toBe(op);
       expect(command?.status.kind).toBe('live');
       if (command?.kind === 'command') {
-        expect(command.audited).toBe(true);
         expect(command.authz).toBe('operator:users.manage');
+        expect(command.audited).toBe(false);
+        if (!command.audited) expect(command.auditGap).toMatch(/^CD-15: /);
       }
+    }
+  });
+
+  it("binds the connector secret write to the gateway's secret leg, naming its audit gap (CD-01)", () => {
+    const secret = bindings['idam.secret'];
+    expect(secret?.kind).toBe('command');
+    expect(secret?.surface).toBe('console');
+    expect(secret?.status.kind).toBe('live');
+    if (secret?.kind === 'command') {
+      expect(secret.audited).toBe(false);
+      if (!secret.audited) expect(secret.auditGap).toMatch(/^CD-01: /);
     }
   });
 
@@ -354,6 +434,68 @@ describe('IP-CONSOLE-05 P5.1: the Policies (policies.*) authoring bindings', () 
   });
 });
 
+describe('IP-CONSOLE-03: the SOC Ops and Reports reads registered by GD.1', () => {
+  it('binds the KPI strip, the shaped report and the weekly volume LIVE to their crdb reads', () => {
+    for (const [id, op] of [
+      ['soc.kpis', 'detect_summary_v1'],
+      ['soc.report', 'soc_incident_report_v1'],
+      ['soc.weekly', 'soc_weekly_summary_v1'],
+    ] as const) {
+      const binding = bindings[id];
+      expect(binding?.kind).toBe('read');
+      expect(binding?.surface).toBe('cruciblql');
+      expect(binding?.op).toBe(op);
+      expect(binding?.status.kind).toBe('live');
+    }
+  });
+});
+
+describe('IP-CONSOLE-11: the Settings (settings.*, soc.settings.*) bindings', () => {
+  const settingsBindings = Object.values(bindings).filter(
+    (b) => b.id.startsWith('settings.') || b.id.startsWith('soc.settings.'),
+  );
+
+  it('registers the governed reads, the two Console-owned reads, and the five commits', () => {
+    const ids = settingsBindings.map((b) => b.id).sort();
+    expect(ids).toEqual([
+      'settings.approvals',
+      'settings.approve',
+      'settings.commit',
+      'settings.consoleRbac',
+      'settings.history',
+      'settings.propose',
+      'settings.read',
+      'settings.reports',
+      'settings.rollback',
+      'settings.securitySession',
+      'soc.settings.commit',
+      'soc.settings.read',
+    ]);
+  });
+
+  it('binds every Settings read and command LIVE (crdb SET.1-SET.5 and C.9c landed)', () => {
+    expect(settingsBindings.every((b) => b.status.kind === 'live')).toBe(true);
+  });
+
+  it('exposes commit / propose / approve / rollback and the SOC commit as audited commands', () => {
+    const commands = settingsBindings.filter((b) => b.kind === 'command');
+    expect(commands.map((b) => b.id).sort()).toEqual([
+      'settings.approve',
+      'settings.commit',
+      'settings.propose',
+      'settings.rollback',
+      'soc.settings.commit',
+    ]);
+    for (const command of commands) {
+      expect(command.surface).toBe('cruciblql');
+      if (command.kind === 'command') {
+        expect(command.audited).toBe(true);
+        expect(command.authz).toBe('operator:settings.change');
+      }
+    }
+  });
+});
+
 describe('INV-CONSOLE-NO-STUB: the enforcement rules', () => {
   it('accepts a well-formed live read binding', () => {
     const manifest: BindingManifest = { [liveRead.id]: liveRead };
@@ -373,19 +515,39 @@ describe('INV-CONSOLE-NO-STUB: the enforcement rules', () => {
     expect(validateManifest(manifest).some((v) => /mock/.test(v.problem))).toBe(true);
   });
 
-  it('requires a command binding to be audited', () => {
-    const manifest = {
-      'vtz.isolate': {
-        id: 'vtz.isolate',
-        kind: 'command',
-        surface: 'torch',
-        op: 'vtz_isolate',
-        authz: 'admin:contain',
-        audited: false,
-        status: { kind: 'live' },
-      },
+  it('requires a command binding to be audited or to name its tracked audit gap', () => {
+    const command = {
+      id: 'vtz.isolate',
+      kind: 'command',
+      surface: 'torch',
+      op: 'vtz_isolate',
+      authz: 'admin:contain',
+      audited: false,
+      status: { kind: 'live' },
+    };
+    // Neither audited nor naming a gap (only reachable through a cast): a violation, never a crash.
+    const silent = { 'vtz.isolate': command } as unknown as BindingManifest;
+    expect(validateManifest(silent).some((v) => /audit gap/.test(v.problem))).toBe(true);
+    const blank = {
+      'vtz.isolate': { ...command, auditGap: '   ' },
     } as unknown as BindingManifest;
-    expect(validateManifest(manifest).some((v) => /audited/.test(v.problem))).toBe(true);
+    expect(validateManifest(blank).some((v) => /audit gap/.test(v.problem))).toBe(true);
+  });
+
+  it('lets a named audit gap pass DEV validation but FAIL a release build', () => {
+    const gapped: CommandBinding = {
+      id: bindingId('vtz.isolate'),
+      kind: 'command',
+      surface: 'torch',
+      op: 'vtz_isolate',
+      authz: 'admin:contain',
+      audited: false,
+      auditGap: 'CD-99: the isolate op writes no audit record',
+      status: { kind: 'live' },
+    };
+    const manifest: BindingManifest = { [gapped.id]: gapped };
+    expect(validateManifest(manifest)).toEqual([]); // dev: a tracked gap is allowed
+    expect(() => assertReleaseReady(manifest)).toThrow(/unaudited commands must not ship/);
   });
 
   it('requires a PENDING binding to name its owning repo + gating task', () => {

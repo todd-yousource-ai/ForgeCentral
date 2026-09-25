@@ -219,7 +219,7 @@ in-app guide states each one plainly until it is fixed.
 
 | Gap | Requirement | As built | Defect | Owner |
 |-----|-------------|----------|--------|-------|
-| G1 | Settings operations registered; routes mapped by the contract test (9.4) | no `settings.*` binding exists; the contract test covers the empty shell only | CD-41 | FC (`IP-CONSOLE-11-guide` GD.1) |
+| G1 | Settings operations registered; routes mapped by the contract test (9.4) | CLOSED by GD.1: every Settings operation is a registered binding, every `/api` route is declared in `apps/bff/src/routes.ts`, and the route-coverage contract test maps each route to its bindings | CD-41 | FC (`IP-CONSOLE-11-guide` GD.1) |
 | G2 | Served only on the 8443 admin plane (Sections 2, 7) | the BFF serves `/api/settings*` to any authenticated session; whether a path around the terminator exists in deployment is UNVERIFIED | -- | FC |
 | G3 | The operator's tier governs Settings (9.1) | the tier is asserted by the Console for global admins and accepted uncapped by the engine; recorded stopgap | CD-03 | crdb (`DEF-RBAC-PERMISSION-MAP`) |
 | G4 | Propose and approve for every editable setting under dual control (9.4, 9.5) | the SOC tiers and SIEM write-back cannot be proposed anywhere in the Console; section-form buttons still read Commit under dual control; proposals are memory-only | CD-17 | crdb + FC |
