@@ -10,7 +10,8 @@
     "baseUrl": ".",
     "paths": {
       "@forge/contracts": ["../../packages/contracts/src/index.ts"],
-      "@forge/wire": ["../../packages/wire/src/index.ts"]
+      "@forge/wire": ["../../packages/wire/src/index.ts"],
+      "@forge/bindings": ["../../packages/bindings/src/index.ts"]
     }
   },
   "include": ["src", "test", "vitest.config.ts"]

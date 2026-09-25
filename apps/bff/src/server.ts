@@ -145,6 +145,7 @@ import { principalFromSession } from './engine/principal.js';
 import { EngineRefusedError } from './engine/wire-client.js';
 import type { EphemeralCache } from './cache.js';
 import { openApiDocument } from './openapi.js';
+import { apiRouteVerdict } from './routes.js';
 import { serveSpa } from './static.js';
 
 /** A structural view of the logger the server needs (so tests can pass a spy without pino). */
@@ -2595,6 +2596,20 @@ async function route(
   path: string,
   res: ServerResponse,
 ): Promise<void> {
+  // INV-BINDING-ROUTE-COVERAGE (IP-CONSOLE-11-guide GD.1): an /api request that no route in routes.ts
+  // declares never reaches a handler, so every served /api route is declared with the bindings it
+  // realizes. A declared path under the wrong method is refused here as it was by the 405 gate below.
+  if (path.startsWith('/api/')) {
+    const verdict = apiRouteVerdict(method, path);
+    if (verdict === 'undeclared') {
+      sendJson(res, 404, { error: 'not_found' });
+      return;
+    }
+    if (verdict === 'method') {
+      sendJson(res, 405, { error: 'method_not_allowed' });
+      return;
+    }
+  }
   // Command routes (POST) are matched before the read-only gate.
   if (await handleEntityIsolate(deps, req, method, path, res)) {
     return;

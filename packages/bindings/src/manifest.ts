@@ -99,12 +99,13 @@ const entityReads: readonly ReadBinding[] = [
 
 const entityCommands: readonly CommandBinding[] = [
   {
-    // Real + audited containment (TRD-32 v2 Quarantine/Deny; Torch containment for a wrapped agent). Live
-    // kernel-level (BPF-LSM) enforcement is AG.7, deliberately OFF -- the command records intent + audits;
-    // the returned IsolateEffect reports enforcementActive: false. Never fabricates enforcement.
+    // Real + audited containment disposition (TRD-32 v2 Quarantine/Deny) over the crdb CONTAIN op. Live
+    // enforcement is deliberately OFF: the command records intent + audits, the returned IsolateEffect
+    // reports enforcementActive: false, and nothing is sent to an endpoint (census CD-46). Never
+    // fabricates enforcement.
     id: bindingId('entity.isolate'),
     kind: 'command',
-    surface: 'forge',
+    surface: 'cruciblql',
     op: 'entity_isolate_v1',
     authz: 'operator:contain',
     audited: true,
@@ -154,9 +155,10 @@ const entityCommands: readonly CommandBinding[] = [
 // -- IP-CONSOLE-09 (Logs, P1.2) the `logs.*` decision-LOG bindings -----------------------------------
 //
 // The tenant-wide decision LOG. `logs.query` + `logs.explain` are LIVE against the crdb
-// IP-CONSOLE-LOG-QUERY producer (LOG_QUERY / LOG_EXPLAIN over :7878, landed). `logs.tail` (the real push
-// stream) and `logs.export` (the audited engine export) are honest PENDING deferrals naming their gating
-// engine task -- v1 tailing polls `logs.query`, and export lands with crdb LQ.4.
+// IP-CONSOLE-LOG-QUERY producer (LOG_QUERY / LOG_EXPLAIN over :7878, landed). `logs.export` is the
+// audited engine export (LOG_EXPORT, LQ.4, landed): a COMMAND, because it writes a receipt to the audit
+// chain. `logs.tail` (the real push stream) is an honest PENDING deferral naming its gating engine task --
+// v1 tailing polls `logs.query`.
 
 const logReads: readonly ReadBinding[] = [
   {
@@ -192,15 +194,19 @@ const logReads: readonly ReadBinding[] = [
       gatingTask: 'IP-CONSOLE-READINESS Part B (bounded decision SUBSCRIBE push stream)',
     },
   },
+];
+
+const logCommands: readonly CommandBinding[] = [
   {
-    // A real audited engine export of the current filtered set, recorded on the audit chain (crdb
+    // A real audited engine export of the current filtered page, recorded on the audit chain (crdb
     // LOG_EXPORT, IP-CONSOLE-LOG-QUERY LQ.4, landed). Never a client-assembled CSV of a plain read: the
     // rows come from the audited op, whose receipt lands on the chain.
     id: bindingId('logs.export'),
-    kind: 'read',
+    kind: 'command',
     surface: 'cruciblql',
     op: 'log_export_v1',
-    viewModel: 'LogExportView',
+    authz: 'operator:logs.export',
+    audited: true,
     status: { kind: 'live' },
   },
 ];
@@ -236,6 +242,16 @@ const overviewReads: readonly ReadBinding[] = [
     surface: 'cruciblql',
     op: 'entity_connections_v1',
     viewModel: 'ConnectionList',
+    status: { kind: 'live' },
+  },
+  {
+    // A source or destination container's members, ordered by connection count, for the Overview's
+    // container drill-in list (crdb CONNECTIVITY_MEMBERS, bounded at 500).
+    id: bindingId('overview.members'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'connectivity_members_v1',
+    viewModel: 'OverviewMemberList',
     status: { kind: 'live' },
   },
   {
@@ -313,7 +329,8 @@ const vtzReads: readonly ReadBinding[] = [
     },
   },
   {
-    // Policies scoped to a zone. Needs the crdb policy store the Policies surface produces.
+    // Policies scoped to a zone. The crdb policy store is live (POLICY_LIST_BY_ZONE backs the Policies
+    // surface); the per-zone count on the zone card is not wired to it yet.
     id: bindingId('vtz.policyCount'),
     kind: 'read',
     surface: 'cruciblql',
@@ -321,8 +338,8 @@ const vtzReads: readonly ReadBinding[] = [
     viewModel: 'VtzPolicyCount',
     status: {
       kind: 'pending',
-      owningRepo: 'crdb',
-      gatingTask: 'IP-CONSOLE-05 Policies surface (crdb policy store)',
+      owningRepo: 'forgecentral',
+      gatingTask: 'IP-CONSOLE-02: derive the per-zone count from POLICY_LIST_BY_ZONE (not wired)',
     },
   },
 ];
@@ -514,37 +531,57 @@ const usersCommands: readonly CommandBinding[] = [
   },
   {
     // Configure a federation connector (enabled + the two cadences; NO secret): LIVE on crdb
-    // IDAM_CONFIGURE (IA.8), audited, applied without restart.
+    // IDAM_CONFIGURE (IA.8), applied without restart -- to in-memory connector state that reverts at an
+    // engine restart, with no audit record (census CD-15).
     id: bindingId('idam.configure'),
     kind: 'command',
     surface: 'cruciblql',
     op: 'idam_configure_v1',
     authz: 'operator:users.manage',
-    audited: true,
+    audited: false,
+    auditGap:
+      'CD-15: IDAM_CONFIGURE changes in-memory connector state, writes no audit record, and reverts at an engine restart',
     status: { kind: 'live' },
   },
   {
     // Onboard a connector's connectivity (domain/client id/audience + a secret REFERENCE, never a
-    // secret value): LIVE on crdb IDAM_CONNECT (IP-LUG-IDAM-CONNECT CO.1/CO.2), audited, applied live
-    // via a fail-closed re-spawn. The secret itself is written by the on-node crypto-sidecar, never on
-    // this wire.
+    // secret value): LIVE on crdb IDAM_CONNECT (IP-LUG-IDAM-CONNECT CO.1/CO.2), applied live via a
+    // fail-closed re-spawn of in-memory connector state, with no audit record (census CD-15). The secret
+    // itself is written by the on-node crypto-sidecar (`idam.secret`), never on this wire.
     id: bindingId('idam.connect'),
     kind: 'command',
     surface: 'cruciblql',
     op: 'idam_connect_v1',
     authz: 'operator:users.manage',
-    audited: true,
+    audited: false,
+    auditGap:
+      'CD-15: IDAM_CONNECT re-spawns the in-memory connector, writes no audit record, and reverts at an engine restart',
     status: { kind: 'live' },
   },
   {
-    // Trigger a real federation sync: LIVE on crdb IDAM_SYNC (IA.8), audited. An ACK, not a result --
-    // the sync loop picks up the queued walk and the connector card reports progress.
+    // Trigger a real federation sync: LIVE on crdb IDAM_SYNC (IA.8). An ACK, not a result -- the sync
+    // loop picks up the queued walk and the connector card reports progress. No audit record (CD-15).
     id: bindingId('idam.sync'),
     kind: 'command',
     surface: 'cruciblql',
     op: 'idam_sync_v1',
     authz: 'operator:users.manage',
-    audited: true,
+    audited: false,
+    auditGap: 'CD-15: IDAM_SYNC queues a directory sync and writes no audit record',
+    status: { kind: 'live' },
+  },
+  {
+    // Write the connector's client secret into the node's protected secret store: the gateway's secret
+    // leg (the crypto sidecar), never the engine wire. It checks only for a session and records nothing
+    // (census CD-01).
+    id: bindingId('idam.secret'),
+    kind: 'command',
+    surface: 'console',
+    op: 'idam_secret_set_v1',
+    authz: 'operator:users.manage',
+    audited: false,
+    auditGap:
+      'CD-01: the secret write needs only a session, has no engine authorization, and writes no audit record',
     status: { kind: 'live' },
   },
 ];
@@ -744,13 +781,12 @@ const policyCommands: readonly CommandBinding[] = [
 // and the verdict narrative (IP-SOC-VERDICT-NARRATIVE VN.7/VN.8, live-proven): SOC_INCIDENT_LIST /
 // SOC_INCIDENT_DETAIL / SOC_NARRATIVE reads and SOC_PLAN_APPROVE / SOC_PLAN_MODIFY audited commands are
 // all live engine ops, so each registers LIVE (the live :7878 drive folds into S3.N, the Objects/VTZ/
-// Policies precedent). The KPI strip rides DETECT_SUMMARY, already registered by the detection work.
+// Policies precedent). The KPI strip (`soc.kpis`) reads DETECT_SUMMARY with the queue, and the Reports
+// surface reads the shaped incident report (`soc.report`) and the weekly volume (`soc.weekly`).
 //
-// `soc.plan.propose` is the honest exception. The response-plan RECORD, its audited commit, and both
-// commands exist -- but crdb has no production PROPOSER (`propose_plan` has no caller outside tests),
-// so on a live box SOC_INCIDENT_DETAIL returns an EMPTY plan and there is nothing for an operator to
-// approve. Registering it PENDING is what keeps S3.6's response list and S3.8's button honest about
-// why they are empty, instead of the Console composing a plan client-side (INV-SOC-PLAN-DURABLE).
+// `soc.plan.propose` rides SOC_INCIDENT_DETAIL: the engine proposes the plan at the establishing
+// transition (the crdb proposer landed with SS.6 and the C.3 response tier), so the binding is LIVE;
+// the Console never composes a plan client-side (INV-SOC-PLAN-DURABLE).
 
 const socReads: readonly ReadBinding[] = [
   {
@@ -836,6 +872,36 @@ const socReads: readonly ReadBinding[] = [
     surface: 'cruciblql',
     op: 'soc_incident_impact_v1',
     viewModel: 'BusinessImpact',
+    status: { kind: 'live' },
+  },
+  {
+    // The SOC Ops KPI strip: the engine's detection summary (events analyzed, noise collapsed, rules
+    // evaluable) with the queue counts (crdb DETECT_SUMMARY + SOC_INCIDENT_LIST).
+    id: bindingId('soc.kpis'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'detect_summary_v1',
+    viewModel: 'SocKpis',
+    status: { kind: 'live' },
+  },
+  {
+    // One incident's shaped report, each section labelled model / engine / template (crdb
+    // SOC_INCIDENT_REPORT, IP-AISOC-STEP1 C.5). The Reports surface's download is a client-side save of
+    // exactly this read.
+    id: bindingId('soc.report'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_incident_report_v1',
+    viewModel: 'SocReport',
+    status: { kind: 'live' },
+  },
+  {
+    // The weekly detection volume and corpus coverage (crdb SOC_WEEKLY_SUMMARY, IP-AISOC-STEP1 C.9b).
+    id: bindingId('soc.weekly'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_weekly_summary_v1',
+    viewModel: 'SocWeekly',
     status: { kind: 'live' },
   },
 ];
@@ -938,6 +1004,140 @@ const socCommands: readonly CommandBinding[] = [
   },
 ];
 
+// -- IP-CONSOLE-11 (Settings, ST.1-ST.N) the `settings.*` and `soc.settings.*` bindings ---------------
+//
+// Every Settings tab reads or commits the engine's governed configuration over the ten Settings wire
+// operations (crdb IP-CONSOLE-SETTINGS-WIRE SET.1-SET.5, landed and deployed), each carrying the
+// operator's settings tier for a global admin. Two reads are ForgeCentral's own state, surface
+// `console`: the operator role map (installer configuration) and the admin session's negotiated key
+// exchange (the gateway's session lookup). Registered by IP-CONSOLE-11-guide GD.1.
+
+const settingsReads: readonly ReadBinding[] = [
+  {
+    // The governed configuration by surface: every registry row with its value, source, apply class,
+    // bound and definition, plus the typed values of the patchable sections (crdb SETTINGS_READ, SET.1).
+    id: bindingId('settings.read'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'settings_read_v1',
+    viewModel: 'SettingsView',
+    status: { kind: 'live' },
+  },
+  {
+    // The engine's status reports by name: server, connectivity, security, telemetry, key issuing,
+    // egress (crdb SETTINGS_REPORTS, SET.4).
+    id: bindingId('settings.reports'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'settings_reports_v1',
+    viewModel: 'SettingsReportsView',
+    status: { kind: 'live' },
+  },
+  {
+    // Pending two-person proposals, made in the Console or on the engine's admin plane (one store;
+    // crdb SETTINGS_APPROVALS, SET.3).
+    id: bindingId('settings.approvals'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'settings_approvals_v1',
+    viewModel: 'PendingProposal',
+    status: { kind: 'live' },
+  },
+  {
+    // Committed configuration versions, newest first, with who committed each and which settings
+    // changed (crdb SETTINGS_HISTORY, SET.5).
+    id: bindingId('settings.history'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'settings_history_v1',
+    viewModel: 'SettingsHistoryView',
+    status: { kind: 'live' },
+  },
+  {
+    // The SOC response tiers and SIEM write-back (crdb SOC_SETTINGS_READ, C.9c).
+    id: bindingId('soc.settings.read'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'soc_settings_read_v1',
+    viewModel: 'SocSettings',
+    status: { kind: 'live' },
+  },
+  {
+    // The Console's own operator role map, read at BFF start from the installer configuration; served
+    // to global admins only (the map names every tenant it grants).
+    id: bindingId('settings.consoleRbac'),
+    kind: 'read',
+    surface: 'console',
+    op: 'console_rbac_config_v1',
+    viewModel: 'ConsoleRbacView',
+    status: { kind: 'live' },
+  },
+  {
+    // The key exchange this browser session negotiated with the admin TLS terminator, from the
+    // gateway's session lookup (ST.5b); never inferred.
+    id: bindingId('settings.securitySession'),
+    kind: 'read',
+    surface: 'console',
+    op: 'admin_session_lookup_v1',
+    viewModel: 'AdminSessionKx',
+    status: { kind: 'live' },
+  },
+];
+
+const settingsCommands: readonly CommandBinding[] = [
+  {
+    // A batch of knob edits and/or typed section patches, validated whole and committed as one version
+    // (crdb SETTINGS_COMMIT, SET.2 / SET.2b); refused whole under dual control.
+    id: bindingId('settings.commit'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'settings_commit_v1',
+    authz: 'operator:settings.change',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // The same batch recorded as a two-person proposal under dual control (crdb SETTINGS_PROPOSE, SET.3).
+    id: bindingId('settings.propose'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'settings_propose_v1',
+    authz: 'operator:settings.change',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Approve a pending proposal as a distinct second principal (crdb SETTINGS_APPROVE, SET.3).
+    id: bindingId('settings.approve'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'settings_approve_v1',
+    authz: 'operator:settings.change',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Restore a whole earlier version through the governed commit (crdb SETTINGS_ROLLBACK, SET.5).
+    id: bindingId('settings.rollback'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'settings_rollback_v1',
+    authz: 'operator:settings.change',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Commit the SOC response tiers and/or SIEM write-back (crdb SOC_SETTINGS_COMMIT, C.9c).
+    id: bindingId('soc.settings.commit'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'soc_settings_commit_v1',
+    authz: 'operator:settings.change',
+    audited: true,
+    status: { kind: 'live' },
+  },
+];
+
 function register(target: Record<string, Binding>, entries: readonly Binding[]): void {
   for (const entry of entries) {
     target[entry.id] = entry;
@@ -948,6 +1148,7 @@ const registry: Record<string, Binding> = {};
 register(registry, entityReads);
 register(registry, entityCommands);
 register(registry, logReads);
+register(registry, logCommands);
 register(registry, overviewReads);
 register(registry, vtzReads);
 register(registry, vtzCommands);
@@ -959,6 +1160,8 @@ register(registry, policyReads);
 register(registry, policyCommands);
 register(registry, socReads);
 register(registry, socCommands);
+register(registry, settingsReads);
+register(registry, settingsCommands);
 
 /** The Console binding registry. Keyed by `BindingId`; populated by the surface IPs. */
 export const bindings: BindingManifest = registry;

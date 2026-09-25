@@ -2,10 +2,12 @@
 //
 // Two layers:
 //  - validateManifest: structural rules that always hold (dev + release). A malformed binding is a bug at
-//    any time: a key/id mismatch, an empty op, a command that is not audited, a mock/fixture op, or a
-//    PENDING binding that does not name its gating engine task (so a deferral is always traceable).
+//    any time: a key/id mismatch, an empty op, a command that is neither audited nor names its tracked
+//    audit gap, a mock/fixture op, or a PENDING binding that does not name its gating engine task (so a
+//    deferral, like an audit gap, is always traceable).
 //  - assertReleaseReady: the release gate. No PENDING binding may ship (a deferral is a plan artifact,
-//    never a shipped stub) and no mock op may ship. `pnpm test:contract` runs both.
+//    never a shipped stub), no command with a tracked audit gap may ship (TRD-CONSOLE-00 AUDITED holds
+//    at release), and no mock op may ship. `pnpm test:contract` runs both.
 
 import type { BindingManifest } from '@forge/contracts';
 
@@ -36,8 +38,16 @@ export function validateManifest(manifest: BindingManifest): BindingViolation[] 
         problem: `op '${binding.op}' names a mock/fixture provider`,
       });
     }
-    if (binding.kind === 'command' && binding.audited !== true) {
-      violations.push({ bindingId: key, problem: 'command binding must be audited' });
+    // `!binding.auditGap` also catches a gap that is absent at runtime (a manifest built through a cast).
+    if (
+      binding.kind === 'command' &&
+      !binding.audited &&
+      (!binding.auditGap || binding.auditGap.trim() === '')
+    ) {
+      violations.push({
+        bindingId: key,
+        problem: 'command binding must be audited, or name its tracked audit gap',
+      });
     }
     if (
       binding.status.kind === 'pending' &&
@@ -52,7 +62,10 @@ export function validateManifest(manifest: BindingManifest): BindingViolation[] 
   return violations;
 }
 
-/** Release gate: throws if the manifest is malformed, ships a PENDING binding, or ships a mock op. */
+/**
+ * Release gate: throws if the manifest is malformed, ships a PENDING binding, ships a command the engine
+ * does not audit (a tracked audit gap), or ships a mock op.
+ */
 export function assertReleaseReady(manifest: BindingManifest): void {
   const problems = validateManifest(manifest).map((v) => `${v.bindingId}: ${v.problem}`);
   const pending = Object.values(manifest)
@@ -60,6 +73,12 @@ export function assertReleaseReady(manifest: BindingManifest): void {
     .map((b) => b.id);
   if (pending.length > 0) {
     problems.push(`PENDING bindings must not ship in a release build: ${pending.join(', ')}`);
+  }
+  const unaudited = Object.values(manifest)
+    .filter((b) => b.kind === 'command' && !b.audited)
+    .map((b) => b.id);
+  if (unaudited.length > 0) {
+    problems.push(`unaudited commands must not ship in a release build: ${unaudited.join(', ')}`);
   }
   if (problems.length > 0) {
     throw new Error(`INV-CONSOLE-NO-STUB violated:\n  ${problems.join('\n  ')}`);

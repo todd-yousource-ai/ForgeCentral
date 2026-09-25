@@ -26,6 +26,7 @@ const REGISTERED_PREFIXES = [
   'objects.',
   'policies.',
   'soc.',
+  'settings.',
 ];
 
 describe('no-stub contract (F0.8 shell)', () => {
@@ -33,8 +34,9 @@ describe('no-stub contract (F0.8 shell)', () => {
     // The registered contracts so far are the entity-drawer (entity.*), the Logs surface (logs.*), the
     // Overview (overview.*), the VTZ governance surface (vtz.*), the Users surface (users.* /
     // groups.* / idam.*, UY.1), the Objects catalog (objects.*), the Policies authoring plane
-    // (policies.*), and the SOC Ops surface (soc.*, S3.1); the shell renders none of them yet (each
-    // surface consumes its bindings in its own PR -- the SOC queue lands in S3.4, not S3.1).
+    // (policies.*), the SOC Ops surface (soc.*, S3.1), and Settings (settings.*, registered by
+    // IP-CONSOLE-11-guide GD.1); the shell renders none of them yet (each surface consumes its bindings
+    // in its own PR -- the SOC queue lands in S3.4, not S3.1).
     const ids = Object.keys(bindings);
     expect(ids.length).toBeGreaterThan(0);
     expect(ids.every((id) => REGISTERED_PREFIXES.some((prefix) => id.startsWith(prefix)))).toBe(

@@ -46,6 +46,9 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@forge/bindings':
+        specifier: workspace:*
+        version: link:../../packages/bindings
       '@types/node':
         specifier: ^22.10.2
         version: 22.20.1

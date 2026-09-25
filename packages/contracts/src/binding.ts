@@ -2,18 +2,24 @@
 //
 // The no-stub contract (INV-CONSOLE-NO-STUB): every value the Console renders and every control it
 // exposes binds to a REAL Crucible/Torch/Forge operation. F0.1 lands the TYPE of that binding; F0.4
-// populates the registry and adds the contract test that asserts every route/control references a
-// registered binding and every binding's backend op exists (or is explicitly PENDING with its owning
-// engine task, INV-CROSS). This module is the single home for those shapes so the BFF and the SPA share
-// one definition.
+// populates the registry and its structural contract test; IP-CONSOLE-11-guide GD.1 makes the registry
+// the enforced index of the BFF's routes: every `/api` route is declared with the bindings it realizes
+// (apps/bff/src/routes.ts), an undeclared route is refused at dispatch, and the contract test proves every
+// LIVE binding is served by a declared route (INV-BINDING-ROUTE-COVERAGE). A binding whose op is not built
+// yet is explicitly PENDING with its owning engine task (INV-CROSS). This module is the single home for
+// those shapes so the BFF and the SPA share one definition.
 
 /** A stable identifier for one binding (e.g. `overview.graph.read`, `vtz.isolate.command`). */
 export type BindingId = string & { readonly __binding: 'BindingId' };
 
 export const bindingId = (raw: string): BindingId => raw as BindingId;
 
-/** Which engine surface a binding resolves against. */
-export type EngineSurface = 'cruciblql' | 'admin' | 'torch' | 'forge';
+/**
+ * Which surface a binding resolves against: an engine's (`cruciblql`, `admin`, `torch`, `forge`), or
+ * `console` -- ForgeCentral's own installation configuration or its gateway (the operator role map, the
+ * admin session lookup, the connector secret store), which are real platform state but not an engine op.
+ */
+export type EngineSurface = 'cruciblql' | 'admin' | 'torch' | 'forge' | 'console';
 
 /**
  * A binding is either LIVE (its backend op exists today) or PENDING (the op is not built yet; the
@@ -37,19 +43,25 @@ export interface ReadBinding {
   readonly status: BindingStatus;
 }
 
-/** A command binding: resolves to a mutating op, is authorized engine-side, and is always audited. */
-export interface CommandBinding {
+/**
+ * How a command is audited: by the engine (`audited: true`, the rule), or not yet, in which case the
+ * binding names the tracked defect (`auditGap`) -- the same honest-deferral discipline as PENDING. A
+ * command never claims an audit the engine does not write, and never omits the question.
+ */
+export type CommandAudit =
+  { readonly audited: true } | { readonly audited: false; readonly auditGap: string };
+
+/** A command binding: resolves to a mutating op and is authorized by the engine (or the gateway). */
+export type CommandBinding = {
   readonly id: BindingId;
   readonly kind: 'command';
   readonly surface: EngineSurface;
   /** The concrete mutating op the BFF handler calls. */
   readonly op: string;
-  /** The engine-side authorization this command requires (rendered for the contract test). */
+  /** The authorization this command is meant to require (a label; see the engine for what it checks). */
   readonly authz: string;
-  /** Every command produces an audit entry; this is `true` by construction, never omitted. */
-  readonly audited: true;
   readonly status: BindingStatus;
-}
+} & CommandAudit;
 
 export type Binding = ReadBinding | CommandBinding;
 
