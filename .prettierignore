@@ -8,6 +8,8 @@ node_modules/
 packages/contracts/schema/**
 # Generated code: the emitter (scripts/generate.mjs) is the sole authority on its format.
 packages/contracts/src/generated/**
+# Generated guide content: scripts/generate-guide-content.mjs is the sole authority on its format.
+apps/console/src/guide/generated/**
 
 # pnpm-managed lockfile (not prettier-owned).
 pnpm-lock.yaml

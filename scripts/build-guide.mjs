@@ -4,7 +4,7 @@
 // The guide is authored as HTML fragments in docs/guide/chapters/ (NN-slug.html per chapter,
 // 9N-appendix-slug.html per appendix), in the Cisco configuration-guide layout with the Forge brand
 // (docs/guide/assets/forge-guide.css). This script:
-//   1. validates the fragments: every h2 / h3 carries an id, ids are unique, every internal link
+//   1. (scripts/guide-model.mjs, shared with the console's ReadMe) validates the fragments: every h2 / h3 carries an id, ids are unique, every internal link
 //      resolves, no em or en dash, and no internal component or repository name in prose (commands and
 //      paths inside <code> / <pre> are exempt) -- INV-GUIDE-FORGE-NAMING;
 //   2. numbers figures and tables per chapter and fills cross references;
@@ -19,10 +19,12 @@
 //        FORGE_GUIDE_DIR=<dir> node scripts/build-guide.mjs   renders a copy laid out like docs/guide.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { GuideError, fillXrefs, processGuide } from './guide-model.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // FORGE_GUIDE_DIR renders another copy of the guide (a review draft); the default is the committed one.
@@ -34,12 +36,6 @@ const BASENAME = 'ForgeCentral-Configuration-Guide';
 // cap bounds a layout that would oscillate, which then fails loudly instead of looping.
 const MAX_PASSES = 4;
 
-// Internal names the guide's prose must never use (operator ruling 2026-09-25: Forge is the platform;
-// repository and component names are internal). Checked outside <code> and <pre>.
-const INTERNAL_NAMES = /\b(crucible\w*|crdb|cdb|torch\w*|bff|sidecar|forge-central)\b/i;
-const PROVENANCE = /\b(TRD-\S+|IP-[A-Z]{2,}\S*|CD-\d+)\b/;
-const DASHES = new RegExp(`[${String.fromCharCode(0x2013)}${String.fromCharCode(0x2014)}]`);
-
 const pn = (id) => `<span class="pn" data-ref="${id}"></span>`;
 
 function fail(message) {
@@ -47,161 +43,15 @@ function fail(message) {
   process.exit(1);
 }
 
-function stripTags(html) {
-  return html
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&gt;/g, '>')
-    .replace(/&lt;/g, '<')
-    .replace(/&nbsp;/g, ' ');
-}
-
 function dataUri(path, mime) {
   return `data:${mime};base64,${readFileSync(path).toString('base64')}`;
 }
 
-/** Read the chapter fragments in file order and give each its label, number and section list. */
-function loadChapters() {
-  const dir = join(GUIDE, 'chapters');
-  const files = readdirSync(dir)
-    .filter((f) => /^\d\d-[a-z0-9-]+\.html$/.test(f))
-    .sort();
-  let chapterNo = 0;
-  let appendixNo = 0;
-  return files.map((file) => {
-    const html = readFileSync(join(dir, file), 'utf8');
-    const h1 = /<h1>([^<]+)<\/h1>/.exec(html);
-    if (h1 === null) fail(`${file}: the fragment must open with <h1>Title</h1>`);
-    const isAppendix = /^9\d-appendix-/.test(file);
-    const num = isAppendix ? String.fromCharCode(65 + appendixNo++) : String(++chapterNo);
-    const body = html.replace(h1[0], '');
-    const sections = [...body.matchAll(/<h([23]) id="([a-z0-9-]+)">([\s\S]*?)<\/h\1>/g)].map(
-      (m) => ({
-        level: Number(m[1]),
-        id: m[2],
-        text: stripTags(m[3]),
-      }),
-    );
-    return {
-      file,
-      id: `ch-${file.slice(3, -5)}`,
-      label: isAppendix ? 'APPENDIX' : 'CHAPTER',
-      num,
-      title: h1[1],
-      body,
-      sections,
-    };
-  });
-}
-
-/** Fail on anything the content rules forbid (see the header). */
-function lint(chapters, frontFiles) {
-  const problems = [];
-  for (const ch of chapters) {
-    for (const m of ch.body.matchAll(/<h[23](?![^>]*\bid=)[^>]*>/g)) {
-      problems.push(`${ch.file}: heading without an id: ${m[0]}`);
-    }
-    const prose = stripTags(ch.body.replace(/<code>[\s\S]*?<\/code>|<pre[\s\S]*?<\/pre>/g, ' '));
-    const lines = `${ch.title}\n${prose}`.split('\n');
-    for (const line of lines) {
-      if (INTERNAL_NAMES.test(line))
-        problems.push(`${ch.file}: internal name in prose: "${line.trim().slice(0, 100)}"`);
-      if (PROVENANCE.test(line))
-        problems.push(`${ch.file}: internal provenance in prose: "${line.trim().slice(0, 100)}"`);
-    }
-  }
-  for (const [name, text] of frontFiles) {
-    if (DASHES.test(text)) problems.push(`${name}: em or en dash`);
-  }
-  for (const ch of chapters) {
-    if (DASHES.test(ch.body)) problems.push(`${ch.file}: em or en dash`);
-  }
-  if (problems.length > 0) fail(`content lint failed:\n  ${problems.join('\n  ')}`);
-}
-
-/** Number the figures and tables of one chapter; returns the new body and the label of each id. */
-function numberFloats(ch) {
-  let figures = 0;
-  let tables = 0;
-  const labels = new Map();
-  let body = ch.body.replace(
-    /<figure id="([a-z0-9-]+)" data-title="([^"]+)"( class="[^"]*")?>([\s\S]*?)<\/figure>/g,
-    (_m, id, title, cls, inner) => {
-      const label = `Figure ${ch.num}-${++figures}`;
-      labels.set(id, label);
-      return `<figure id="${id}"${cls ?? ''}>${inner}<figcaption><span class="fignum">${label}.</span> ${title}</figcaption></figure>`;
-    },
-  );
-  body = body.replace(
-    /<div class="tablewrap( wide)?" id="([a-z0-9-]+)" data-title="([^"]+)">/g,
-    (_m, wide, id, title) => {
-      const label = `Table ${ch.num}-${++tables}`;
-      labels.set(id, label);
-      return `<div class="tablewrap${wide ?? ''}" id="${id}"><div class="tcap">${label}. ${title}</div>`;
-    },
-  );
-  const limits = [];
-  body = body.replace(/<div class="note limit">([\s\S]*?)<\/div>/g, (_m, inner) => {
-    const id = `lim-${ch.num.toLowerCase()}-${limits.length + 1}`;
-    limits.push({ id, inner });
-    return `<div class="note limit" id="${id}">${inner}</div>`;
-  });
-  return { body, labels, limits };
-}
-
-/** Fill the known-limitations appendix (marker <!-- known-limitations -->) from every Limitation note. */
-function fillLimitations(chapters) {
-  const blocks = chapters
-    .filter((ch) => ch.floats.limits.length > 0)
-    .map((ch) => {
-      const items = ch.floats.limits
-        .map(
-          (l) =>
-            `<li>${l.inner.replace(/<\/?p>/g, ' ').trim()} <span class="on">(<a href="#${l.id}">page ${pn(l.id)}</a>)</span></li>`,
-        )
-        .join('\n');
-      const where = `${ch.label === 'APPENDIX' ? 'Appendix' : 'Chapter'} ${ch.num}`;
-      return `<h3 id="limx-${ch.num.toLowerCase()}">${where}: ${ch.title}</h3>\n<ul class="limlist">\n${items}\n</ul>`;
-    })
-    .join('\n');
-  for (const ch of chapters) {
-    ch.floats.body = ch.floats.body.replace('<!-- known-limitations -->', blocks);
-  }
-}
-
-/** Every id and its display text (chapter, section, figure, table), for cross references. */
-function buildIndex(chapters) {
-  const index = new Map();
-  for (const ch of chapters) {
-    const add = (id, text) => {
-      if (index.has(id)) fail(`duplicate id "${id}" (${ch.file})`);
-      index.set(id, text);
-    };
-    add(ch.id, ch.title);
-    for (const s of ch.sections) add(s.id, s.text);
-    for (const [id, label] of ch.floats.labels) add(id, label);
-    for (const m of ch.floats.body.matchAll(/\bid="([a-z0-9-]+)"/g)) {
-      if (!index.has(m[1])) add(m[1], m[1]);
-    }
-  }
-  for (const ch of chapters) {
-    for (const m of ch.floats.body.matchAll(/href="#([a-z0-9-]+)"/g)) {
-      if (!index.has(m[1])) fail(`${ch.file}: link to unknown id "#${m[1]}"`);
-    }
-  }
-  return index;
-}
-
 function fillRefs(html, index, pages) {
-  return html
-    .replace(
-      /<a class="xref" href="#([a-z0-9-]+)"><\/a>/g,
-      (_m, id) => `<a class="xref" href="#${id}">${index.get(id) ?? id}</a>`,
-    )
-    .replace(
-      /<span class="pn" data-ref="([a-z0-9-]+)"><\/span>/g,
-      (_m, id) => `<span class="pn" data-ref="${id}">${pages.get(id) ?? '0'}</span>`,
-    );
+  return fillXrefs(html, index).replace(
+    /<span class="pn" data-ref="([a-z0-9-]+)"><\/span>/g,
+    (_m, id) => `<span class="pn" data-ref="${id}">${pages.get(id) ?? '0'}</span>`,
+  );
 }
 
 function cover(meta, assets) {
@@ -302,17 +152,17 @@ function sameNumbers(refs, a, b) {
 }
 
 async function main() {
-  const meta = JSON.parse(readFileSync(join(GUIDE, 'guide.json'), 'utf8'));
-  const legal = readFileSync(join(GUIDE, 'front', 'legal.html'), 'utf8');
-  const chapters = loadChapters();
-  if (chapters.length === 0) fail('no chapters in docs/guide/chapters');
-  lint(chapters, [
-    ['front/legal.html', legal],
-    ['guide.json', JSON.stringify(meta)],
-  ]);
-  for (const ch of chapters) ch.floats = numberFloats(ch);
-  fillLimitations(chapters);
-  const index = buildIndex(chapters);
+  let processed;
+  try {
+    processed = processGuide(
+      GUIDE,
+      (id) => `<span class="on">(<a href="#${id}">page ${pn(id)}</a>)</span>`,
+    );
+  } catch (err) {
+    if (err instanceof GuideError) fail(err.message);
+    throw err;
+  }
+  const { meta, legal, chapters, index } = processed;
   const assets = {
     mark: dataUri(join(ROOT, 'apps', 'console', 'public', 'forge.png'), 'image/png'),
     logo: dataUri(join(ROOT, 'docs', 'assets', 'yousource-logo-on-light.svg'), 'image/svg+xml'),

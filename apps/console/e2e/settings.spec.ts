@@ -335,6 +335,7 @@ test('the no-stub sweep: every tab reads real routes, boot-bound identity is rea
     'Observability',
     'HA & Topology',
     'FIPS Mode',
+    'ReadMe',
   ];
   // Web-first: waits for the strip to render (reading text contents directly raced the first paint).
   await expect(tabs).toHaveText(names);
@@ -349,6 +350,7 @@ test('the no-stub sweep: every tab reads real routes, boot-bound identity is rea
     Observability: /0\.0\.0\.0:4317/,
     'HA & Topology': /every 120 s/,
     'FIPS Mode': /aws-lc-rs/,
+    ReadMe: /ForgeCentral Configuration Guide/,
   };
   for (const name of names) {
     await page.getByRole('tab', { name, exact: true }).click();
@@ -364,6 +366,38 @@ test('the no-stub sweep: every tab reads real routes, boot-bound identity is rea
       await expect(page.getByRole('button', { name: /edit|commit|propose/i })).toHaveCount(0);
     }
   }
+  expect(bff.unknown).toEqual([]);
+  expect(bff.posts).toEqual([]);
+});
+
+test('the ReadMe: a guide section within 3 clicks of the Overview, a deep link that survives a reload, live reference values', async ({
+  page,
+}) => {
+  // IP-CONSOLE-11-guide GD.2 (INV-GUIDE-ADDRESSABLE, TRD-CONSOLE-11 11.5).
+  const bff = await mockBff(page);
+  await page.goto('/');
+  // Click 1: Settings. Click 2: ReadMe. Click 3: a section in the contents.
+  await page
+    .getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: 'Settings' })
+    .click();
+  await page.getByRole('tab', { name: 'ReadMe' }).click();
+  await page
+    .getByRole('navigation', { name: 'Guide contents' })
+    .getByRole('link', { name: 'Turn on two-person control for Settings', exact: true })
+    .click();
+  await expect(page.locator('#setc-dual')).toBeVisible();
+  expect(page.url()).toMatch(/\/settings\?tab=readme#setc-dual$/);
+
+  // The deep link survives a reload.
+  await page.reload();
+  await expect(page.locator('#setc-dual')).toBeVisible();
+
+  // The Settings reference renders the engine's values, not the document's snapshot.
+  await page.goto('/settings?tab=readme#ref-data');
+  const cadence = page.getByRole('row', { name: /maintenance\.cadence_secs/ });
+  await expect(cadence).toContainText('120');
+  await expect(cadence).toContainText('Live');
   expect(bff.unknown).toEqual([]);
   expect(bff.posts).toEqual([]);
 });

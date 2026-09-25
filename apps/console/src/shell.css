@@ -1662,3 +1662,188 @@ body {
   font-family: inherit;
   resize: vertical;
 }
+
+/* ---- The ReadMe tab: the configuration guide rendered in the console (IP-CONSOLE-11-guide GD.2). ----
+   The chapter content keeps the guide's own class names (note, limit, tablewrap, path, ui, ...), styled
+   here for the screen with the console's tokens; the print stylesheet stays with the printed guide. */
+.fcx-guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-md);
+  max-width: 72rem;
+  line-height: 1.55;
+}
+.fcx-guide__meta {
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-sm);
+}
+.fcx-guide__filter {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  font-size: var(--fc-font-size-sm);
+}
+.fcx-guide__filter input {
+  flex: 1;
+  max-width: 28rem;
+}
+.fcx-guide__notice {
+  border-left: 3px solid var(--fc-color-status-caution);
+  padding: var(--fc-space-xs) var(--fc-space-sm);
+}
+.fcx-guide__where {
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-sm);
+}
+.fcx-guide__contents ol {
+  list-style: none;
+  padding-left: var(--fc-space-md);
+  margin: 0;
+}
+.fcx-guide__contents > ol {
+  padding-left: 0;
+  columns: 2 22rem;
+}
+.fcx-guide__contents > ol > li {
+  break-inside: avoid;
+  margin-bottom: var(--fc-space-sm);
+  font-weight: var(--fc-font-weight-semibold);
+}
+.fcx-guide__contents li li {
+  font-weight: normal;
+  font-size: var(--fc-font-size-sm);
+}
+.fcx-guide a {
+  color: var(--fc-color-brand-primary);
+}
+.fcx-guide__chapnum {
+  color: var(--fc-color-text-muted);
+  font-size: var(--fc-font-size-xs);
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+.fcx-guide__title {
+  margin-top: 0;
+}
+.fcx-guide__chapter h3 {
+  margin-top: var(--fc-space-xl);
+  border-bottom: 1px solid var(--fc-color-surface-border);
+  padding-bottom: var(--fc-space-xs);
+}
+.fcx-guide__chapter .lead {
+  font-size: var(--fc-font-size-md);
+  color: var(--fc-color-text-muted);
+}
+.fcx-guide__chapter .ui {
+  font-weight: var(--fc-font-weight-semibold);
+}
+.fcx-guide__chapter .path {
+  font-weight: var(--fc-font-weight-semibold);
+  white-space: nowrap;
+}
+.fcx-guide__chapter .path .sep {
+  margin: 0 0.25em;
+  color: var(--fc-color-text-muted);
+}
+.fcx-guide__chapter .note {
+  border-left: 3px solid var(--fc-color-brand-primary);
+  background: var(--fc-color-surface-card);
+  padding: var(--fc-space-sm) var(--fc-space-md);
+  border-radius: var(--fc-radius-sm);
+}
+.fcx-guide__chapter .note.limit {
+  border-left-color: var(--fc-color-status-caution);
+}
+.fcx-guide__chapter .note.limit::before {
+  content: 'Limitation';
+  display: block;
+  font-weight: var(--fc-font-weight-semibold);
+  color: var(--fc-color-status-caution);
+}
+.fcx-guide__chapter .tablewrap {
+  overflow-x: auto;
+  margin: var(--fc-space-md) 0;
+}
+.fcx-guide__chapter .tcap {
+  font-size: var(--fc-font-size-sm);
+  font-weight: var(--fc-font-weight-semibold);
+  margin-bottom: var(--fc-space-xs);
+}
+.fcx-guide__chapter table.data {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--fc-font-size-sm);
+}
+.fcx-guide__chapter table.data th,
+.fcx-guide__chapter table.data td {
+  border: 1px solid var(--fc-color-surface-border);
+  padding: var(--fc-space-xs) var(--fc-space-sm);
+  text-align: left;
+  vertical-align: top;
+}
+.fcx-guide__chapter .pill {
+  display: inline-block;
+  border-radius: var(--fc-radius-pill);
+  padding: 0 0.6em;
+  font-size: var(--fc-font-size-xs);
+  border: 1px solid var(--fc-color-surface-border);
+}
+.fcx-guide__chapter .pill.ok {
+  border-color: var(--fc-color-status-good);
+  color: var(--fc-color-status-good);
+}
+.fcx-guide__chapter .pill.caution,
+.fcx-guide__chapter .pill.ro {
+  border-color: var(--fc-color-status-caution);
+  color: var(--fc-color-status-caution);
+}
+.fcx-guide__chapter .pill.off,
+.fcx-guide__chapter .pill.na {
+  color: var(--fc-color-text-muted);
+}
+.fcx-guide__chapter .procedure {
+  margin: var(--fc-space-md) 0;
+}
+.fcx-guide__chapter .ptitle {
+  font-weight: var(--fc-font-weight-semibold);
+}
+.fcx-guide__chapter .result {
+  color: var(--fc-color-text-muted);
+}
+.fcx-guide__chapter .applies-live {
+  color: var(--fc-color-status-good);
+}
+.fcx-guide__chapter .applies-restart {
+  color: var(--fc-color-status-caution);
+}
+.fcx-guide__chapter .applies-pending {
+  color: var(--fc-color-text-muted);
+}
+.fcx-guide__chapter figure {
+  margin: var(--fc-space-lg) 0;
+  background: #ffffff;
+  border-radius: var(--fc-radius-md);
+  padding: var(--fc-space-md);
+}
+.fcx-guide__chapter figure svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  max-width: 56rem;
+}
+.fcx-guide__chapter figcaption {
+  font-size: var(--fc-font-size-sm);
+  color: #0c2748;
+  margin-top: var(--fc-space-sm);
+}
+.fcx-guide__chapter .fignum {
+  font-weight: var(--fc-font-weight-semibold);
+}
+.fcx-guide__chapter pre {
+  overflow-x: auto;
+}
+.fcx-guide__hits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fc-space-xs);
+}
