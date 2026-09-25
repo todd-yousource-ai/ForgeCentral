@@ -16,6 +16,39 @@ export interface IsolateVars {
   readonly commandId: string;
 }
 
+/** A failed isolate command with its HTTP status, so the drawer can say what happened. */
+export class IsolateError extends Error {
+  constructor(readonly status: number) {
+    super(`isolate failed: ${String(status)}`);
+    this.name = 'IsolateError';
+  }
+}
+
+/** The operator-facing line for a failed isolate. */
+export function isolateFailure(error: Error): string {
+  if (!(error instanceof IsolateError)) return 'Isolation could not reach ForgeCentral.';
+  switch (error.status) {
+    case 401:
+      return 'Your session has expired. Sign in again; nothing was recorded.';
+    case 403:
+      return 'The engine refused the isolation.';
+    case 400:
+    case 405:
+      return 'Isolation is not available for this entity as sent.';
+    case 503:
+      return 'The engine is unavailable; nothing was recorded.';
+    default:
+      return 'The engine could not complete the isolation; check the entity before retrying.';
+  }
+}
+
+/** The operator-facing line for a recorded isolation: the effect as the engine reported it. */
+export function isolateRecorded(effect: IsolateEffect): string {
+  return effect.enforcementActive
+    ? `Isolation recorded (${effect.posture}) and enforced.`
+    : `Isolation recorded (${effect.posture}) and audited. Enforcement is off: nothing is sent to an endpoint.`;
+}
+
 async function postIsolate(ref: EntityRef, vars: IsolateVars): Promise<IsolateEffect> {
   const res = await fetch(`/api/entity/${ref.kind}/${encodeURIComponent(ref.id)}/isolate`, {
     method: 'POST',
@@ -24,7 +57,7 @@ async function postIsolate(ref: EntityRef, vars: IsolateVars): Promise<IsolateEf
     body: JSON.stringify({ commandId: vars.commandId, posture: vars.posture }),
   });
   if (!res.ok) {
-    throw new Error(`isolate failed: ${String(res.status)}`);
+    throw new IsolateError(res.status);
   }
   return (await res.json()) as IsolateEffect;
 }

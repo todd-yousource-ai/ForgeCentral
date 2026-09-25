@@ -11,7 +11,7 @@ import {
 } from '@forge/contracts';
 
 import { entityQueryKey, fetchEntityDetail, useEntityDetail } from '../entity/useEntityDetail.js';
-import { useIsolate } from '../entity/useIsolate.js';
+import { isolateFailure, isolateRecorded, useIsolate } from '../entity/useIsolate.js';
 import { useClassMembers } from '../surfaces/useClassMembers.js';
 import { useEntityConnections, type ConnectionSubject } from '../surfaces/useEntityConnections.js';
 
@@ -175,6 +175,17 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
               connections={connectionsSection}
               connectionsLoading={connectionSubject !== null && connections.isLoading}
               actions={{ onIsolate: () => setConfirm({ commandId: crypto.randomUUID() }) }}
+              actionNotice={
+                isolate.isSuccess ? (
+                  <p className="fcx-isolate-result" role="status">
+                    {isolateRecorded(isolate.data)}
+                  </p>
+                ) : isolate.isError ? (
+                  <p className="fcx-isolate-result" role="alert">
+                    {isolateFailure(isolate.error)}
+                  </p>
+                ) : null
+              }
             />
             <ConfirmDialog
               open={confirm !== null}
@@ -192,17 +203,6 @@ export function DrawerHost({ children }: { readonly children: ReactNode }): Reac
                 setConfirm(null);
               }}
             />
-            {isolate.isSuccess ? (
-              <p className="fcx-isolate-result" role="status">
-                Isolation recorded ({isolate.data.posture}). Enforcement is off; the disposition is
-                audited and distributed to the endpoint.
-              </p>
-            ) : null}
-            {isolate.isError ? (
-              <p className="fcx-isolate-result" role="alert">
-                Isolation could not be recorded (refused or unavailable).
-              </p>
-            ) : null}
           </>
         )
       ) : container !== null ? (
