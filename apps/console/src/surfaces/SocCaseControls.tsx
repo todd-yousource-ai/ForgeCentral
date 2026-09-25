@@ -22,7 +22,7 @@
 // the id the Console submits (crdb rider C.1r validates it engine-side once that store exists).
 
 import { useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog, FieldHint } from '@forge/design';
+import { Badge, ConfirmDialog, DisabledReason, FieldHint } from '@forge/design';
 import {
   DISPOSITIONS,
   REMEDIATION_ACTIONS,
@@ -283,6 +283,7 @@ export function SocCaseControls({ incidentId }: SocCaseControlsProps): ReactElem
           data-testid="soc-assign"
           // A malformed id is refused HERE (the BFF parser would 400 it) rather than sent.
           disabled={!assigneeValid || busy}
+          aria-describedby="soc-assign-reason"
           onClick={() => {
             setPending({
               kind: 'act',
@@ -292,6 +293,11 @@ export function SocCaseControls({ incidentId }: SocCaseControlsProps): ReactElem
         >
           Assign
         </button>
+        {!assigneeValid ? (
+          <DisabledReason id="soc-assign-reason">
+            Enter the assignee&apos;s principal id, in the form shown.
+          </DisabledReason>
+        ) : null}
         <button
           type="button"
           className="fcx-socv__control"
@@ -415,10 +421,11 @@ export function SocCaseControls({ incidentId }: SocCaseControlsProps): ReactElem
           className="fcx-socv__control"
           data-testid="soc-disposition"
           disabled={dispositionDraft === null || busy}
+          aria-describedby="soc-disposition-note"
         >
           Record disposition
         </button>
-        <span className="fcx-socv__controls-note">
+        <span className="fcx-socv__controls-note" id="soc-disposition-note">
           {form.disposition === 'undetermined'
             ? 'Closes the incident with no verdict label; unlike a plain close, the trail records that an operator ruled it undetermined.'
             : form.disposition === 'false_positive'

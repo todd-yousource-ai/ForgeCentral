@@ -408,10 +408,16 @@ function NotesPane({ incidentId }: { readonly incidentId: string }): ReactElemen
             className="fcx-socv__control"
             data-testid="soc-note-record"
             disabled={trimmed === '' || overCap || record.isPending}
+            aria-describedby="soc-note-count"
           >
             Record note
           </button>
-          <span className="fcx-socv__controls-note" data-testid="soc-note-count">
+          <span
+            className="fcx-socv__controls-note"
+            id="soc-note-count"
+            data-testid="soc-note-count"
+          >
+            {trimmed === '' && !overCap ? 'Write a note to record it. ' : ''}
             {overCap
               ? `${String(draft.length)} of ${String(MAX_NOTE_CHARS)} characters: over the engine's ceiling.`
               : `${String(draft.length)} of ${String(MAX_NOTE_CHARS)} characters. Accepted on a closed incident too; audited and not deletable.`}

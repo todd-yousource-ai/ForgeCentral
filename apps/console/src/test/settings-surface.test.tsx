@@ -130,13 +130,25 @@ describe('the Settings tab SOC section (S3.18)', () => {
     const view = renderWithProviders(<SettingsSurface />, { route: '/settings' });
     await screen.findByTestId('settings-dual-control');
     expect(screen.getByRole('button', { name: 'Commit tiers' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Commit write-back' })).toBeDisabled();
+    const writeBack = screen.getByRole('button', { name: 'Commit write-back' });
+    expect(writeBack).toBeDisabled();
+    // GD.13: every locked control is described by the dual-control notice, which links to the cause.
+    expect(writeBack).toHaveAccessibleDescription(/tenant-config under dual control/);
+    expect(screen.getByTestId('settings-p-low')).toHaveAccessibleDescription(/dual control/);
+    expect(screen.getByRole('link', { name: 'Why these controls are locked' })).toHaveAttribute(
+      'href',
+      '/settings?tab=readme#soc-set-restrictions',
+    );
     view.unmount();
     vi.unstubAllGlobals();
     mockSettings(null, ACCEPTED);
     renderWithProviders(<SettingsSurface />, { route: '/settings' });
     await screen.findByText('Admin or SecurityAudit tier required');
     expect(screen.queryByTestId('settings-soc')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Who can configure what' })).toHaveAttribute(
+      'href',
+      '/settings?tab=readme#cfg-who',
+    );
   });
 });
 
@@ -344,8 +356,10 @@ describe('knob edits on the Configuration tab (ST.2a)', () => {
     renderWithProviders(<SettingsSurface />, { route: '/settings' });
     fireEvent.click(await screen.findByRole('tab', { name: 'Configuration' }));
     const table = await screen.findByTestId('settings-configuration');
-    // The boot-bound row on the first surface is read-only.
-    expect(within(table).getAllByText('read-only').length).toBeGreaterThan(0);
+    // The boot-bound row on the first surface is read-only, with a link to why (GD.13).
+    expect(within(table).getAllByText(/read-only/).length).toBeGreaterThan(0);
+    const why = within(table).getAllByRole('link', { name: /^Why .* is read-only$/ })[0];
+    expect(why).toHaveAttribute('href', '/settings?tab=readme#cfg-apply');
     expect(
       screen.queryByRole('button', { name: 'Edit admin_endpoint.max_payload_bytes' }),
     ).toBeNull();

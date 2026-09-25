@@ -18,6 +18,7 @@ import {
   Badge,
   ConfirmDialog,
   DataTable,
+  DisabledReason,
   TabStrip,
   type BadgeVariant,
   type DataTableColumn,
@@ -195,9 +196,13 @@ function UserForm({
         type="submit"
         className="fcx-btn fcx-btn--primary"
         disabled={active.isPending || username.trim() === ''}
+        aria-describedby="user-submit-reason"
       >
         {active.isPending ? 'Committing...' : editing === null ? 'Create User' : 'Save'}
       </button>
+      {username.trim() === '' ? (
+        <DisabledReason id="user-submit-reason">Needs a user name.</DisabledReason>
+      ) : null}
       <button type="button" className="fcx-btn" onClick={onDone}>
         Cancel
       </button>
@@ -563,9 +568,13 @@ function GroupsTab({
             type="submit"
             className="fcx-btn fcx-btn--primary"
             disabled={create.isPending || name.trim() === ''}
+            aria-describedby="group-submit-reason"
           >
             {create.isPending ? 'Creating...' : 'Create'}
           </button>
+          {name.trim() === '' ? (
+            <DisabledReason id="group-submit-reason">Needs a group name.</DisabledReason>
+          ) : null}
           <button type="button" className="fcx-btn" onClick={() => setCreating(false)}>
             Cancel
           </button>

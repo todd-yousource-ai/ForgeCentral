@@ -130,10 +130,11 @@ export function OverviewSurface(): ReactElement {
             className="fcx-btn"
             onClick={() => setVtzPage((p) => Math.max(0, p - 1))}
             disabled={activePage === 0}
+            aria-describedby="ov-pager-status"
           >
             Previous zones
           </button>
-          <span className="fcx-ov-pager__status" aria-live="polite">
+          <span className="fcx-ov-pager__status" id="ov-pager-status" aria-live="polite">
             Zones {activePage + 1} of {pageCount}
           </span>
           <button
@@ -141,6 +142,7 @@ export function OverviewSurface(): ReactElement {
             className="fcx-btn"
             onClick={() => setVtzPage((p) => Math.min(pageCount - 1, p + 1))}
             disabled={activePage >= pageCount - 1}
+            aria-describedby="ov-pager-status"
           >
             More zones
           </button>

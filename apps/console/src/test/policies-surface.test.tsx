@@ -266,8 +266,10 @@ describe('the Policies surface (P5.3) groups the real policies by VTZ', () => {
       (o) => o.textContent,
     );
     expect(levels).toEqual(['Full', 'Sampled', 'Off']);
-    // Incomplete (no subjects/targets): Save as Draft is disabled.
-    expect(screen.getByRole('button', { name: 'Save as Draft' })).toBeDisabled();
+    // Incomplete (no subjects/targets): Save as Draft is disabled, and says what is missing (GD.13).
+    const draft = screen.getByRole('button', { name: 'Save as Draft' });
+    expect(draft).toBeDisabled();
+    expect(draft).toHaveAccessibleDescription(/^Needs a name, a zone, a subject, a target\.$/);
   });
 
   it('authors a draft through the audited route with the built cross-product ruleset', async () => {

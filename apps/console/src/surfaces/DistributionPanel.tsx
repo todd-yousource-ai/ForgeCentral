@@ -6,7 +6,9 @@
 // (INV-CONSOLE-NO-STUB); an unconfirmed box never reads as a delivered one.
 
 import { useMemo, useState, type ReactElement } from 'react';
-import { ConfirmDialog } from '@forge/design';
+import { ConfirmDialog, DisabledReason } from '@forge/design';
+
+import { GuideLink } from '../guide/GuideLink.js';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { useBundleConvergence, useDistribute } from './useDistribution.js';
@@ -97,12 +99,19 @@ export function DistributionPanel({
             type="button"
             className="fcx-btn"
             disabled={distribute.isPending || scope.length === 0}
+            aria-describedby="distribution-empty-reason"
             onClick={() => setConfirming(true)}
           >
             {distribute.isPending
               ? 'Re-distributing…'
               : `Commit & re-distribute to ${String(scope.length)} endpoint${scope.length === 1 ? '' : 's'}`}
           </button>
+          {scope.length === 0 ? (
+            <DisabledReason id="distribution-empty-reason">
+              No endpoint holds this zone&apos;s bundle, so there is nowhere to re-distribute it.{' '}
+              <GuideLink section="dist-restrictions">About distribution</GuideLink>
+            </DisabledReason>
+          ) : null}
 
           <ConfirmDialog
             open={confirming}

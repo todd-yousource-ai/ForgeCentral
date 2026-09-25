@@ -1,6 +1,7 @@
 // apps/console/src/test/field-help.test.tsx -- IP-CONSOLE-11-guide GD.12b: the configuration forms
 // outside Settings state their limits under each field and hold values to the engine's own rules
-// before the confirm (the VTZ editor, the risk-acceptance date and the IdAM cadences).
+// before the confirm (the VTZ editor, the risk-acceptance date and the IdAM cadences); GD.13: a
+// disabled control says why.
 
 import {
   DEFAULT_REAUTH_INTERVAL_HOURS,
@@ -127,5 +128,40 @@ describe('the IdAM onboarding cadences (GD.12b)', () => {
       target: { value: '0' },
     });
     expect(connect).toBeDisabled();
+  });
+});
+
+describe('a disabled control says why (GD.13)', () => {
+  it('the VTZ editor names what is missing', () => {
+    editor();
+    expect(screen.getByRole('button', { name: 'Create zone' })).toHaveAccessibleDescription(
+      'Needs a name.',
+    );
+  });
+
+  it('the IdAM form lists the missing fields, then the cadence', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }),
+        ),
+      ),
+    );
+    renderWithProviders(<IdamConnectorsPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Onboard Auth0' }));
+    const save = screen.getByRole('button', { name: 'Save connector' });
+    expect(save).toHaveAccessibleDescription(
+      'Needs the provider domain, the client ID, the client secret.',
+    );
+    fireEvent.change(screen.getByLabelText('Provider Domain'), {
+      target: { value: 'x.auth0.com' },
+    });
+    fireEvent.change(screen.getByLabelText('Client ID'), { target: { value: 'cid' } });
+    fireEvent.change(screen.getByLabelText(/Client Secret/), { target: { value: 's' } });
+    fireEvent.change(screen.getByLabelText('Delta poll interval (seconds)'), {
+      target: { value: '1' },
+    });
+    expect(save).toHaveAccessibleDescription('A cadence is outside its range.');
   });
 });

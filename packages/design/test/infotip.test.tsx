@@ -1,9 +1,9 @@
-// packages/design/test/infotip.test.tsx -- GD.12 InfoTip (toggle-tip) and FieldHint a11y tests.
+// packages/design/test/infotip.test.tsx -- GD.12 InfoTip and FieldHint, GD.13 DisabledReason a11y tests.
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { FieldHint, InfoTip } from '../src/index.js';
+import { DisabledReason, FieldHint, InfoTip } from '../src/index.js';
 
 describe('InfoTip', () => {
   it('is a named button, collapsed, with no note text until opened', () => {
@@ -52,6 +52,22 @@ describe('FieldHint', () => {
     );
     expect(screen.getByRole('textbox', { name: 'Value' })).toHaveAccessibleDescription(
       'At most 256 characters.',
+    );
+  });
+});
+
+describe('DisabledReason', () => {
+  it('gives a disabled control a reason read with it', () => {
+    render(
+      <>
+        <button type="button" disabled aria-describedby="r1">
+          Commit
+        </button>
+        <DisabledReason id="r1">Under dual control: propose instead.</DisabledReason>
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Commit' })).toHaveAccessibleDescription(
+      'Under dual control: propose instead.',
     );
   });
 });

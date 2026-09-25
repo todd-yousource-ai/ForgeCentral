@@ -46,6 +46,7 @@ import { SocPlanEditor } from './SocPlanEditor.js';
 import { useCognitionRun } from './useCognitionRun.js';
 import { PlanCommandError, useApprovePlan, useModifyPlan } from './usePlanCommand.js';
 import { useSocImpact, useSocNarrative } from './useSoc.js';
+import { GuideLink } from '../guide/GuideLink.js';
 
 /**
  * The Business impact block (crdb ED.4 + ED.5): band + checkable factors + the sentence in its
@@ -357,13 +358,18 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
           className="fcx-socv__control"
           data-testid="soc-generate"
           disabled={run.isPending || run.data?.state === 'started' || run.data?.state === 'running'}
+          aria-describedby="soc-generate-note"
           onClick={() => {
             run.mutate(incidentId);
           }}
         >
           Generate verdict
         </button>
-        <span className="fcx-socv__controls-note" data-testid="soc-generate-note">
+        <span
+          className="fcx-socv__controls-note"
+          id="soc-generate-note"
+          data-testid="soc-generate-note"
+        >
           {run.isPending
             ? 'Asking the engine.'
             : run.isError
@@ -381,8 +387,9 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
       <h5 className="fcx-socv__sub">Already enforced</h5>
       <p className="fcx-socv__state-detail">
         {executed.length === 0
-          ? 'Nothing. Enforcement is off on this deployment, so no step of any response has been carried out.'
-          : `${String(executed.length)} step(s) carried out.`}
+          ? 'Nothing. Enforcement is off on this deployment, so no step of any response has been carried out. '
+          : `${String(executed.length)} step(s) carried out. `}
+        <GuideLink section="cfg-endpoints">What enforcement off means</GuideLink>
       </p>
 
       <h5 className="fcx-socv__sub">Business impact</h5>
@@ -416,6 +423,7 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
           type="button"
           className="fcx-socv__control"
           disabled={detail.plan.length === 0 || detail.planApproved || approve.isPending}
+          aria-describedby="soc-plan-controls-note"
           onClick={() => {
             setConfirming(true);
           }}
@@ -428,18 +436,21 @@ export function SocVerdictPanel({ incidentId, detail, kpis }: SocVerdictPanelPro
           // Editing is refused once approved -- an edit under a recorded authorization would make
           // the audit trail say an operator approved steps they never saw.
           disabled={detail.plan.length === 0 || detail.planApproved || editing}
+          aria-describedby="soc-plan-controls-note"
           onClick={() => {
             setEditing(true);
           }}
         >
           Modify plan
         </button>
-        <span className="fcx-socv__controls-note">
+        <span className="fcx-socv__controls-note" id="soc-plan-controls-note">
           {detail.plan.length === 0
             ? 'Nothing to act on: no plan has been proposed.'
             : detail.planApproved
               ? 'This plan is already approved. A second approval is refused, not re-recorded.'
-              : 'Approval is audited under your principal, and authorizes only the steps listed above.'}
+              : editing
+                ? 'The plan is open for editing below; save or cancel it first.'
+                : 'Approval is audited under your principal, and authorizes only the steps listed above.'}
         </span>
       </div>
 

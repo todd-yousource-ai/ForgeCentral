@@ -18,6 +18,8 @@ import {
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { useGovernedSettings, useSecuritySession, useSettingsReports } from './useSettings.js';
+import { TierRequired } from './TierRequired.js';
+import { GuideLink } from '../guide/GuideLink.js';
 
 interface Fact {
   readonly label: string;
@@ -43,12 +45,23 @@ function Facts({ caption, facts }: { readonly caption: string; readonly facts: r
   );
 }
 
-/** A control or value the engine does not serve yet, stated with the engine work that owns it. */
-function Pending({ what, owner }: { readonly what: string; readonly owner: string }): ReactElement {
+/**
+ * A control or value the engine does not serve yet, stated with the engine work that owns it and a link
+ * to the guide section that explains it (INV-GUIDE-DISABLED-EXPLAINED).
+ */
+function Pending({
+  what,
+  owner,
+  section,
+}: {
+  readonly what: string;
+  readonly owner: string;
+  readonly section: string;
+}): ReactElement {
   return (
     <p className="fcx-settings__hint">
       <Badge variant="neutral">Not available</Badge> {what} The engine has no verb or read for it
-      yet: {owner}.
+      yet: {owner}. <GuideLink section={section}>More in the guide</GuideLink>
     </p>
   );
 }
@@ -74,12 +87,7 @@ function WithReports({
     );
   }
   if (reports.data === null) {
-    return (
-      <EmptyState
-        title="Admin or SecurityAudit tier required"
-        hint="The engine serves its admin plane reports to Admin and SecurityAudit operators only."
-      />
-    );
+    return <TierRequired what="its admin plane reports" />;
   }
   if (!reports.data.adminPlane) {
     return (
@@ -114,6 +122,7 @@ function SessionKx(): ReactElement {
   if (kx.status === 'unconfigured') {
     return (
       <Pending
+        section="posture-security"
         what="The key exchange negotiated for this browser session is not shown on this install."
         owner="the Console sidecar's session lookup is not provisioned (re-run the Console installer)"
       />
@@ -239,6 +248,7 @@ export function KeyLockTab(): ReactElement {
               />
             )}
             <Pending
+              section="posture-keylock"
               what="Signing-key rotation and the signing key ids the audit chain names are not shown, and there is no Rotate control."
               owner="TRD-04 signing-key rotation as an admin verb (crdb IP-CONSOLE-SETTINGS-WIRE SET.6c)"
             />
@@ -295,6 +305,7 @@ export function ObservabilityTab(): ReactElement {
       </WithReports>
       <ObservabilityKnobs />
       <Pending
+        section="posture-observability"
         what="The telemetry exporter configuration is set at boot and is not shown or editable here."
         owner="a runtime exporter configuration (crdb IP-CONSOLE-SETTINGS-WIRE SET.6d)"
       />
@@ -331,6 +342,7 @@ export function TopologyTab(): ReactElement {
         }
       </WithReports>
       <Pending
+        section="posture-ha"
         what="The cluster leader, per-node lag, Rotate Leadership and Test Quorum Loss are not available; the configured regions and shard placement are boot configuration the engine does not serve."
         owner="TRD-07 cluster status and leadership as admin verbs (crdb IP-CONSOLE-SETTINGS-WIRE SET.6a)"
       />

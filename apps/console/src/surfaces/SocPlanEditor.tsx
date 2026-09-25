@@ -137,18 +137,23 @@ export function SocPlanEditor({
         >
           Add step
         </button>
-        <button type="submit" className="fcx-socv__control" disabled={invalid || saving}>
+        <button
+          type="submit"
+          className="fcx-socv__control"
+          disabled={invalid || saving}
+          aria-describedby="soc-plan-note"
+        >
           Save plan
         </button>
         <button type="button" className="fcx-socv__control" onClick={onCancel}>
           Cancel
         </button>
         {invalid ? (
-          <span className="fcx-socv__controls-note">
+          <span className="fcx-socv__controls-note" id="soc-plan-note">
             Every step needs a title. The engine refuses a blank one.
           </span>
         ) : (
-          <span className="fcx-socv__controls-note">
+          <span className="fcx-socv__controls-note" id="soc-plan-note">
             Saving replaces the proposed steps and bumps the revision, so an approval issued against
             the old plan is refused rather than applied.
           </span>
