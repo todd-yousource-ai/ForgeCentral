@@ -12,7 +12,8 @@
 // dual control the engine refuses the write and this surface says so up front rather than offering a
 // button that cannot work.
 
-import { useEffect, useState, type ReactElement } from 'react';
+import { Suspense, lazy, useEffect, useState, type ReactElement } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Badge, ConfirmDialog, DataTable, GlassPanel, TabStrip } from '@forge/design';
 import type {
   SettingRow,
@@ -504,6 +505,9 @@ function SocTab(): ReactElement {
   );
 }
 
+// The ReadMe (IP-CONSOLE-11-guide GD.2) is its own chunk: the guide's content loads only when opened.
+const ReadmeTab = lazy(() => import('../guide/ReadmeTab.js'));
+
 /** The tabs whose engine bindings are live (TRD-CONSOLE-11 Section 9.2); the rest are absent. */
 const SETTINGS_TABS = [
   { id: 'soc', label: 'SOC' },
@@ -516,10 +520,18 @@ const SETTINGS_TABS = [
   { id: 'observability', label: 'Observability' },
   { id: 'topology', label: 'HA & Topology' },
   { id: 'fips', label: 'FIPS Mode' },
+  { id: 'readme', label: 'ReadMe' },
 ] as const;
 
+const TAB_IDS: ReadonlySet<string> = new Set(SETTINGS_TABS.map((t) => t.id));
+
 export function SettingsSurface(): ReactElement {
-  const [tab, setTab] = useState<string>('soc');
+  // The active tab lives in the URL (`?tab=`), so a tab (and the ReadMe's section hash) survives a
+  // reload and can be linked to (INV-GUIDE-ADDRESSABLE). An unknown value falls back to SOC.
+  const [params, setParams] = useSearchParams();
+  const requested = params.get('tab') ?? 'soc';
+  const tab = TAB_IDS.has(requested) ? requested : 'soc';
+  const setTab = (id: string): void => setParams({ tab: id });
   return (
     <section className="fcx-surface" aria-labelledby="surface-settings">
       <h2 id="surface-settings" className="fcx-surface__heading">
@@ -544,6 +556,10 @@ export function SettingsSurface(): ReactElement {
         <TopologyTab />
       ) : tab === 'fips' ? (
         <FipsTab />
+      ) : tab === 'readme' ? (
+        <Suspense fallback={<LoadingState label="Opening the guide" />}>
+          <ReadmeTab />
+        </Suspense>
       ) : (
         <SocTab />
       )}

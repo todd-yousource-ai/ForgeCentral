@@ -237,6 +237,8 @@ describe('the Settings tab strip and the Configuration tab (ST.1)', () => {
       'Observability',
       'HA & Topology',
       'FIPS Mode',
+      // The configuration guide (IP-CONSOLE-11-guide GD.2): static content plus the live reference.
+      'ReadMe',
     ]);
     await screen.findByTestId('settings-soc');
   });
