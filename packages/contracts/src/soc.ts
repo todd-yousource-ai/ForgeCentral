@@ -1648,6 +1648,23 @@ export const CLASSIFICATION_TAGS = [
 ] as const;
 export type ClassificationTag = (typeof CLASSIFICATION_TAGS)[number];
 
+/**
+ * The top of the SOC tier scale (milli). The engine refuses a pair unless p_low <= p_high <= this bound
+ * (crdb `cdb-admin` config_document tier check); the Console form enforces and shows the same rule.
+ */
+export const SOC_TIER_MILLI_MAX = 1000;
+
+/** True when a tier pair is one the engine would accept: integers, 0 <= p_low <= p_high <= the max. */
+export function socTiersOrdered(pLowMilli: number, pHighMilli: number): boolean {
+  return (
+    Number.isInteger(pLowMilli) &&
+    Number.isInteger(pHighMilli) &&
+    pLowMilli >= 0 &&
+    pLowMilli <= pHighMilli &&
+    pHighMilli <= SOC_TIER_MILLI_MAX
+  );
+}
+
 export interface SocTierSettings {
   readonly pLowMilli: number;
   readonly pHighMilli: number;

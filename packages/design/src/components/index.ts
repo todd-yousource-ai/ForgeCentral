@@ -15,3 +15,4 @@ export * from './OverviewSankeyFlow.js';
 export * from './VtzZoneCard.js';
 export * from './GlassPanel.js';
 export * from './AmbientBackdrop.js';
+export * from './InfoTip.js';

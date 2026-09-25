@@ -429,6 +429,15 @@ function textOrNull(text: string | undefined): string | null {
 /** The most edits one commit carries (the engine bounds a batch by its registry size). */
 export const MAX_SETTING_EDITS = 64;
 
+/** The longest value (characters) one setting edit may carry. */
+export const MAX_SETTING_VALUE_CHARS = 256;
+
+/** The longest text (characters) one entry of a list-valued section may carry. */
+export const MAX_SECTION_TEXT_CHARS = 256;
+
+/** The longest egress destination id (characters). */
+export const MAX_EGRESS_ID_CHARS = 128;
+
 /**
  * Narrow a client request body closed: `{key, value}` strings in the registry key shape (at most
  * [`MAX_SETTING_EDITS`]) and / or a well-formed section patch; at least one of the two. The ENGINE
@@ -455,7 +464,7 @@ export function toSettingsCommitRequest(raw: unknown): SettingsCommitRequest | n
       typeof key !== 'string' ||
       typeof value !== 'string' ||
       !/^[a-z_][a-z0-9_.]{0,127}$/.test(key) ||
-      value.length > 256
+      value.length > MAX_SETTING_VALUE_CHARS
     ) {
       return null;
     }
@@ -475,6 +484,12 @@ export function toSettingsCommitRequest(raw: unknown): SettingsCommitRequest | n
   return sections === undefined ? { edits } : { edits, sections };
 }
 
+/**
+ * The top of the LUG binding-confirm threshold (permille). The engine refuses a larger value, and
+ * refuses an enabled LUG with any of its four caps at 0 (crdb `cdb-admin` config_document LUG check).
+ */
+export const LUG_THRESHOLD_PERMILLE_MAX = 1000;
+
 /** The most entries a list-valued section may carry in one patch. */
 export const MAX_SECTION_ENTRIES = 256;
 
@@ -484,7 +499,7 @@ function stringList(raw: unknown): string[] | null {
   }
   const out: string[] = [];
   for (const v of raw as unknown[]) {
-    if (typeof v !== 'string' || v.length > 256) {
+    if (typeof v !== 'string' || v.length > MAX_SECTION_TEXT_CHARS) {
       return null;
     }
     out.push(v);
@@ -527,7 +542,7 @@ export function toSectionPatch(raw: unknown): SectionPatch | null {
       if (
         typeof id !== 'string' ||
         id.trim() === '' ||
-        id.length > 128 ||
+        id.length > MAX_EGRESS_ID_CHARS ||
         typeof ceiling !== 'string' ||
         !(CLASSIFICATION_TAGS as readonly string[]).includes(ceiling)
       ) {
@@ -595,7 +610,7 @@ export function toSectionPatch(raw: unknown): SectionPatch | null {
   }
   if (p['socNarrativeModelRef'] !== undefined) {
     const ref = p['socNarrativeModelRef'];
-    if (typeof ref !== 'string' || ref.length > 256) return null;
+    if (typeof ref !== 'string' || ref.length > MAX_SECTION_TEXT_CHARS) return null;
     out.socNarrativeModelRef = ref;
   }
   return Object.keys(out).length === 0 ? null : out;

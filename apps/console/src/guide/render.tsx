@@ -2,16 +2,20 @@
 //
 // The tree holds only the generator's allowlisted tags and attributes; this renderer maps each one to
 // its React prop (class -> className, SVG presentation attributes to camelCase, a style string to an
-// object) and turns every in-guide link into a navigation inside the ReadMe. It never sets HTML.
+// object) and turns every in-guide link into a navigation inside the ReadMe. A `data-const` marker
+// renders the live Console constant it names (GD.12). It never sets HTML.
 
 import { createElement, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 
+import { GUIDE_CONSTANTS } from './constants.js';
 import type { GuideNode } from './model.js';
 
 /** How the renderer navigates a link and fills a live Settings reference table. */
 export interface GuideRenderContext {
   readonly onNavigate: (id: string) => void;
   readonly reference: (keys: readonly string[], id: string) => ReactElement;
+  /** The constants a `data-const` marker renders from; defaults to the Console's own. */
+  readonly constants?: Readonly<Record<string, number>>;
 }
 
 const RENAMED: Readonly<Record<string, string>> = {
@@ -46,6 +50,18 @@ function renderNode(node: GuideNode, key: number, ctx: GuideRenderContext): Reac
   if (node.t === 'x-settings-reference') {
     const keys = (attrs['keys'] ?? '').split(' ').filter((k) => k !== '');
     return <div key={key}>{ctx.reference(keys, attrs['id'] ?? '')}</div>;
+  }
+  const constName = attrs['data-const'];
+  if (constName !== undefined) {
+    // The value comes from the code that enforces it; the authored text is the PDF's copy of it.
+    const value = (ctx.constants ?? GUIDE_CONSTANTS)[constName];
+    if (value !== undefined) {
+      return (
+        <span key={key} className={attrs['class']} data-const={constName}>
+          {String(value)}
+        </span>
+      );
+    }
   }
   const props: Record<string, unknown> = { key };
   for (const [name, value] of Object.entries(attrs)) {
