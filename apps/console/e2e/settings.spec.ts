@@ -402,6 +402,20 @@ test('the ReadMe: a guide section within 3 clicks of the Overview, a deep link t
   expect(bff.posts).toEqual([]);
 });
 
+test('Help opens the guide section for the active tab in a full-height side panel (GD.11)', async ({
+  page,
+}) => {
+  await mockBff(page);
+  await page.goto('/settings?tab=configuration');
+  await page.getByRole('button', { name: 'Help' }).click();
+  const panel = page.getByRole('dialog', { name: 'The governed configuration' });
+  await expect(
+    panel.getByText(/The governed configuration is a single document the Forge engine validates/),
+  ).toBeInViewport();
+  await panel.getByRole('link', { name: 'Read the full chapter' }).click();
+  await expect(page).toHaveURL(/\/settings\?tab=readme#ch-settings-configuration$/);
+});
+
 test('the tier below Admin / SecurityAudit is an honest empty state on every engine tab', async ({
   page,
 }) => {

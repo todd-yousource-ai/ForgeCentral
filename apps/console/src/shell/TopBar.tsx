@@ -1,4 +1,5 @@
 import { Suspense, lazy, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import { Badge } from '@forge/design';
@@ -50,18 +51,23 @@ function HelpButton(): ReactElement | null {
       >
         Help
       </button>
-      {open ? (
-        <Suspense fallback={null}>
-          <HelpPanel
-            sectionId={sectionId}
-            onClose={() => {
-              setOpen(false);
-              // Back to the control the operator came from.
-              trigger.current?.focus();
-            }}
-          />
-        </Suspense>
-      ) : null}
+      {/* Portalled to the body: the top bar's glass styling would otherwise confine the drawer's
+          fixed-position overlay to the bar itself. */}
+      {open
+        ? createPortal(
+            <Suspense fallback={null}>
+              <HelpPanel
+                sectionId={sectionId}
+                onClose={() => {
+                  setOpen(false);
+                  // Back to the control the operator came from.
+                  trigger.current?.focus();
+                }}
+              />
+            </Suspense>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
