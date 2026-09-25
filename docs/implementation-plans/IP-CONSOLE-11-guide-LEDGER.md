@@ -7,7 +7,9 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25, GD.8 in progress):** GD.8 ON BRANCH `docs/console-11-gd8-soc`: `TRD-CONSOLE-03` refreshed (a
+- **State (2026-09-25):** GD.8 MERGED `73999e6` (operator: "Approve and continue"). NEXT = GD.9 (TRD-CONSOLE-09 and
+  -08 refresh; the Logs and Reports chapters re-verified).
+- **Earlier (2026-09-25):** GD.8 ON BRANCH `docs/console-11-gd8-soc`: `TRD-CONSOLE-03` refreshed (a
   Section 0b as built, the binding table replaced, resolved deferrals marked, known gaps added, A11 marked
   unmet); the IP-CONSOLE-03 ledger corrected (hashes, S3.9b, the wire fix, S3.14 NOT BUILT, prerequisites,
   a new Resume-here); chapter 13 re-verified (calibration only from true / false positives, a false
@@ -122,7 +124,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.5 | 11.6 | MERGED `7b7676f` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-10 refreshed (Section 8); chapter 10 re-verified; objects failure copy fixed; coverage `objects.*` |
 | GD.6 | 11.6 | MERGED `19db9a4` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-05 refreshed; chapters 11-12 re-verified; policy Delete fixed (CD-52); coverage `policies.*` |
 | GD.7 | 11.6 | MERGED `fae079b` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-04 refreshed; chapters 7-8 re-verified; connector Syncing (CD-56) and users copy (CD-55) fixed; coverage users/groups/idam |
-| GD.8 | 11.6 | ON BRANCH | | TRD-CONSOLE-03 refreshed; IP-CONSOLE-03 ledger corrected; chapter 13 re-verified; SOC copy fixed (CD-60); coverage `soc.*` |
+| GD.8 | 11.6 | MERGED `73999e6` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-03 refreshed; IP-CONSOLE-03 ledger corrected; chapter 13 re-verified; SOC copy fixed (CD-60); coverage `soc.*` |
 | GD.9 | 11.6 | PLANNED | | TRD-CONSOLE-09, -08 refresh; chapters re-verified |
 | GD.10 | 11.6 | PLANNED | | TRD-CONSOLE-01, -12, -00 refresh; chapters re-verified |
 | GD.11 | 11.2 (2) | PLANNED | | the contextual side panel |
