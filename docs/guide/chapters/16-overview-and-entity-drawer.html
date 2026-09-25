@@ -2,7 +2,7 @@
 
 <p class="lead">The Overview is ForgeCentral's home: a live graph of who and what is connecting to what, grouped through trust zones. You configure nothing on it directly; it is where you notice something and open it. The entity drawer is the detail panel that opens from the Overview, Users, Objects and Logs, and it carries the one action available from anywhere: Isolate.</p>
 
-<h2 id="ovw-availability">Availability</h2>
+<h2 id="ovw-availability" data-covers="overview.live entity.zones entity.effectivePolicies entity.reassignZone entity.remediation entity.fullReport">Availability</h2>
 <div class="tablewrap" id="tab-ovw-availability" data-title="Overview and entity drawer: availability">
 <table class="data">
 <tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
@@ -10,11 +10,11 @@
 <tr><td>Entity drawer</td><td><span class="pill ro">READ-ONLY</span></td><td>Status, information, capabilities, recent decisions, connections.</td></tr>
 <tr><td>Isolate from network</td><td><span class="pill off">RECORDED ONLY</span></td><td>Records a quarantine disposition; nothing is isolated.</td></tr>
 <tr><td>Change an entity's zone, view remediation, open a full report</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Not shown in the drawer.</td></tr>
-<tr><td>Zone membership and effective policies in the drawer</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>The sections say <b class="ui">Not yet available</b>.</td></tr>
+<tr><td>Zone membership and effective policies in the drawer</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>The sections say <b class="ui">Not yet available</b>, followed by the reason.</td></tr>
 </table>
 </div>
 
-<h2 id="ovw-graph">Read the Overview</h2>
+<h2 id="ovw-graph" data-covers="overview.graph overview.members">Read the Overview</h2>
 
 <figure id="fig-ovw-graph" data-title="How the Overview graph is laid out" class="wide">
 <svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
@@ -54,36 +54,46 @@
 
 <ol>
   <li><b>Sources</b>: AI agents, users and devices. Select a lane to list its members.</li>
-  <li><b>Trust zones</b>: each ring is a zone, colored by its risk band. Select a ring to open the zone on <span class="path">Virtual Trust Zones<span class="sep">&gt;</span>Configure</span>. When there are more than three zones, use <b class="ui">Previous zones</b> and <b class="ui">More zones</b>.</li>
-  <li><b>Destinations</b>: network, SaaS apps, private apps and data stores. Select one to list what reaches it.</li>
+  <li><b>Trust zones</b>: each ring is a zone, colored by its risk band and marked with its posture (<b class="ui">Watching</b>, <b class="ui">Standard</b> or <b class="ui">Quarantine</b>). Select a ring you authored to open it on <span class="path">Virtual Trust Zones<span class="sep">&gt;</span>Configure</span>; a demonstration ring opens Configure with no zone selected. When there are more than three zones, use <b class="ui">Previous zones</b> and <b class="ui">More zones</b>.</li>
+  <li><b>Destinations</b>: network, SaaS apps, private apps and data stores. Select one to list the destinations in that category.</li>
 </ol>
 <p>Hover over a source or destination to highlight its paths. The header shows the worst risk band across the zones (<b class="ui">Risk: Nominal</b>, <b class="ui">Elevated</b> or <b class="ui">Critical</b>), <b class="ui">Live</b> while refreshes succeed, <b class="ui">Partial graph</b> when the engine's scan reached its limit, and a banner when a refresh failed and the last graph is still shown.</p>
-<div class="note limit"><p>In this release, the Overview places entities in three built-in demonstration zones (<code>Demo.Users.Public</code>, <code>Demo.Private.Agent</code>, <code>Demo.Public.Agent</code>) by matching entity names, and adds the zones you authored as extra rings. The grouping is not operator configuration and does not reflect zone membership you set; zone membership is not available yet.</p></div>
+<div class="note limit"><p>In this release, the Overview places entities in three built-in demonstration zones (<code>Demo.Users.Public</code>, <code>Demo.Private.Agent</code>, <code>Demo.Public.Agent</code>) by matching parts of entity ids (every other entity goes to <code>Demo.Users.Public</code>), and adds the zones you authored as extra rings that carry no traffic and always read <b class="ui">Nominal</b>. The grouping is not operator configuration and does not reflect zone membership you set; zone membership is not available yet.</p></div>
 
-<h2 id="ovw-drawer">The entity drawer</h2>
-<p>The drawer opens from a row on <span class="path">Users<span class="sep">&gt;</span>All Users</span>, an object's name on Objects, a member of an Overview list, or a decision on Logs. Close it with its close button, <b class="ui">Esc</b>, or a click outside it; when you opened it from an Overview list, <b class="ui">Back</b> returns to the list.</p>
+<h2 id="ovw-drawer" data-covers="overview.entityConnections entity.header entity.info entity.capabilities entity.recentDecisions">The entity drawer</h2>
+<p>The drawer opens from a row on <span class="path">Users<span class="sep">&gt;</span>All Users</span>, an object's name on Objects, a member of an Overview list, or a decision on Logs. Close it with its close button, <b class="ui">Esc</b>, or a click outside it; when you opened it from an Overview list, the back arrow returns to the list.</p>
 <div class="tablewrap" id="tab-ovw-sections" data-title="Entity drawer sections">
 <table class="data">
 <tr><th style="width:24%">Section</th><th>Shows</th></tr>
 <tr><td><b class="ui">Status</b></td><td>The entity's name, kind and status.</td></tr>
 <tr><td><b class="ui">Information</b></td><td>Role, clearance, when it enrolled, and its tags (for users: origin, email, organization, groups, privileges; for objects: selector, lifecycle and current members).</td></tr>
-<tr><td><b class="ui">Capabilities</b></td><td>For AI agents: what the agent is built from and can do, from its signed construction report.</td></tr>
-<tr><td><b class="ui">Recent decisions</b></td><td>For users and agents: the latest decisions involving them.</td></tr>
+<tr><td><b class="ui">Capabilities</b></td><td>For AI agents in the agent directory: what the agent is built from and can do, from its signed construction report, or otherwise its tools, authority and delegations.</td></tr>
+<tr><td><b class="ui">Recent decisions</b></td><td>For users and agents. In this release the section always reads <b class="ui">None.</b>: ForgeCentral asks the engine for the wrong kind of subject. Find decisions on Logs.</td></tr>
 <tr><td><b class="ui">Connections</b></td><td>When opened from the Overview: where the entity connects.</td></tr>
-<tr><td><b class="ui">Connected VTZs</b>, <b class="ui">Effective policies</b></td><td><b class="ui">Not yet available</b>.</td></tr>
+<tr><td><b class="ui">Connected VTZs</b>, <b class="ui">Effective policies</b></td><td><b class="ui">Not yet available</b>, followed by the reason. An object's drawer has no Connected VTZs section.</td></tr>
 </table>
 </div>
 <div class="note limit"><p>An object's drawer shows <b class="ui">Enrolled</b> as 1970-01-01; objects do not enroll, so ignore the value. Recent decisions cannot be opened from the drawer; find them on Logs.</p></div>
 
-<h2 id="ovw-isolate">Isolate an entity</h2>
+<h2 id="ovw-isolate" data-covers="entity.isolate">Isolate an entity</h2>
 <p><b class="ui">Isolate from network</b> records, under your identity, that the entity should be moved into a quarantine posture. The record is audited. Because enforcement is off, nothing is blocked and nothing is sent to the entity's endpoint.</p>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
   <li>Open the entity in the drawer.</li>
-  <li>Under <b class="ui">Quick actions</b>, choose <b class="ui">Isolate from network</b>.</li>
-  <li>Read the confirmation, which states that live enforcement is off, and choose <b class="ui">Isolate</b>. <span class="result">The drawer reads Isolation recorded (quarantine).</span></li>
+  <li>At the foot of the drawer, choose <b class="ui">Isolate from network</b>.</li>
+  <li>Read the confirmation, which states that live enforcement is off, and choose <b class="ui">Isolate</b>. <span class="result">The drawer reads Isolation recorded (quarantine) and audited. Enforcement is off: nothing is sent to an endpoint.</span></li>
 </ol>
 </div>
 <div class="note limit"><p>The success message adds that the disposition is distributed to the endpoint. In this release it is not: the disposition is recorded by the Forge engine only. There is no action to lift an isolation, and <b class="ui">Isolate from network</b> is offered for objects and network destinations too, where it records a disposition that has no endpoint.</p></div>
-<p>If recording fails, the drawer reads <b class="ui">Isolation could not be recorded (refused or unavailable).</b></p>
+<div class="tablewrap" id="tab-ovw-isolate-errors" data-title="Isolate failure messages">
+<table class="data">
+<tr><th style="width:50%">Message</th><th>Meaning</th></tr>
+<tr><td>The engine refused the isolation.</td><td>The Forge engine declined it for your identity.</td></tr>
+<tr><td>Your session has expired. Sign in again; nothing was recorded.</td><td>Sign in again and repeat.</td></tr>
+<tr><td>Isolation is not available for this entity as sent.</td><td>The request did not fit this entity; reload the drawer.</td></tr>
+<tr><td>The engine is unavailable; nothing was recorded.</td><td>Wait and try again.</td></tr>
+<tr><td>The engine could not complete the isolation; check the entity before retrying.</td><td>The engine was reached but failed; the isolation may have been recorded.</td></tr>
+<tr><td>Isolation could not reach ForgeCentral.</td><td>Your browser could not reach ForgeCentral; reload.</td></tr>
+</table>
+</div>

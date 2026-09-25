@@ -7,7 +7,16 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25):** GD.9 MERGED `6cc2980` (operator: "Approve and continue"). NEXT = GD.10 (TRD-CONSOLE-01,
+- **State (2026-09-25, GD.10 in progress):** GD.10 ON BRANCH `docs/console-11-gd10-overview-nav`: `TRD-CONSOLE-01`
+  and `-12` refreshed (as-built sections, known gaps), `TRD-CONSOLE-00` Sections 5 and 12 amended (nine
+  destinations, the real click paths with the two over-budget tasks, the built tab strips and freshness, the
+  surface catalog), `SUITE.md` statuses and terminology; chapters 3 and 16 re-verified (click counts, what
+  refreshes, which actions confirm, the Settings tabs, session lifetime, states; demo rings, destination
+  lists, capabilities, recent decisions always empty, the pending notes); fixed: the Isolate result line
+  now renders inside the drawer with true text and per-status failures (CD-64, CD-46); new defect CD-63
+  (recent decisions); coverage gate widened to `overview.*` and `entity.*`, so every manifest binding is in
+  scope ahead of GD.N.
+- **Earlier (2026-09-25):** GD.9 MERGED `6cc2980` (operator: "Approve and continue"). NEXT = GD.10 (TRD-CONSOLE-01,
   -12 and the TRD-CONSOLE-00 navigation and surface catalog; the Navigating and Overview chapters).
 - **Earlier (2026-09-25):** GD.9 ON BRANCH `docs/console-11-gd9-logs-reports`: `TRD-CONSOLE-09`
   and `TRD-CONSOLE-08` refreshed (an as-built section each, unmet acceptance marked, known gaps kept);
@@ -135,7 +144,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.7 | 11.6 | MERGED `fae079b` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-04 refreshed; chapters 7-8 re-verified; connector Syncing (CD-56) and users copy (CD-55) fixed; coverage users/groups/idam |
 | GD.8 | 11.6 | MERGED `73999e6` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-03 refreshed; IP-CONSOLE-03 ledger corrected; chapter 13 re-verified; SOC copy fixed (CD-60); coverage `soc.*` |
 | GD.9 | 11.6 | MERGED `6cc2980` (2026-09-25; full gate green, e2e 41/41) | | TRD-CONSOLE-09 and -08 refreshed; chapters 14-15 re-verified; Logs offset (CD-13) and export copy fixed; coverage `logs.*` |
-| GD.10 | 11.6 | PLANNED | | TRD-CONSOLE-01, -12, -00 refresh; chapters re-verified |
+| GD.10 | 11.6 | ON BRANCH | | TRD-CONSOLE-01, -12 refreshed, -00 Sections 5 and 12, SUITE; chapters 3 and 16 re-verified; Isolate result fixed (CD-64); coverage overview/entity |
 | GD.11 | 11.2 (2) | PLANNED | | the contextual side panel |
 | GD.12 | 11.2 (3) | PLANNED | | inline micro-copy and info tips |
 | GD.13 | INV-GUIDE-DISABLED-EXPLAINED | PLANNED | | state-aware explanations |

@@ -1,11 +1,38 @@
 # TRD-CONSOLE-01 -- Overview: the live connectivity graph (home)
 
-**Status:** DRAFT (authored 2026-07-07). Inherits `TRD-CONSOLE-00`. This is the Console home and the
+**Status:** BUILT IN PART (authored 2026-07-07; refreshed 2026-09-25 by `IP-CONSOLE-11-guide` GD.10 against the
+configuration census; Section 0b records the built surface and wins where later sections differ; unbuilt
+requirements are kept in the Known gaps section). Inherits `TRD-CONSOLE-00`. This is the Console home and the
 product's signature surface: a dynamic, live graph of the actual connectivity happening across the
 platform, driven by the Crucible connectivity LOG. The mock home screens (`shot-01`, `shot-13`,
 `shot-14`) are the interaction target.
 
 ---
+
+## 0b. As built (2026-09-25)
+
+- **Graph.** Sources: AI Agents, Users (humans with a live session), Devices. Middle: trust zones, at most
+  three per page with Previous zones / More zones paging; each zone shows its risk band (Nominal with no
+  detections, Elevated on any candidate, Critical on any escalate) and its posture (Watching, Standard,
+  Quarantine). Destinations: Network, SaaS Apps, Private Apps, Data Stores, classified by the gateway from
+  the engine's network endpoints (reverse DNS). Zone routing is the engine's fixed demonstration assignment
+  (three Demo zones matched by entity-id substring, a catch-all default); authored zones render as extra
+  rings that carry no flows and read Nominal (CD-19). There is no Trust Score.
+- **Bindings.** `overview.graph` (CONNECTIVITY_GRAPH; the first paint reads 50 nodes, then the full limit),
+  `overview.members` (CONNECTIVITY_MEMBERS, up to 500 members by connection count),
+  `overview.entityConnections` (ENTITY_CONNECTIONS, up to 500). `overview.live` is `PENDING`: the surface
+  re-reads `overview.graph` every 2 s and the gateway caches each projection for 2 s.
+- **Interaction.** Hovering a source or destination highlights only its paths (no prefetch). Selecting a
+  lane or ring opens the drawer as a member list (a destination lists the endpoints of its category);
+  choosing a member opens its detail, and back returns to the list. Selecting an authored zone opens
+  `/vtz?zone=<id>` on Configure; a demonstration zone lands on Configure with none selected. Keyboard
+  buttons do the same for every container and zone.
+- **Three clicks.** Inspect: container (1), member (2). Isolate: container (1), member (2), Isolate from
+  network (3), confirm (4) -- over budget.
+- **States.** Loading skeleton; "No connectivity observed" (no time-range control); a "Reconnecting to the
+  live graph" banner that keeps the last graph; a "Partial graph" badge when the engine scan reaches its
+  ceiling; "Could not load the connectivity graph." with Retry (401 / 403 / 502 / 503 not told apart). The
+  graph is one read that fails whole.
 
 ## 1. Purpose
 
@@ -120,3 +147,10 @@ Cross-module gap: the graph view model is typed against the LOG DTO shape (a dri
 compilation). Parallel execution: the source/VTZ/destination aggregations fan out tolerantly -- a failed
 sub-aggregation degrades that column with an inline error, not the whole graph. Missing failure path:
 the empty/stale/unauthorized/engine-down states are each tested.
+
+## 10. Known gaps (recorded 2026-09-25; kept as requirements)
+
+- Operator-configured zone routing; the demonstration assignment and flowless authored rings (CD-19).
+- The push stream (`overview.live`, OV-06); the top tabs, saved views and hover prefetch (OV-02, OV-03,
+  OV-05); a time-range control; filter by type.
+- The Isolate path exceeds the three-click budget; typed failure states for 401 / 403 / 502 / 503.

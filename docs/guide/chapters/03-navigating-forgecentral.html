@@ -1,6 +1,6 @@
 <h1>Navigating ForgeCentral</h1>
 
-<p class="lead">ForgeCentral puts every configuration within three clicks of the Overview: choose a destination on the navigation rail, open a tab or a record, then act. This chapter shows the layout, how ForgeCentral reports what the Forge engine said, and how to work safely when something goes wrong.</p>
+<p class="lead">ForgeCentral aims to put every configuration within three clicks of the Overview: choose a destination on the navigation rail, open a tab or a record, then act. A few tasks take more today, for example isolating an entity from the Overview (four clicks) or publishing a policy edit (five). This chapter shows the layout, how ForgeCentral reports what the Forge engine said, and how to work safely when something goes wrong.</p>
 
 <h2 id="nav-availability">Availability</h2>
 <div class="tablewrap" id="tab-nav-availability" data-title="Navigating ForgeCentral: availability">
@@ -9,7 +9,7 @@
 <tr><td>Navigation rail</td><td><span class="pill ok">AVAILABLE</span></td><td>Nine destinations, the same for every operator.</td></tr>
 <tr><td>Account menu</td><td><span class="pill ok">AVAILABLE</span></td><td>Your identity, your engine access tier, and Sign out.</td></tr>
 <tr><td>Entity drawer</td><td><span class="pill ok">AVAILABLE</span></td><td>The shared detail panel for users, hosts, agents and objects.</td></tr>
-<tr><td>Live updates</td><td><span class="pill ro">READ-ONLY</span></td><td>The Overview refreshes every two seconds; other pages refresh when you return to them or after a change.</td></tr>
+<tr><td>Live updates</td><td><span class="pill ro">READ-ONLY</span></td><td>The Overview and Logs refresh every two seconds; other pages refresh when you return to them or after a change.</td></tr>
 <tr><td>Tenant switcher</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>ForgeCentral works in the tenant of your sign-in.</td></tr>
 </table>
 </div>
@@ -70,11 +70,11 @@
 <ol>
   <li><b>Navigation rail.</b> The nine destinations: Overview, Virtual Trust Zones, Users, Objects, Policies, SOC Ops, Reports, Logs and Settings. The active destination is highlighted.</li>
   <li><b>Page title.</b> The name of the destination you are on.</li>
-  <li><b>Live indicator.</b> <b class="ui">Live</b> while the Overview is receiving fresh data; <b class="ui">Not live</b> on every other page, which refreshes on demand instead.</li>
+  <li><b>Live indicator.</b> <b class="ui">Live</b> while the Overview is receiving fresh data, otherwise <b class="ui">Not live</b>. Logs has its own <b class="ui">Live</b> / <b class="ui">Paused</b> / <b class="ui">Reconnecting</b> badge.</li>
   <li><b>Account menu.</b> Your email address (or identity-provider subject) and your engine access tier: <b class="ui">User</b>, <b class="ui">Developer</b>, <b class="ui">Admin</b> or <b class="ui">SecurityAudit</b>. Open it to sign out.</li>
   <li><b>Tabs.</b> Most destinations group their content into tabs.</li>
-  <li><b>Actions.</b> Every control that changes something acts on Forge itself; ForgeCentral keeps no copy. Actions with a lasting effect ask you to confirm first.</li>
-  <li><b>Entity drawer.</b> Opens on the right when you select a user, host, agent or object, without leaving the page.</li>
+  <li><b>Actions.</b> Every control that changes something acts on Forge itself; ForgeCentral keeps no copy. Most actions with a lasting effect ask you to confirm first; generating a SOC verdict, saving a plan edit, exporting the log and saving an identity-provider connector do not.</li>
+  <li><b>Entity drawer.</b> Opens on the right when you select a user, an AI agent or an object, without leaving the page.</li>
 </ol>
 
 <h2 id="nav-destinations">Where each configuration lives</h2>
@@ -89,13 +89,13 @@
 <tr><td><b class="ui">SOC Ops</b></td><td>Act on incidents: assign, acknowledge, note, close, record a disposition, generate a verdict, modify and approve a response plan.</td><td><a class="xref" href="#ch-soc-operations"></a></td></tr>
 <tr><td><b class="ui">Reports</b></td><td>Nothing; read the weekly panel and export incident reports.</td><td><a class="xref" href="#ch-reports"></a></td></tr>
 <tr><td><b class="ui">Logs</b></td><td>Filter decisions and create an audited export.</td><td><a class="xref" href="#ch-logs"></a></td></tr>
-<tr><td><b class="ui">Settings</b></td><td>The governed configuration, change control, SOC response, and the platform's posture.</td><td><a class="xref" href="#ch-settings-configuration"></a>, <a class="xref" href="#ch-settings-soc-response"></a>, <a class="xref" href="#ch-settings-platform-posture"></a></td></tr>
+<tr><td><b class="ui">Settings</b></td><td>The governed configuration, change control, SOC response, the platform's posture, the Console's roles (RBAC), the identity-provider connector (Federation), and this guide (ReadMe).</td><td><a class="xref" href="#ch-settings-configuration"></a>, <a class="xref" href="#ch-settings-soc-response"></a>, <a class="xref" href="#ch-settings-platform-posture"></a></td></tr>
 </table>
 </div>
 
 <h2 id="nav-signin">Sign in and sign out</h2>
-<p>You sign in with your organization's identity provider. ForgeCentral maps your identity to a ForgeCentral role (global administrator, tenant administrator or tenant user) and an engine access tier, which the account menu shows.</p>
-<div class="note"><p>A ForgeCentral session lasts one hour; after that, sign in again. Reinstalling ForgeCentral ends every operator's session.</p></div>
+<p>You sign in with your organization's identity provider. ForgeCentral maps your identity to a ForgeCentral role (global administrator, tenant administrator or tenant user) and an engine access tier; the account menu shows the tier.</p>
+<div class="note"><p>A ForgeCentral session lasts one hour; after that, sign in again. Sessions are held in memory, so any restart of the ForgeCentral service, including a reinstall, ends every operator's session.</p></div>
 
 <div class="procedure">
 <div class="ptitle">Procedure</div>
@@ -106,7 +106,7 @@
 </div>
 
 <h2 id="nav-states">How ForgeCentral shows what the engine said</h2>
-<p>ForgeCentral never invents a value. Every page shows one of five states, and each tells you something specific:</p>
+<p>ForgeCentral never invents a value. Every page shows one of these states, and each tells you something specific. The Overview also has a stale state (<b class="ui">Reconnecting to the live graph</b>, keeping the last graph), and a path that matches no page reads <b class="ui">That destination does not exist</b>.</p>
 <div class="tablewrap" id="tab-nav-states" data-title="Page states">
 <table class="data">
 <tr><th style="width:22%">State</th><th>What it means</th><th style="width:32%">What to do</th></tr>
@@ -126,5 +126,6 @@
 <ul>
   <li>The Overview reads the engine every two seconds while it is open.</li>
   <li>Other pages read the engine when you open them, again when you return after a few seconds, and immediately after a change you make there.</li>
-  <li>Settings is never cached: every tab reads the engine each time you open it.</li>
+  <li>Logs reads the engine every two seconds while it is not paused.</li>
+  <li>Settings is never cached: every tab reads the engine each time you open it, except the Console roles on RBAC (ForgeCentral's own settings) and ReadMe (this guide).</li>
 </ul>

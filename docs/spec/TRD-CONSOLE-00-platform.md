@@ -262,6 +262,13 @@ established), then the three ops centers under their product names -- `SOC Ops` 
 `SOC Ops` · `Agent Ops` · `Network Ops` · `Reports` · `Logs` · `Settings`. A persistent account menu
 (bottom) and the YouSource mark + environment badge (top).
 
+**As built (2026-09-25, `IP-CONSOLE-11-guide` GD.10):** nine destinations -- `Agent Ops` and `Network Ops`
+were removed from the rail on 2026-09-24 (crdb C.9, INV-FC-NO-STUB) and return with their phases. The mark
+and environment badge sit at the top of the rail; the page title, the Live indicator and the account menu
+(identity, tier, Sign out) sit in the top bar. Each destination has a stable path (`/`, `/vtz`, `/users`,
+`/objects`, `/policies`, `/soc-ops`, `/reports`, `/logs`, `/settings`; Settings tabs are `?tab=`
+addressable); an unknown path renders an explicit not-found state.
+
 ### 5.2 The three-click rule (INV-CONSOLE-3-CLICKS)
 
 Every defined operator task completes in <= 3 clicks from the Overview graph. The canonical paths (each
@@ -279,6 +286,14 @@ owned + tested by a per-surface TRD):
 The three-click budget is a hard acceptance gate: any surface TRD introducing a task deeper than three
 clicks must either restructure or cite an explicit exception approved in this TRD.
 
+**As built (2026-09-25), with the known gaps:** Inspect is container (1) -> member (2) (there is no entity
+node on the graph). Isolate is container (1) -> member (2) -> Isolate from network (3) -> confirm (4), over
+budget. See why: Logs -> a decision row (1) -> the rationale (Network Ops is not built). Replay is not built
+(Network Ops is off the rail). Publish a policy edit is Policies (1) -> expand the zone (2) -> Edit (3) ->
+Save & Publish (4) -> Publish (5), over budget. Re-scope a VTZ is Virtual Trust Zones (1) -> Configure (2) ->
+a zone (3) -> Save changes (4) -> confirm (5); boundary editing is absent and a move fails (CD-10). Isolate
+and Publish exceed the budget and carry no approved exception (known gap).
+
 ### 5.3 Recurring interaction patterns
 
 - **The entity drawer.** Clicking any entity anywhere (graph node, table row, decision card) opens a
@@ -289,6 +304,15 @@ clicks must either restructure or cite an explicit exception approved in this TR
   settings tab strips). Tabs are same-surface filters, never new destinations, so they do not spend a
   click against the budget for entity tasks.
 - **Time range + Live.** Time-scoped surfaces carry a range control; "Live"-badged panels stream.
+
+**As built (2026-09-25):** the drawer shows header, information, zones and effective policies (`PENDING`),
+capabilities, recent decisions and, from a connectivity context, connections, with one quick action
+(Isolate from network); Trust Score is removed; Modify VTZ, remediation and full report are known gaps.
+Built tab strips: Virtual Trust Zones (Active, Configure), Users (All Users, Groups, External IDAM), SOC Ops
+focus tabs (Incidents built; six others read Not yet built), Settings (eleven tabs); the Overview has no top
+tabs. The Overview and Logs poll every 2 s (the push stream is a known gap); Logs has its own Live / Paused /
+Reconnecting badge and its range has no end bound (CD-62); the top bar reads Live only while the Overview is
+receiving.
 
 ---
 
@@ -514,6 +538,21 @@ the platform's CNSA 2.0 / FIPS posture.
 
 Each surface is owned by a per-surface TRD that inherits this platform TRD. Each declares its read
 bindings (real data source) and command bindings (real actions), its <= 3-click paths, and its states.
+
+**As built (2026-09-25):** the surface TRDs were refreshed to the built surfaces by `IP-CONSOLE-11-guide`
+GD.3 to GD.10; each records its built actions and its known gaps. In summary: Overview -- open a container's
+members, open a zone, hover filter, zone pager; Virtual Trust Zones -- create, edit, delete a zone (posture,
+boundary and members are gaps); SOC Ops -- the incident queue and detail, case acts, dispositions, verdict
+generation, plan modify / approve (built from SOC incident list / detail and `DETECT_SUMMARY`, not
+dashboards); Users -- add, edit, suspend / activate / revoke users, create groups, onboard, configure and
+sync the IdP (override removed; group edit and membership are gaps); Policies -- create, edit, publish,
+delete, re-distribute a zone bundle, over the Forge policy store per VTZ (TRD-32 v2, not TRD-04; version
+view is a gap); Agent Ops and Network Ops -- not built, off the rail; Reports -- the incident report and the
+weekly summary, exported client-side (report tabs and share are gaps); Logs -- filter, pause / resume,
+rationale, export of the current page; Objects -- create, edit, delete (governing policies are a gap);
+Settings -- eleven tabs over the engine settings plane and admin reports (rotation, DR test and exporter
+configuration are gaps; FIPS has no toggle by design; RBAC is read-only); Entity drawer -- isolate (modify
+VTZ, remediate and full report are gaps).
 
 | TRD | Surface | Primary real data source | Key real actions |
 |-----|---------|--------------------------|------------------|
