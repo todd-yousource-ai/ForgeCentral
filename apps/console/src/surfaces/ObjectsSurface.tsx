@@ -58,12 +58,17 @@ function selectorHint(kind: ObjectKind, selectorKind: SelectorKind): string {
 }
 
 /** The typed failure line for a command form. */
-function commandFailure(error: Error | null): string | null {
+export function commandFailure(error: Error | null): string | null {
   if (error === null) return null;
   if (error instanceof ObjectCommandError) {
     if (error.status === 409) return 'An object with that name already exists.';
     if (error.status === 400)
       return 'The form is incomplete or the selector does not fit the kind.';
+    if (error.status === 401)
+      return 'Your session has expired. Sign in again; nothing was committed.';
+    // 502 / 503: the gateway could not reach the engine -- a connection failure, not a refusal.
+    if (error.status === 502 || error.status === 503)
+      return 'The command could not reach the engine.';
     return 'The engine refused the command.';
   }
   return 'The command could not reach the engine.';
@@ -258,7 +263,7 @@ export function ObjectsSurface(): ReactElement {
       <ConfirmDialog
         open={confirming !== null}
         title={confirming !== null ? `Delete ${confirming.name}?` : ''}
-        description="Deleting a catalog object changes no enforcement; a policy that references it must be re-authored on the Policy tab. History is preserved."
+        description="Deleting a catalog object changes no enforcement; a policy that references it must be re-authored on the Policies surface. History is preserved."
         tone="critical"
         confirmLabel="Delete"
         onConfirm={() => {
