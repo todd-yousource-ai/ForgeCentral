@@ -8,7 +8,33 @@
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import type { LogExportRequest, LogExportView } from '@forge/contracts';
 
-/** POST the export to the BFF. Throws on a non-2xx (the surface shows a sanitized error). */
+/** A failed export with its HTTP status, so the surface can say what happened. */
+export class LogExportError extends Error {
+  constructor(readonly status: number) {
+    super(`log export failed: ${String(status)}`);
+    this.name = 'LogExportError';
+  }
+}
+
+/** The operator-facing line for a failed export. A 502 can follow an engine commit, so it never promises
+ *  that nothing was recorded. */
+export function exportFailure(error: Error): string {
+  if (!(error instanceof LogExportError)) return 'The export could not reach ForgeCentral.';
+  switch (error.status) {
+    case 401:
+      return 'Your session has expired. Sign in again; nothing was exported.';
+    case 403:
+      return 'The engine refused the export. Nothing was recorded.';
+    case 400:
+      return 'The export request was not accepted as sent. Nothing was recorded.';
+    case 503:
+      return 'The engine is unavailable. Nothing was recorded.';
+    default:
+      return 'The engine could not complete the export; a receipt may still have been recorded.';
+  }
+}
+
+/** POST the export to the BFF. Throws a `LogExportError` on a non-2xx. */
 export async function postLogExport(request: LogExportRequest): Promise<LogExportView> {
   const res = await fetch('/api/logs/export', {
     method: 'POST',
@@ -17,7 +43,7 @@ export async function postLogExport(request: LogExportRequest): Promise<LogExpor
     body: JSON.stringify(request),
   });
   if (!res.ok) {
-    throw new Error(`log export failed: ${String(res.status)}`);
+    throw new LogExportError(res.status);
   }
   return (await res.json()) as LogExportView;
 }

@@ -14,11 +14,11 @@
 </table>
 </div>
 
-<h2 id="log-read">Read the decision log</h2>
-<p>Each row is one decision: <b class="ui">Time (UTC)</b>; <b class="ui">Decision</b> (the finding and the rule that fired); <b class="ui">ATT&amp;CK</b> (the technique); <b class="ui">Confidence</b> (the engine's confidence tier); and <b class="ui">Outcome</b>, the posture the engine gave it:</p>
+<h2 id="log-read" data-covers="logs.query logs.explain logs.tail">Read the decision log</h2>
+<p>On an installed Forge node each row is one <em>episode</em>: the repeated firing of one rule on one subject, timed at its most recent fire, with no scope (it shows <code>--</code>). On a node without episodes each row is one decision. The columns are <b class="ui">Time (UTC)</b>; <b class="ui">Decision</b> (the finding and the rule that fired); <b class="ui">ATT&amp;CK</b> (the technique); <b class="ui">Confidence</b> (the engine's confidence tier); and <b class="ui">Outcome</b>, the posture the engine gave it. The table shows the engine's own tags (<code>HIGH</code>, <code>escalate</code>, <code>observe-only</code>); the filter uses the labels below:</p>
 <ul>
   <li><b class="ui">Escalate</b>: raised for a person to act on.</li>
-  <li><b class="ui">Candidate</b>: promoted as a possible incident.</li>
+  <li><b class="ui">Candidate</b>: worth an analyst's attention, not acted on automatically.</li>
   <li><b class="ui">Observe only</b>: recorded and watched, not raised.</li>
 </ul>
 <div class="procedure">
@@ -27,19 +27,29 @@
   <li>Choose <b class="ui">Logs</b>.</li>
   <li>Narrow the list with the filter bar: <b class="ui">Search</b> (a finding, rule or evidence), <b class="ui">Confidence</b> (<b class="ui">High</b>, <b class="ui">Medium</b>, <b class="ui">Low</b>, <b class="ui">Contested</b>; an exact tier, not a minimum), <b class="ui">Outcome</b>, and <b class="ui">Time range</b> (<b class="ui">All time</b>, <b class="ui">Last 24h</b>, <b class="ui">Last 7 days</b>, <b class="ui">Last 30 days</b>).</li>
   <li>To stop the list moving while you read, choose <b class="ui">Pause</b>; choose <b class="ui">Resume</b> to follow it again. The badge reads <b class="ui">Live</b>, <b class="ui">Paused</b>, or <b class="ui">Reconnecting</b> after a missed refresh.</li>
-  <li>Choose a row's <b class="ui">Decision</b> to open <b class="ui">Why this decision fired</b>: the finding, rule, ATT&amp;CK technique and tactics, scope and evidence. Choose <b class="ui">View</b> beside the acting entity to open it in the entity drawer.</li>
+  <li>Choose a row's <b class="ui">Decision</b> to open <b class="ui">Why this decision fired</b>: the finding, rule, ATT&amp;CK technique and tactics, scope and evidence. Choose <b class="ui">View</b> beside the acting entity to open it in the entity drawer. Choosing elsewhere on a row opens the acting entity's drawer directly, or the rationale when the decision has no acting entity.</li>
 </ol>
 </div>
-<div class="note limit"><p>The log shows up to 100 decisions for the current filter, newest first. To reach older decisions, narrow the time range or the search.</p></div>
+<div class="note limit"><p>The log shows up to 100 rows for the current filter, newest first (fewer when the engine trims a large page). Every time range ends now, so a shorter range does not reach older rows: to find older ones, narrow the <b class="ui">Search</b>, <b class="ui">Confidence</b> or <b class="ui">Outcome</b>. The live refresh is a poll every two seconds, not a stream.</p></div>
 
-<h2 id="log-export">Export decisions</h2>
+<h2 id="log-export" data-covers="logs.export">Export decisions</h2>
 <p>An export is an audited engine operation: the Forge engine records a receipt on its audit chain and returns the rows, which your browser saves as <code>decision-log-</code><i>receipt</i><code>.json</code>.</p>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
-  <li>Set the filters. Choose the <b class="ui">Time range</b> again just before you export, so the range ends now.</li>
-  <li>Choose <b class="ui">Export</b>. There is no confirmation step. <span class="result">The page reads Exported N decision(s); audit receipt ... recorded at version V, and the file downloads. A repeated export of the same request reads (already recorded).</span></li>
+  <li>Set the filters. The time range ends now; its start is fixed when you last changed a filter, so change a filter just before you export if the page has been open a while.</li>
+  <li>Choose <b class="ui">Export</b>. There is no confirmation step. <span class="result">The page reads Exported N decision(s); audit receipt ... recorded at version V, and the file downloads. Each export is a new request with its own receipt.</span></li>
 </ol>
 </div>
-<div class="note limit"><p>An export contains at most the 100 decisions the current filter shows, not every decision that matches. For a larger export, export in several narrower time ranges.</p></div>
-<p>If the export fails, the page reads <b class="ui">The export was refused or unavailable. Nothing was recorded.</b></p>
+<div class="note limit"><p>An export contains at most the 100 decisions the current filter shows, not every decision that matches. Narrowing the time range does not reach older rows (every range ends now); narrow the search, confidence or outcome instead. On an installed node the export reads decisions as well as episodes, so it can contain rows the table did not show.</p></div>
+<div class="tablewrap" id="tab-log-export-errors" data-title="Export failure messages">
+<table class="data">
+<tr><th style="width:50%">Message</th><th>Meaning</th></tr>
+<tr><td>The engine refused the export. Nothing was recorded.</td><td>The Forge engine declined the export for your identity.</td></tr>
+<tr><td>Your session has expired. Sign in again; nothing was exported.</td><td>Sign in again and export.</td></tr>
+<tr><td>The export request was not accepted as sent. Nothing was recorded.</td><td>The request was malformed; reload and try again.</td></tr>
+<tr><td>The engine is unavailable. Nothing was recorded.</td><td>Wait and try again.</td></tr>
+<tr><td>The engine could not complete the export; a receipt may still have been recorded.</td><td>Check the audit record before exporting again.</td></tr>
+<tr><td>The export could not reach ForgeCentral.</td><td>Your browser could not reach ForgeCentral; reload.</td></tr>
+</table>
+</div>

@@ -507,6 +507,26 @@ describe('BFF HTTP surface', () => {
     expect(detail.capabilities.status).toBe('ok');
   });
 
+  it('GET /api/logs forwards offset to the engine, so the background pager walks pages (CD-13)', async () => {
+    const seen: unknown[] = [];
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith(operatorSession),
+        operatorEngine: operatorEngineWith({
+          logQuery: (_principal: unknown, request: unknown) => {
+            seen.push(request);
+            return Promise.resolve({ decisions: [] });
+          },
+        }),
+      },
+    );
+    expect((await fetch(`${base}/api/logs?limit=100&offset=200`)).status).toBe(200);
+    expect((await fetch(`${base}/api/logs?limit=100`)).status).toBe(200);
+    expect(seen[0]).toMatchObject({ offset: 200 });
+    expect(seen[1]).not.toHaveProperty('offset');
+  });
+
   it('GET /api/logs brokers the LOG_QUERY read + projects the rows (LG.2)', async () => {
     const base = await start(
       mockClient(() => Promise.resolve()),

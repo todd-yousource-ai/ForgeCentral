@@ -445,6 +445,8 @@ function parseLogFilter(params: URLSearchParams): LogQueryFilter {
       : DEFAULT_LOG_LIMIT;
   const since = num('since');
   const until = num('until');
+  // The SPA's background pager walks `offset`; dropping it served page 0 for every page (CD-13).
+  const offset = num('offset');
   const technique = str('technique');
   const tactic = str('tactic');
   const ruleId = str('ruleId');
@@ -460,6 +462,7 @@ function parseLogFilter(params: URLSearchParams): LogQueryFilter {
     ...(confidence !== undefined ? { confidence } : {}),
     ...(action !== undefined ? { action } : {}),
     ...(search !== undefined ? { search } : {}),
+    ...(offset !== undefined && offset > 0 ? { offset: Math.floor(offset) } : {}),
     limit,
   };
 }
