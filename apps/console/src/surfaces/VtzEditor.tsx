@@ -24,7 +24,7 @@
 // changes, so there is no state-sync effect to get wrong.
 
 import { useState, type ReactElement } from 'react';
-import { ConfirmDialog, FieldHint } from '@forge/design';
+import { ConfirmDialog, DisabledReason, FieldHint } from '@forge/design';
 import {
   DEFAULT_REAUTH_INTERVAL_HOURS,
   MAX_REAUTH_INTERVAL_HOURS,
@@ -281,6 +281,7 @@ export function VtzEditor({
             aria-label="Parent VTZ (optional)"
             value={parentName}
             disabled={busy || moveBlocked}
+            aria-describedby="vtz-parent-note"
             onChange={(e) => setParentName(e.target.value)}
           >
             <option value="">None (top-level zone)</option>
@@ -290,7 +291,7 @@ export function VtzEditor({
               </option>
             ))}
           </select>
-          <span className="fcx-field__note">
+          <span className="fcx-field__note" id="vtz-parent-note">
             {moveBlocked
               ? 'This zone has sub-zones, so the engine refuses to move it -- moving it would orphan them. Re-parent or remove them first.'
               : 'Nests this zone under the chosen parent. Leave as None for a stand-alone zone.'}
@@ -397,10 +398,18 @@ export function VtzEditor({
           type="button"
           className="fcx-btn"
           disabled={!canSubmit}
+          aria-describedby="vtz-submit-reason"
           onClick={() => setPending({ kind: 'submit' })}
         >
           {mode === 'create' ? 'Create zone' : 'Save changes'}
         </button>
+        {!canSubmit && !busy ? (
+          <DisabledReason id="vtz-submit-reason">
+            {composed === ''
+              ? 'Needs a name.'
+              : 'A field does not meet its rule; the line under it says which.'}
+          </DisabledReason>
+        ) : null}
         {mode === 'create' && onCancel ? (
           <button type="button" className="fcx-btn" disabled={busy} onClick={onCancel}>
             Cancel

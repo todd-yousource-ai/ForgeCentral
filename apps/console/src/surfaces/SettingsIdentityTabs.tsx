@@ -24,6 +24,7 @@ import {
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { IdamConnectorsPanel } from './IdamConnectorsPanel.js';
 import { useConsoleRbac, useGovernedSettings } from './useSettings.js';
+import { TierRequired } from './TierRequired.js';
 
 type AdminRow = IdentityValues['admins'][number];
 type SsoRow = IdentityValues['ssoGroupRoles'][number];
@@ -81,12 +82,7 @@ function WithIdentity({
     );
   }
   if (governed.data === null) {
-    return (
-      <EmptyState
-        title="Admin or SecurityAudit tier required"
-        hint="The engine serves the identity configuration to Admin and SecurityAudit operators only."
-      />
-    );
+    return <TierRequired what="the identity configuration" />;
   }
   if (governed.data.identity === null) {
     return (

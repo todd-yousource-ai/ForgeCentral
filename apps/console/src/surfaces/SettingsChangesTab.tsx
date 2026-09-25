@@ -19,7 +19,7 @@ import {
   type SettingsVersionRow,
 } from '@forge/contracts';
 
-import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { ErrorState, LoadingState } from '../states/States.js';
 import { GovernedReceipt } from './SettingsSectionForms.js';
 import {
   useApproveProposal,
@@ -27,6 +27,7 @@ import {
   useSettingsApprovals,
   useSettingsHistory,
 } from './useSettings.js';
+import { TierRequired } from './TierRequired.js';
 
 function when(ms: number | null): string {
   return ms === null ? 'not recorded' : new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
@@ -82,12 +83,7 @@ function PendingApprovals(): ReactElement {
       />
     );
   } else if (approvals.data === null) {
-    body = (
-      <EmptyState
-        title="Admin or SecurityAudit tier required"
-        hint="The engine serves pending approvals to Admin and SecurityAudit operators only."
-      />
-    );
+    body = <TierRequired what="pending approvals" />;
   } else {
     body = (
       <DataTable<PendingProposal>
@@ -161,12 +157,7 @@ function History(): ReactElement {
       />
     );
   } else if (history.data === null) {
-    body = (
-      <EmptyState
-        title="Admin or SecurityAudit tier required"
-        hint="The engine serves the configuration history to Admin and SecurityAudit operators only."
-      />
-    );
+    body = <TierRequired what="the configuration history" />;
   } else {
     const head = history.data.versions[0]?.version;
     body = (

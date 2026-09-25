@@ -16,3 +16,4 @@ export * from './VtzZoneCard.js';
 export * from './GlassPanel.js';
 export * from './AmbientBackdrop.js';
 export * from './InfoTip.js';
+export * from './DisabledReason.js';

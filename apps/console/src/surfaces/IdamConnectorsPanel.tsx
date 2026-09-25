@@ -4,7 +4,7 @@
 // so the two mounts can never disagree about a connector.
 
 import { useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog, FieldHint, type BadgeVariant } from '@forge/design';
+import { Badge, ConfirmDialog, DisabledReason, FieldHint, type BadgeVariant } from '@forge/design';
 import type { IdamConnectorState } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
@@ -110,6 +110,16 @@ function IdamConnectForm({
     Number.isInteger(fullHours) &&
     fullHours >= IDAM_FULL_SYNC_HOURS_MIN &&
     fullHours <= IDAM_FULL_SYNC_HOURS_MAX;
+  // Why Save connector is unavailable, in the operator's words (INV-GUIDE-DISABLED-EXPLAINED).
+  const missing = [
+    domainValue.trim() === '' ? 'the provider domain' : null,
+    clientId.trim() === '' ? 'the client ID' : null,
+    secret === '' ? 'the client secret' : null,
+  ].filter((m) => m !== null);
+  const blockers = [
+    missing.length > 0 ? `Needs ${missing.join(', ')}.` : null,
+    pollOk && fullOk ? null : 'A cadence is outside its range.',
+  ].filter((b) => b !== null);
   const failure = connectFailure(connect.error);
 
   const submit = (): void => {
@@ -219,17 +229,14 @@ function IdamConnectForm({
       <button
         type="submit"
         className="fcx-btn fcx-btn--primary"
-        disabled={
-          connect.isPending ||
-          domainValue.trim() === '' ||
-          clientId.trim() === '' ||
-          secret === '' ||
-          !pollOk ||
-          !fullOk
-        }
+        disabled={connect.isPending || blockers.length > 0}
+        aria-describedby="idam-save-reason"
       >
         {connect.isPending ? 'Configuring...' : 'Save connector'}
       </button>
+      {blockers.length > 0 ? (
+        <DisabledReason id="idam-save-reason">{blockers.join(' ')}</DisabledReason>
+      ) : null}
       <button type="button" className="fcx-btn" onClick={onDone}>
         Cancel
       </button>

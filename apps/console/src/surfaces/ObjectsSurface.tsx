@@ -12,7 +12,7 @@
 //   * No posture/enforce control exists anywhere on the surface.
 
 import { useMemo, useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog, FieldHint, type BadgeVariant } from '@forge/design';
+import { Badge, ConfirmDialog, DisabledReason, FieldHint, type BadgeVariant } from '@forge/design';
 import type { ObjectCard, ObjectDraft, ObjectKind, SelectorKind } from '@forge/contracts';
 import { OBJECT_KINDS, objectId, objectKindLabel } from '@forge/contracts';
 
@@ -191,9 +191,13 @@ function ObjectForm({
         type="submit"
         className="fcx-btn fcx-btn--primary"
         disabled={write.isPending || name.trim() === '' || selectorValue.trim() === ''}
+        aria-describedby="object-submit-reason"
       >
         {write.isPending ? 'Committing...' : editing === null ? 'Create Object' : 'Save'}
       </button>
+      {name.trim() === '' || selectorValue.trim() === '' ? (
+        <DisabledReason id="object-submit-reason">Needs a name and a value.</DisabledReason>
+      ) : null}
       <button type="button" className="fcx-btn" onClick={onDone}>
         Cancel
       </button>

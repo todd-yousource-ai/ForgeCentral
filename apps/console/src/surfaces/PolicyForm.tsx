@@ -16,7 +16,7 @@
 // endpoint CNs (there is no enrollable-endpoint list read yet); an empty Applied-To distributes nowhere.
 
 import { useMemo, useState, type ReactElement } from 'react';
-import { AccordionGroup, Badge, ConfirmDialog, FieldHint } from '@forge/design';
+import { AccordionGroup, Badge, ConfirmDialog, DisabledReason, FieldHint } from '@forge/design';
 import type {
   ObjectCard,
   PolicyAction,
@@ -170,6 +170,18 @@ export function PolicyForm({
   const textOk =
     nameBytes <= POLICY_NAME_MAX_BYTES && descriptionBytes <= POLICY_DESCRIPTION_MAX_BYTES;
   const valid = complete && portsOk && textOk;
+  // Why both save buttons are unavailable, in the operator's words (INV-GUIDE-DISABLED-EXPLAINED).
+  const missing = [
+    name.trim() === '' ? 'a name' : null,
+    vtz === '' ? 'a zone' : null,
+    subjects.length === 0 ? 'a subject' : null,
+    targets.length === 0 ? 'a target' : null,
+  ].filter((m) => m !== null);
+  const saveBlockers = [
+    missing.length > 0 ? `Needs ${missing.join(', ')}.` : null,
+    portsOk ? null : 'The port list is not valid.',
+    textOk ? null : 'The name or description is over its limit.',
+  ].filter((b) => b !== null);
 
   const buildDraft = (): PolicyDraft => {
     const sources = subjects
@@ -476,6 +488,7 @@ export function PolicyForm({
           type="button"
           className="fcx-btn"
           disabled={!valid || save.isPending}
+          aria-describedby="policy-save-reason"
           onClick={() => commit(false)}
         >
           {save.isPending ? 'Saving...' : 'Save as Draft'}
@@ -484,10 +497,14 @@ export function PolicyForm({
           type="button"
           className="fcx-btn fcx-btn--primary"
           disabled={!valid || save.isPending}
+          aria-describedby="policy-save-reason"
           onClick={() => setConfirmPublish(true)}
         >
           Save &amp; Publish
         </button>
+        {saveBlockers.length > 0 ? (
+          <DisabledReason id="policy-save-reason">{saveBlockers.join(' ')}</DisabledReason>
+        ) : null}
       </div>
 
       <ConfirmDialog

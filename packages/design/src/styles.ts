@@ -531,6 +531,10 @@ export function componentStyles(): string {
 }
 .fc-field-hint { display: block; margin-top: var(--fc-space-xs); color: var(--fc-color-text-muted); font-size: var(--fc-font-size-xs); }
 
+/* DisabledReason (GD.13): the line that says why a control is unavailable. */
+.fc-disabled-reason { display: block; margin-top: var(--fc-space-xs); color: var(--fc-color-status-caution); font-size: var(--fc-font-size-xs); }
+.fc-disabled-reason a { color: inherit; text-decoration: underline; }
+
 /* Content above the ambient: the hosting surface sets position:relative and lifts its children. */
 .fc-ambient-host { position: relative; }
 .fc-ambient-host > :not(.fc-ambient) { position: relative; z-index: 1; }

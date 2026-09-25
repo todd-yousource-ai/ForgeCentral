@@ -15,11 +15,13 @@
 import { Suspense, lazy, useEffect, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import { GuideLink } from '../guide/GuideLink.js';
 import { SETTINGS_TABS } from './settingsTabs.js';
 import {
   Badge,
   ConfirmDialog,
   DataTable,
+  DisabledReason,
   FieldHint,
   GlassPanel,
   InfoTip,
@@ -43,7 +45,7 @@ import {
   settingSourceLabel,
 } from '@forge/contracts';
 
-import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
+import { ErrorState, LoadingState } from '../states/States.js';
 import { ChangeReceipt, SectionForms } from './SettingsSectionForms.js';
 import { ChangesTab } from './SettingsChangesTab.js';
 import { FederationTab, RbacTab } from './SettingsIdentityTabs.js';
@@ -60,6 +62,7 @@ import {
   useGovernedSettings,
   useSocSettings,
 } from './useSettings.js';
+import { TierRequired } from './TierRequired.js';
 
 function receiptLine(receipt: SocSettingsReceipt): string {
   if (!receipt.refused) {
@@ -124,10 +127,15 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
         {String(settings.version)}
       </p>
       {locked ? (
-        <p className="fcx-settings__notice" data-testid="settings-dual-control">
+        <p
+          className="fcx-settings__notice"
+          id="settings-soc-locked"
+          data-testid="settings-dual-control"
+        >
           <Badge variant="caution">Dual control</Badge> The committed governance places
           tenant-config under dual control. The Console reads these settings but cannot commit them:
-          propose and approve on the admin plane.
+          propose and approve on the admin plane.{' '}
+          <GuideLink section="soc-set-restrictions">Why these controls are locked</GuideLink>
         </p>
       ) : null}
 
@@ -155,7 +163,7 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
             max={SOC_TIER_MILLI_MAX}
             value={pLow}
             disabled={locked}
-            aria-describedby="settings-tiers-hint"
+            aria-describedby="settings-tiers-hint settings-soc-locked"
             onChange={(e) => setPLow(e.target.value)}
             data-testid="settings-p-low"
           />
@@ -171,7 +179,7 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
             max={SOC_TIER_MILLI_MAX}
             value={pHigh}
             disabled={locked}
-            aria-describedby="settings-tiers-hint"
+            aria-describedby="settings-tiers-hint settings-soc-locked"
             onChange={(e) => setPHigh(e.target.value)}
             data-testid="settings-p-high"
           />
@@ -182,9 +190,19 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
         <FieldHint id="settings-tiers-hint">
           Whole numbers from 0 to {SOC_TIER_MILLI_MAX}; p_low may not exceed p_high.
         </FieldHint>
-        <button type="submit" className="fcx-btn" disabled={locked || !tiersValid}>
+        <button
+          type="submit"
+          className="fcx-btn"
+          disabled={locked || !tiersValid}
+          aria-describedby="settings-soc-locked settings-tiers-reason"
+        >
           Commit tiers
         </button>
+        {!locked && !tiersValid ? (
+          <DisabledReason id="settings-tiers-reason">
+            Commit tiers is unavailable until both thresholds meet the rule above.
+          </DisabledReason>
+        ) : null}
       </form>
 
       <form
@@ -206,6 +224,7 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
             type="checkbox"
             checked={siem.enabled}
             disabled={locked}
+            aria-describedby="settings-soc-locked"
             onChange={(e) => setSiem({ ...siem, enabled: e.target.checked })}
             data-testid="settings-siem-enabled"
           />{' '}
@@ -216,6 +235,7 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
           <select
             value={siem.vendor}
             disabled={locked}
+            aria-describedby="settings-soc-locked"
             onChange={(e) => setSiem({ ...siem, vendor: e.target.value as typeof siem.vendor })}
             data-testid="settings-siem-vendor"
           >
@@ -232,6 +252,7 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
             type="text"
             value={siem.host}
             disabled={locked}
+            aria-describedby="settings-soc-locked"
             onChange={(e) => setSiem({ ...siem, host: e.target.value })}
             data-testid="settings-siem-host"
           />
@@ -242,6 +263,7 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
             type="text"
             value={siem.stream}
             disabled={locked}
+            aria-describedby="settings-soc-locked"
             onChange={(e) => setSiem({ ...siem, stream: e.target.value })}
             data-testid="settings-siem-stream"
           />
@@ -252,6 +274,7 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
             type="text"
             value={siem.caseUrlBase}
             disabled={locked}
+            aria-describedby="settings-soc-locked"
             onChange={(e) => setSiem({ ...siem, caseUrlBase: e.target.value })}
             data-testid="settings-siem-case-url"
           />
@@ -261,6 +284,7 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
           <select
             value={siem.ceiling}
             disabled={locked}
+            aria-describedby="settings-soc-locked"
             onChange={(e) => setSiem({ ...siem, ceiling: e.target.value as typeof siem.ceiling })}
             data-testid="settings-siem-ceiling"
           >
@@ -271,7 +295,12 @@ function SocSection({ settings }: { readonly settings: SocSettings }): ReactElem
             ))}
           </select>
         </label>
-        <button type="submit" className="fcx-btn" disabled={locked}>
+        <button
+          type="submit"
+          className="fcx-btn"
+          disabled={locked}
+          aria-describedby="settings-soc-locked"
+        >
           Commit write-back
         </button>
       </form>
@@ -341,7 +370,19 @@ function ConfigurationTable({ view }: { readonly view: SettingsView }): ReactEle
   const stagedKeys = Object.keys(staged);
   const changeCell = (r: SettingRow): ReactElement => {
     if (!isKeyEditable(r)) {
-      return <span>read-only</span>;
+      return (
+        <span>
+          read-only (
+          {/* An editable section is changed through its form below; anything else by how it applies. */}
+          <GuideLink
+            section={r.editable ? 'setc-sections' : 'cfg-apply'}
+            label={`Why ${r.key} is read-only`}
+          >
+            why
+          </GuideLink>
+          )
+        </span>
+      );
     }
     if (editing?.key === r.key) {
       return (
@@ -501,10 +542,7 @@ function ConfigurationTab(): ReactElement {
         />
       ) : null}
       {governed.isSuccess && governed.data === null ? (
-        <EmptyState
-          title="Admin or SecurityAudit tier required"
-          hint="The engine serves the governed configuration to Admin and SecurityAudit operators only."
-        />
+        <TierRequired what="the governed configuration" />
       ) : null}
       {governed.isSuccess && governed.data !== null ? (
         <ConfigurationTable view={governed.data} />
@@ -524,12 +562,7 @@ function SocTab(): ReactElement {
           onRetry={() => void settings.refetch()}
         />
       ) : null}
-      {settings.isSuccess && settings.data === null ? (
-        <EmptyState
-          title="Admin or SecurityAudit tier required"
-          hint="The engine serves these settings to Admin and SecurityAudit operators only; nothing is shown in their place."
-        />
-      ) : null}
+      {settings.isSuccess && settings.data === null ? <TierRequired what="these settings" /> : null}
       {settings.isSuccess && settings.data !== null ? (
         <SocSection settings={settings.data} />
       ) : null}

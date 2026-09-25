@@ -8,7 +8,7 @@
 // different Admin approves it on the Changes tab.
 
 import { useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog, FieldHint } from '@forge/design';
+import { Badge, ConfirmDialog, DisabledReason, FieldHint } from '@forge/design';
 import type {
   SectionPatch,
   SectionValues,
@@ -130,17 +130,36 @@ const SECTION_TITLES: Readonly<Record<SectionName, string>> = {
 
 type Commit = (section: SectionName, patch: SectionPatch) => void;
 
+/**
+ * A section's commit button. While the values are outside the limits the form states (`hint`), it is
+ * unavailable and says so, naming the limits line (INV-GUIDE-DISABLED-EXPLAINED).
+ */
 function Submit({
   label,
-  disabled,
+  invalid = false,
+  hint,
 }: {
   readonly label: string;
-  readonly disabled?: boolean;
+  readonly invalid?: boolean;
+  readonly hint?: string;
 }): ReactElement {
+  const reasonId = `settings-${label.replace(/[^a-z]+/gi, '-').toLowerCase()}-reason`;
   return (
-    <button type="submit" className="fcx-btn" disabled={disabled}>
-      Commit {label}
-    </button>
+    <>
+      <button
+        type="submit"
+        className="fcx-btn"
+        disabled={invalid}
+        aria-describedby={[reasonId, hint].filter((id) => id !== undefined).join(' ')}
+      >
+        Commit {label}
+      </button>
+      {invalid ? (
+        <DisabledReason id={reasonId}>
+          Commit {label} is unavailable until the values meet the limits shown above.
+        </DisabledReason>
+      ) : null}
+    </>
   );
 }
 
@@ -248,11 +267,12 @@ function EgressForm({
         type="button"
         className="fcx-btn"
         disabled={rows.length >= MAX_SECTION_ENTRIES}
+        aria-describedby="settings-egress-hint"
         onClick={() => setRows([...rows, { id: '', ceiling: 'unclassified' }])}
       >
         Add destination
       </button>{' '}
-      <Submit label="egress destinations" disabled={!valid} />
+      <Submit label="egress destinations" invalid={!valid} hint="settings-egress-hint" />
     </form>
   );
 }
@@ -329,7 +349,7 @@ function LugForm({
         Whole numbers. The threshold is 0 to {LUG_THRESHOLD_PERMILLE_MAX} permille. With LUG ingest
         enabled, the three maximums and the last-seen bucket must be at least 1.
       </FieldHint>
-      <Submit label="LUG exposure" disabled={!valid} />
+      <Submit label="LUG exposure" invalid={!valid} hint="settings-lug-hint" />
     </form>
   );
 }
@@ -378,7 +398,7 @@ function FamiliesForm({
         />
       </label>
       <FieldHint id="settings-families-hint">{listLimitsLine}</FieldHint>
-      <Submit label="decoder families" disabled={!valid} />
+      <Submit label="decoder families" invalid={!valid} hint="settings-families-hint" />
     </form>
   );
 }
@@ -421,7 +441,7 @@ function SourceMapForm({
       <FieldHint id="settings-sourcemap-hint">
         Every line needs a source and a format around one =. {listLimitsLine}
       </FieldHint>
-      <Submit label="source-format overrides" disabled={!valid} />
+      <Submit label="source-format overrides" invalid={!valid} hint="settings-sourcemap-hint" />
     </form>
   );
 }

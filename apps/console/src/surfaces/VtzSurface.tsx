@@ -25,7 +25,14 @@
 
 import { useMemo, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Badge, KpiCard, TabStrip, VtzZoneCard, type BadgeVariant } from '@forge/design';
+import {
+  Badge,
+  DisabledReason,
+  KpiCard,
+  TabStrip,
+  VtzZoneCard,
+  type BadgeVariant,
+} from '@forge/design';
 import type { RiskLevel, VtzArchetype, VtzSpecInput, VtzZone } from '@forge/contracts';
 
 import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
@@ -228,6 +235,7 @@ export function VtzSurface(): ReactElement {
           type="button"
           className="fcx-btn"
           disabled={zonesQuery.data === undefined}
+          aria-describedby="vtz-new-reason"
           onClick={() => {
             setCreating(true);
             setTab('configure');
@@ -235,6 +243,11 @@ export function VtzSurface(): ReactElement {
         >
           New zone
         </button>
+        {zonesQuery.data === undefined ? (
+          <DisabledReason id="vtz-new-reason">
+            Available once the zone list has loaded (a new zone may nest under an existing one).
+          </DisabledReason>
+        ) : null}
       </div>
 
       <div className="fcx-vtz-kpis">
