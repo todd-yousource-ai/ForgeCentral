@@ -1847,3 +1847,26 @@ body {
   flex-direction: column;
   gap: var(--fc-space-xs);
 }
+
+/* The contextual help control and panel (IP-CONSOLE-11-guide GD.11). */
+.fcx-help-trigger {
+  background: transparent;
+  border: 1px solid var(--fc-color-surface-border);
+  color: var(--fc-color-text-primary);
+  border-radius: var(--fc-radius-pill);
+  padding: var(--fc-space-xs) var(--fc-space-md);
+  cursor: pointer;
+  font-size: var(--fc-font-size-sm);
+}
+.fcx-help-trigger:hover,
+.fcx-help-trigger:focus-visible {
+  border-color: var(--fc-color-brand-primary);
+}
+.fcx-guide--panel {
+  max-width: none;
+}
+.fcx-guide__panel-links {
+  font-size: var(--fc-font-size-sm);
+  border-top: 1px solid var(--fc-color-surface-border);
+  padding-top: var(--fc-space-sm);
+}

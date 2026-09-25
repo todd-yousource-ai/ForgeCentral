@@ -14,6 +14,8 @@
 
 import { Suspense, lazy, useEffect, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
+
+import { SETTINGS_TABS } from './settingsTabs.js';
 import { Badge, ConfirmDialog, DataTable, GlassPanel, TabStrip } from '@forge/design';
 import type {
   SettingRow,
@@ -508,20 +510,7 @@ function SocTab(): ReactElement {
 // The ReadMe (IP-CONSOLE-11-guide GD.2) is its own chunk: the guide's content loads only when opened.
 const ReadmeTab = lazy(() => import('../guide/ReadmeTab.js'));
 
-/** The tabs whose engine bindings are live (TRD-CONSOLE-11 Section 9.2); the rest are absent. */
-const SETTINGS_TABS = [
-  { id: 'soc', label: 'SOC' },
-  { id: 'configuration', label: 'Configuration' },
-  { id: 'rbac', label: 'RBAC' },
-  { id: 'federation', label: 'Federation' },
-  { id: 'changes', label: 'Changes' },
-  { id: 'security', label: 'Security' },
-  { id: 'keylock', label: 'KeyLock' },
-  { id: 'observability', label: 'Observability' },
-  { id: 'topology', label: 'HA & Topology' },
-  { id: 'fips', label: 'FIPS Mode' },
-  { id: 'readme', label: 'ReadMe' },
-] as const;
+/* The tab list lives in ./settingsTabs.ts, shared with the contextual help map (GD.11). */
 
 const TAB_IDS: ReadonlySet<string> = new Set(SETTINGS_TABS.map((t) => t.id));
 
