@@ -16,7 +16,7 @@
 // endpoint CNs (there is no enrollable-endpoint list read yet); an empty Applied-To distributes nowhere.
 
 import { useMemo, useState, type ReactElement } from 'react';
-import { AccordionGroup, Badge, ConfirmDialog } from '@forge/design';
+import { AccordionGroup, Badge, ConfirmDialog, FieldHint } from '@forge/design';
 import type {
   ObjectCard,
   PolicyAction,
@@ -31,19 +31,24 @@ import type {
 import {
   POLICY_ACTIONS,
   POLICY_CLASSIFICATIONS,
+  POLICY_DESCRIPTION_MAX_BYTES,
   POLICY_LOGGING,
+  POLICY_NAME_MAX_BYTES,
+  POLICY_PORT_MAX,
+  POLICY_PORT_MIN,
   POLICY_PROTOCOLS,
   SCHEDULE_DAYS,
   policyActionLabel,
   policyLoggingLabel,
   policyProtocolLabel,
+  utf8ByteLength,
 } from '@forge/contracts';
 
 import { useObjects } from './useObjects.js';
 import { useVtzTree } from './useVtzTree.js';
 import { PolicyCommandError, useSavePolicy } from './usePolicyMutation.js';
 
-/** Validate a canonical port list (`80, 443, 8080-8090`): ports/ranges in 1-65535. Empty = valid (any). */
+/** Validate a canonical port list (`80, 443, 8080-8090`): ports/ranges in the port range. Empty = valid (any). */
 export function portsValid(input: string): boolean {
   const trimmed = input.trim();
   if (trimmed === '') return true;
@@ -53,11 +58,11 @@ export function portsValid(input: string): boolean {
     if (range) {
       const start = Number(range[1]);
       const end = Number(range[2]);
-      return start >= 1 && end <= 65535 && start < end;
+      return start >= POLICY_PORT_MIN && end <= POLICY_PORT_MAX && start < end;
     }
     if (!/^\d{1,5}$/.test(entry)) return false;
     const port = Number(entry);
-    return port >= 1 && port <= 65535;
+    return port >= POLICY_PORT_MIN && port <= POLICY_PORT_MAX;
   });
 }
 
@@ -159,7 +164,12 @@ export function PolicyForm({
 
   const portsOk = portsValid(ports);
   const complete = name.trim() !== '' && vtz !== '' && subjects.length > 0 && targets.length > 0;
-  const valid = complete && portsOk;
+  // The engine's text bounds are in UTF-8 bytes; checked here so an over-long field disables Save.
+  const nameBytes = utf8ByteLength(name.trim());
+  const descriptionBytes = utf8ByteLength(description);
+  const textOk =
+    nameBytes <= POLICY_NAME_MAX_BYTES && descriptionBytes <= POLICY_DESCRIPTION_MAX_BYTES;
+  const valid = complete && portsOk && textOk;
 
   const buildDraft = (): PolicyDraft => {
     const sources = subjects
@@ -236,7 +246,15 @@ export function PolicyForm({
             onChange={(e) => setName(e.target.value)}
             readOnly={editing !== null}
             required
+            aria-label="Policy Name"
+            aria-describedby="policy-name-hint"
+            aria-invalid={nameBytes > POLICY_NAME_MAX_BYTES}
           />
+          <FieldHint id="policy-name-hint">
+            {editing === null
+              ? `Unique in its zone; ${String(nameBytes)} of ${String(POLICY_NAME_MAX_BYTES)} bytes. It cannot be changed later.`
+              : 'The name cannot be changed.'}
+          </FieldHint>
         </label>
         <label className="fcx-filter">
           Zone
@@ -306,7 +324,13 @@ export function PolicyForm({
             onChange={(e) => setPorts(e.target.value)}
             placeholder="80, 443, 8080-8090"
             aria-invalid={!portsOk}
+            aria-label="Ports"
+            aria-describedby="policy-ports-hint"
           />
+          <FieldHint id="policy-ports-hint">
+            Ports or start-end ranges from {POLICY_PORT_MIN} to {POLICY_PORT_MAX}, separated by
+            commas. Empty means any port.
+          </FieldHint>
         </label>
       </fieldset>
 
@@ -415,13 +439,21 @@ export function PolicyForm({
             className="fcx-input"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            aria-label="Description"
+            aria-describedby="policy-description-hint"
+            aria-invalid={descriptionBytes > POLICY_DESCRIPTION_MAX_BYTES}
           />
+          <FieldHint id="policy-description-hint">
+            Optional; {String(descriptionBytes)} of {String(POLICY_DESCRIPTION_MAX_BYTES)} bytes
+            (text outside ASCII uses more than one byte per character).
+          </FieldHint>
         </label>
       </AccordionGroup>
 
       {!portsOk ? (
         <p role="alert" className="fcx-form-error">
-          The port list must be ports or start-end ranges within 1-65535.
+          The port list must be ports or start-end ranges within {POLICY_PORT_MIN}-{POLICY_PORT_MAX}
+          .
         </p>
       ) : null}
       {failure !== null ? (

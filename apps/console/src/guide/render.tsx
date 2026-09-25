@@ -7,7 +7,7 @@
 
 import { createElement, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 
-import { GUIDE_CONSTANTS } from './constants.js';
+import { GUIDE_CONSTANTS, formatGuideConstant } from './constants.js';
 import type { GuideNode } from './model.js';
 
 /** How the renderer navigates a link and fills a live Settings reference table. */
@@ -58,7 +58,7 @@ function renderNode(node: GuideNode, key: number, ctx: GuideRenderContext): Reac
     if (value !== undefined) {
       return (
         <span key={key} className={attrs['class']} data-const={constName}>
-          {String(value)}
+          {formatGuideConstant(value, attrs['data-format'])}
         </span>
       );
     }

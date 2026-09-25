@@ -70,7 +70,7 @@
 <h2 id="idp-restrictions">Restrictions</h2>
 <ul>
   <li>Auth0 is the only provider in this release.</li>
-  <li>Delta poll interval: 60 to 86,400 seconds (default 300). Full directory sync: 1 to 168 hours (default 24).</li>
+  <li>Delta poll interval: <span class="const" data-const="IDAM_POLL_INTERVAL_SECS_MIN">60</span> to <span class="const" data-const="IDAM_POLL_INTERVAL_SECS_MAX" data-format="grouped">86,400</span> seconds (default <span class="const" data-const="IDAM_POLL_INTERVAL_SECS_DEFAULT">300</span>). Full directory sync: <span class="const" data-const="IDAM_FULL_SYNC_HOURS_MIN">1</span> to <span class="const" data-const="IDAM_FULL_SYNC_HOURS_MAX">168</span> hours (default <span class="const" data-const="IDAM_FULL_SYNC_HOURS_DEFAULT">24</span>). Each range is shown under its field, and <b class="ui">Save connector</b> stays unavailable while a value is outside it.</li>
   <li>The audience is optional; when empty, the engine uses the Auth0 Management API audience for your domain.</li>
 </ul>
 <div class="note limit"><p>Connector changes are held in the Forge engine's memory and are not recorded in the audit trail. When the engine restarts, the connector returns to the settings it was installed with. After an engine restart, open the connector and save your settings again.</p></div>
@@ -103,7 +103,7 @@
 <tr><td><b class="ui">Audience</b></td><td>Optional; leave empty for the Management API.</td></tr>
 <tr><td><b class="ui">Client Secret</b></td><td>The application's client secret. Required. Written to the node's protected store; never shown again.</td></tr>
 <tr><td><b class="ui">Delta poll interval (seconds)</b></td><td>60 to 86,400. How often the connector runs its cycle: it reads the sign-in logs each cycle, and a full sync that is due starts on the next cycle.</td></tr>
-<tr><td><b class="ui">Full directory sync (hours)</b></td><td>1 to 168. How often the connector re-reads the whole directory.</td></tr>
+<tr><td><b class="ui">Full directory sync (hours)</b></td><td><span class="const" data-const="IDAM_FULL_SYNC_HOURS_MIN">1</span> to <span class="const" data-const="IDAM_FULL_SYNC_HOURS_MAX">168</span>. How often the connector re-reads the whole directory.</td></tr>
 </table>
 </div>
 

@@ -12,7 +12,7 @@
 //   * No posture/enforce control exists anywhere on the surface.
 
 import { useMemo, useState, type ReactElement } from 'react';
-import { Badge, ConfirmDialog, type BadgeVariant } from '@forge/design';
+import { Badge, ConfirmDialog, FieldHint, type BadgeVariant } from '@forge/design';
 import type { ObjectCard, ObjectDraft, ObjectKind, SelectorKind } from '@forge/contracts';
 import { OBJECT_KINDS, objectId, objectKindLabel } from '@forge/contracts';
 
@@ -171,7 +171,13 @@ function ObjectForm({
           onChange={(e) => setSelectorValue(e.target.value)}
           placeholder={selectorHint(kind, selectorKind)}
           required
+          aria-label="Value"
+          aria-describedby="object-value-hint"
         />
+        <FieldHint id="object-value-hint">
+          Required: {selectorHint(kind, selectorKind)}. The engine refuses a value that does not fit
+          the selector.
+        </FieldHint>
       </label>
       <label className="fcx-filter">
         Description

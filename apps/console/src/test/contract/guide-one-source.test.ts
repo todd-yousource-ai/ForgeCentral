@@ -9,7 +9,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { GUIDE_CONSTANTS } from '../../guide/constants.js';
+import { GUIDE_CONSTANTS, formatGuideConstant } from '../../guide/constants.js';
 import { GUIDE } from '../../guide/generated/guide-content.js';
 import type { GuideNode } from '../../guide/model.js';
 import { GuideNodes } from '../../guide/render.js';
@@ -17,6 +17,7 @@ import { GuideNodes } from '../../guide/render.js';
 interface Marker {
   readonly where: string;
   readonly name: string;
+  readonly format: string | undefined;
   readonly text: string;
 }
 
@@ -28,7 +29,9 @@ function collect(nodes: readonly GuideNode[], where: string, out: Marker[]): voi
   for (const node of nodes) {
     if (typeof node === 'string') continue;
     const name = node.a?.['data-const'];
-    if (name !== undefined) out.push({ where, name, text: textOf(node) });
+    if (name !== undefined) {
+      out.push({ where, name, format: node.a?.['data-format'], text: textOf(node) });
+    }
     collect(node.c ?? [], where, out);
   }
 }
@@ -40,15 +43,17 @@ for (const chapter of GUIDE.chapters) {
 }
 
 describe('INV-GUIDE-ONE-SOURCE (GD.12)', () => {
-  it('marks the Console limits the Settings chapters state', () => {
+  it('marks the Console limits the chapters state', () => {
     expect(MARKERS.length).toBeGreaterThan(0);
   });
 
   it('names only registered constants, each carrying its current value', () => {
-    const wrong = MARKERS.filter(
-      (m) => GUIDE_CONSTANTS[m.name] === undefined || m.text !== String(GUIDE_CONSTANTS[m.name]),
-    ).map(
-      (m) => `${m.where}: ${m.name} says ${m.text}, code says ${String(GUIDE_CONSTANTS[m.name])}`,
+    const expected = (m: Marker): string | undefined => {
+      const value = GUIDE_CONSTANTS[m.name];
+      return value === undefined ? undefined : formatGuideConstant(value, m.format);
+    };
+    const wrong = MARKERS.filter((m) => m.text !== expected(m)).map(
+      (m) => `${m.where}: ${m.name} says ${m.text}, code says ${String(expected(m))}`,
     );
     expect(wrong).toEqual([]);
   });
@@ -82,5 +87,10 @@ describe('INV-GUIDE-ONE-SOURCE (GD.12)', () => {
       `At most <span class="const" data-const="MAX_SETTING_EDITS">${String(GUIDE_CONSTANTS['MAX_SETTING_EDITS'])}</span> changes.`,
     );
     expect(render({ ...GUIDE_CONSTANTS, MAX_SETTING_EDITS: 32 })).toContain('>32</span>');
+  });
+
+  it('prints a grouped marker with thousands separators', () => {
+    expect(formatGuideConstant(86_400, 'grouped')).toBe('86,400');
+    expect(formatGuideConstant(86_400, undefined)).toBe('86400');
   });
 });

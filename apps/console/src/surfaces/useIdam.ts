@@ -86,6 +86,9 @@ export const IDAM_POLL_INTERVAL_SECS_MIN = 60;
 export const IDAM_POLL_INTERVAL_SECS_MAX = 86_400;
 export const IDAM_FULL_SYNC_HOURS_MIN = 1;
 export const IDAM_FULL_SYNC_HOURS_MAX = 168;
+/** The cadences a new connector starts with in the form. */
+export const IDAM_POLL_INTERVAL_SECS_DEFAULT = 300;
+export const IDAM_FULL_SYNC_HOURS_DEFAULT = 24;
 
 /** The onboarding form's input: connectivity, the write-only secret, and the two cadences (ID.4a). */
 export interface IdamConnectInput {

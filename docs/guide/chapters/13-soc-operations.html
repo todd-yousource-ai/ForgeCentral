@@ -75,9 +75,9 @@
 <h2 id="soc-restrictions">Restrictions</h2>
 <ul>
   <li>A closed incident refuses assign, acknowledge and close; it still accepts notes and a corrected disposition.</li>
-  <li>A note is at most 4,000 characters; text with many accented or non-Latin characters can be refused sooner.</li>
+  <li>A note is at most <span class="const" data-const="MAX_NOTE_CHARS" data-format="grouped">4,000</span> characters; text with many accented or non-Latin characters can be refused sooner.</li>
   <li>A later disposition replaces the earlier one as the incident's verdict, and its calibration effect replaces the earlier one's; the Audit Trail keeps both entries.</li>
-  <li>The <b class="ui">Acceptance lapses on</b> date of a risk-accepted verdict can be at most 365 days away; a later date is refused.</li>
+  <li>The <b class="ui">Acceptance lapses on</b> date of a risk-accepted verdict can be at most <span class="const" data-const="RISK_ACCEPTANCE_MAX_DAYS">365</span> days away; the date picker stops there, and <b class="ui">Record disposition</b> stays unavailable for a later date.</li>
 </ul>
 <div class="note limit"><p><b class="ui">Generate verdict</b> and <b class="ui">Save plan</b> act without a confirmation step. After a verdict run starts, the panels do not refresh on their own: select the incident again after a few minutes to see the narrative.</p></div>
 <div class="note limit"><p>If a verdict run is refused, ForgeCentral may say <b class="ui">The run request did not reach the engine.</b> even though the engine answered. Running it again is safe: the engine does not start a second run while one is recorded or running.</p></div>
@@ -124,7 +124,7 @@
 <tr><td><b class="ui">Benign, authorized</b></td><td><b class="ui">Authorized by</b></td><td>Closes the incident; no calibration effect.</td></tr>
 <tr><td><b class="ui">True positive, remediated</b></td><td><b class="ui">Action taken</b>: <code>reimage</code>, <code>credential_rotation</code>, <code>patch</code>, <code>isolate</code> or <code>remove</code></td><td>Closes the incident and teaches calibration.</td></tr>
 <tr><td><b class="ui">True positive, blocked</b></td><td><b class="ui">Blocking control</b></td><td>Closes the incident and teaches calibration.</td></tr>
-<tr><td><b class="ui">True positive, risk accepted</b></td><td><b class="ui">Accepting party</b>, and <b class="ui">Acceptance lapses on</b> (a future date)</td><td>Closes the incident and teaches calibration; the acceptance lapses on that date (at most 365 days away).</td></tr>
+<tr><td><b class="ui">True positive, risk accepted</b></td><td><b class="ui">Accepting party</b>, and <b class="ui">Acceptance lapses on</b> (a future date)</td><td>Closes the incident and teaches calibration; the acceptance lapses on that date (at most <span class="const" data-const="RISK_ACCEPTANCE_MAX_DAYS">365</span> days away).</td></tr>
 <tr><td><b class="ui">Duplicate</b></td><td><b class="ui">Predecessor incident id</b></td><td>Closes the incident; no calibration effect.</td></tr>
 <tr><td><b class="ui">Undetermined</b></td><td>None</td><td>Closes the incident; the trail records that you ruled it undetermined.</td></tr>
 </table>
