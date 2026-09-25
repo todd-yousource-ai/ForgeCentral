@@ -698,6 +698,38 @@
       ],
       "type": "object"
     },
+    "WireConnectivityReport": {
+      "additionalProperties": false,
+      "properties": {
+        "crypto_provider": {
+          "type": "string"
+        },
+        "fips_module": {
+          "type": "boolean"
+        },
+        "identities_bound": {
+          "type": "integer"
+        },
+        "listen_addr": {
+          "type": "string"
+        },
+        "mutual_tls": {
+          "type": "boolean"
+        },
+        "post_quantum_kx": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "listen_addr",
+        "mutual_tls",
+        "identities_bound",
+        "post_quantum_kx",
+        "crypto_provider",
+        "fips_module"
+      ],
+      "type": "object"
+    },
     "WireContain": {
       "additionalProperties": false,
       "properties": {
@@ -1756,6 +1788,26 @@
         "opened_at",
         "last_seen",
         "evidence_count"
+      ],
+      "type": "object"
+    },
+    "WireKeyIssuingReport": {
+      "additionalProperties": false,
+      "properties": {
+        "dual_control_required": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "key_validity_secs": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "dual_control_required",
+        "key_validity_secs"
       ],
       "type": "object"
     },
@@ -4545,6 +4597,18 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SettingsReports": {
+              "$ref": "#/$defs/WireSettingsReports"
+            }
+          },
+          "required": [
+            "SettingsReports"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SettingsCommitted": {
               "$ref": "#/$defs/WireSettingsCommitted"
             }
@@ -5519,6 +5583,18 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SettingsReports": {
+              "$ref": "#/$defs/WireSettingsReportsQuery"
+            }
+          },
+          "required": [
+            "SettingsReports"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SettingsCommit": {
               "$ref": "#/$defs/WireSettingsCommit"
             }
@@ -5781,6 +5857,78 @@
       "required": [],
       "type": "object"
     },
+    "WireSecurityReport": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_spot_failures": {
+          "type": "integer"
+        },
+        "artifacts_spot_checked": {
+          "type": "integer"
+        },
+        "audit_chain_verified": {
+          "type": "boolean"
+        },
+        "audit_entries": {
+          "type": "integer"
+        },
+        "audit_head_version": {
+          "type": "integer"
+        },
+        "classification": {
+          "type": "string"
+        },
+        "template_artifacts": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "classification",
+        "audit_head_version",
+        "audit_entries",
+        "audit_chain_verified",
+        "artifacts_spot_checked",
+        "artifact_spot_failures",
+        "template_artifacts"
+      ],
+      "type": "object"
+    },
+    "WireServerReport": {
+      "additionalProperties": false,
+      "properties": {
+        "durable": {
+          "type": "boolean"
+        },
+        "maintenance_cadence_secs": {
+          "type": "integer"
+        },
+        "maintenance_enabled": {
+          "type": "boolean"
+        },
+        "max_payload": {
+          "type": "integer"
+        },
+        "serving": {
+          "type": "boolean"
+        },
+        "shards": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "shards",
+        "serving",
+        "durable",
+        "maintenance_enabled",
+        "maintenance_cadence_secs",
+        "max_payload",
+        "version"
+      ],
+      "type": "object"
+    },
     "WireSettingEdit": {
       "additionalProperties": false,
       "properties": {
@@ -5998,6 +6146,68 @@
       },
       "required": [
         "request_id"
+      ],
+      "type": "object"
+    },
+    "WireSettingsReports": {
+      "additionalProperties": false,
+      "properties": {
+        "admin_plane": {
+          "type": "boolean"
+        },
+        "connectivity": {
+          "$ref": "#/$defs/WireConnectivityReport"
+        },
+        "egress": {
+          "items": {
+            "$ref": "#/$defs/WireEgressSetting"
+          },
+          "type": "array"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "key_issuing": {
+          "$ref": "#/$defs/WireKeyIssuingReport"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "security": {
+          "$ref": "#/$defs/WireSecurityReport"
+        },
+        "server": {
+          "$ref": "#/$defs/WireServerReport"
+        },
+        "telemetry": {
+          "$ref": "#/$defs/WireTelemetryReport"
+        }
+      },
+      "required": [
+        "admin_plane",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSettingsReportsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "reports": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "reports"
       ],
       "type": "object"
     },
@@ -7256,6 +7466,34 @@
         "active_candidate",
         "active_escalate",
         "last_fired_secs"
+      ],
+      "type": "object"
+    },
+    "WireTelemetryReport": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "grpc_addr": {
+          "type": "string"
+        },
+        "http_addr": {
+          "type": "string"
+        },
+        "queue_capacity": {
+          "type": "integer"
+        },
+        "tenants_bound": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "grpc_addr",
+        "http_addr",
+        "queue_capacity",
+        "tenants_bound"
       ],
       "type": "object"
     },

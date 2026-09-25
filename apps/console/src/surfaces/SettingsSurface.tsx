@@ -33,6 +33,13 @@ import { EmptyState, ErrorState, LoadingState } from '../states/States.js';
 import { GovernedReceipt, SectionForms } from './SettingsSectionForms.js';
 import { FederationTab, RbacTab } from './SettingsIdentityTabs.js';
 import {
+  FipsTab,
+  KeyLockTab,
+  ObservabilityTab,
+  SecurityTab,
+  TopologyTab,
+} from './SettingsReportTabs.js';
+import {
   useCommitGovernedSettings,
   useCommitSocSettings,
   useGovernedSettings,
@@ -498,6 +505,11 @@ const SETTINGS_TABS = [
   { id: 'configuration', label: 'Configuration' },
   { id: 'rbac', label: 'RBAC' },
   { id: 'federation', label: 'Federation' },
+  { id: 'security', label: 'Security' },
+  { id: 'keylock', label: 'KeyLock' },
+  { id: 'observability', label: 'Observability' },
+  { id: 'topology', label: 'HA & Topology' },
+  { id: 'fips', label: 'FIPS Mode' },
 ] as const;
 
 export function SettingsSurface(): ReactElement {
@@ -514,6 +526,16 @@ export function SettingsSurface(): ReactElement {
         <RbacTab />
       ) : tab === 'federation' ? (
         <FederationTab />
+      ) : tab === 'security' ? (
+        <SecurityTab />
+      ) : tab === 'keylock' ? (
+        <KeyLockTab />
+      ) : tab === 'observability' ? (
+        <ObservabilityTab />
+      ) : tab === 'topology' ? (
+        <TopologyTab />
+      ) : tab === 'fips' ? (
+        <FipsTab />
       ) : (
         <SocTab />
       )}

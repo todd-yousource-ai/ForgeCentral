@@ -39,6 +39,7 @@ import type {
   WireSocSettingsCommit,
   WireSocSettingsQuery,
   WireSettingsQuery,
+  WireSettingsReportsQuery,
   WireSettingsCommit,
   WireSocNarrativeQuery,
   WireSocTelemetryQuery,
@@ -700,6 +701,16 @@ function settingsReadToCbor(request: WireSettingsQuery): unknown {
   return out;
 }
 
+/** `SETTINGS_REPORTS` (crdb SET.4). Rust struct order: request_id, reports, operator?. */
+function settingsReportsToCbor(request: WireSettingsReportsQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    reports: [...request.reports],
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SETTINGS_COMMIT` (crdb SET.2 / SET.2b). Rust struct order: request_id, edits, sections?, operator?. */
 function settingsCommitToCbor(request: WireSettingsCommit): unknown {
   const out: Record<string, unknown> = {
@@ -1038,6 +1049,9 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SettingsRead' in request) {
     return encode({ SettingsRead: settingsReadToCbor(request.SettingsRead) });
+  }
+  if ('SettingsReports' in request) {
+    return encode({ SettingsReports: settingsReportsToCbor(request.SettingsReports) });
   }
   if ('SocSettingsRead' in request) {
     return encode({ SocSettingsRead: socSettingsReadToCbor(request.SocSettingsRead) });

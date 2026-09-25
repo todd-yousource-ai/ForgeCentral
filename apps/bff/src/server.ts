@@ -25,6 +25,7 @@ import {
   vtzId,
   toSocSettingsPatch,
   toSettingsCommitRequest,
+  toSettingsReportNames,
 } from '@forge/contracts';
 import type {
   EntityRef,
@@ -105,6 +106,7 @@ import {
   SettingsUnavailableError,
   resolveSettings,
   resolveSettingsCommit,
+  resolveSettingsReports,
 } from './engine/settings.js';
 import {
   resolveIdamConfigure,
@@ -2110,6 +2112,61 @@ function handleConsoleRbac(
   return true;
 }
 
+/**
+ * `GET /api/settings/reports?names=a,b` (IP-CONSOLE-11 report tabs over crdb SET.4): the admin plane's
+ * status reports by name. An empty or unknown name is a 400 before any engine call; the engine's tier
+ * refusal is a 403; nothing is cached.
+ */
+async function handleSettingsReports(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (path !== '/api/settings/reports' || method !== 'GET') return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const names = toSettingsReportNames(
+    new URL(req.url ?? '/', 'http://localhost').searchParams.get('names'),
+  );
+  if (names === null) {
+    sendJson(res, 400, { error: 'bad_request' });
+    return true;
+  }
+  try {
+    const view = await resolveSettingsReports(
+      deps.operatorEngine,
+      principalFromSession(session, activeTenantOverride(req)),
+      names,
+      { timeoutMs: deps.config.requestTimeoutMs },
+    );
+    if (view === null) {
+      sendJson(res, 403, { error: 'refused', class: 'Tier' });
+      return true;
+    }
+    sendJson(res, 200, view);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn(
+        { err: err instanceof Error ? err.name : 'unknown' },
+        'settings reports failed',
+      );
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleSocSettings(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -2407,6 +2464,9 @@ async function route(
     return;
   }
   if (handleConsoleRbac(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleSettingsReports(deps, req, method, path, res)) {
     return;
   }
   if (await handleSocSettings(deps, req, method, path, res)) {

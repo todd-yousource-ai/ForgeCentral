@@ -8,11 +8,19 @@
 import type {
   SettingsCommitRequest,
   SettingsReceipt,
+  SettingsReportName,
+  SettingsReportsView,
   SettingsView,
   WireSettingsCommit,
   WireSettingsQuery,
+  WireSettingsReportsQuery,
 } from '@forge/contracts';
-import { toSettingsReceipt, toSettingsView, toWireSettingsCommitFields } from '@forge/contracts';
+import {
+  toSettingsReceipt,
+  toSettingsReportsView,
+  toSettingsView,
+  toWireSettingsCommitFields,
+} from '@forge/contracts';
 
 import type { EngineCallOptions } from './client.js';
 import type { OperatorEngine } from './operator-engine.js';
@@ -66,4 +74,18 @@ export async function resolveSettingsCommit(
     ...toWireSettingsCommitFields(request),
   };
   return toSettingsReceipt(await engine.settingsCommit(principal, wire, opts));
+}
+
+/**
+ * Read the admin plane's status reports by name (crdb SET.4, `SETTINGS_REPORTS`). `null` is the
+ * engine's refusal (a tier below Admin / SecurityAudit). Nothing is cached: a report is a live read.
+ */
+export async function resolveSettingsReports(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  names: readonly SettingsReportName[],
+  opts?: EngineCallOptions,
+): Promise<SettingsReportsView | null> {
+  const request: WireSettingsReportsQuery = { request_id: requestId(), reports: [...names] };
+  return toSettingsReportsView(await engine.settingsReports(principal, request, opts));
 }

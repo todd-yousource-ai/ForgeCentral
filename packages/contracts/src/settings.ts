@@ -18,6 +18,7 @@ import type {
   WireSectionPatch,
   WireSettingRow,
   WireSettings,
+  WireSettingsReports,
   WireSourceFormatMapping,
   WireSsoGroupRoles,
 } from './generated/wire-dto.js';
@@ -653,4 +654,156 @@ export function refusalCauseLabel(refusal: SettingRefusal): string {
 /** Whether the Configuration tab offers a key edit for this row (knob, editable, not a set). */
 export function isKeyEditable(row: SettingRow): boolean {
   return row.editable && row.origin === 'knob' && row.valueType !== 'CapabilitySet';
+}
+
+/** The admin-plane reports the engine serves by name (crdb SET.4, `SETTINGS_REPORT_NAMES`). */
+export const SETTINGS_REPORT_NAMES = [
+  'server',
+  'connectivity',
+  'security',
+  'telemetry',
+  'key_issuing',
+  'egress',
+] as const;
+export type SettingsReportName = (typeof SETTINGS_REPORT_NAMES)[number];
+
+/**
+ * The admin plane's status reports as the Settings tabs read them (crdb SET.4). Each is null unless it
+ * was asked for. `adminPlane` false means the node runs no admin endpoint: no report exists, and the
+ * surface says so rather than showing defaults that would read as measured.
+ */
+export interface SettingsReportsView {
+  readonly adminPlane: boolean;
+  readonly server: {
+    readonly shards: number;
+    readonly serving: boolean;
+    readonly durable: boolean;
+    readonly maintenanceEnabled: boolean;
+    readonly maintenanceCadenceSecs: number;
+    readonly maxPayload: number;
+    readonly version: string;
+  } | null;
+  readonly connectivity: {
+    readonly listenAddr: string;
+    readonly mutualTls: boolean;
+    readonly identitiesBound: number;
+    readonly postQuantumKx: boolean;
+    readonly cryptoProvider: string;
+    readonly fipsModule: boolean;
+  } | null;
+  readonly security: {
+    readonly classification: string;
+    readonly auditHeadVersion: number;
+    readonly auditEntries: number;
+    readonly auditChainVerified: boolean;
+    readonly artifactsSpotChecked: number;
+    readonly artifactSpotFailures: number;
+    readonly templateArtifacts: number;
+  } | null;
+  readonly telemetry: {
+    readonly enabled: boolean;
+    readonly grpcAddr: string;
+    readonly httpAddr: string;
+    readonly queueCapacity: number;
+    readonly tenantsBound: number;
+  } | null;
+  readonly keyIssuing: {
+    readonly enabled: boolean;
+    readonly dualControlRequired: boolean;
+    readonly keyValiditySecs: number;
+  } | null;
+  readonly egress: readonly { readonly id: string; readonly ceiling: string }[] | null;
+}
+
+/**
+ * Parse the `names` query parameter (`a,b,c`): every name known, at least one, duplicates dropped.
+ * `null` (a 400) otherwise, so a stale caller never silently loses a report.
+ */
+export function toSettingsReportNames(raw: string | null): SettingsReportName[] | null {
+  if (raw === null || raw.trim() === '') {
+    return null;
+  }
+  const out: SettingsReportName[] = [];
+  for (const part of raw.split(',')) {
+    const name = part.trim();
+    if (!(SETTINGS_REPORT_NAMES as readonly string[]).includes(name)) {
+      return null;
+    }
+    if (!out.includes(name as SettingsReportName)) {
+      out.push(name as SettingsReportName);
+    }
+  }
+  return out;
+}
+
+/** Project the `SETTINGS_REPORTS` reply; `null` for the engine's refusal. */
+export function toSettingsReportsView(wire: WireSettingsReports): SettingsReportsView | null {
+  if (wire.refused) {
+    return null;
+  }
+  const s = wire.server;
+  const c = wire.connectivity;
+  const sec = wire.security;
+  const t = wire.telemetry;
+  const k = wire.key_issuing;
+  return {
+    adminPlane: wire.admin_plane,
+    server:
+      s === undefined
+        ? null
+        : {
+            shards: s.shards,
+            serving: s.serving,
+            durable: s.durable,
+            maintenanceEnabled: s.maintenance_enabled,
+            maintenanceCadenceSecs: s.maintenance_cadence_secs,
+            maxPayload: s.max_payload,
+            version: s.version,
+          },
+    connectivity:
+      c === undefined
+        ? null
+        : {
+            listenAddr: c.listen_addr,
+            mutualTls: c.mutual_tls,
+            identitiesBound: c.identities_bound,
+            postQuantumKx: c.post_quantum_kx,
+            cryptoProvider: c.crypto_provider,
+            fipsModule: c.fips_module,
+          },
+    security:
+      sec === undefined
+        ? null
+        : {
+            classification: sec.classification,
+            auditHeadVersion: sec.audit_head_version,
+            auditEntries: sec.audit_entries,
+            auditChainVerified: sec.audit_chain_verified,
+            artifactsSpotChecked: sec.artifacts_spot_checked,
+            artifactSpotFailures: sec.artifact_spot_failures,
+            templateArtifacts: sec.template_artifacts,
+          },
+    telemetry:
+      t === undefined
+        ? null
+        : {
+            enabled: t.enabled,
+            grpcAddr: t.grpc_addr,
+            httpAddr: t.http_addr,
+            queueCapacity: t.queue_capacity,
+            tenantsBound: t.tenants_bound,
+          },
+    keyIssuing:
+      k === undefined
+        ? null
+        : {
+            enabled: k.enabled,
+            dualControlRequired: k.dual_control_required,
+            keyValiditySecs: k.key_validity_secs,
+          },
+    egress:
+      wire.egress === undefined
+        ? null
+        : wire.egress.map((e: WireEgressSetting) => ({ id: e.id, ceiling: e.ceiling })),
+  };
 }
