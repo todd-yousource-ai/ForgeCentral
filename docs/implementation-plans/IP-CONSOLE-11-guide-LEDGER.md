@@ -7,7 +7,10 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 
 ## Resume here (rewrite at every merge)
 
-- **State (2026-09-25):** GD.N ON BRANCH `feat/console-11-gdn-capstone`, awaiting review. Coverage is
+- **State (2026-09-25):** PLAN COMPLETE. GD.N MERGED `0bbc902` (operator: "Approve"); every PR row is merged;
+  GD.E1-E3 and GD.D1 stay DEFERRED by ruling. Open outside the plan: CD-65 (engine-connection cascade)
+  and the other open census rows. Post-merge: Console reinstalled from main and the live walk re-run.
+- **Earlier (2026-09-25):** GD.N ON BRANCH `feat/console-11-gdn-capstone`. Coverage is
   global (all 89 manifest bindings have a declaring section; the per-surface scope list is gone);
   three Playwright journeys added (the filter narrows to a hit that opens its section and says so on no
   match; Help follows the active Settings tab; the tier refusal's link opens `cfg-who`), beside the
@@ -200,7 +203,7 @@ defect. The census it rests on is `IP-CONSOLE-11-guide-CENSUS.md`.
 | GD.12a | 11.2 (3) | MERGED `709efc0` (2026-09-25; full gate green, e2e 42/42) | | InfoTip + FieldHint; Settings forms show and enforce the engine limits from named constants; guide `data-const` markers rendered live; INV-GUIDE-ONE-SOURCE contract test |
 | GD.12b | 11.2 (3) | MERGED `3e0aa13` (2026-09-25; full gate green, e2e 42/42) | | the same for VTZ, Objects, Policies, Users/groups, IdAM, SOC case controls, Logs |
 | GD.13 | INV-GUIDE-DISABLED-EXPLAINED | MERGED `047726e` (2026-09-25; full gate green, e2e 42/42) | | DisabledReason + GuideLink; 33 disabled controls state why; hidden locks link to their cause; source-scanning contract test |
-| GD.N | 11.6; INV-GUIDE-COVERS-EVERY-CONFIG | ON BRANCH `feat/console-11-gdn-capstone` | | capstone: global coverage (89/89), Playwright journeys, Console installed live + bundle verified; logged-in walk owed to the operator |
+| GD.N | 11.6; INV-GUIDE-COVERS-EVERY-CONFIG | MERGED `0bbc902` (2026-09-25; full gate green, e2e 45/45; live walk) | | capstone: global coverage (89/89), Playwright journeys, Console installed live + bundle verified; logged-in walk owed to the operator |
 | GD.E1 | -- | DEFERRED (ruling 2026-09-25) | | crdb: setting tier on the wire |
 | GD.E2 | -- | DEFERRED (ruling 2026-09-25) | | crdb: deployment profiles on the wire |
 | GD.E3 | -- | DEFERRED (ruling 2026-09-25) | | crdb: detection report + enrolled-endpoint read |
