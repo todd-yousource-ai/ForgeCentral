@@ -136,6 +136,11 @@ describe('the live entity drawer (DR.3d)', () => {
     await waitFor(() => {
       expect(screen.getByRole('status')).toHaveTextContent(/Isolation recorded/i);
     });
+    // The line is inside the drawer panel (not under its overlay) and claims no endpoint delivery
+    // (census CD-46, CD-64).
+    expect(screen.getByRole('dialog')).toContainElement(screen.getByRole('status'));
+    expect(screen.getByRole('status')).toHaveTextContent(/nothing is sent to an endpoint/i);
+    expect(screen.getByRole('status')).not.toHaveTextContent(/distributed/i);
     const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith('/isolate'));
     expect(call?.[0]).toBe('/api/entity/principal/aig%3Aagent%3Aa/isolate');
     const body = JSON.parse((call?.[1] as RequestInit).body as string) as {

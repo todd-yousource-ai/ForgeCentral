@@ -19,26 +19,27 @@ which also names the cross-surface Crucible/Torch/Forge work (`INV-CROSS`) each 
 
 | TRD | Title | Status |
 |-----|-------|--------|
-| CONSOLE-00 | Platform and Architecture (foundation: BFF-over-Crucible, design system, IA, data contract, auth, performance, invariants) | DRAFT |
-| CONSOLE-01 | Overview -- the live connectivity graph (home) | DRAFT |
-| CONSOLE-02 | Virtual Trust Zones | DRAFT |
-| CONSOLE-03 | SOC Operations | DRAFT |
-| CONSOLE-04 | Users and Identity (principals + External IDAM) | DRAFT |
-| CONSOLE-05 | Policies | DRAFT |
-| CONSOLE-06 | TrustFlow (brokered egress / inference plane) | DRAFT |
-| CONSOLE-07 | AIOps (command center: Reflex, Oversight, Incidents, Decision Stream, Governance, Containment, Workflows, Rewind, Simulations) | DRAFT |
-| CONSOLE-08 | Reports | DRAFT |
-| CONSOLE-09 | Logs (decision / audit stream -- the LOG) | DRAFT |
-| CONSOLE-10 | Objects (protected resources) | DRAFT |
-| CONSOLE-11 | Settings (HA/DR, KeyLock, Federation, Security, FIPS, RBAC, Observability, Policy) | DRAFT |
-| CONSOLE-12 | Entity drawer (shared detail + quick-actions pattern) | DRAFT |
+| CONSOLE-00 | Platform and Architecture (foundation: BFF-over-Crucible, design system, IA, data contract, auth, performance, invariants) | DRAFT; navigation and surface catalog amended to the built surface 2026-09-25 (GD.10) |
+| CONSOLE-01 | Overview -- the live connectivity graph (home) | BUILT IN PART (refreshed GD.10) |
+| CONSOLE-02 | Virtual Trust Zones | AMENDED 2026-09-25 (GD.4), built in part |
+| CONSOLE-03 | SOC Operations | BUILT (refreshed GD.8; supersedes `TRD-CONSOLE-03-dashboards`, SUPERSEDED) |
+| CONSOLE-04 | Users and Identity (principals + External IDAM) | AMENDED 2026-09-25 (GD.7), built in part |
+| CONSOLE-05 | Policies | REVISED 2026-07-24, AMENDED 2026-09-25 (GD.6), built in part |
+| CONSOLE-06 | Agent Ops (was TrustFlow; brokered egress / inference plane) | DRAFT; not built, off the rail |
+| CONSOLE-07 | Network Ops (was AIOps; command center: Reflex, Oversight, Incidents, Decision Stream, Governance, Containment, Workflows, Rewind, Simulations) | DRAFT; not built, off the rail |
+| CONSOLE-08 | Reports | PARTLY BUILT (refreshed GD.9) |
+| CONSOLE-09 | Logs (decision / audit stream -- the LOG) | BUILT IN PART (refreshed GD.9) |
+| CONSOLE-10 | Objects (protected resources) | AMENDED 2026-09-25 (GD.5), built in part |
+| CONSOLE-11 | Settings (SOC, Configuration, RBAC, Federation, Changes, Security, KeyLock, Observability, HA & Topology, FIPS Mode, ReadMe) | REVISED 2026-09-25 (Sections 9 to 11: as built, gaps, the in-app guide) |
+| CONSOLE-12 | Entity drawer (shared detail + quick-actions pattern) | BUILT IN PART (refreshed GD.10) |
 
 ## Terminology (trust-era mock -> AI-native platform)
 
-Normative map in `TRD-CONSOLE-00` Section 3. Highlights: **TrustOps -> AIOps**; Trust Overview -> the
-live **Overview** graph; Trust Replay -> **Rewind** (Crucible `AS OF` time-travel). Retained because
-they name real things: **Trust Score** (the computed risk/confidence value), **TrustFlow** (the real
-`torch-trustflow` plane), **Virtual Trust Zones** (the real Forge TRD-32 v2 model).
+Normative map in `TRD-CONSOLE-00` Section 3. Highlights: **TrustOps -> AIOps -> Network Ops**; Trust
+Overview -> the live **Overview** graph; Trust Replay -> **Rewind** (Crucible `AS OF` time-travel);
+TrustFlow -> **Agent Ops**. **Trust Score is removed** (struck from `TRD-CONSOLE-02` on 2026-07-19; no
+surface or drawer shows one). Retained because it names a real thing: **Virtual Trust Zones** (the Forge
+TRD-32 v2 model).
 
 ## Brand assets (canonical)
 

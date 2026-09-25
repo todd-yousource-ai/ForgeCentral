@@ -1,6 +1,8 @@
 # TRD-CONSOLE-12 -- The entity drawer (shared detail + quick-actions pattern)
 
-**Status:** DRAFT (authored 2026-07-07). Inherits `TRD-CONSOLE-00`. This TRD specifies the entity
+**Status:** BUILT IN PART (authored 2026-07-07; refreshed 2026-09-25 by `IP-CONSOLE-11-guide` GD.10 against the
+configuration census; Section 0b records the built surface and wins where later sections differ; unbuilt
+requirements are kept in the Known gaps section). Inherits `TRD-CONSOLE-00`. This TRD specifies the entity
 drawer -- the right-side panel that opens when an operator clicks any entity anywhere in the Console
 (a graph node, a table row, a decision card, a log line). It is a shared component, not a page; it
 lands with `TRD-CONSOLE-01` (Overview) because every surface reuses it. The mock target is `shot-14`.
@@ -9,6 +11,35 @@ The drawer is the linchpin of the three-click rule: it turns any entity, from an
 governance picture plus the actions to steer it, in one click, with the actions one click deeper.
 
 ---
+
+## 0b. As built (2026-09-25)
+
+- **Opens** from a Users row, an Objects name, an Overview member list, and a Logs row or rationale. An
+  Overview member of kind agent_instance, mcp_server or user opens as a principal; every other kind as an
+  object. Hover prefetch exists only on Users rows and Objects cards. Close with the close button, Esc or
+  the overlay; a back arrow appears when the drawer was opened from a member list. No surface opens it for
+  a zone.
+- **Status**: the kind label and a lifecycle badge (active, suspended, compromised, unknown); the name is
+  the title. Trust Score and its sparkline are removed by ruling.
+- **Information**: Role, Clearance, Enrolled (UTC; first seen for a person; 1970-01-01 for an object) and
+  Tags as key=value badges (people: origin, namespace, lifecycle, email, org, group, privilege, identity;
+  objects: selector, lifecycle, tag, attribute, member).
+- **Connected VTZs and Effective policies** are `PENDING` (`entity.zones`, `entity.effectivePolicies`);
+  people read "Not yet available (...)" with the gating text; an object has no Connected VTZs section.
+- **Capabilities**: agents in the agent directory only -- the construction report's rows when present,
+  else the AIG tools / authority / delegation edges, else "None.".
+- **Recent decisions**: bound to ENTITY_DECISIONS (limit 50), but the gateway sends the reference kind
+  `principal`, which the engine does not index, so the section always reads "None." (CD-63). Rows cannot
+  be opened.
+- **Connections** (only when opened from an Overview member): outbound destination id and kind
+  (`overview.entityConnections`), with empty and failure states.
+- **Quick actions**: Isolate from network is LIVE (`entity.isolate`, CONTAIN): it records Quarantine under
+  the operator's identity, audited, idempotent by command id; enforcement is off and nothing reaches an
+  endpoint; the result line renders inside the drawer and names each failure status (fixed by GD.10,
+  CD-46, CD-64). Offered on every entity kind. Modify VTZ assignment, remediation and full report are
+  `PENDING` and not rendered.
+- **Load**: one aggregated read, `/api/entity/<kind>/<id>`, loads the sections in parallel; each section
+  degrades on its own, with no per-section retry. No live subscription.
 
 ## 1. Purpose
 
@@ -142,3 +173,12 @@ field fails compilation. Parallel execution: the section fan-out uses tolerant p
 section does not fail the drawer). Missing failure path: empty-section, unauthorized, vanished-entity,
 and each action's denial path are tested. Schema bypass: capabilities come from the typed Construction
 Report shape, never an ad-hoc parse.
+
+## 9. Known gaps (recorded 2026-09-25; kept as requirements)
+
+- A zone as a drawer entity (DRW-01); live subscription; per-section retry; a typed "entity not found".
+- Recent decisions: the query sends a kind the engine does not index (CD-63); EXPLAIN click-through.
+- Connected VTZs and effective policies (DRW-04); the pending notes show internal plan ids (CD-45, CD-50).
+- Modify VTZ assignment, remediation and full report (DRW-04, DRW-05, DRW-06); choosing the containment
+  posture; showing the effect's summary.
+- Isolate is offered on every kind (CD-34) and takes four clicks from the Overview.

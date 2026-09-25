@@ -44,6 +44,8 @@ export interface EntityDrawerProps {
   readonly loading?: boolean;
   /** Quick-action handlers; only provided actions render a button. */
   readonly actions?: EntityQuickActions;
+  /** A status line for the last quick action, shown inside the drawer beside the actions. */
+  readonly actionNotice?: ReactNode;
   /** When provided, a back control renders in the header (the drawer was opened from a container list, so
    * back returns to that list rather than closing). Absent = no back affordance (opened standalone). */
   readonly onBack?: (() => void) | undefined;
@@ -175,6 +177,7 @@ export function EntityDrawer({
   detail,
   loading,
   actions,
+  actionNotice,
   onBack,
   connections,
   connectionsLoading,
@@ -361,6 +364,9 @@ export function EntityDrawer({
             </button>
           ) : null}
         </div>
+        {actionNotice !== undefined && actionNotice !== null ? (
+          <div className="fc-entity-action-notice">{actionNotice}</div>
+        ) : null}
       </div>
     </Drawer>
   );
