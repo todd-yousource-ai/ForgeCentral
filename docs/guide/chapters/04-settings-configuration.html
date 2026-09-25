@@ -7,19 +7,19 @@
 <table class="data">
 <tr><th style="width:30%">Capability</th><th style="width:17%">Status</th><th>Description</th></tr>
 <tr><td>Settings table</td><td><span class="pill ok">AVAILABLE</span></td><td>Every engine setting, grouped by surface, with value, source, apply class and definition.</td></tr>
-<tr><td>Setting edits</td><td><span class="pill ok">AVAILABLE</span></td><td>16 settings that apply at runtime, changed together in one batch.</td></tr>
+<tr><td>Setting edits</td><td><span class="pill ok">AVAILABLE</span></td><td>The settings that apply at runtime (Appendix A marks them <b>Edit</b>), changed together in one batch.</td></tr>
 <tr><td>Section forms</td><td><span class="pill ok">AVAILABLE</span></td><td>Six structured sections: dual control, egress destinations, local user graph exposure, disabled decoder families, source-format overrides, narrative model.</td></tr>
 <tr><td>Two-person control</td><td><span class="pill ok">AVAILABLE</span></td><td>Propose and approve, when dual control covers <code>tenant-config</code>.</td></tr>
-<tr><td>History and rollback</td><td><span class="pill ok">AVAILABLE</span></td><td>Every committed version, who committed it, which settings changed; roll back to any listed version.</td></tr>
+<tr><td>History and rollback</td><td><span class="pill ok">AVAILABLE</span></td><td>The 50 most recent committed versions, the principal that committed each, which settings changed; roll back to any listed version.</td></tr>
 <tr><td>Boot-bound and pending settings</td><td><span class="pill ro">READ-ONLY</span></td><td>Shown with their source and apply class; changed on the engine host.</td></tr>
 <tr><td>Side-by-side difference of two versions</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>History lists which settings changed, not their old and new values.</td></tr>
 </table>
 </div>
 
-<div class="note"><p>Every Settings tab is served to global administrators only. Other operators see <b class="ui">Admin or SecurityAudit tier required</b>.</p></div>
+<div class="note"><p>The engine serves the Settings tabs to global administrators only; other operators see <b class="ui">Admin or SecurityAudit tier required</b>. The <b class="ui">ReadMe</b> tab and the identity-provider list on <b class="ui">Federation</b> are open to every operator. A global administrator whose sign-in maps to the security-audit role can read every tab, but the engine refuses every commit, proposal, approval and rollback from that role.</p></div>
 
-<h2 id="setc-concepts">The governed configuration</h2>
-<p>The governed configuration is a single document the Forge engine validates as a whole. Each commit becomes a new version, numbered from 1. Before anything is committed (version 0), every value is the engine's fail-closed default. The settings are grouped into <b>surfaces</b> (for example <code>sessions</code>, <code>retention</code>, <code>query_surface</code>), and each row of the settings table reads like this:</p>
+<h2 id="setc-concepts" data-covers="settings.read">The governed configuration</h2>
+<p>The governed configuration is a single document the Forge engine validates as a whole. Each commit is recorded at a version of the Forge engine's store. The store versions every other write too, so configuration versions are not consecutive. Before anything is committed (version 0), every value is the engine's fail-closed default. The settings are grouped into <b>surfaces</b> (for example <code>sessions</code>, <code>retention</code>, <code>query_surface</code>), and each row of the settings table reads like this:</p>
 
 <figure id="fig-setc-row" data-title="Anatomy of a row in the settings table" class="wide">
 <svg viewBox="0 0 760 196" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
@@ -103,7 +103,7 @@
   <rect x="578" y="198" width="172" height="62" rx="6" fill="#e6f5ef" stroke="#3fbe96" stroke-width="1.6"/>
   <text x="664" y="222" font-size="12" font-weight="700" fill="#0c2748" text-anchor="middle">Validated and committed</text>
   <text x="664" y="241" font-size="10.5" fill="#5a6477" text-anchor="middle">as in the top row</text>
-  <text x="196" y="290" font-size="11" fill="#5a6477">A proposal is discarded if the configuration changed after it was made (propose again),</text>
+  <text x="196" y="290" font-size="11" fill="#5a6477">A proposal goes stale if the configuration changes after it was made (propose again),</text>
   <text x="196" y="306" font-size="11" fill="#5a6477">or if the Forge engine restarts before it is approved.</text>
   <g font-size="12" font-weight="700" text-anchor="middle">
     <circle cx="10" cy="32" r="11" fill="#3fbe96"/><text x="10" y="36" fill="#ffffff">1</text>
@@ -135,7 +135,7 @@
 <div class="note limit"><p>After a failed commit, <b class="ui">Retry</b> clears the error message but does not resend. Submit the change again.</p></div>
 <div class="note caution"><p>Turning <code>query_surface.enabled</code> off stops the Forge engine from answering almost every ForgeCentral read, so most pages go empty. Settings stays reachable, so you can turn it back on here.</p></div>
 
-<h2 id="setc-edit">Change one or more settings</h2>
+<h2 id="setc-edit" data-covers="settings.commit settings.propose">Change one or more settings</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
@@ -164,20 +164,20 @@
 <tr><td>a section: change it through its form</td><td>Use the section form below the table.</td></tr>
 <tr><td>boot-bound: needs a restart, not editable here</td><td>Change it on the engine host, then restart the engine.</td></tr>
 <tr><td>pending: nothing applies it yet</td><td>The feature it configures is not built yet.</td></tr>
-<tr><td>not a valid value for this setting</td><td>The value does not parse, or it is outside the setting's bound (see the Definition column).</td></tr>
-<tr><td>the wrong kind of value</td><td>For example, text where the setting takes a number.</td></tr>
+<tr><td>not a valid value for this setting</td><td>The value does not parse as the setting's type, for example text where the setting takes a number. A value that parses but is outside the setting's bound is refused by validation instead: the receipt says the candidate did not validate and lists the engine's reason.</td></tr>
+<tr><td>the wrong kind of value</td><td>The value is too large for the setting, or of a kind the setting does not hold.</td></tr>
 <tr><td>listed twice in one commit</td><td>Stage each setting once per batch.</td></tr>
 </table>
 </div>
 
-<h2 id="setc-sections">Change a section</h2>
+<h2 id="setc-sections" data-covers="settings.commit settings.propose">Change a section</h2>
 <p>Six settings are structured, so each has a form under <b class="ui">Section settings</b>, below the table. A form starts from the committed values and replaces the whole section when you commit it.</p>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
   <li>Choose <span class="path">Settings<span class="sep">&gt;</span>Configuration</span> and scroll to <b class="ui">Section settings</b>.</li>
   <li>Expand the section and edit its fields (<a class="xref" href="#tab-setc-sections"></a>).</li>
-  <li>Choose the form's commit button, for example <b class="ui">Commit Egress destinations</b>. Under two-person control the button keeps this label, but the confirmation says <b class="ui">Propose</b>.</li>
+  <li>Choose the form's commit button, for example <b class="ui">Commit egress destinations</b>. Under two-person control the button keeps this label, but the confirmation says <b class="ui">Propose</b>.</li>
   <li>Confirm, then read the receipt as for a setting change.</li>
 </ol>
 </div>
@@ -195,50 +195,52 @@
 </div>
 <div class="note"><p><b class="ui">Snapshot cadence (hours)</b> governs what the engine accepts; each endpoint's own inventory cadence is set by its installer.</p></div>
 
-<h2 id="setc-dual">Turn on two-person control for Settings</h2>
+<h2 id="setc-dual" data-covers="settings.propose">Turn on two-person control for Settings</h2>
 <div class="note caution"><p>After this change, every Settings change is a proposal that a second administrator must approve, and the SOC response settings on <span class="path">Settings<span class="sep">&gt;</span>SOC</span> can no longer be changed from ForgeCentral at all. Make sure two administrators are available before you turn it on.</p></div>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
   <li>Choose <span class="path">Settings<span class="sep">&gt;</span>Configuration</span>, scroll to <b class="ui">Section settings</b>, and expand <b class="ui">Dual control</b>.</li>
   <li>Check <code>tenant-config</code>, and any other capabilities that should need two people.</li>
-  <li>Choose <b class="ui">Commit Dual control</b> and confirm. <span class="result">The version line now adds: every change here is a proposal a different Admin approves on the Changes tab.</span></li>
+  <li>Choose <b class="ui">Commit dual control</b> and confirm. <span class="result">The version line now adds: every change here is a proposal a different Admin approves on the Changes tab.</span></li>
 </ol>
 </div>
 <p>Removing <code>tenant-config</code> again is itself a proposal that a second administrator approves.</p>
 
-<h2 id="setc-approve">Approve a proposal</h2>
+<h2 id="setc-approve" data-covers="settings.approvals settings.approve">Approve a proposal</h2>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
   <li>Choose <span class="path">Settings<span class="sep">&gt;</span>Changes</span>. <b class="ui">Pending approvals</b> lists each proposal with its number, who proposed it, when, and which settings it changes. Proposals made on the engine host appear here too.</li>
-  <li>Choose <b class="ui">Approve</b> on the proposal. A proposal marked <b class="ui">Stale</b> cannot be approved: the configuration changed after it was made.</li>
+  <li>Choose <b class="ui">Approve</b> on the proposal. A proposal marked <b class="ui">Stale</b> has no <b class="ui">Approve</b>: the configuration changed after it was made. It stays listed until the engine restarts; propose again.</li>
   <li>Read the confirmation, which repeats the proposer, the settings and the rule that the proposer cannot approve their own proposal, then confirm.</li>
   <li>Read the receipt: the commit receipt, or one of these refusals:
     <ul>
       <li><b class="ui">You proposed this change; a different Admin must approve it.</b></li>
-      <li><b class="ui">That proposal no longer exists</b> (approved, discarded, or the engine restarted).</li>
-      <li><b class="ui">The configuration changed after this was proposed</b>: the proposal was discarded; propose again.</li>
+      <li><b class="ui">That proposal no longer exists</b> (it was approved, discarded, or the node restarted).</li>
+      <li><b class="ui">The configuration changed after this was proposed, so approving it would undo that change.</b> The proposal was discarded; propose again.</li>
     </ul>
   </li>
 </ol>
 </div>
 
-<h2 id="setc-rollback">Roll back to an earlier version</h2>
+<h2 id="setc-rollback" data-covers="settings.history settings.rollback">Roll back to an earlier version</h2>
 <p>A rollback restores the <b>whole</b> configuration as it was at an earlier version, through the same validation as any commit, and is recorded as a new version.</p>
 <div class="procedure">
 <div class="ptitle">Procedure</div>
 <ol class="steps">
-  <li>Choose <span class="path">Settings<span class="sep">&gt;</span>Changes</span>. <b class="ui">Configuration history</b> lists versions newest first, with who committed each one and which settings changed. The current version is marked <b class="ui">current</b>.</li>
+  <li>Choose <span class="path">Settings<span class="sep">&gt;</span>Changes</span>. <b class="ui">Configuration history</b> lists the 50 newest versions first, with the principal that committed each one and which settings changed. The current version is marked <b class="ui">current</b>.</li>
   <li>On the version you want, choose <b class="ui">Roll back to N</b>, then confirm.</li>
   <li>Read the receipt. Under two-person control, the rollback becomes a proposal with its own number.</li>
 </ol>
 </div>
-<div class="note limit"><p>History lists which settings changed in each version, not their old and new values, and versions older than the engine's time-travel window (<code>retention.time_travel_window_secs</code>) drop out of the list.</p></div>
+<div class="note limit"><p>History lists which settings changed in each version, not their old and new values. It shows the 50 newest versions; older ones exist but are not listed, and versions older than the engine's time-travel window (<code>retention.time_travel_window_secs</code>) drop out entirely.</p></div>
+<div class="note limit"><p>A version records the committing principal as <code>console:</code> followed by the operator's engine principal id, not a name; an approval adds <code>approved-by</code> and the approver's id, a rollback adds <code>rollback-to</code> and the version.</p></div>
 
 <h2 id="setc-verify">Verify a change</h2>
 <ul>
-  <li>On <span class="path">Settings<span class="sep">&gt;</span>Configuration</span>, the version line reads <b class="ui">Committed configuration at version N</b>, and the setting's <b class="ui">Source</b> reads <b class="ui">committed at version N</b> with your new value.</li>
-  <li>On <span class="path">Settings<span class="sep">&gt;</span>Changes</span>, the newest version names you and lists the settings you changed.</li>
+  <li>On <span class="path">Settings<span class="sep">&gt;</span>Configuration</span>, the setting shows your new value.</li>
+  <li>On <span class="path">Settings<span class="sep">&gt;</span>Changes</span>, the newest version carries your principal id and lists the settings you changed. Its number is the version the receipt named.</li>
   <li>For a change the receipt listed as waiting for a restart, the new value takes effect after the Forge engine restarts.</li>
 </ul>
+<div class="note limit"><p>The version line and the <b class="ui">Source</b> column on <span class="path">Settings<span class="sep">&gt;</span>Configuration</span> show the engine store's latest version, which moves with every data write, not the version your change was committed at. Use <span class="path">Settings<span class="sep">&gt;</span>Changes</span> for the committed version.</p></div>

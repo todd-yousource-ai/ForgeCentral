@@ -16,7 +16,7 @@
 </table>
 </div>
 
-<h2 id="posture-rbac">RBAC</h2>
+<h2 id="posture-rbac" data-covers="settings.read settings.consoleRbac">RBAC</h2>
 <p><span class="path">Settings<span class="sep">&gt;</span>RBAC</span> shows two independent lists:</p>
 <ul>
   <li><b class="ui">Engine admin assignments</b>: the identities the Forge engine itself treats as administrators, each with its roles and clearance. This is boot configuration: the tab states the version it was read from and that it changes on the engine host, followed by an engine restart.</li>
@@ -25,8 +25,8 @@
 <div class="note"><p>Roles are resolved from your identity-provider groups first; the highest role wins. The per-identity grants apply only when your sign-in carries no group.</p></div>
 <div class="note limit"><p>The ForgeCentral installer writes a role map with one global administrator and no group grants, and reinstalling rewrites the map. Granting a group a role requires editing the installation settings, and the edit is lost on the next install unless it is carried into the installer's inputs.</p></div>
 
-<h2 id="posture-security">Security</h2>
-<p>Your browser reaches the Forge engine over two protected connections, and the Security tab reports on both:</p>
+<h2 id="posture-security" data-covers="settings.reports settings.securitySession">Security</h2>
+<p>Your browser reaches the Forge engine over two protected connections (<a class="xref" href="#fig-posture-legs"></a>). The Security tab reports on the first, and on the engine's own administration endpoint:</p>
 
 <figure id="fig-posture-legs" data-title="The two protected connections behind every Settings page" class="wide">
 <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, Arial, sans-serif">
@@ -58,24 +58,25 @@
 
 <ol>
   <li><b class="ui">This browser session</b> shows the key exchange your browser negotiated with ForgeCentral: the hybrid post-quantum group when your browser supports it, otherwise the P-384 floor. ForgeCentral refuses a browser that offers neither, rather than downgrading.</li>
-  <li><b class="ui">Admin endpoint</b> is the engine's connectivity report for its administration listener: the listen address, whether mutual TLS is required, how many administrator identities are bound, and whether the post-quantum hybrid key exchange is offered.</li>
+  <li><b class="ui">Admin endpoint</b> is the engine's connectivity report for its administration listener: the listen address, whether mutual TLS is required, how many administrator identities are bound, and whether the post-quantum hybrid key exchange is offered. ForgeCentral does not use this endpoint; the mutual-TLS and post-quantum rows state the engine's built-in posture rather than a measurement.</li>
 </ol>
+<div class="note limit"><p>The Security tab does not report on connection 2, from ForgeCentral to the Forge engine.</p></div>
 <p>The tab also shows <b class="ui">Server security</b>, the engine's security report: its operating classification, the audit chain (<b class="ui">Verified</b> or <b class="ui">Failed verification</b>), the number of audit entries and the head version, and how many stored artifacts were spot-checked and how many failed. The engine verifies the audit chain when you open the tab. <b class="ui">Registered egress destinations</b> lists where the engine may send data for model inference, with each destination's classification ceiling; you add and remove them on <span class="path">Settings<span class="sep">&gt;</span>Configuration</span>.</p>
 <div class="note caution"><p><b class="ui">Failed verification</b> on the audit chain means the engine's audit record does not verify. Treat it as a security incident: do not change configuration, and contact security@yousource.ai.</p></div>
 <div class="note limit"><p>If <b class="ui">This browser session</b> reads <b class="ui">Not available</b>, the session lookup was not set up when ForgeCentral was installed; reinstall ForgeCentral to enable it. The tab also says key issuing is edited on Configuration; it is not editable in this release.</p></div>
 
-<h2 id="posture-keylock">KeyLock</h2>
+<h2 id="posture-keylock" data-covers="settings.reports">KeyLock</h2>
 <p><b class="ui">Agent key issuing</b> reports whether the engine issues keys to agents, whether enrolling, issuing, rotating and revoking a key needs two people, and how long an issued key is valid. Signing-key rotation is not available in this release: there is no rotate control, and the signing key ids are not shown.</p>
 
-<h2 id="posture-observability">Observability</h2>
+<h2 id="posture-observability" data-covers="settings.reports">Observability</h2>
 <p><b class="ui">Telemetry ingest</b> is the engine's telemetry report: whether its OpenTelemetry (OTLP) receiver is running, its gRPC and HTTP addresses, the ingest queue capacity, and how many tenants are bound. Below it, <b class="ui">Observability settings</b> mirrors the two observability rows of the governed configuration; the ingest byte budget per window is edited on <span class="path">Settings<span class="sep">&gt;</span>Configuration</span> (surface <code>observability</code>). The telemetry exporter is configured at boot and is not shown.</p>
 
-<h2 id="posture-ha">HA &amp; Topology</h2>
+<h2 id="posture-ha" data-covers="settings.reports">HA &amp; Topology</h2>
 <p><b class="ui">This node</b> is the engine's server report: shards hosted, whether it is serving, whether storage is durable, the maintenance cadence, the administration frame ceiling and the engine version. Multi-node cluster views, leadership rotation, quorum-loss tests, disaster-recovery targets and failover tests are not available in this release.</p>
 <div class="note limit"><p>The maintenance cadence shown here is the value the engine started with. After you change <code>maintenance.cadence_secs</code> on Configuration, the new cadence is in force but this report shows the old value until the engine restarts.</p></div>
 
-<h2 id="posture-fips">FIPS Mode</h2>
-<p><b class="ui">Crypto build posture</b> shows the cryptographic provider and whether the FIPS 140-3 validated module is linked. FIPS mode is chosen when the engine is built; it cannot be switched on a running node, so the tab has no toggle.</p>
+<h2 id="posture-fips" data-covers="settings.reports">FIPS Mode</h2>
+<p><b class="ui">Crypto build posture</b> shows the cryptographic provider and whether the FIPS-validated module is linked. FIPS mode is chosen when the engine is built; it cannot be switched on a running node, so the tab has no toggle.</p>
 
 <h2 id="posture-change">Change a posture value</h2>
 <div class="tablewrap" id="tab-posture-where" data-title="Where each posture value is changed">
