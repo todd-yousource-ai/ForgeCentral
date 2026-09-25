@@ -68,6 +68,9 @@ import type {
   WireSocSettingsCommitted,
   WireSettings,
   WireSettingsReports,
+  WireSettingsProposed,
+  WireSettingsApprovals,
+  WireSettingsHistory,
   WireSettingsCommitted,
 } from '@forge/contracts';
 
@@ -278,6 +281,30 @@ export function replyToSettings(reply: WireReply): WireSettings {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a settings read');
+}
+
+/** Map an engine `WireReply` to `WireSettingsProposed` (SETTINGS_PROPOSE, crdb SET.3). */
+export function replyToSettingsProposed(reply: WireReply): WireSettingsProposed {
+  if (typeof reply === 'object' && 'SettingsProposed' in reply) return reply.SettingsProposed;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a settings proposal');
+}
+
+/** Map an engine `WireReply` to `WireSettingsApprovals` (SETTINGS_APPROVALS, crdb SET.3). */
+export function replyToSettingsApprovals(reply: WireReply): WireSettingsApprovals {
+  if (typeof reply === 'object' && 'SettingsApprovals' in reply) return reply.SettingsApprovals;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a settings approvals read');
+}
+
+/** Map an engine `WireReply` to `WireSettingsHistory` (SETTINGS_HISTORY, crdb SET.5). */
+export function replyToSettingsHistory(reply: WireReply): WireSettingsHistory {
+  if (typeof reply === 'object' && 'SettingsHistory' in reply) return reply.SettingsHistory;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a settings history read');
 }
 
 /** Map an engine `WireReply` to `WireSettingsReports` (SETTINGS_REPORTS, crdb SET.4). */
@@ -905,6 +932,61 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToSettingsCommitted(await dispatch(transport, { SettingsCommit: request })),
+      opts,
+    );
+  }
+
+  async settingsPropose(
+    request: Parameters<CrucibleClient['settingsPropose']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsProposed> {
+    return this.call(
+      async (transport) =>
+        replyToSettingsProposed(await dispatch(transport, { SettingsPropose: request })),
+      opts,
+    );
+  }
+
+  async settingsApprovals(
+    request: Parameters<CrucibleClient['settingsApprovals']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsApprovals> {
+    return this.call(
+      async (transport) =>
+        replyToSettingsApprovals(await dispatch(transport, { SettingsApprovals: request })),
+      opts,
+    );
+  }
+
+  async settingsApprove(
+    request: Parameters<CrucibleClient['settingsApprove']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsCommitted> {
+    return this.call(
+      async (transport) =>
+        replyToSettingsCommitted(await dispatch(transport, { SettingsApprove: request })),
+      opts,
+    );
+  }
+
+  async settingsHistory(
+    request: Parameters<CrucibleClient['settingsHistory']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsHistory> {
+    return this.call(
+      async (transport) =>
+        replyToSettingsHistory(await dispatch(transport, { SettingsHistory: request })),
+      opts,
+    );
+  }
+
+  async settingsRollback(
+    request: Parameters<CrucibleClient['settingsRollback']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsCommitted> {
+    return this.call(
+      async (transport) =>
+        replyToSettingsCommitted(await dispatch(transport, { SettingsRollback: request })),
       opts,
     );
   }

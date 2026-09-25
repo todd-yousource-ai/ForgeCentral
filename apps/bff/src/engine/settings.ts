@@ -7,6 +7,9 @@
 
 import type {
   SettingsCommitRequest,
+  PendingProposal,
+  SettingsHistoryView,
+  SettingsProposalReceipt,
   SettingsReceipt,
   SettingsReportName,
   SettingsReportsView,
@@ -16,6 +19,9 @@ import type {
   WireSettingsReportsQuery,
 } from '@forge/contracts';
 import {
+  toPendingProposals,
+  toSettingsHistoryView,
+  toSettingsProposalReceipt,
   toSettingsReceipt,
   toSettingsReportsView,
   toSettingsView,
@@ -88,4 +94,71 @@ export async function resolveSettingsReports(
 ): Promise<SettingsReportsView | null> {
   const request: WireSettingsReportsQuery = { request_id: requestId(), reports: [...names] };
   return toSettingsReportsView(await engine.settingsReports(principal, request, opts));
+}
+
+/**
+ * Propose a settings change for a second Admin's approval (crdb SET.3, `SETTINGS_PROPOSE`): the same
+ * body as a commit. The reply is a receipt: the proposal id, or the engine's refusals verbatim.
+ */
+export async function resolveSettingsPropose(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  request: SettingsCommitRequest,
+  opts?: EngineCallOptions,
+): Promise<SettingsProposalReceipt> {
+  const wire: WireSettingsCommit = {
+    request_id: requestId(),
+    ...toWireSettingsCommitFields(request),
+  };
+  return toSettingsProposalReceipt(await engine.settingsPropose(principal, wire, opts));
+}
+
+/** The pending config proposals from either plane (crdb SET.3); null for the tier refusal. */
+export async function resolveSettingsApprovals(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  opts?: EngineCallOptions,
+): Promise<readonly PendingProposal[] | null> {
+  return toPendingProposals(
+    await engine.settingsApprovals(principal, { request_id: requestId() }, opts),
+  );
+}
+
+/** Approve a pending proposal as `principal` (crdb SET.3); the receipt says why when refused. */
+export async function resolveSettingsApprove(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  proposal: number,
+  opts?: EngineCallOptions,
+): Promise<SettingsReceipt> {
+  return toSettingsReceipt(
+    await engine.settingsApprove(principal, { request_id: requestId(), proposal }, opts),
+  );
+}
+
+/** The configuration history, newest first (crdb SET.5); null for the tier refusal. */
+export async function resolveSettingsHistory(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  limit: number,
+  opts?: EngineCallOptions,
+): Promise<SettingsHistoryView | null> {
+  return toSettingsHistoryView(
+    await engine.settingsHistory(principal, { request_id: requestId(), limit }, opts),
+  );
+}
+
+/**
+ * Restore a prior configuration version (crdb SET.5). Under dual control the receipt carries a
+ * proposal instead of a version.
+ */
+export async function resolveSettingsRollback(
+  engine: OperatorEngine,
+  principal: OperatorPrincipal,
+  to: number,
+  opts?: EngineCallOptions,
+): Promise<SettingsReceipt> {
+  return toSettingsReceipt(
+    await engine.settingsRollback(principal, { request_id: requestId(), to }, opts),
+  );
 }

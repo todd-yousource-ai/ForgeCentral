@@ -111,6 +111,13 @@ import type {
   WireSettingsQuery,
   WireSettingsReports,
   WireSettingsReportsQuery,
+  WireSettingsProposed,
+  WireSettingsApprovals,
+  WireSettingsApprovalsQuery,
+  WireSettingsApprove,
+  WireSettingsHistory,
+  WireSettingsHistoryQuery,
+  WireSettingsRollback,
   WireSettingsCommit,
   WireSettingsCommitted,
 } from '@forge/contracts';
@@ -212,6 +219,31 @@ export interface CrucibleClient {
   socWeekly(request: WireSocWeeklyQuery, opts?: EngineCallOptions): Promise<WireSocWeeklySummary>;
   /** Read the governed settings of one registry surface, or all (SETTINGS_READ, crdb SET.1). */
   settingsRead(request: WireSettingsQuery, opts?: EngineCallOptions): Promise<WireSettings>;
+  /** Propose a settings change for a second approval (SETTINGS_PROPOSE, crdb SET.3). */
+  settingsPropose(
+    request: WireSettingsCommit,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsProposed>;
+  /** The config proposals awaiting approval (SETTINGS_APPROVALS, crdb SET.3). */
+  settingsApprovals(
+    request: WireSettingsApprovalsQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsApprovals>;
+  /** Approve a pending proposal (SETTINGS_APPROVE, crdb SET.3). */
+  settingsApprove(
+    request: WireSettingsApprove,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsCommitted>;
+  /** The committed configuration versions (SETTINGS_HISTORY, crdb SET.5). */
+  settingsHistory(
+    request: WireSettingsHistoryQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsHistory>;
+  /** Restore a prior configuration version (SETTINGS_ROLLBACK, crdb SET.5). */
+  settingsRollback(
+    request: WireSettingsRollback,
+    opts?: EngineCallOptions,
+  ): Promise<WireSettingsCommitted>;
   /** Read the admin plane's status reports by name (SETTINGS_REPORTS, crdb SET.4). */
   settingsReports(
     request: WireSettingsReportsQuery,

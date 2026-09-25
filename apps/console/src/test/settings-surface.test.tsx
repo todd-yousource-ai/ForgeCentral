@@ -179,6 +179,23 @@ function mockGoverned(
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/settings/propose' && init?.method === 'POST') {
+        posted.push({
+          propose: JSON.parse(typeof init.body === 'string' ? init.body : '{}') as unknown,
+        });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              proposal: 7,
+              refusedEdits: [],
+              violations: [],
+              refused: false,
+              explanation: null,
+            }),
+        } as Response);
+      }
       if (url === '/api/settings' && init?.method === 'POST') {
         posted.push(JSON.parse(typeof init.body === 'string' ? init.body : '{}'));
         return Promise.resolve({
@@ -214,6 +231,7 @@ describe('the Settings tab strip and the Configuration tab (ST.1)', () => {
       'Configuration',
       'RBAC',
       'Federation',
+      'Changes',
       'Security',
       'KeyLock',
       'Observability',
@@ -340,11 +358,28 @@ describe('knob edits on the Configuration tab (ST.2a)', () => {
     expect(screen.getByTestId('settings-configuration-staged')).toBeInTheDocument();
   });
 
-  it('offers no edit under dual control', async () => {
-    mockGoverned({ ...GOVERNED, dualControlRequired: true });
+  it('proposes instead of committing under dual control (ST.9)', async () => {
+    const posted: unknown[] = [];
+    mockGoverned({ ...GOVERNED, dualControlRequired: true }, null, posted);
     await openMaintenance();
-    expect(screen.queryByRole('button', { name: 'Edit maintenance.cadence_secs' })).toBeNull();
-    expect(screen.getByTestId('settings-configuration-version')).toHaveTextContent('dual control');
+    expect(screen.getByTestId('settings-configuration-version')).toHaveTextContent(
+      'a different Admin approves',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit maintenance.cadence_secs' }));
+    fireEvent.change(screen.getByLabelText('New value for maintenance.cadence_secs'), {
+      target: { value: '300' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Stage' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose 1 change' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('under dual control');
+    fireEvent.click(screen.getByRole('button', { name: 'Propose' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toEqual({
+      propose: { edits: [{ key: 'maintenance.cadence_secs', value: '300' }] },
+    });
+    expect(await screen.findByTestId('settings-configuration-receipt')).toHaveTextContent(
+      'Proposal 7 recorded',
+    );
   });
 });
 
@@ -464,9 +499,21 @@ describe('the typed section forms on the Configuration tab (ST.2b)', () => {
     expect(posted[1]).toEqual({ edits: [], sections: { socNarrativeModelRef: '' } });
   });
 
-  it('shows no section forms under dual control', async () => {
-    await openSections({ ...WITH_SECTIONS, dualControlRequired: true });
-    expect(screen.queryByTestId('settings-sections')).toBeNull();
+  it('proposes a section under dual control (ST.9)', async () => {
+    const posted: unknown[] = [];
+    await openSections({ ...WITH_SECTIONS, dualControlRequired: true }, posted);
+    const dual = within(screen.getByTestId('settings-section-dualControl'));
+    fireEvent.click(dual.getByLabelText('audit-export'));
+    fireEvent.click(dual.getByRole('button', { name: 'Commit dual control' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('Propose Dual control?');
+    fireEvent.click(screen.getByRole('button', { name: 'Propose' }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toEqual({
+      propose: { edits: [], sections: { dualControl: ['audit-export'] } },
+    });
+    expect(await screen.findByTestId('settings-configuration-receipt')).toHaveTextContent(
+      'Proposal 7 recorded',
+    );
   });
 });
 
@@ -773,6 +820,125 @@ describe("the Security tab's own-session key exchange (ST.5b)", () => {
     expect(
       await screen.findByText(/did not arrive through the admin TLS terminator/),
     ).toBeInTheDocument();
+  });
+});
+
+describe('the Changes tab: approvals and history (ST.9)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const PENDING = [
+    {
+      proposal: 3,
+      proposer: 'console:someone-else',
+      proposedAtMs: 1_700_000_000_000,
+      changedKeys: ['maintenance.cadence_secs'],
+      stale: false,
+    },
+    {
+      proposal: 4,
+      proposer: 'sha512:admin-plane',
+      proposedAtMs: 1_700_000_000_000,
+      changedKeys: ['egress.destinations'],
+      stale: true,
+    },
+  ];
+  const HISTORY = {
+    versions: [
+      {
+        version: 9,
+        principal: 'console:a approved-by console:b',
+        atMs: 1_700_000_000_000,
+        changedKeys: ['maintenance.cadence_secs'],
+      },
+      { version: 5, principal: null, atMs: null, changedKeys: [] },
+    ],
+    complete: false,
+  };
+
+  function mockChanges(acts: string[], receipt: unknown, approvals: unknown = PENDING): void {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        const reply = (status: number, body: unknown) =>
+          Promise.resolve({
+            ok: status === 200,
+            status,
+            json: () => Promise.resolve(body),
+          } as Response);
+        if (init?.method === 'POST') {
+          acts.push(`${url} ${typeof init.body === 'string' ? init.body : ''}`);
+          return reply(200, receipt);
+        }
+        if (url === '/api/settings/approvals') {
+          return reply(approvals === null ? 403 : 200, { proposals: approvals });
+        }
+        if (url.startsWith('/api/settings/history')) return reply(200, HISTORY);
+        return reply(200, SETTINGS);
+      }),
+    );
+  }
+
+  const refused = {
+    version: 0,
+    needsRestart: [],
+    dualControlRequired: true,
+    refusedEdits: [],
+    violations: [],
+    refused: true,
+    explanation: 'x',
+    proposal: null,
+    approvalRefused: 'self_approval',
+  };
+
+  it('lists proposals from both planes, approves behind a confirm, and shows a refusal in words', async () => {
+    const acts: string[] = [];
+    mockChanges(acts, refused);
+    await openTab('Changes');
+    const table = await screen.findByRole('table', {
+      name: 'Configuration proposals awaiting a second Admin',
+    });
+    expect(within(table).getByText('sha512:admin-plane')).toBeInTheDocument();
+    // A stale proposal offers no Approve: the engine would refuse it.
+    expect(within(table).getByText(/Stale/)).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: 'Approve 4' })).toBeNull();
+    fireEvent.click(within(table).getByRole('button', { name: 'Approve 3' }));
+    expect(acts).toEqual([]);
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      'You cannot approve your own proposal',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(acts).toEqual(['/api/settings/approvals/3/approve {}']));
+    expect(await screen.findByTestId('settings-changes-receipt')).toHaveTextContent(
+      'a different Admin must approve it',
+    );
+  });
+
+  it('shows the history with names and rolls back behind a confirm; a proposal under dual control', async () => {
+    const acts: string[] = [];
+    mockChanges(acts, { ...refused, refused: false, approvalRefused: null, proposal: 11 });
+    await openTab('Changes');
+    const table = await screen.findByRole('table', {
+      name: 'Committed configuration versions, newest first',
+    });
+    expect(within(table).getByText('console:a approved-by console:b')).toBeInTheDocument();
+    expect(within(table).getAllByText('not recorded').length).toBeGreaterThan(0);
+    expect(within(table).getByText('current')).toBeInTheDocument();
+    expect(screen.getByText(/Older versions exist/)).toBeInTheDocument();
+    fireEvent.click(within(table).getByRole('button', { name: 'Roll back to 5' }));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('applied live');
+    fireEvent.click(screen.getByRole('button', { name: 'Roll back' }));
+    await waitFor(() => expect(acts).toEqual(['/api/settings/rollback {"to":5}']));
+    expect(await screen.findByTestId('settings-changes-receipt')).toHaveTextContent(
+      'the rollback is proposal 11',
+    );
+  });
+
+  it('states the tier below for the approvals', async () => {
+    mockChanges([], refused, null);
+    await openTab('Changes');
+    expect((await screen.findAllByText('Admin or SecurityAudit tier required')).length).toBe(1);
   });
 });
 

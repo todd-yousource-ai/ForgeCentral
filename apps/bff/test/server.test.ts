@@ -79,6 +79,11 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     settingsRead: unused,
     settingsCommit: unused,
     settingsReports: unused,
+    settingsPropose: unused,
+    settingsApprovals: unused,
+    settingsApprove: unused,
+    settingsHistory: unused,
+    settingsRollback: unused,
     socSettingsCommit: unused,
     socCognitionRun: unused,
     socIncidentAct: unused,
@@ -168,6 +173,11 @@ function operatorEngineWith(soc: Partial<OperatorEngine> = {}): OperatorEngine {
     settingsRead: unused,
     settingsCommit: unused,
     settingsReports: unused,
+    settingsPropose: unused,
+    settingsApprovals: unused,
+    settingsApprove: unused,
+    settingsHistory: unused,
+    settingsRollback: unused,
     socSettingsCommit: unused,
     socCognitionRun: unused,
     socIncidentAct: unused,
@@ -1319,6 +1329,72 @@ describe('BFF HTTP surface', () => {
     expect(asked).toHaveLength(1);
     expect(asked[0]).toBeGreaterThan(0);
     await new Promise<void>((r) => sidecar.close(() => r()));
+  });
+
+  it('the dual-control and history routes refuse bad input before the engine and pass the rest', async () => {
+    const calls: unknown[] = [];
+    const committed = {
+      version: 0,
+      needs_restart: [],
+      dual_control_required: true,
+      refused_edits: [],
+      violations: [],
+      refused: true,
+      approval_refused: 'self_approval',
+    };
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      settingsPropose: (_p, request) => {
+        calls.push(['propose', request.edits]);
+        return Promise.resolve({ proposal: 3, refused_edits: [], violations: [], refused: false });
+      },
+      settingsApprovals: () => Promise.resolve({ proposals: [], refused: true }),
+      settingsApprove: (_p, request) => {
+        calls.push(['approve', request.proposal]);
+        return Promise.resolve(committed);
+      },
+      settingsHistory: (_p, request) => {
+        calls.push(['history', request.limit]);
+        return Promise.resolve({ versions: [], complete: true, refused: false });
+      },
+      settingsRollback: (_p, request) => {
+        calls.push(['rollback', request.to]);
+        return Promise.resolve({ ...committed, refused: false, approval_refused: '', proposal: 4 });
+      },
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    expect((await post('/api/settings/propose', { edits: [] })).status).toBe(400);
+    expect((await post('/api/settings/rollback', { to: 0 })).status).toBe(400);
+    expect((await fetch(`${base}/api/settings/history?limit=500`)).status).toBe(400);
+    expect((await post('/api/settings/approvals/abc/approve', {})).status).not.toBe(200);
+    expect(calls).toEqual([]);
+
+    const proposed = await post('/api/settings/propose', {
+      edits: [{ key: 'maintenance.cadence_secs', value: '120' }],
+    });
+    expect(await proposed.json()).toMatchObject({ proposal: 3, refused: false });
+    expect((await fetch(`${base}/api/settings/approvals`)).status).toBe(403);
+    const approved = await post('/api/settings/approvals/3/approve', {});
+    expect(await approved.json()).toMatchObject({ approvalRefused: 'self_approval' });
+    const history = await fetch(`${base}/api/settings/history?limit=10`);
+    expect(await history.json()).toEqual({ versions: [], complete: true });
+    const rolled = await post('/api/settings/rollback', { to: 7 });
+    expect(await rolled.json()).toMatchObject({ proposal: 4, refused: false });
+    expect(calls).toEqual([
+      ['propose', [{ key: 'maintenance.cadence_secs', value: '120' }]],
+      ['approve', 3],
+      ['history', 10],
+      ['rollback', 7],
+    ]);
   });
 
   it('GET /api/settings/reports refuses a bad name before the engine and serves the named reports', async () => {

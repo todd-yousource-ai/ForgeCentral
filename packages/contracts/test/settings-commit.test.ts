@@ -9,6 +9,12 @@ import {
   toSettingsCommitRequest,
   toSettingsReceipt,
   toWireSettingsCommitFields,
+  approvalRefusalLabel,
+  toHistoryLimit,
+  toPendingProposals,
+  toPositiveId,
+  toSettingsHistoryView,
+  toSettingsProposalReceipt,
 } from '../src/settings.js';
 
 describe('the settings commit contract (ST.2a, crdb SET.2)', () => {
@@ -125,5 +131,84 @@ describe('the section patch contract (ST.2b, crdb SET.2b)', () => {
     ]) {
       expect(toSectionPatch(bad)).toBeNull();
     }
+  });
+});
+
+describe('dual control and history contracts (ST.9, crdb SET.3 / SET.5)', () => {
+  const committed = {
+    version: 0,
+    needs_restart: [],
+    dual_control_required: true,
+    refused_edits: [],
+    violations: [],
+    refused: true,
+  };
+
+  it('reads approval refusals and a rollback proposal off the receipt', () => {
+    expect(toSettingsReceipt({ ...committed, approval_refused: 'stale' }).approvalRefused).toBe(
+      'stale',
+    );
+    expect(toSettingsReceipt({ ...committed, approval_refused: 'weird' }).approvalRefused).toBe(
+      'other',
+    );
+    expect(toSettingsReceipt(committed).approvalRefused).toBeNull();
+    const proposed = toSettingsReceipt({ ...committed, refused: false, proposal: 4 });
+    expect(proposed.proposal).toBe(4);
+    expect(approvalRefusalLabel('self_approval')).toMatch(/different Admin/);
+  });
+
+  it('projects proposals, pending approvals and history fail-closed', () => {
+    expect(
+      toSettingsProposalReceipt({ proposal: 3, refused_edits: [], violations: [], refused: false })
+        .proposal,
+    ).toBe(3);
+    expect(
+      toSettingsProposalReceipt({
+        proposal: 0,
+        refused_edits: [],
+        violations: ['x'],
+        refused: true,
+      }).proposal,
+    ).toBeNull();
+    expect(toPendingProposals({ proposals: [], refused: true })).toBeNull();
+    expect(
+      toPendingProposals({
+        proposals: [
+          {
+            proposal: 3,
+            proposer: 'console:a',
+            proposed_at_ms: 5,
+            changed_keys: ['k'],
+            stale: true,
+          },
+        ],
+        refused: false,
+      }),
+    ).toEqual([
+      { proposal: 3, proposer: 'console:a', proposedAtMs: 5, changedKeys: ['k'], stale: true },
+    ]);
+    expect(
+      toSettingsHistoryView({
+        versions: [{ version: 9, changed_keys: ['k'], at_ms: 0 }],
+        complete: false,
+        refused: false,
+      }),
+    ).toEqual({
+      versions: [{ version: 9, principal: null, atMs: null, changedKeys: ['k'] }],
+      complete: false,
+    });
+    expect(toSettingsHistoryView({ versions: [], complete: true, refused: true })).toBeNull();
+  });
+
+  it('narrows ids and the history limit', () => {
+    expect(toPositiveId('12')).toBe(12);
+    expect(toPositiveId(7)).toBe(7);
+    expect(toPositiveId('0')).toBeNull();
+    expect(toPositiveId('-1')).toBeNull();
+    expect(toPositiveId(1.5)).toBeNull();
+    expect(toHistoryLimit(null)).toBe(0);
+    expect(toHistoryLimit('50')).toBe(50);
+    expect(toHistoryLimit('101')).toBeNull();
+    expect(toHistoryLimit('x')).toBeNull();
   });
 });

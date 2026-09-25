@@ -19,6 +19,10 @@ import type {
   WireSettingRow,
   WireSettings,
   WireSettingsReports,
+  WireSettingsProposed,
+  WireSettingsApprovals,
+  WireSettingsHistory,
+  WireSettingRefusal,
   WireSourceFormatMapping,
   WireSsoGroupRoles,
 } from './generated/wire-dto.js';
@@ -384,6 +388,42 @@ export interface SettingsReceipt {
   readonly violations: readonly string[];
   readonly refused: boolean;
   readonly explanation: string | null;
+  /** A proposal recorded INSTEAD of a commit (a rollback under dual control, crdb SET.5). */
+  readonly proposal: number | null;
+  /** Why an approval was refused (crdb SET.3); null for a commit or an approval that committed. */
+  readonly approvalRefused: ApprovalRefusal | null;
+}
+
+/** Why the engine refused an approval (crdb SET.3); `other` keeps an unknown tag visible. */
+export type ApprovalRefusal = 'self_approval' | 'unknown_proposal' | 'stale' | 'other';
+
+/** An approval refusal in the operator's words. */
+export function approvalRefusalLabel(cause: ApprovalRefusal): string {
+  switch (cause) {
+    case 'self_approval':
+      return 'You proposed this change; a different Admin must approve it.';
+    case 'unknown_proposal':
+      return 'That proposal no longer exists (it was approved, discarded, or the node restarted).';
+    case 'stale':
+      return 'The configuration changed after this was proposed, so approving it would undo that change. The proposal was discarded; propose again.';
+    case 'other':
+      return 'The engine refused the approval.';
+  }
+}
+
+function toRefusals(refusals: readonly WireSettingRefusal[]): SettingRefusal[] {
+  return refusals.map((r) => ({
+    key: r.key,
+    cause: (SETTING_REFUSAL_CAUSES as readonly string[]).includes(r.cause)
+      ? (r.cause as SettingRefusalCause)
+      : 'other',
+    causeTag: r.cause,
+    detail: r.detail === undefined || r.detail === '' ? null : r.detail,
+  }));
+}
+
+function textOrNull(text: string | undefined): string | null {
+  return text === undefined || text === '' ? null : text;
 }
 
 /** The most edits one commit carries (the engine bounds a batch by its registry size). */
@@ -614,18 +654,17 @@ export function toSettingsReceipt(wire: WireSettingsCommitted): SettingsReceipt 
     version: wire.version,
     needsRestart: wire.needs_restart,
     dualControlRequired: wire.dual_control_required,
-    refusedEdits: wire.refused_edits.map((r) => ({
-      key: r.key,
-      cause: (SETTING_REFUSAL_CAUSES as readonly string[]).includes(r.cause)
-        ? (r.cause as SettingRefusalCause)
-        : 'other',
-      causeTag: r.cause,
-      detail: r.detail === undefined || r.detail === '' ? null : r.detail,
-    })),
+    refusedEdits: toRefusals(wire.refused_edits),
     violations: wire.violations,
     refused: wire.refused,
-    explanation:
-      wire.explanation === undefined || wire.explanation === '' ? null : wire.explanation,
+    explanation: textOrNull(wire.explanation),
+    proposal: wire.proposal === undefined || wire.proposal === 0 ? null : wire.proposal,
+    approvalRefused:
+      wire.approval_refused === undefined || wire.approval_refused === ''
+        ? null
+        : ((['self_approval', 'unknown_proposal', 'stale'] as const).find(
+            (c) => c === wire.approval_refused,
+          ) ?? 'other'),
   };
 }
 
@@ -828,4 +867,99 @@ export function sessionGroupLabel(group: string): string {
     default:
       return `Other (${group})`;
   }
+}
+
+/** What the engine did with a proposal (crdb SET.3 `SETTINGS_PROPOSE`). */
+export interface SettingsProposalReceipt {
+  /** The proposal id a second Admin approves; null when refused. */
+  readonly proposal: number | null;
+  readonly refusedEdits: readonly SettingRefusal[];
+  readonly violations: readonly string[];
+  readonly refused: boolean;
+  readonly explanation: string | null;
+}
+
+export function toSettingsProposalReceipt(wire: WireSettingsProposed): SettingsProposalReceipt {
+  return {
+    proposal: wire.refused || wire.proposal === 0 ? null : wire.proposal,
+    refusedEdits: toRefusals(wire.refused_edits),
+    violations: wire.violations,
+    refused: wire.refused,
+    explanation: textOrNull(wire.explanation),
+  };
+}
+
+/** One config proposal awaiting a second approval, from the Console or the admin plane. */
+export interface PendingProposal {
+  readonly proposal: number;
+  readonly proposer: string;
+  readonly proposedAtMs: number;
+  readonly changedKeys: readonly string[];
+  /** The configuration changed since: approving it would be refused. */
+  readonly stale: boolean;
+}
+
+/** The pending approvals (crdb SET.3); null for the engine's refusal. */
+export function toPendingProposals(wire: WireSettingsApprovals): readonly PendingProposal[] | null {
+  if (wire.refused) {
+    return null;
+  }
+  return wire.proposals.map((p) => ({
+    proposal: p.proposal,
+    proposer: p.proposer,
+    proposedAtMs: p.proposed_at_ms,
+    changedKeys: p.changed_keys,
+    stale: p.stale,
+  }));
+}
+
+/** One committed configuration version (crdb SET.5). */
+export interface SettingsVersionRow {
+  readonly version: number;
+  /** Who committed it; null for a version committed before names were recorded. */
+  readonly principal: string | null;
+  /** When; null when not recorded. */
+  readonly atMs: number | null;
+  readonly changedKeys: readonly string[];
+}
+
+/** The configuration history, newest first (crdb SET.5). */
+export interface SettingsHistoryView {
+  readonly versions: readonly SettingsVersionRow[];
+  /** False when older versions exist beyond this page or were reclaimed by retention. */
+  readonly complete: boolean;
+}
+
+/** Project `SETTINGS_HISTORY`; null for the engine's refusal. */
+export function toSettingsHistoryView(wire: WireSettingsHistory): SettingsHistoryView | null {
+  if (wire.refused) {
+    return null;
+  }
+  return {
+    versions: wire.versions.map((v) => ({
+      version: v.version,
+      principal: textOrNull(v.principal),
+      atMs: v.at_ms === undefined || v.at_ms === 0 ? null : v.at_ms,
+      changedKeys: v.changed_keys,
+    })),
+    complete: wire.complete,
+  };
+}
+
+/** The most versions one history read asks for (the engine caps at 100). */
+export const SETTINGS_HISTORY_MAX = 100;
+
+/** A positive integer id or version from a path segment or body field; null otherwise. */
+export function toPositiveId(raw: unknown): number | null {
+  const n = typeof raw === 'string' && /^[0-9]{1,15}$/.test(raw) ? Number(raw) : raw;
+  return typeof n === 'number' && Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+/** The `limit` query parameter: absent = the engine default (0), else 1..100; null (a 400) otherwise. */
+export function toHistoryLimit(raw: string | null): number | null {
+  if (raw === null || raw === '') {
+    return 0;
+  }
+  const n = toPositiveId(raw);
+  return n !== null && n <= SETTINGS_HISTORY_MAX ? n : null;
 }

@@ -289,6 +289,31 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
         refused: false,
       });
     },
+    settingsPropose: (req) => {
+      calls.push(`settingsPropose:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.reject(new Error('unused'));
+    },
+    settingsApprovals: (req) => {
+      calls.push(`settingsApprovals:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.reject(new Error('unused'));
+    },
+    settingsApprove: (req) => {
+      calls.push(`settingsApprove:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.reject(new Error('unused'));
+    },
+    settingsHistory: (req) => {
+      calls.push(`settingsHistory:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.reject(new Error('unused'));
+    },
+    settingsRollback: (req) => {
+      calls.push(`settingsRollback:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.reject(new Error('unused'));
+    },
     settingsReports: (req) => {
       calls.push(`settingsReports:${String(req.request_id)}`);
       reads.push(req);

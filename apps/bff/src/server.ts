@@ -26,6 +26,8 @@ import {
   toSocSettingsPatch,
   toSettingsCommitRequest,
   toSettingsReportNames,
+  toPositiveId,
+  toHistoryLimit,
 } from '@forge/contracts';
 import type {
   EntityRef,
@@ -108,6 +110,11 @@ import {
   resolveSettings,
   resolveSettingsCommit,
   resolveSettingsReports,
+  resolveSettingsPropose,
+  resolveSettingsApprovals,
+  resolveSettingsApprove,
+  resolveSettingsHistory,
+  resolveSettingsRollback,
 } from './engine/settings.js';
 import {
   resolveIdamConfigure,
@@ -2217,6 +2224,115 @@ async function handleSecuritySession(
   return true;
 }
 
+/** The approve route's path: `/api/settings/approvals/<id>/approve`. */
+const SETTINGS_APPROVE_RE = /^\/api\/settings\/approvals\/([0-9]{1,15})\/approve$/;
+
+/**
+ * Dual control + history (IP-CONSOLE-11 ST.9 over crdb SET.3 / SET.5):
+ *   POST /api/settings/propose               -- the commit body, recorded as a proposal (Admin)
+ *   GET  /api/settings/approvals             -- pending proposals from either plane
+ *   POST /api/settings/approvals/<id>/approve -- approve as a distinct Admin
+ *   GET  /api/settings/history[?limit=N]     -- committed versions, newest first
+ *   POST /api/settings/rollback {to}         -- restore a version (a proposal under dual control)
+ * Malformed input is a 400 before any engine call; the engine's tier refusal is a 403; a refused
+ * proposal / approval / rollback is a 200 receipt carrying the engine's reason; nothing is cached.
+ */
+async function handleSettingsGovernance(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const approve = SETTINGS_APPROVE_RE.exec(path);
+  const known =
+    (path === '/api/settings/propose' && method === 'POST') ||
+    (path === '/api/settings/approvals' && method === 'GET') ||
+    (approve !== null && method === 'POST') ||
+    (path === '/api/settings/history' && method === 'GET') ||
+    (path === '/api/settings/rollback' && method === 'POST');
+  if (!known) return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  const engine = deps.operatorEngine;
+  if (!engine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  const readBody = async (): Promise<unknown> => {
+    try {
+      return await readJsonBody(req, MAX_COMMAND_BODY_BYTES);
+    } catch {
+      return undefined;
+    }
+  };
+  try {
+    if (path === '/api/settings/propose') {
+      const request = toSettingsCommitRequest(await readBody());
+      if (request === null) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      sendJson(res, 200, await resolveSettingsPropose(engine, principal, request, opts));
+    } else if (path === '/api/settings/approvals') {
+      const pending = await resolveSettingsApprovals(engine, principal, opts);
+      if (pending === null) {
+        sendJson(res, 403, { error: 'refused', class: 'Tier' });
+      } else {
+        sendJson(res, 200, { proposals: pending });
+      }
+    } else if (approve !== null) {
+      const proposal = toPositiveId(approve[1]);
+      if (proposal === null) {
+        sendJson(res, 400, { error: 'bad_request' });
+        return true;
+      }
+      sendJson(res, 200, await resolveSettingsApprove(engine, principal, proposal, opts));
+    } else if (path === '/api/settings/history') {
+      const limit = toHistoryLimit(
+        new URL(req.url ?? '/', 'http://localhost').searchParams.get('limit'),
+      );
+      if (limit === null) {
+        sendJson(res, 400, { error: 'bad_request' });
+        return true;
+      }
+      const history = await resolveSettingsHistory(engine, principal, limit, opts);
+      if (history === null) {
+        sendJson(res, 403, { error: 'refused', class: 'Tier' });
+      } else {
+        sendJson(res, 200, history);
+      }
+    } else {
+      const body = await readBody();
+      const to =
+        typeof body === 'object' && body !== null
+          ? toPositiveId((body as { to?: unknown }).to)
+          : null;
+      if (to === null) {
+        sendJson(res, 400, { error: 'malformed_request' });
+        return true;
+      }
+      sendJson(res, 200, await resolveSettingsRollback(engine, principal, to, opts));
+    }
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn(
+        { err: err instanceof Error ? err.name : 'unknown' },
+        'settings governance failed',
+      );
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
 async function handleSocSettings(
   deps: ServerDeps,
   req: IncomingMessage,
@@ -2520,6 +2636,9 @@ async function route(
     return;
   }
   if (await handleSecuritySession(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleSettingsGovernance(deps, req, method, path, res)) {
     return;
   }
   if (await handleSocSettings(deps, req, method, path, res)) {

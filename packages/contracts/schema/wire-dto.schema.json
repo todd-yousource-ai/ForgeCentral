@@ -4621,6 +4621,42 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SettingsProposed": {
+              "$ref": "#/$defs/WireSettingsProposed"
+            }
+          },
+          "required": [
+            "SettingsProposed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SettingsApprovals": {
+              "$ref": "#/$defs/WireSettingsApprovals"
+            }
+          },
+          "required": [
+            "SettingsApprovals"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SettingsHistory": {
+              "$ref": "#/$defs/WireSettingsHistory"
+            }
+          },
+          "required": [
+            "SettingsHistory"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocSettingsCommitted": {
               "$ref": "#/$defs/WireSocSettingsCommitted"
             }
@@ -5607,6 +5643,66 @@
         {
           "additionalProperties": false,
           "properties": {
+            "SettingsPropose": {
+              "$ref": "#/$defs/WireSettingsCommit"
+            }
+          },
+          "required": [
+            "SettingsPropose"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SettingsApprovals": {
+              "$ref": "#/$defs/WireSettingsApprovalsQuery"
+            }
+          },
+          "required": [
+            "SettingsApprovals"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SettingsApprove": {
+              "$ref": "#/$defs/WireSettingsApprove"
+            }
+          },
+          "required": [
+            "SettingsApprove"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SettingsHistory": {
+              "$ref": "#/$defs/WireSettingsHistoryQuery"
+            }
+          },
+          "required": [
+            "SettingsHistory"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "SettingsRollback": {
+              "$ref": "#/$defs/WireSettingsRollback"
+            }
+          },
+          "required": [
+            "SettingsRollback"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SocSettingsCommit": {
               "$ref": "#/$defs/WireSocSettingsCommit"
             }
@@ -6062,6 +6158,62 @@
       ],
       "type": "object"
     },
+    "WireSettingsApprovals": {
+      "additionalProperties": false,
+      "properties": {
+        "explanation": {
+          "type": "string"
+        },
+        "proposals": {
+          "items": {
+            "$ref": "#/$defs/WireSettingsProposal"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "proposals",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSettingsApprovalsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WireSettingsApprove": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "proposal": {
+          "type": "integer"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "proposal"
+      ],
+      "type": "object"
+    },
     "WireSettingsCommit": {
       "additionalProperties": false,
       "properties": {
@@ -6090,6 +6242,9 @@
     "WireSettingsCommitted": {
       "additionalProperties": false,
       "properties": {
+        "approval_refused": {
+          "type": "string"
+        },
         "dual_control_required": {
           "type": "boolean"
         },
@@ -6101,6 +6256,9 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "proposal": {
+          "type": "integer"
         },
         "refused": {
           "type": "boolean"
@@ -6125,6 +6283,114 @@
         "version",
         "needs_restart",
         "dual_control_required",
+        "refused_edits",
+        "violations",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSettingsHistory": {
+      "additionalProperties": false,
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "versions": {
+          "items": {
+            "$ref": "#/$defs/WireSettingsVersion"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "versions",
+        "complete",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireSettingsHistoryQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "type": "integer"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "WireSettingsProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "changed_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "proposal": {
+          "type": "integer"
+        },
+        "proposed_at_ms": {
+          "type": "integer"
+        },
+        "proposer": {
+          "type": "string"
+        },
+        "stale": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "proposal",
+        "proposer",
+        "proposed_at_ms",
+        "changed_keys",
+        "stale"
+      ],
+      "type": "object"
+    },
+    "WireSettingsProposed": {
+      "additionalProperties": false,
+      "properties": {
+        "explanation": {
+          "type": "string"
+        },
+        "proposal": {
+          "type": "integer"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "refused_edits": {
+          "items": {
+            "$ref": "#/$defs/WireSettingRefusal"
+          },
+          "type": "array"
+        },
+        "violations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "proposal",
         "refused_edits",
         "violations",
         "refused"
@@ -6208,6 +6474,50 @@
       "required": [
         "request_id",
         "reports"
+      ],
+      "type": "object"
+    },
+    "WireSettingsRollback": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "to": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "to"
+      ],
+      "type": "object"
+    },
+    "WireSettingsVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "at_ms": {
+          "type": "integer"
+        },
+        "changed_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "principal": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "changed_keys"
       ],
       "type": "object"
     },

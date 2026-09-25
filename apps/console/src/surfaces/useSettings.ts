@@ -17,6 +17,9 @@ import { toConsoleRbacView } from '@forge/contracts';
 import type {
   AdminSessionKx,
   ConsoleRbacView,
+  PendingProposal,
+  SettingsHistoryView,
+  SettingsProposalReceipt,
   SettingsCommitRequest,
   SettingsReportName,
   SettingsReportsView,
@@ -198,5 +201,101 @@ export function useSecuritySession(): UseQueryResult<AdminSessionKx> {
     queryKey: ['settings', 'security-session'],
     queryFn: fetchSecuritySession,
     staleTime: 0,
+  });
+}
+
+/** POST a JSON body to a settings route; a non-2xx is an error, a 200 is the engine's receipt. */
+async function postSettings<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`${path} failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as T;
+}
+
+/** What a governed change produced: a commit receipt, or (under dual control) a proposal receipt. */
+export type GovernedChangeResult =
+  | { readonly kind: 'commit'; readonly receipt: SettingsReceipt }
+  | { readonly kind: 'proposal'; readonly receipt: SettingsProposalReceipt };
+
+/**
+ * One change path for the Configuration tab (IP-CONSOLE-11 ST.9): a direct commit, or under dual
+ * control a PROPOSAL a different Admin approves (crdb SET.3). Either re-reads what it touches.
+ */
+export function useGovernedChange(
+  propose: boolean,
+): UseMutationResult<GovernedChangeResult, Error, SettingsCommitRequest> {
+  const client = useQueryClient();
+  return useMutation<GovernedChangeResult, Error, SettingsCommitRequest>({
+    mutationFn: async (request) =>
+      propose
+        ? {
+            kind: 'proposal',
+            receipt: await postSettings<SettingsProposalReceipt>('/api/settings/propose', request),
+          }
+        : { kind: 'commit', receipt: await postGovernedSettings(request) },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+}
+
+/** The pending config proposals from either plane (crdb SET.3); a 403 is the tier refusal. */
+export async function fetchApprovals(): Promise<readonly PendingProposal[] | null> {
+  const res = await fetch('/api/settings/approvals', { credentials: 'include' });
+  if (res.status === 403) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`approvals failed: ${String(res.status)}`);
+  }
+  return ((await res.json()) as { proposals: readonly PendingProposal[] }).proposals;
+}
+
+export function useSettingsApprovals(): UseQueryResult<readonly PendingProposal[] | null> {
+  return useQuery({ queryKey: ['settings', 'approvals'], queryFn: fetchApprovals, staleTime: 0 });
+}
+
+/** Approve a proposal as the signed-in Admin; the receipt carries the engine's reason if refused. */
+export function useApproveProposal(): UseMutationResult<SettingsReceipt, Error, number> {
+  const client = useQueryClient();
+  return useMutation<SettingsReceipt, Error, number>({
+    mutationFn: (proposal) =>
+      postSettings<SettingsReceipt>(`/api/settings/approvals/${String(proposal)}/approve`, {}),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+}
+
+/** The configuration history, newest first (crdb SET.5); a 403 is the tier refusal. */
+export async function fetchHistory(): Promise<SettingsHistoryView | null> {
+  const res = await fetch('/api/settings/history?limit=50', { credentials: 'include' });
+  if (res.status === 403) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`history failed: ${String(res.status)}`);
+  }
+  return (await res.json()) as SettingsHistoryView;
+}
+
+export function useSettingsHistory(): UseQueryResult<SettingsHistoryView | null> {
+  return useQuery({ queryKey: ['settings', 'history'], queryFn: fetchHistory, staleTime: 0 });
+}
+
+/** Restore a configuration version (crdb SET.5); under dual control the receipt is a proposal. */
+export function useRollback(): UseMutationResult<SettingsReceipt, Error, number> {
+  const client = useQueryClient();
+  return useMutation<SettingsReceipt, Error, number>({
+    mutationFn: (to) => postSettings<SettingsReceipt>('/api/settings/rollback', { to }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['settings'] });
+    },
   });
 }
