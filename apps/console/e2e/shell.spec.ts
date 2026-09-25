@@ -73,10 +73,12 @@ test('authenticated: the shell, the IA, empty states, and the drawer frame', asy
   await mockBff(page, true);
   await page.goto('/');
 
-  // The IA is reachable: all eleven destinations in the rail.
+  // The IA is reachable: all nine destinations in the rail (Agent Ops and Network Ops were removed as
+  // placeholders with no engine binding, IP-AISOC-STEP1 C.9 / S3.16, INV-CONSOLE-NO-STUB).
   const rail = page.getByRole('navigation', { name: 'Primary' });
   await expect(rail).toBeVisible();
-  await expect(rail.getByRole('link')).toHaveCount(11);
+  await expect(rail.getByRole('link')).toHaveCount(9);
+  await expect(rail.getByRole('link', { name: 'Agent Ops' })).toHaveCount(0);
 
   // The home Overview surface renders live: the heading, the honest empty connectivity flow (the mocked
   // tenant has none), and -- since the O1.7 poll succeeds -- a real Live indicator driven by the poll.
@@ -84,13 +86,10 @@ test('authenticated: the shell, the IA, empty states, and the drawer frame', asy
   await expect(page.getByText('No connectivity observed')).toBeVisible();
   await expect(page.locator('.fcx-topbar').getByText('Live')).toBeVisible();
 
-  // One-click navigation to a still-placeholder destination (Agent Ops), an honest empty placeholder.
-  // The Overview unmounts, so it stops driving freshness and the shell indicator returns to the
-  // deferred "Not live". (SOC Ops became a real surface with S3.3; Agent Ops is still awaiting its
-  // phase, so it is the placeholder this assertion uses now.)
-  await rail.getByRole('link', { name: 'Agent Ops' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Agent Ops' })).toBeVisible();
-  await expect(page.getByText('No Agent Ops data yet')).toBeVisible();
+  // One click to a surface that drives no freshness (Settings): the Overview unmounts, so the shell
+  // indicator returns to the deferred "Not live".
+  await rail.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
   await expect(page.getByText('Not live')).toBeVisible();
 
   // SOC Ops now renders its real shell against the live KPI read (S3.3): every tile is an engine
