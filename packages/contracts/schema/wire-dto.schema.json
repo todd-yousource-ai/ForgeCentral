@@ -5995,6 +5995,9 @@
     "WireServerReport": {
       "additionalProperties": false,
       "properties": {
+        "build_time_unix": {
+          "type": "integer"
+        },
         "durable": {
           "type": "boolean"
         },

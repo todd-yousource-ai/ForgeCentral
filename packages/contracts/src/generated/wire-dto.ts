@@ -1082,6 +1082,7 @@ export interface WireSecurityReport {
 }
 
 export interface WireServerReport {
+  build_time_unix?: number;
   durable: boolean;
   maintenance_cadence_secs: number;
   maintenance_enabled: boolean;

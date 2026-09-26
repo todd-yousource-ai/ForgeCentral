@@ -100,7 +100,9 @@ const REPORTS = {
     maintenanceEnabled: true,
     maintenanceCadenceSecs: 120,
     maxPayload: 262_144,
-    version: '0.0.0',
+    version: '3bd23114e0af4aff60f52f15fdbef3ad7b052053',
+    build: { kind: 'commit', commit: '3bd23114e0af4aff60f52f15fdbef3ad7b052053', dirty: false },
+    builtAtUnix: 1_790_393_113,
   },
   connectivity: {
     listenAddr: '127.0.0.1:7440',
