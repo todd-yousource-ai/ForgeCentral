@@ -11,6 +11,7 @@ import { Badge, DataTable, GlassPanel } from '@forge/design';
 import {
   sessionGroupLabel,
   settingApplyClass,
+  type EngineBuild,
   type SettingRow,
   type SettingsReportName,
   type SettingsReportsView,
@@ -28,6 +29,41 @@ interface Fact {
 
 function yesNo(value: boolean): string {
   return value ? 'Yes' : 'No';
+}
+
+/** Hex digits shown for a commit; the full id is the cell's title. */
+const SHORT_COMMIT_LENGTH = 12; // TUNE: 12 hex is unambiguous in the repo and fits the fact column.
+
+/**
+ * The engine build (crdb A.1): the commit it was built from, badged clean or with uncommitted changes.
+ * A report that names no commit (an engine from before build stamping) is shown verbatim as
+ * unidentified, never as a build.
+ */
+function EngineBuildFact({ build }: { readonly build: EngineBuild }): ReactElement {
+  if (build.kind === 'unstamped') {
+    return (
+      <>
+        <code>{build.reported}</code> <Badge variant="caution">No build identity</Badge>
+      </>
+    );
+  }
+  return (
+    <>
+      <code title={build.commit}>{build.commit.slice(0, SHORT_COMMIT_LENGTH)}</code>{' '}
+      {build.dirty ? (
+        <Badge variant="caution">Uncommitted changes</Badge>
+      ) : (
+        <Badge variant="good">Clean commit</Badge>
+      )}
+    </>
+  );
+}
+
+/** The engine build time in UTC, or why there is none. */
+function builtAtLabel(unixSeconds: number | null): string {
+  return unixSeconds === null
+    ? 'not reported (engine predates build stamping)'
+    : `${new Date(unixSeconds * 1000).toISOString().replace('T', ' ').slice(0, 19)} UTC`;
 }
 
 /** One report as a two-column fact table, captioned with the report it came from. */
@@ -335,7 +371,8 @@ export function TopologyTab(): ReactElement {
                     : 'off',
                 },
                 { label: 'Admin frame ceiling (bytes)', value: r.server.maxPayload },
-                { label: 'Engine version', value: <code>{r.server.version}</code> },
+                { label: 'Engine build', value: <EngineBuildFact build={r.server.build} /> },
+                { label: 'Engine built', value: builtAtLabel(r.server.builtAtUnix) },
               ]}
             />
           )

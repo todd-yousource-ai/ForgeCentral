@@ -652,7 +652,9 @@ const REPORTS = {
     maintenanceEnabled: true,
     maintenanceCadenceSecs: 120,
     maxPayload: 262_144,
-    version: '0.0.0',
+    version: '3bd23114e0af4aff60f52f15fdbef3ad7b052053',
+    build: { kind: 'commit', commit: '3bd23114e0af4aff60f52f15fdbef3ad7b052053', dirty: false },
+    builtAtUnix: 1_790_393_113,
   },
   connectivity: {
     listenAddr: '127.0.0.1:7440',
@@ -805,11 +807,50 @@ describe('the report-backed tabs (crdb SET.4)', () => {
     expect(screen.getByText(/SET\.6d/)).toBeInTheDocument();
   });
 
+  it('the engine build badges uncommitted changes (A.1b)', async () => {
+    mockReports({
+      ...REPORTS,
+      server: {
+        ...REPORTS.server,
+        version: '3bd23114e0af4aff60f52f15fdbef3ad7b052053-dirty',
+        build: { kind: 'commit', commit: '3bd23114e0af4aff60f52f15fdbef3ad7b052053', dirty: true },
+      },
+    });
+    await openTab('HA & Topology');
+    const node = await screen.findByRole('table', { name: 'This node (the engine server report)' });
+    expect(within(node).getByText('Uncommitted changes')).toBeInTheDocument();
+    expect(within(node).queryByText('Clean commit')).toBeNull();
+  });
+
+  it('an engine from before build stamping shows no build identity and no build time (A.1b)', async () => {
+    mockReports({
+      ...REPORTS,
+      server: {
+        ...REPORTS.server,
+        version: '0.0.0',
+        build: { kind: 'unstamped', reported: '0.0.0' },
+        builtAtUnix: null,
+      },
+    });
+    await openTab('HA & Topology');
+    const node = await screen.findByRole('table', { name: 'This node (the engine server report)' });
+    expect(within(node).getByText('0.0.0')).toBeInTheDocument();
+    expect(within(node).getByText('No build identity')).toBeInTheDocument();
+    expect(
+      within(node).getByText('not reported (engine predates build stamping)'),
+    ).toBeInTheDocument();
+  });
+
   it('HA & Topology and FIPS Mode read their reports and offer no control', async () => {
     mockReports(REPORTS);
     await openTab('HA & Topology');
     const node = await screen.findByRole('table', { name: 'This node (the engine server report)' });
     expect(within(node).getByText('every 120 s')).toBeInTheDocument();
+    // A.1b: the engine build is the commit it was built from, badged, with its build time.
+    const commit = within(node).getByText('3bd23114e0af');
+    expect(commit).toHaveAttribute('title', '3bd23114e0af4aff60f52f15fdbef3ad7b052053');
+    expect(within(node).getByText('Clean commit')).toBeInTheDocument();
+    expect(within(node).getByText('2026-09-26 03:25:13 UTC')).toBeInTheDocument();
     expect(screen.getByText(/SET\.6a/)).toBeInTheDocument();
     cleanupAndReset();
     mockReports(REPORTS);

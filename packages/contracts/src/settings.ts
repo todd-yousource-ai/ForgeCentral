@@ -735,7 +735,12 @@ export interface SettingsReportsView {
     readonly maintenanceEnabled: boolean;
     readonly maintenanceCadenceSecs: number;
     readonly maxPayload: number;
+    /** The engine's `ServerReport.version`, verbatim. */
     readonly version: string;
+    /** `version` read as a build identity (crdb A.1); see {@link parseEngineBuild}. */
+    readonly build: EngineBuild;
+    /** When the engine binary was built (unix seconds); null from an engine that predates A.1. */
+    readonly builtAtUnix: number | null;
   } | null;
   readonly connectivity: {
     readonly listenAddr: string;
@@ -790,6 +795,30 @@ export function toSettingsReportNames(raw: string | null): SettingsReportName[] 
   return out;
 }
 
+/**
+ * The engine build as `ServerReport.version` states it (crdb IP-AISOC-DETECT-EVOLVE A.1, crate
+ * `cdb-build-id`): `<sha>` for a clean build, `<sha>-dirty` when the source tree differed from that
+ * commit. Anything else names no build: an engine that predates A.1 reports its package version
+ * (`0.0.0`), and a build made outside a git checkout reports `unknown`. Those read as `unstamped`,
+ * never as a commit.
+ */
+export type EngineBuild =
+  | { readonly kind: 'commit'; readonly commit: string; readonly dirty: boolean }
+  | { readonly kind: 'unstamped'; readonly reported: string };
+
+/** A full commit id (SHA-1 or SHA-256 object format) with the optional dirty suffix. */
+const ENGINE_BUILD_ID = /^([0-9a-f]{40}|[0-9a-f]{64})(-dirty)?$/;
+
+/** Read an engine `ServerReport.version` as a build identity; see {@link EngineBuild}. */
+export function parseEngineBuild(version: string): EngineBuild {
+  const match = ENGINE_BUILD_ID.exec(version);
+  const commit = match?.[1];
+  if (commit === undefined) {
+    return { kind: 'unstamped', reported: version };
+  }
+  return { kind: 'commit', commit, dirty: match?.[2] !== undefined };
+}
+
 /** Project the `SETTINGS_REPORTS` reply; `null` for the engine's refusal. */
 export function toSettingsReportsView(wire: WireSettingsReports): SettingsReportsView | null {
   if (wire.refused) {
@@ -813,6 +842,8 @@ export function toSettingsReportsView(wire: WireSettingsReports): SettingsReport
             maintenanceCadenceSecs: s.maintenance_cadence_secs,
             maxPayload: s.max_payload,
             version: s.version,
+            build: parseEngineBuild(s.version),
+            builtAtUnix: s.build_time_unix ?? null,
           },
     connectivity:
       c === undefined
