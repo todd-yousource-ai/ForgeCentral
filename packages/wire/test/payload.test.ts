@@ -231,6 +231,19 @@ describe('encodeWireRequest: the policy verbs (IP-CONSOLE-05)', () => {
     });
   });
 
+  it('the queue read carries the page cursor over the real encoder, and omits it on page one', () => {
+    // crdb B.5: a cursor the encoder dropped would re-read page one forever. The first page stays
+    // byte-identical to the pre-paging form.
+    expect(
+      asMap({ SocIncidentList: { request_id: 2, limit: 200, cursor: 'q1.3.1.3.9.ep-7' } }),
+    ).toEqual({
+      SocIncidentList: { request_id: 2, limit: 200, cursor: 'q1.3.1.3.9.ep-7' },
+    });
+    expect(asMap({ SocIncidentList: { request_id: 2, limit: 200 } })).toEqual({
+      SocIncidentList: { request_id: 2, limit: 200 },
+    });
+  });
+
   it('encodes request_id as the integer the engine decodes, never a string', () => {
     // crdb `RequestId` is a transparent u128. The committed schema declared these four DTOs
     // `string` until it was fixed; a client that sent one would fail at the CBOR seam with nothing

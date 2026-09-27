@@ -123,8 +123,8 @@ describe('the SOC read resolvers (S3.2)', () => {
   });
 
   it('surfaces a refused queue as unavailable, never as an empty queue', async () => {
-    // The engine refuses rather than truncating an over-ceiling queue. Rendering that as "no open
-    // incidents" would show a calmer environment than the one the analyst is standing in.
+    // A refusal (over the engine's scan ceiling, or a bad cursor) is never rendered as "no open
+    // incidents": that would show a calmer environment than the one the analyst is standing in.
     const list: WireSocIncidentList = {
       rows: [],
       refused: true,
@@ -137,6 +137,52 @@ describe('the SOC read resolvers (S3.2)', () => {
     await expect(resolveIncidentQueue(engineOf({ list }), PRINCIPAL)).rejects.toThrow(
       /exceed the queue ceiling/,
     );
+  });
+
+  it('walks the engine cursor to the end of a queue longer than one page (crdb B.5)', async () => {
+    // B.6 (INV-RF-9, Console): past one page the queue is paged, and the BFF follows next_cursor so
+    // the Console holds the WHOLE ranked queue -- never the first 200 rows read as the whole.
+    const pages: WireSocIncidentList[] = [
+      {
+        rows: [wireRow({ incident_id: 'ep-1' }), wireRow({ incident_id: 'ep-2' })],
+        refused: false,
+        total: 5,
+        next_cursor: 'q1.c1',
+      },
+      {
+        // ep-2 moved behind the cursor mid-walk: served once, at its first (higher) rank.
+        rows: [wireRow({ incident_id: 'ep-2' }), wireRow({ incident_id: 'ep-3' })],
+        refused: false,
+        total: 5,
+        next_cursor: 'q1.c2',
+      },
+      {
+        rows: [wireRow({ incident_id: 'ep-4' }), wireRow({ incident_id: 'ep-5' })],
+        refused: false,
+        total: 5,
+      },
+    ];
+    const seen: { cursor?: string }[] = [];
+    const engine = {
+      socIncidentList: (_principal: OperatorPrincipal, request: { cursor?: string }) => {
+        seen.push(request);
+        return Promise.resolve(pages[seen.length - 1]);
+      },
+    } as unknown as OperatorEngine;
+
+    const queue = await resolveIncidentQueue(engine, PRINCIPAL);
+
+    expect(queue.map((r) => r.incidentId)).toEqual(['ep-1', 'ep-2', 'ep-3', 'ep-4', 'ep-5']);
+    expect(seen.map((r) => r.cursor)).toEqual([undefined, 'q1.c1', 'q1.c2']);
+  });
+
+  it('refuses a queue whose cursor never ends rather than serving part of it', async () => {
+    const endless = {
+      socIncidentList: () =>
+        Promise.resolve({ rows: [wireRow()], refused: false, total: 1, next_cursor: 'q1.again' }),
+    } as unknown as OperatorEngine;
+
+    await expect(resolveIncidentQueue(endless, PRINCIPAL)).rejects.toThrow(/did not end/);
   });
 
   it('resolves an empty queue as an honest empty list', async () => {
@@ -233,9 +279,8 @@ describe('the SOC read resolvers (S3.2)', () => {
     ).rejects.toBeInstanceOf(SocUnavailableError);
   });
 
-  it('asks the engine for its own ceiling and carries the incident id', async () => {
-    // The Console must not impose a second, smaller, invisible bound of its own -- the engine's
-    // refuse-not-truncate contract is what keeps the queue honest.
+  it('asks the engine for its own page size and carries the incident id', async () => {
+    // The Console must not impose a second, smaller, invisible bound of its own.
     const seen: unknown[] = [];
     await resolveIncidentQueue(engineOf({ seen }), PRINCIPAL);
     await resolveIncidentDetail(engineOf({ seen }), PRINCIPAL, 'ep-soc-1');

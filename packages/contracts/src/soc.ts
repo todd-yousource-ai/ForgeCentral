@@ -408,8 +408,27 @@ export interface SocKpis {
    * that means nothing.
    */
   readonly totalFirings: number;
-  /** Open episodes awaiting an analyst (`active_alerts`, FV.4). */
+  /**
+   * Firings that kept an already-open incident alive (`sustained_total`, crdb A.2): neither muted
+   * nor raised, so `noiseCollapsed` is never read as "everything that was not an alert". `null` from
+   * a pre-A.2 node, which did not partition firings by outcome.
+   */
+  readonly sustained: number | null;
+  /** The window the firing counts cover, in hours (crdb A.2); `null` from a pre-A.2 node. */
+  readonly windowHours: number | null;
+  /**
+   * What one firing count is (crdb A.2): `rule_evaluations` -- re-evaluated evidence counts again, so
+   * these are not events. `null` from a pre-A.2 node, which did not say.
+   */
+  readonly countUnit: 'rule_evaluations' | null;
+  /** Open episodes awaiting an analyst (`active_alerts`, FV.4). A FLOOR when `materialRefusedTenants > 0`. */
   readonly materialIncidents: number;
+  /**
+   * Tenants whose open-alert read the engine refused (`active_alerts_refused_tenants`, crdb A.6):
+   * above zero, `materialIncidents` omits them and the tile reads "at least N", never N. `null` from a
+   * pre-A.6 node, which counted a refused read as zero and cannot be told apart from a quiet one.
+   */
+  readonly materialRefusedTenants: number | null;
   /**
    * Containments actually CARRIED OUT in the window (crdb SS.3).
    *
@@ -553,6 +572,34 @@ export function toIncidentQueue(list: WireSocIncidentList): readonly SocIncident
     rows.push(row);
   }
   return rows;
+}
+
+/** One page of the ranked queue (crdb B.5): the rows, the queue's total, and where the next page starts. */
+export interface SocIncidentPage {
+  readonly rows: readonly SocIncidentRow[];
+  /** Every open incident the engine reports visible to the operator, not only this page's. */
+  readonly total: number;
+  /** The next page's cursor, echoed back opaque; `null` when this page reaches the end. */
+  readonly nextCursor: string | null;
+}
+
+/**
+ * Project one `SOC_INCIDENT_LIST` page (crdb B.5, `INV-RF-9`). `null` exactly when
+ * {@link toIncidentQueue} is: a refusal, or one row the contract cannot narrow.
+ *
+ * A pre-B.5 engine sends no `total`; the page's own length stands in, which is what that engine meant
+ * (it refused rather than returning part of a queue).
+ */
+export function toIncidentPage(list: WireSocIncidentList): SocIncidentPage | null {
+  const rows = toIncidentQueue(list);
+  if (rows === null) {
+    return null;
+  }
+  return {
+    rows,
+    total: list.total ?? rows.length,
+    nextCursor: list.next_cursor ?? null,
+  };
 }
 
 /** Project one lineage node. FAIL-CLOSED on an unknown lane or kind. */
@@ -752,7 +799,11 @@ export function toSocKpis(
     eventsAnalyzed: summary.events_analyzed,
     noiseCollapsed: summary.muted_total,
     totalFirings: summary.techniques.reduce((total, row) => total + row.fires, 0),
+    sustained: summary.sustained_total ?? null,
+    windowHours: summary.window_hours ?? null,
+    countUnit: summary.count_unit === 'RuleEvaluations' ? 'rule_evaluations' : null,
     materialIncidents: summary.active_alerts,
+    materialRefusedTenants: summary.active_alerts_refused_tenants ?? null,
     autoContained: summary.auto_contained,
     decisionWaiting: queue.filter((row) => isWaitingOnAHuman(row.authority)).length,
     detectionEnabled: summary.enabled,

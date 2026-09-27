@@ -63,6 +63,32 @@ function mutedShare(kpis: SocKpis): number | null {
   return Math.round((kpis.noiseCollapsed / kpis.totalFirings) * 100);
 }
 
+/**
+ * What the Noise Collapsed share is a share OF (crdb A.2): the counted unit and the window, stated so
+ * a reader never takes rule evaluations for events. A pre-A.2 node reports neither; the line then
+ * says only "firings", as before.
+ */
+function firingsBasis(kpis: SocKpis): string {
+  const unit = kpis.countUnit === 'rule_evaluations' ? 'rule evaluations' : 'firings';
+  const window = kpis.windowHours === null ? '' : ` in ${String(kpis.windowHours)}h`;
+  const sustained =
+    kpis.sustained === null || kpis.sustained === 0
+      ? ''
+      : `; ${formatCount(kpis.sustained)} sustained open incidents`;
+  return `${formatCount(kpis.totalFirings)} ${unit}${window}${sustained}`;
+}
+
+/**
+ * The Material Incidents value (crdb A.6): a refused tenant read makes the engine's count a FLOOR, so
+ * it reads "at least N" -- a bare N (or a 0) there is a calmer queue than the one that exists.
+ */
+function materialValue(kpis: SocKpis): string {
+  const refused = kpis.materialRefusedTenants ?? 0;
+  return refused > 0
+    ? `at least ${formatCount(kpis.materialIncidents)}`
+    : formatCount(kpis.materialIncidents);
+}
+
 /** The five KPI tiles, each bound to a real engine number. */
 function KpiStrip({ kpis }: { readonly kpis: SocKpis }): ReactElement {
   const share = mutedShare(kpis);
@@ -81,15 +107,22 @@ function KpiStrip({ kpis }: { readonly kpis: SocKpis }): ReactElement {
             <span className="fcx-socops__kpi-sub">
               {share === null
                 ? 'no firings in the window'
-                : `${String(share)}% of ${formatCount(kpis.totalFirings)} firings`}
+                : `${String(share)}% of ${firingsBasis(kpis)}`}
             </span>
           </>
         }
       />
       <KpiCard
         label="Material Incidents"
-        value={formatCount(kpis.materialIncidents)}
-        badge={{ text: 'Open', variant: 'info' }}
+        value={materialValue(kpis)}
+        badge={
+          (kpis.materialRefusedTenants ?? 0) > 0
+            ? {
+                text: `${String(kpis.materialRefusedTenants)} tenant read(s) refused`,
+                variant: 'caution',
+              }
+            : { text: 'Open', variant: 'info' }
+        }
       />
       <KpiCard
         label="Auto-Contained"

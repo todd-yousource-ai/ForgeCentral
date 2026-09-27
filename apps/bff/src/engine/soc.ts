@@ -13,9 +13,11 @@
 // calmer environment than the one the analyst is standing in.
 //
 // THE ENGINE'S REFUSALS ARE PRESERVED, NOT REINTERPRETED:
-//   * An over-ceiling queue is REFUSED by the engine rather than truncated. That refusal surfaces as
-//     `SocUnavailableError` (503), never as an empty queue -- rendering "no open incidents" for a
-//     queue too large to return is the one direction a SOC number must never fail in.
+//   * The queue is PAGED by the engine (crdb B.5) and walked to the end here, so the Console always
+//     holds the whole ranked queue. An engine refusal (over its 20,000 scan ceiling, or a malformed
+//     cursor) surfaces as `SocUnavailableError` (503), never as an empty or shortened queue --
+//     rendering "no open incidents" for a queue too large to return is the one direction a SOC number
+//     must never fail in.
 //   * An unknown incident, another tenant's, and one above the caller's clearance are ONE
 //     indistinguishable refusal by design (crdb SS.4b). The resolver preserves that: it returns
 //     `null` for all three and the route maps it to a single 404. Reconstructing a difference here
@@ -69,7 +71,7 @@ import {
   toIncidentDetail,
   toIncidentTelemetry,
   toIncidentNotes,
-  toIncidentQueue,
+  toIncidentPage,
   toPlanEffect,
   toSocKpis,
   toVerdictNarrative,
@@ -96,14 +98,19 @@ export class SocUnavailableError extends Error {
 }
 
 /**
- * The queue page size requested of the engine.
- *
- * The engine clamps this to its own ceiling (crdb `MAX_QUEUE_ROWS`) and REFUSES rather than
- * truncating when a tenant has more open incidents than that, so this is a request, not a bound the
- * Console enforces. Asking for the engine's own maximum means the Console never introduces a second,
- * smaller, invisible limit of its own.
+ * The queue page size requested of the engine: its own page ceiling (crdb `MAX_QUEUE_ROWS`), so the
+ * Console never introduces a second, smaller, invisible limit of its own.
  */
-const QUEUE_LIMIT = 200;
+const QUEUE_PAGE = 200;
+
+/**
+ * The most pages one queue read walks.
+ *
+ * TUNE: 100 pages of 200 = 20,000 rows, the engine's own scan ceiling (crdb `MAX_QUEUE_SCAN`). The
+ * engine refuses a larger queue before this is reached; the bound only stops a cursor that never
+ * ends (an engine defect) from holding a request open. Reaching it is a refusal, never a short queue.
+ */
+const QUEUE_MAX_PAGES = 100;
 
 let nextRequestId = 1n;
 export function requestId(): number {
@@ -123,20 +130,43 @@ export async function resolveIncidentQueue(
   principal: OperatorPrincipal,
   opts?: EngineCallOptions,
 ): Promise<readonly SocIncidentRow[]> {
-  const request: WireSocIncidentListQuery = { request_id: requestId(), limit: QUEUE_LIMIT };
-  const list = await engine.socIncidentList(principal, request, opts);
-  const queue = toIncidentQueue(list);
-  if (queue === null) {
-    // Both causes land here on purpose: the engine refused the queue (over its ceiling), or a row
-    // carries a tag the Console cannot narrow. Either way the honest answer is "this queue cannot
-    // be shown", never a shorter queue that reads as the whole one.
-    throw new SocUnavailableError(
-      list.refused
-        ? `the engine refused the queue (${list.explanation ?? 'no reason given'})`
-        : 'an incident row carries an unknown engine tag',
-    );
+  // crdb B.5 (INV-RF-9): follow the engine's cursor to the end of the queue. The pages are already in
+  // the engine's order and the cursor resumes strictly after the last row, so concatenation IS the
+  // ranked queue. A row whose rank moves behind the cursor mid-walk would appear twice; the id set
+  // keeps the first (higher-ranked) sighting.
+  const rows: SocIncidentRow[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  for (let pages = 0; pages < QUEUE_MAX_PAGES; pages += 1) {
+    const request: WireSocIncidentListQuery = {
+      request_id: requestId(),
+      limit: QUEUE_PAGE,
+      ...(cursor === null ? {} : { cursor }),
+    };
+    const list = await engine.socIncidentList(principal, request, opts);
+    const page = toIncidentPage(list);
+    if (page === null) {
+      // Both causes land here on purpose: the engine refused (over its ceiling, or the cursor), or
+      // a row carries a tag the Console cannot narrow. Either way the honest answer is "this queue
+      // cannot be shown", never a shorter queue that reads as the whole one.
+      throw new SocUnavailableError(
+        list.refused
+          ? `the engine refused the queue (${list.explanation ?? 'no reason given'})`
+          : 'an incident row carries an unknown engine tag',
+      );
+    }
+    for (const row of page.rows) {
+      if (!seen.has(row.incidentId)) {
+        seen.add(row.incidentId);
+        rows.push(row);
+      }
+    }
+    if (page.nextCursor === null) {
+      return rows;
+    }
+    cursor = page.nextCursor;
   }
-  return queue;
+  throw new SocUnavailableError(`the queue did not end within ${QUEUE_MAX_PAGES} pages`);
 }
 
 /**
