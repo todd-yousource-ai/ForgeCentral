@@ -19,6 +19,7 @@ import {
   isWaitingOnAHuman,
   MAX_NOTE_CHARS,
   toIncidentDetail,
+  toIncidentPage,
   toIncidentQueue,
   toIncidentRow,
   toPlanEffect,
@@ -588,6 +589,62 @@ describe('toSocKpis coverage (crdb B.8a, INV-DET-COVERAGE-VISIBLE)', () => {
   it('reads an absent coverage as null, never as zeroes', () => {
     expect(toSocKpis(summary, [])?.coverage).toBeNull();
     expect(toSocCoverage(undefined)).toBeNull();
+  });
+});
+
+describe('the queue page and the honest tiles (crdb B.5, A.2, A.6; EVOLVE B.6)', () => {
+  const summary: WireDetectSummary = {
+    enabled: true,
+    techniques_lit: 0,
+    muted_total: 0,
+    active_alerts: 0,
+    summary_refused: false,
+    techniques: [],
+    observed_components: [],
+    observed_in_window: 0,
+    events_analyzed: 10,
+    auto_contained: 0,
+  };
+
+  it('projects a page with its total and cursor, and a pre-paging reply as its own length', () => {
+    const paged: WireSocIncidentList = {
+      rows: [wireRow()],
+      refused: false,
+      total: 250,
+      next_cursor: 'q1.c',
+    };
+    const legacy: WireSocIncidentList = { rows: [wireRow()], refused: false };
+
+    expect(toIncidentPage(paged)).toMatchObject({ total: 250, nextCursor: 'q1.c' });
+    expect(toIncidentPage(legacy)).toMatchObject({ total: 1, nextCursor: null });
+    expect(toIncidentPage({ rows: [], refused: true })).toBeNull();
+  });
+
+  it('carries the A.2 partition and the A.6 refusal count, null from an older node', () => {
+    const current = toSocKpis(
+      {
+        ...summary,
+        sustained_total: 40,
+        window_hours: 24,
+        count_unit: 'RuleEvaluations',
+        active_alerts_refused_tenants: 2,
+      },
+      [],
+    );
+    const older = toSocKpis(summary, []);
+
+    expect(current).toMatchObject({
+      sustained: 40,
+      windowHours: 24,
+      countUnit: 'rule_evaluations',
+      materialRefusedTenants: 2,
+    });
+    expect(older).toMatchObject({
+      sustained: null,
+      windowHours: null,
+      countUnit: null,
+      materialRefusedTenants: null,
+    });
   });
 });
 

@@ -273,7 +273,9 @@ export interface WireDetectCoverage {
 
 export interface WireDetectSummary {
   active_alerts: number;
+  active_alerts_refused_tenants?: number;
   auto_contained: number;
+  count_unit?: WireFunnelCountUnit;
   coverage?: WireDetectCoverage;
   enabled: boolean;
   events_analyzed: number;
@@ -281,8 +283,10 @@ export interface WireDetectSummary {
   observed_components: Array<WireObservedComponent>;
   observed_in_window: number;
   summary_refused: boolean;
+  sustained_total?: number;
   techniques: Array<WireTechniqueSummary>;
   techniques_lit: number;
+  window_hours?: number;
 }
 
 export interface WireDetectSummaryQuery {
@@ -327,6 +331,8 @@ export interface WireError {
 }
 
 export type WireErrorClass = 'Unauthenticated' | 'Denied' | 'VersionUnsupported' | 'Conflict' | 'IdempotencyConflict' | 'AsOfUnavailable' | 'StorageUnavailable' | 'AuditFailure' | 'IntegrityFailure' | 'LimitExceeded' | 'Framing' | 'Internal';
+
+export type WireFunnelCountUnit = 'RuleEvaluations';
 
 export interface WireGroupList {
   groups: Array<WireGroupRecord>;
@@ -1331,11 +1337,14 @@ export interface WireSocIncidentDetailQuery {
 
 export interface WireSocIncidentList {
   explanation?: string;
+  next_cursor?: string;
   refused: boolean;
   rows: Array<WireIncidentRow>;
+  total?: number;
 }
 
 export interface WireSocIncidentListQuery {
+  cursor?: string;
   limit: number;
   operator?: OperatorDelegation;
   request_id: number;
@@ -1565,6 +1574,7 @@ export interface WireTechniqueSummary {
   active_candidate: number;
   active_escalate: number;
   anchor: string;
+  dropped?: number;
   fires: number;
   last_fired_secs: number;
   muted_below_bar: number;
@@ -1572,6 +1582,7 @@ export interface WireTechniqueSummary {
   muted_fp_feedback: number;
   muted_ratified: number;
   raised: number;
+  sustained?: number;
 }
 
 export interface WireTelemetryReport {

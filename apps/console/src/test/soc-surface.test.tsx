@@ -30,6 +30,10 @@ const KPIS: SocKpis = {
   noiseCollapsed: 97,
   totalFirings: 100,
   materialIncidents: 3,
+  sustained: null,
+  windowHours: null,
+  countUnit: null,
+  materialRefusedTenants: null,
   autoContained: 0,
   decisionWaiting: 2,
   detectionEnabled: true,
@@ -101,6 +105,31 @@ describe('the SOC Ops shell (S3.3)', () => {
     const tile = await screen.findByLabelText('Noise Collapsed');
     expect(tile).toHaveTextContent('no firings in the window');
     expect(tile).not.toHaveTextContent('%');
+  });
+
+  it('names the unit, the window and the sustained share of what noise collapsed (crdb A.2)', async () => {
+    // B.6 (INV-RF-11): a firing count is rule evaluations over a window, and sustained firings are
+    // neither muted nor alerts -- the share says so rather than reading as a share of events.
+    mockKpis({ ...KPIS, sustained: 2, windowHours: 24, countUnit: 'rule_evaluations' });
+
+    renderWithProviders(<SocOpsSurface />);
+
+    const tile = await screen.findByLabelText('Noise Collapsed');
+    expect(tile).toHaveTextContent(
+      '97% of 100 rule evaluations in 24h; 2 sustained open incidents',
+    );
+  });
+
+  it('reads a refused tenant read as a floor, never as the total (crdb A.6)', async () => {
+    // B.6 (INV-RF-11, D07-06): a refused read makes the count a floor; a bare number -- or a 0 --
+    // would be a calmer queue than the one that exists.
+    mockKpis({ ...KPIS, materialIncidents: 0, materialRefusedTenants: 1 });
+
+    renderWithProviders(<SocOpsSurface />);
+
+    const tile = await screen.findByLabelText('Material Incidents');
+    expect(tile).toHaveTextContent('at least 0');
+    expect(tile).toHaveTextContent('1 tenant read(s) refused');
   });
 
   it('shows an error state rather than empty tiles when the read fails', async () => {

@@ -1082,8 +1082,14 @@
         "active_alerts": {
           "type": "integer"
         },
+        "active_alerts_refused_tenants": {
+          "type": "integer"
+        },
         "auto_contained": {
           "type": "integer"
+        },
+        "count_unit": {
+          "$ref": "#/$defs/WireFunnelCountUnit"
         },
         "coverage": {
           "$ref": "#/$defs/WireDetectCoverage"
@@ -1109,6 +1115,9 @@
         "summary_refused": {
           "type": "boolean"
         },
+        "sustained_total": {
+          "type": "integer"
+        },
         "techniques": {
           "items": {
             "$ref": "#/$defs/WireTechniqueSummary"
@@ -1116,6 +1125,9 @@
           "type": "array"
         },
         "techniques_lit": {
+          "type": "integer"
+        },
+        "window_hours": {
           "type": "integer"
         }
       },
@@ -1307,6 +1319,11 @@
         "LimitExceeded",
         "Framing",
         "Internal"
+      ]
+    },
+    "WireFunnelCountUnit": {
+      "enum": [
+        "RuleEvaluations"
       ]
     },
     "WireGroupList": {
@@ -6872,6 +6889,9 @@
         "explanation": {
           "type": "string"
         },
+        "next_cursor": {
+          "type": "string"
+        },
         "refused": {
           "type": "boolean"
         },
@@ -6880,6 +6900,9 @@
             "$ref": "#/$defs/WireIncidentRow"
           },
           "type": "array"
+        },
+        "total": {
+          "type": "integer"
         }
       },
       "required": [
@@ -6891,6 +6914,9 @@
     "WireSocIncidentListQuery": {
       "additionalProperties": false,
       "properties": {
+        "cursor": {
+          "type": "string"
+        },
         "limit": {
           "type": "integer"
         },
@@ -7749,6 +7775,9 @@
         "anchor": {
           "type": "string"
         },
+        "dropped": {
+          "type": "integer"
+        },
         "fires": {
           "type": "integer"
         },
@@ -7768,6 +7797,9 @@
           "type": "integer"
         },
         "raised": {
+          "type": "integer"
+        },
+        "sustained": {
           "type": "integer"
         }
       },

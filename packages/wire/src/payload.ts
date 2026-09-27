@@ -537,7 +537,8 @@ function detectSummaryToCbor(request: WireDetectSummaryQuery): unknown {
 
 /**
  * `SOC_INCIDENT_LIST` (crdb SS.4b): the ranked decision queue. Rust struct order: request_id, limit,
- * operator?.
+ * operator?, cursor?. The cursor (crdb B.5) is emitted ONLY when present, so a first-page request is
+ * byte-identical to the pre-paging form.
  */
 function socIncidentListToCbor(request: WireSocIncidentListQuery): unknown {
   const out: Record<string, unknown> = {
@@ -545,6 +546,9 @@ function socIncidentListToCbor(request: WireSocIncidentListQuery): unknown {
     limit: request.limit,
   };
   applyOperator(out, request.operator);
+  if (request.cursor != null) {
+    out['cursor'] = request.cursor;
+  }
   return out;
 }
 
