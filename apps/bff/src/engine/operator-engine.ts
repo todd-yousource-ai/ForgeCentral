@@ -117,6 +117,10 @@ import type {
   WireSettingsQuery,
   WireSettingsReports,
   WireSettingsReportsQuery,
+  WireModelAccess,
+  WireModelAccessQuery,
+  WireAgentGrantReceipt,
+  WireAgentGrantSet,
   WireSettingsProposed,
   WireSettingsApprovals,
   WireSettingsApprovalsQuery,
@@ -152,6 +156,8 @@ export type EngineAction =
   | 'socSettingsRead'
   | 'settingsRead'
   | 'settingsReports'
+  | 'modelAccessRead'
+  | 'agentGrantSet'
   | 'settingsPropose'
   | 'settingsApprovals'
   | 'settingsApprove'
@@ -404,6 +410,21 @@ export interface OperatorEngine {
     request: WireSettingsReportsQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSettingsReports>;
+  /**
+   * Read the model-access page (MODEL_ACCESS_READ, crdb GW.10a) on behalf of `principal`, under the
+   * Settings delegation (the engine gates it like SETTINGS_REPORTS).
+   */
+  modelAccessRead(
+    principal: OperatorPrincipal,
+    request: WireModelAccessQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireModelAccess>;
+  /** Replace one agent's models and tools (AGENT_GRANT_SET, crdb GW.10a) as `principal`. */
+  agentGrantSet(
+    principal: OperatorPrincipal,
+    request: WireAgentGrantSet,
+    opts?: EngineCallOptions,
+  ): Promise<WireAgentGrantReceipt>;
   /** Read the committed SOC settings (SOC_SETTINGS_READ, crdb C.9c) on behalf of `principal`. */
   socSettingsRead(
     principal: OperatorPrincipal,
@@ -835,6 +856,16 @@ export function createOperatorEngine(
       delegation.record(delegationFor(principal, 'settingsReports', request.request_id));
       const operator = settingsDelegation(principal);
       return client.settingsReports({ ...request, operator }, opts);
+    },
+    modelAccessRead: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'modelAccessRead', request.request_id));
+      const operator = settingsDelegation(principal);
+      return client.modelAccessRead({ ...request, operator }, opts);
+    },
+    agentGrantSet: (principal, request, opts) => {
+      delegation.record(delegationFor(principal, 'agentGrantSet', request.request_id));
+      const operator = settingsDelegation(principal);
+      return client.agentGrantSet({ ...request, operator }, opts);
     },
     settingsCommit: (principal, request, opts) => {
       delegation.record(delegationFor(principal, 'settingsCommit', request.request_id));

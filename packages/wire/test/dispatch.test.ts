@@ -126,6 +126,18 @@ describe('dispatch', () => {
     { SocUeba: { request_id: 1, incident: 'i1' } },
     { SocWeekly: { request_id: 1, weeks: 4 } },
     { SocSettingsRead: { request_id: 1 } },
+    // GW.10a: the model-access page read and the agent grant set.
+    { ModelAccessRead: { request_id: 1, from_unix_ms: 0, to_unix_ms: 1 } },
+    {
+      AgentGrantSet: {
+        request_id: 1,
+        agent: 'claude-code',
+        models: [],
+        tools: [],
+        expected_models: [],
+        expected_tools: [],
+      },
+    },
     { SettingsRead: { request_id: 1, surface: 'maintenance' } },
     {
       SettingsCommit: { request_id: 1, edits: [{ key: 'maintenance.cadence_secs', value: '120' }] },

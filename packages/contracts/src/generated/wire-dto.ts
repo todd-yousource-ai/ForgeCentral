@@ -41,6 +41,33 @@ export interface WireAdminAssignment {
   roles: Array<string>;
 }
 
+export interface WireAgentGrant {
+  agent: string;
+  class: string;
+  models: Array<string>;
+  read_scopes: Array<string>;
+  tools: Array<string>;
+  workspaces: Array<string>;
+}
+
+export interface WireAgentGrantReceipt {
+  conflict: boolean;
+  current?: WireAgentGrant;
+  explanation?: string;
+  grant?: WireAgentGrant;
+  refused: boolean;
+}
+
+export interface WireAgentGrantSet {
+  agent: string;
+  expected_models: Array<string>;
+  expected_tools: Array<string>;
+  models: Array<string>;
+  operator?: OperatorDelegation;
+  request_id: number;
+  tools: Array<string>;
+}
+
 export interface WireAgentList {
   agents: Array<WireAgentRecord>;
 }
@@ -606,6 +633,53 @@ export interface WireMemberList {
   members: Array<WireConnectivityMember>;
 }
 
+export interface WireModelAccess {
+  admin_plane: boolean;
+  catalog_configured: boolean;
+  catalog_version: number;
+  explanation?: string;
+  grants: Array<WireAgentGrant>;
+  grants_truncated: boolean;
+  models: Array<WireModelView>;
+  refused: boolean;
+  roles: Array<WireModelRole>;
+  spend: Array<WireSpendRow>;
+  spend_truncated: boolean;
+}
+
+export interface WireModelAccessQuery {
+  from_unix_ms: number;
+  operator?: OperatorDelegation;
+  request_id: number;
+  to_unix_ms: number;
+}
+
+export interface WireModelRole {
+  model: string;
+  role: string;
+  version: string;
+}
+
+export interface WireModelView {
+  ceiling: string;
+  context_window: number;
+  destination: string;
+  id: string;
+  lifecycle: string;
+  max_output_tokens: number;
+  pin: string;
+  price_cache_read: number;
+  price_cache_write: number;
+  price_output: number;
+  price_uncached_input: number;
+  region: string;
+  retention_days: number;
+  surface: string;
+  vendor_model: string;
+  version: string;
+  zdr_eligible: boolean;
+}
+
 export interface WireNamedDest {
   address: string;
   count: number;
@@ -957,6 +1031,8 @@ export type WireReply =
   | { SocSettings: WireSocSettings; }
   | { Settings: WireSettings; }
   | { SettingsReports: WireSettingsReports; }
+  | { ModelAccess: WireModelAccess; }
+  | { AgentGrantReceipt: WireAgentGrantReceipt; }
   | { SettingsCommitted: WireSettingsCommitted; }
   | { SettingsProposed: WireSettingsProposed; }
   | { SettingsApprovals: WireSettingsApprovals; }
@@ -1035,6 +1111,8 @@ export type WireRequest =
   | { SocSettingsRead: WireSocSettingsQuery; }
   | { SettingsRead: WireSettingsQuery; }
   | { SettingsReports: WireSettingsReportsQuery; }
+  | { ModelAccessRead: WireModelAccessQuery; }
+  | { AgentGrantSet: WireAgentGrantSet; }
   | { SettingsCommit: WireSettingsCommit; }
   | { SettingsPropose: WireSettingsCommit; }
   | { SettingsApprovals: WireSettingsApprovalsQuery; }
@@ -1543,6 +1621,19 @@ export interface WireSourceVtzEdge {
   source_class: string;
   vtz_id: string;
   weight: number;
+}
+
+export interface WireSpendRow {
+  cache_read: number;
+  cache_write: number;
+  calls: number;
+  cost_micro_usd: number;
+  model: string;
+  output: number;
+  principal: string;
+  reasoning: number;
+  session: string;
+  uncached_input: number;
 }
 
 export interface WireSsoGroupRoles {

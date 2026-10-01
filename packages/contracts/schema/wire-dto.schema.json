@@ -132,6 +132,122 @@
       ],
       "type": "object"
     },
+    "WireAgentGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "class": {
+          "type": "string"
+        },
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "read_scopes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tools": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "workspaces": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "agent",
+        "models",
+        "tools",
+        "read_scopes",
+        "workspaces",
+        "class"
+      ],
+      "type": "object"
+    },
+    "WireAgentGrantReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "conflict": {
+          "type": "boolean"
+        },
+        "current": {
+          "$ref": "#/$defs/WireAgentGrant"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "grant": {
+          "$ref": "#/$defs/WireAgentGrant"
+        },
+        "refused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "conflict",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireAgentGrantSet": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "expected_models": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "expected_tools": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "tools": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "request_id",
+        "agent",
+        "models",
+        "tools",
+        "expected_models",
+        "expected_tools"
+      ],
+      "type": "object"
+    },
     "WireAgentList": {
       "additionalProperties": false,
       "properties": {
@@ -2490,6 +2606,188 @@
       ],
       "type": "object"
     },
+    "WireModelAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "admin_plane": {
+          "type": "boolean"
+        },
+        "catalog_configured": {
+          "type": "boolean"
+        },
+        "catalog_version": {
+          "type": "integer"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "grants": {
+          "items": {
+            "$ref": "#/$defs/WireAgentGrant"
+          },
+          "type": "array"
+        },
+        "grants_truncated": {
+          "type": "boolean"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/$defs/WireModelView"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "type": "boolean"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/WireModelRole"
+          },
+          "type": "array"
+        },
+        "spend": {
+          "items": {
+            "$ref": "#/$defs/WireSpendRow"
+          },
+          "type": "array"
+        },
+        "spend_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "admin_plane",
+        "catalog_configured",
+        "catalog_version",
+        "models",
+        "roles",
+        "grants",
+        "grants_truncated",
+        "spend",
+        "spend_truncated",
+        "refused"
+      ],
+      "type": "object"
+    },
+    "WireModelAccessQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "from_unix_ms": {
+          "type": "integer"
+        },
+        "operator": {
+          "$ref": "#/$defs/OperatorDelegation"
+        },
+        "request_id": {
+          "type": "integer"
+        },
+        "to_unix_ms": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "from_unix_ms",
+        "to_unix_ms"
+      ],
+      "type": "object"
+    },
+    "WireModelRole": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "model",
+        "version"
+      ],
+      "type": "object"
+    },
+    "WireModelView": {
+      "additionalProperties": false,
+      "properties": {
+        "ceiling": {
+          "type": "string"
+        },
+        "context_window": {
+          "type": "integer"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "max_output_tokens": {
+          "type": "integer"
+        },
+        "pin": {
+          "type": "string"
+        },
+        "price_cache_read": {
+          "type": "integer"
+        },
+        "price_cache_write": {
+          "type": "integer"
+        },
+        "price_output": {
+          "type": "integer"
+        },
+        "price_uncached_input": {
+          "type": "integer"
+        },
+        "region": {
+          "type": "string"
+        },
+        "retention_days": {
+          "type": "integer"
+        },
+        "surface": {
+          "type": "string"
+        },
+        "vendor_model": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "zdr_eligible": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "vendor_model",
+        "destination",
+        "surface",
+        "pin",
+        "lifecycle",
+        "ceiling",
+        "region",
+        "context_window",
+        "max_output_tokens",
+        "price_uncached_input",
+        "price_cache_read",
+        "price_cache_write",
+        "price_output",
+        "zdr_eligible",
+        "retention_days"
+      ],
+      "type": "object"
+    },
     "WireNamedDest": {
       "additionalProperties": false,
       "properties": {
@@ -4629,6 +4927,30 @@
         {
           "additionalProperties": false,
           "properties": {
+            "ModelAccess": {
+              "$ref": "#/$defs/WireModelAccess"
+            }
+          },
+          "required": [
+            "ModelAccess"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "AgentGrantReceipt": {
+              "$ref": "#/$defs/WireAgentGrantReceipt"
+            }
+          },
+          "required": [
+            "AgentGrantReceipt"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "SettingsCommitted": {
               "$ref": "#/$defs/WireSettingsCommitted"
             }
@@ -5645,6 +5967,30 @@
           },
           "required": [
             "SettingsReports"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ModelAccessRead": {
+              "$ref": "#/$defs/WireModelAccessQuery"
+            }
+          },
+          "required": [
+            "ModelAccessRead"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "AgentGrantSet": {
+              "$ref": "#/$defs/WireAgentGrantSet"
+            }
+          },
+          "required": [
+            "AgentGrantSet"
           ],
           "type": "object"
         },
@@ -7651,6 +7997,54 @@
         "source_class",
         "vtz_id",
         "weight"
+      ],
+      "type": "object"
+    },
+    "WireSpendRow": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_read": {
+          "type": "integer"
+        },
+        "cache_write": {
+          "type": "integer"
+        },
+        "calls": {
+          "type": "integer"
+        },
+        "cost_micro_usd": {
+          "type": "integer"
+        },
+        "model": {
+          "type": "string"
+        },
+        "output": {
+          "type": "integer"
+        },
+        "principal": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "integer"
+        },
+        "session": {
+          "type": "string"
+        },
+        "uncached_input": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "principal",
+        "session",
+        "model",
+        "calls",
+        "uncached_input",
+        "cache_read",
+        "cache_write",
+        "reasoning",
+        "output",
+        "cost_micro_usd"
       ],
       "type": "object"
     },

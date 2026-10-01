@@ -129,6 +129,37 @@ export const SETTINGS_PATHS: Record<string, Record<string, Operation>> = {
   },
 };
 
+const ROLE_403 = {
+  description: 'Refused before any engine call: the operator is not a global admin.',
+};
+
+/**
+ * The Model access routes (IP-FRONTIER-GATEWAY GW.10 over crdb GW.10a), each over a real engine
+ * operation. Exported so a test proves the server and this document never drift apart.
+ */
+export const MODEL_ACCESS_PATHS: Record<string, Record<string, Operation>> = {
+  '/api/model-access': {
+    get: op(
+      'The frontier catalog, the agent grants and spend over the last N days (MODEL_ACCESS_READ)',
+      'ModelAccessView.',
+      { '400': BAD_400, '403': ROLE_403 },
+    ),
+  },
+  '/api/model-access/grant': {
+    put: op(
+      "Replace one agent's models and tools (AGENT_GRANT_SET, node-side read-modify-write)",
+      'AgentGrantOutcome (applied).',
+      {
+        '400': BAD_400,
+        '403': ROLE_403,
+        '409': {
+          description: 'The grant changed since it was read: AgentGrantOutcome (conflict).',
+        },
+      },
+    ),
+  },
+};
+
 /** The BFF OpenAPI 3.1 document (operational surface; engine-brokered paths added per binding). */
 export function openApiDocument(): Record<string, unknown> {
   return {
@@ -195,6 +226,7 @@ export function openApiDocument(): Record<string, unknown> {
         },
       },
       ...SETTINGS_PATHS,
+      ...MODEL_ACCESS_PATHS,
       '/auth/me': {
         get: {
           summary: 'The current operator identity',

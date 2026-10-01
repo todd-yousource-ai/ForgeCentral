@@ -455,7 +455,7 @@ describe('IP-CONSOLE-11: the Settings (settings.*, soc.settings.*) bindings', ()
     (b) => b.id.startsWith('settings.') || b.id.startsWith('soc.settings.'),
   );
 
-  it('registers the governed reads, the two Console-owned reads, and the five commits', () => {
+  it('registers the governed reads, the two Console-owned reads, and the six commits', () => {
     const ids = settingsBindings.map((b) => b.id).sort();
     expect(ids).toEqual([
       'settings.approvals',
@@ -463,6 +463,9 @@ describe('IP-CONSOLE-11: the Settings (settings.*, soc.settings.*) bindings', ()
       'settings.commit',
       'settings.consoleRbac',
       'settings.history',
+      // GW.10 (crdb GW.10a): the Model access tab's read and its grant change.
+      'settings.modelAccess',
+      'settings.modelAccessGrant',
       'settings.propose',
       'settings.read',
       'settings.reports',
@@ -477,11 +480,12 @@ describe('IP-CONSOLE-11: the Settings (settings.*, soc.settings.*) bindings', ()
     expect(settingsBindings.every((b) => b.status.kind === 'live')).toBe(true);
   });
 
-  it('exposes commit / propose / approve / rollback and the SOC commit as audited commands', () => {
+  it('exposes commit / propose / approve / rollback, the grant change and the SOC commit as audited commands', () => {
     const commands = settingsBindings.filter((b) => b.kind === 'command');
     expect(commands.map((b) => b.id).sort()).toEqual([
       'settings.approve',
       'settings.commit',
+      'settings.modelAccessGrant',
       'settings.propose',
       'settings.rollback',
       'soc.settings.commit',

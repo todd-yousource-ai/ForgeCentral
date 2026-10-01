@@ -27,6 +27,7 @@ export const SETTINGS_TAB_HELP: Readonly<Record<SettingsTabId, string>> = {
   rbac: 'posture-rbac',
   federation: 'idp-how',
   changes: 'setc-approve',
+  'model-access': 'posture-model-access',
   security: 'posture-security',
   keylock: 'posture-keylock',
   observability: 'posture-observability',

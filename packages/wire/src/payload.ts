@@ -40,6 +40,8 @@ import type {
   WireSocSettingsQuery,
   WireSettingsQuery,
   WireSettingsReportsQuery,
+  WireModelAccessQuery,
+  WireAgentGrantSet,
   WireSettingsApprovalsQuery,
   WireSettingsApprove,
   WireSettingsHistoryQuery,
@@ -725,6 +727,37 @@ function settingsReportsToCbor(request: WireSettingsReportsQuery): unknown {
   return out;
 }
 
+/**
+ * `MODEL_ACCESS_READ` (crdb GW.10a). Rust struct order: request_id, from_unix_ms, to_unix_ms,
+ * operator?.
+ */
+function modelAccessReadToCbor(request: WireModelAccessQuery): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    from_unix_ms: request.from_unix_ms,
+    to_unix_ms: request.to_unix_ms,
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
+/**
+ * `AGENT_GRANT_SET` (crdb GW.10a). Rust struct order: request_id, agent, models, tools,
+ * expected_models, expected_tools, operator?.
+ */
+function agentGrantSetToCbor(request: WireAgentGrantSet): unknown {
+  const out: Record<string, unknown> = {
+    request_id: request.request_id,
+    agent: request.agent,
+    models: [...request.models],
+    tools: [...request.tools],
+    expected_models: [...request.expected_models],
+    expected_tools: [...request.expected_tools],
+  };
+  applyOperator(out, request.operator);
+  return out;
+}
+
 /** `SETTINGS_APPROVALS` (crdb SET.3). Rust struct order: request_id, operator?. */
 function settingsApprovalsToCbor(request: WireSettingsApprovalsQuery): unknown {
   const out: Record<string, unknown> = { request_id: request.request_id };
@@ -1116,6 +1149,12 @@ export function encodeWireRequest(request: WireRequest): Uint8Array {
   }
   if ('SettingsReports' in request) {
     return encode({ SettingsReports: settingsReportsToCbor(request.SettingsReports) });
+  }
+  if ('ModelAccessRead' in request) {
+    return encode({ ModelAccessRead: modelAccessReadToCbor(request.ModelAccessRead) });
+  }
+  if ('AgentGrantSet' in request) {
+    return encode({ AgentGrantSet: agentGrantSetToCbor(request.AgentGrantSet) });
   }
   if ('SocSettingsRead' in request) {
     return encode({ SocSettingsRead: socSettingsReadToCbor(request.SocSettingsRead) });

@@ -18,6 +18,7 @@ export * from './objects.js';
 export * from './policies.js';
 export * from './soc.js';
 export * from './settings.js';
+export * from './model-access.js';
 export * from './forge.js';
 export * from './openapi.js';
 export * from './schema.js';
