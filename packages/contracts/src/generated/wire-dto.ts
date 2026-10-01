@@ -355,9 +355,10 @@ export interface WireError {
   code: number;
   correlation_id: number;
   retry: RetryClass;
+  retry_after_ms?: number;
 }
 
-export type WireErrorClass = 'Unauthenticated' | 'Denied' | 'VersionUnsupported' | 'Conflict' | 'IdempotencyConflict' | 'AsOfUnavailable' | 'StorageUnavailable' | 'AuditFailure' | 'IntegrityFailure' | 'LimitExceeded' | 'Framing' | 'Internal';
+export type WireErrorClass = 'Unauthenticated' | 'Denied' | 'VersionUnsupported' | 'Conflict' | 'IdempotencyConflict' | 'AsOfUnavailable' | 'StorageUnavailable' | 'AuditFailure' | 'IntegrityFailure' | 'LimitExceeded' | 'Framing' | 'Internal' | 'Overloaded';
 
 export type WireFunnelCountUnit = 'RuleEvaluations';
 
