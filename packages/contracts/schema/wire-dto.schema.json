@@ -1411,6 +1411,9 @@
         },
         "retry": {
           "$ref": "#/$defs/RetryClass"
+        },
+        "retry_after_ms": {
+          "type": "integer"
         }
       },
       "required": [
@@ -1434,7 +1437,8 @@
         "IntegrityFailure",
         "LimitExceeded",
         "Framing",
-        "Internal"
+        "Internal",
+        "Overloaded"
       ]
     },
     "WireFunnelCountUnit": {
