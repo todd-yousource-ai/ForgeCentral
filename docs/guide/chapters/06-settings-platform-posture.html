@@ -1,6 +1,6 @@
 <h1>Settings: Access and Platform Posture</h1>
 
-<p class="lead">Six Settings tabs report how the platform is secured and run: <b class="ui">RBAC</b>, <b class="ui">Security</b>, <b class="ui">KeyLock</b>, <b class="ui">Observability</b>, <b class="ui">HA &amp; Topology</b> and <b class="ui">FIPS Mode</b>. They are read-only. Each value is the Forge engine's own report or its configuration, labelled with its source, and each tab says where a value is changed.</p>
+<p class="lead">Six Settings tabs report how the platform is secured and run: <b class="ui">RBAC</b>, <b class="ui">Security</b>, <b class="ui">KeyLock</b>, <b class="ui">Observability</b>, <b class="ui">HA &amp; Topology</b> and <b class="ui">FIPS Mode</b>. They are read-only. Each value is the Forge engine's own report or its configuration, labelled with its source, and each tab says where a value is changed. A seventh tab, <b class="ui">Model access</b>, shows which hosted AI models the platform routes and lets a global administrator grant them to agents.</p>
 
 <h2 id="posture-availability">Availability</h2>
 <div class="tablewrap" id="tab-posture-availability" data-title="Access and platform posture: availability">
@@ -13,6 +13,8 @@
 <tr><td>Telemetry exporter configuration</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Set at boot; not shown.</td></tr>
 <tr><td>Cluster leader, lag, leadership rotation, quorum and failover tests</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>This release reports a single node.</td></tr>
 <tr><td>FIPS mode toggle</td><td><span class="pill na">NOT YET AVAILABLE</span></td><td>Not possible by design: FIPS mode is chosen when the engine is built.</td></tr>
+<tr><td>Model access: hosted models, agent grants, spend</td><td><span class="pill ok">AVAILABLE</span></td><td>Global administrators. Granting a model or the engine tools to an agent is a change the engine audits.</td></tr>
+<tr><td>Adding a hosted model or changing its price</td><td><span class="pill ro">READ-ONLY</span></td><td>The frontier catalog is installed with the engine; the tab shows it.</td></tr>
 </table>
 </div>
 
@@ -78,6 +80,17 @@
 <h2 id="posture-fips" data-covers="settings.reports">FIPS Mode</h2>
 <p><b class="ui">Crypto build posture</b> shows the cryptographic provider and whether the FIPS-validated module is linked. FIPS mode is chosen when the engine is built; it cannot be switched on a running node, so the tab has no toggle.</p>
 
+<h2 id="posture-model-access" data-covers="settings.modelAccess settings.modelAccessGrant">Model access</h2>
+<p><span class="path">Settings<span class="sep">&gt;</span>Model access</span> is where you decide which hosted AI models each agent may use. Agents such as coding assistants reach the models through the Forge engine's agent door, never directly: the engine checks the agent's grant, the classification of what it sends and its daily budget on every call, and only then forwards the call to the provider. The tab has three parts:</p>
+<ul>
+  <li><b class="ui">Agent grants</b>: one row per agent and one checkbox per hosted model, plus <b class="ui">Engine tools</b>, which opens the Forge engine's governed graph and search tools to the agent. A checked box is a grant the engine holds.</li>
+  <li><b class="ui">Hosted models</b>: the frontier catalog the engine routes, with each model's provider, API, classification ceiling, whether the provider pins its version or rolls it, its prices per million tokens and the provider's retention. Below it, the AI SOC roles and the model each one uses.</li>
+  <li><b class="ui">Spend</b>: what each agent spent through the agent door, per day, over the last 7 or 30 days, and the other model spend (AI SOC runs, cognition connections).</li>
+</ul>
+<p>To grant a model to an agent, open <span class="path">Settings<span class="sep">&gt;</span>Model access</span> and select the checkbox where the agent's row meets the model's column. Clear the checkbox to revoke the grant. If the agent is not listed yet, type its source id under the matrix and choose <b class="ui">Add agent row</b> first.</p>
+<div class="note"><p>The engine makes each change itself: it reads the grant it holds, replaces only the models and tools, and keeps everything else on the grant. If another administrator changed the same agent's grant after you opened the page, nothing is saved; the tab says so and shows the grant as it is now, so you can make your change again.</p></div>
+<div class="note limit"><p>Only global administrators see this tab, because it names every agent's grant and spend. Spend is attributed to an agent only for calls made through the agent door; calls recorded before the engine began naming the agent on each call are not shown.</p></div>
+
 <h2 id="posture-change">Change a posture value</h2>
 <div class="tablewrap" id="tab-posture-where" data-title="Where each posture value is changed">
 <table class="data">
@@ -88,5 +101,7 @@
 <tr><td>Administration listener, mutual TLS, telemetry exporter</td><td>The engine's boot configuration on the engine host, then an engine restart.</td></tr>
 <tr><td>Key issuing</td><td>Not changeable in this release.</td></tr>
 <tr><td>FIPS mode</td><td>A FIPS build of the engine, installed in place of the current one.</td></tr>
+<tr><td>Which models and tools an agent may use</td><td><span class="path">Settings<span class="sep">&gt;</span>Model access</span>.</td></tr>
+<tr><td>Hosted models, prices, AI SOC roles</td><td>The frontier catalog installed with the engine.</td></tr>
 </table>
 </div>
