@@ -319,6 +319,27 @@ function recordingClient(overrides: Partial<CrucibleClient> = {}): {
       reads.push(req);
       return Promise.resolve({ admin_plane: true, refused: false });
     },
+    modelAccessRead: (req) => {
+      calls.push(`modelAccessRead:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({
+        admin_plane: true,
+        catalog_configured: false,
+        catalog_version: 0,
+        models: [],
+        roles: [],
+        grants: [],
+        grants_truncated: false,
+        spend: [],
+        spend_truncated: false,
+        refused: false,
+      });
+    },
+    agentGrantSet: (req) => {
+      calls.push(`agentGrantSet:${String(req.request_id)}`);
+      reads.push(req);
+      return Promise.resolve({ conflict: false, refused: false });
+    },
     settingsRead: (req) => {
       calls.push(`settingsRead:${String(req.request_id)}`);
       reads.push(req);

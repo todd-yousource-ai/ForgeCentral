@@ -13,7 +13,7 @@ import type { WireVtzTreeNode } from '@forge/contracts';
 import type { CrucibleClient } from '../src/engine/client.js';
 import type { OperatorEngine } from '../src/engine/operator-engine.js';
 import { EngineRefusedError } from '../src/engine/wire-client.js';
-import { SETTINGS_PATHS } from '../src/openapi.js';
+import { MODEL_ACCESS_PATHS, SETTINGS_PATHS } from '../src/openapi.js';
 import { createServer, type ServerDeps, type ServerLogger } from '../src/server.js';
 
 const config: BffConfig = {
@@ -80,6 +80,8 @@ function mockClient(ping: () => Promise<void>): CrucibleClient {
     settingsRead: unused,
     settingsCommit: unused,
     settingsReports: unused,
+    modelAccessRead: unused,
+    agentGrantSet: unused,
     settingsPropose: unused,
     settingsApprovals: unused,
     settingsApprove: unused,
@@ -174,6 +176,8 @@ function operatorEngineWith(soc: Partial<OperatorEngine> = {}): OperatorEngine {
     settingsRead: unused,
     settingsCommit: unused,
     settingsReports: unused,
+    modelAccessRead: unused,
+    agentGrantSet: unused,
     settingsPropose: unused,
     settingsApprovals: unused,
     settingsApprove: unused,
@@ -456,6 +460,10 @@ describe('BFF HTTP surface', () => {
     };
     const documented = Object.keys(doc.paths).filter((p) => p.startsWith('/api/settings'));
     expect(documented.sort()).toEqual(Object.keys(SETTINGS_PATHS).sort());
+    // GW.10: the Model access routes are documented and claimed the same way.
+    const modelAccess = Object.keys(doc.paths).filter((p) => p.startsWith('/api/model-access'));
+    expect(modelAccess.sort()).toEqual(Object.keys(MODEL_ACCESS_PATHS).sort());
+    documented.push(...modelAccess);
     for (const path of documented) {
       for (const method of Object.keys(doc.paths[path] ?? {})) {
         const concrete = path.replace('{proposal}', '3');
@@ -1487,6 +1495,143 @@ describe('BFF HTTP surface', () => {
     const ok = await fetch(`${global}/api/settings/console-rbac`);
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual({ groupRoles: [], localRbac: [], defaultTenant: null });
+  });
+
+  it('Model access (GW.10): both routes refuse a non-global-admin before any engine call', async () => {
+    const engineCalls: string[] = [];
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      modelAccessRead: () => {
+        engineCalls.push('read');
+        return Promise.reject(new Error('must not be reached'));
+      },
+      agentGrantSet: () => {
+        engineCalls.push('set');
+        return Promise.reject(new Error('must not be reached'));
+      },
+    };
+    const tenantAdmin = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(operatorSession), operatorEngine: engine },
+    );
+    const read = await fetch(`${tenantAdmin}/api/model-access`);
+    const write = await fetch(`${tenantAdmin}/api/model-access/grant`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        agent: 'codex',
+        models: ['m'],
+        tools: [],
+        expectedModels: [],
+        expectedTools: [],
+      }),
+    });
+    expect([read.status, write.status]).toEqual([403, 403]);
+    expect(await read.json()).toEqual({ error: 'refused', class: 'Role' });
+    expect(engineCalls).toEqual([]);
+    const anonymous = await start(
+      mockClient(() => Promise.resolve()),
+      { authRouter: authRouterWith(undefined), operatorEngine: engine },
+    );
+    expect((await fetch(`${anonymous}/api/model-access`)).status).toBe(401);
+  });
+
+  it('Model access (GW.10): a global admin reads the page and a stale toggle is a 409', async () => {
+    const sent: unknown[] = [];
+    let stored = ['gpt-6-luna'];
+    const engine: OperatorEngine = {
+      ...operatorEngineWith(),
+      modelAccessRead: (_principal, request) => {
+        sent.push(request);
+        return Promise.resolve({
+          admin_plane: true,
+          catalog_configured: true,
+          catalog_version: 1,
+          models: [],
+          roles: [],
+          grants: [
+            {
+              agent: 'codex',
+              models: stored,
+              tools: [],
+              read_scopes: [],
+              workspaces: [],
+              class: 'internal',
+            },
+          ],
+          grants_truncated: false,
+          spend: [],
+          spend_truncated: false,
+          refused: false,
+        });
+      },
+      agentGrantSet: (_principal, request) => {
+        sent.push(request);
+        // The engine's read-modify-write: a stale expectation is a conflict carrying what is stored.
+        const current = {
+          agent: 'codex',
+          tools: [],
+          read_scopes: [],
+          workspaces: [],
+          class: 'internal',
+        };
+        if (JSON.stringify(request.expected_models) !== JSON.stringify(stored)) {
+          return Promise.resolve({
+            conflict: true,
+            refused: false,
+            current: { ...current, models: stored },
+          });
+        }
+        stored = request.models;
+        return Promise.resolve({
+          conflict: false,
+          refused: false,
+          grant: { ...current, models: stored },
+        });
+      },
+    };
+    const base = await start(
+      mockClient(() => Promise.resolve()),
+      {
+        authRouter: authRouterWith({ ...operatorSession, role: 'global-admin' }),
+        operatorEngine: engine,
+      },
+    );
+    const put = (body: unknown) =>
+      fetch(`${base}/api/model-access/grant`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    expect((await fetch(`${base}/api/model-access?days=0`)).status).toBe(400);
+    expect((await fetch(`${base}/api/model-access?days=32`)).status).toBe(400);
+    const page = await fetch(`${base}/api/model-access?days=7`);
+    expect(page.status).toBe(200);
+    const asked = sent[0] as { from_unix_ms: number; to_unix_ms: number };
+    expect(asked.to_unix_ms - asked.from_unix_ms).toBeGreaterThan(6 * 86_400_000);
+    expect(((await page.json()) as { agents: { agent: string }[] }).agents[0]?.agent).toBe('codex');
+
+    expect((await put({ agent: 'codex' })).status).toBe(400);
+    const change = {
+      agent: 'codex',
+      models: ['claude-opus-5-5', 'gpt-6-luna'],
+      tools: [],
+      expectedModels: ['gpt-6-luna'],
+      expectedTools: [],
+    };
+    const applied = await put(change);
+    expect(applied.status).toBe(200);
+    expect(await applied.json()).toMatchObject({
+      kind: 'applied',
+      grant: { models: change.models },
+    });
+    const stale = await put(change);
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({
+      kind: 'conflict',
+      current: { models: change.models },
+    });
   });
 
   it('POST /api/vtz commits an authored zone through the audited path', async () => {

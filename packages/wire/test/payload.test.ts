@@ -530,6 +530,54 @@ describe('encodeWireRequest: the case acts (IP-CONSOLE-03 S3.11 over crdb C.1)',
     });
   });
 
+  it('MODEL_ACCESS_READ encodes in Rust struct order, the operator only when present (GW.10a)', () => {
+    const plain = asMap({
+      ModelAccessRead: { request_id: 9, from_unix_ms: 1_000, to_unix_ms: 2_000 },
+    });
+    const body = plain['ModelAccessRead'] as Record<string, unknown>;
+    // ciborium emits struct fields in declaration order, so key order IS the byte layout.
+    expect(Object.keys(body)).toEqual(['request_id', 'from_unix_ms', 'to_unix_ms']);
+    const delegated = asMap({
+      ModelAccessRead: {
+        request_id: 9,
+        from_unix_ms: 1_000,
+        to_unix_ms: 2_000,
+        operator: { principal: 'p-1', tenant: 't-1', settings_tier: 'SecurityAudit' },
+      },
+    });
+    expect(Object.keys(delegated['ModelAccessRead'] as object)).toEqual([
+      'request_id',
+      'from_unix_ms',
+      'to_unix_ms',
+      'operator',
+    ]);
+  });
+
+  it('AGENT_GRANT_SET encodes every list in Rust struct order, empty lists kept (GW.10a)', () => {
+    const map = asMap({
+      AgentGrantSet: {
+        request_id: 10,
+        agent: 'claude-code',
+        models: ['claude-opus-5-5'],
+        tools: [],
+        expected_models: [],
+        expected_tools: [],
+      },
+    });
+    const body = map['AgentGrantSet'] as Record<string, unknown>;
+    // The engine's serde requires every list (no `default`): an empty one is sent, never omitted.
+    expect(Object.keys(body)).toEqual([
+      'request_id',
+      'agent',
+      'models',
+      'tools',
+      'expected_models',
+      'expected_tools',
+    ]);
+    expect(body['models']).toEqual(['claude-opus-5-5']);
+    expect(body['expected_tools']).toEqual([]);
+  });
+
   it('the notes READ encodes over the real CBOR path', () => {
     expect(asMap({ SocNotes: { request_id: 7, incident: 'ep-soc-1' } })).toEqual({
       SocNotes: { request_id: 7, incident: 'ep-soc-1' },

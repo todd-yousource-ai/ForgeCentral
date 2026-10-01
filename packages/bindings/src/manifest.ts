@@ -1034,6 +1034,16 @@ const settingsReads: readonly ReadBinding[] = [
     status: { kind: 'live' },
   },
   {
+    // The Model access page (IP-FRONTIER-GATEWAY GW.10): the frontier catalog, the tenant's agent
+    // grants and its spend in a window, one round trip (crdb MODEL_ACCESS_READ, GW.10a).
+    id: bindingId('settings.modelAccess'),
+    kind: 'read',
+    surface: 'cruciblql',
+    op: 'model_access_read_v1',
+    viewModel: 'ModelAccessView',
+    status: { kind: 'live' },
+  },
+  {
     // Pending two-person proposals, made in the Console or on the engine's admin plane (one store;
     // crdb SETTINGS_APPROVALS, SET.3).
     id: bindingId('settings.approvals'),
@@ -1122,6 +1132,17 @@ const settingsCommands: readonly CommandBinding[] = [
     kind: 'command',
     surface: 'cruciblql',
     op: 'settings_rollback_v1',
+    authz: 'operator:settings.change',
+    audited: true,
+    status: { kind: 'live' },
+  },
+  {
+    // Replace one agent's models and tools; the engine does the read-modify-write and refuses a
+    // stale write as a conflict (crdb AGENT_GRANT_SET, GW.10a; durable agent-grant-audit row).
+    id: bindingId('settings.modelAccessGrant'),
+    kind: 'command',
+    surface: 'cruciblql',
+    op: 'agent_grant_set_v1',
     authz: 'operator:settings.change',
     audited: true,
     status: { kind: 'live' },

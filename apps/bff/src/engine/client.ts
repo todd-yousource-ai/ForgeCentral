@@ -111,6 +111,10 @@ import type {
   WireSettingsQuery,
   WireSettingsReports,
   WireSettingsReportsQuery,
+  WireModelAccess,
+  WireModelAccessQuery,
+  WireAgentGrantReceipt,
+  WireAgentGrantSet,
   WireSettingsProposed,
   WireSettingsApprovals,
   WireSettingsApprovalsQuery,
@@ -249,6 +253,16 @@ export interface CrucibleClient {
     request: WireSettingsReportsQuery,
     opts?: EngineCallOptions,
   ): Promise<WireSettingsReports>;
+  /** The model-access page: catalog, agent grants and spend (MODEL_ACCESS_READ, crdb GW.10a). */
+  modelAccessRead(
+    request: WireModelAccessQuery,
+    opts?: EngineCallOptions,
+  ): Promise<WireModelAccess>;
+  /** Replace one agent's models and tools, node-side read-modify-write (AGENT_GRANT_SET, GW.10a). */
+  agentGrantSet(
+    request: WireAgentGrantSet,
+    opts?: EngineCallOptions,
+  ): Promise<WireAgentGrantReceipt>;
   /** Commit knob edits / section patches (SETTINGS_COMMIT, crdb SET.2 / SET.2b). */
   settingsCommit(
     request: WireSettingsCommit,

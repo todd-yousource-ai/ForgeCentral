@@ -251,6 +251,7 @@ describe('the Settings tab strip and the Configuration tab (ST.1)', () => {
       'RBAC',
       'Federation',
       'Changes',
+      'Model access',
       'Security',
       'KeyLock',
       'Observability',

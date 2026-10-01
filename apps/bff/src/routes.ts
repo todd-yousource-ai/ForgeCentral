@@ -105,6 +105,9 @@ export const API_ROUTES: readonly ApiRoute[] = [
   r('POST', '/api/settings', 'settings.commit'),
   r('GET', '/api/settings/console-rbac', 'settings.consoleRbac'),
   r('GET', '/api/settings/reports', 'settings.reports'),
+  // Model access (IP-FRONTIER-GATEWAY GW.10).
+  r('GET', '/api/model-access', 'settings.modelAccess'),
+  r('PUT', '/api/model-access/grant', 'settings.modelAccessGrant'),
   r('GET', '/api/settings/security-session', 'settings.securitySession'),
   r('POST', '/api/settings/propose', 'settings.propose'),
   r('GET', '/api/settings/approvals', 'settings.approvals'),

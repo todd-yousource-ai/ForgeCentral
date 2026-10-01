@@ -146,6 +146,10 @@ function frameTypeForRequest(request: WireRequest): FrameType {
       'SettingsRead' in request ||
       // The admin-plane status reports (SETTINGS_REPORTS, crdb SET.4; IP-CONSOLE-11 report tabs).
       'SettingsReports' in request ||
+      // The model-access page and the agent grant set (MODEL_ACCESS_READ / AGENT_GRANT_SET, crdb
+      // GW.10a; IP-FRONTIER-GATEWAY GW.10): a tier-gated read and a node-side read-modify-write.
+      'ModelAccessRead' in request ||
+      'AgentGrantSet' in request ||
       // Dual control + history (crdb SET.3 / SET.5; IP-CONSOLE-11 ST.9).
       'SettingsPropose' in request ||
       'SettingsApprovals' in request ||

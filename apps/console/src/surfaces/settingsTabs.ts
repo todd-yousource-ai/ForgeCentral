@@ -8,6 +8,7 @@ export const SETTINGS_TABS = [
   { id: 'rbac', label: 'RBAC' },
   { id: 'federation', label: 'Federation' },
   { id: 'changes', label: 'Changes' },
+  { id: 'model-access', label: 'Model access' },
   { id: 'security', label: 'Security' },
   { id: 'keylock', label: 'KeyLock' },
   { id: 'observability', label: 'Observability' },

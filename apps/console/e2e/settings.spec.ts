@@ -156,8 +156,52 @@ const SETTINGS_ROUTES = [
   /\/api\/settings\/approvals\/[0-9]+\/approve$/,
   /\/api\/settings\/history(\?limit=[0-9]+)?$/,
   /\/api\/settings\/rollback$/,
+  /\/api\/model-access(\?days=[0-9]+)?$/,
+  /\/api\/model-access\/grant$/,
   /\/api\/idam\/connectors$/,
 ];
+
+/** The Model access page as the BFF projects it (GW.10): one hosted model, one agent holding it. */
+const MODEL_ACCESS = {
+  adminPlane: true,
+  catalogConfigured: true,
+  catalogVersion: 1,
+  models: [
+    {
+      id: 'gpt-6-luna',
+      version: 'rolling',
+      vendorModel: 'gpt-6-luna',
+      destination: 'openai',
+      surface: 'openai-responses',
+      pin: 'rolling',
+      lifecycle: 'active',
+      ceiling: 'internal',
+      region: 'us',
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      prices: { uncachedInput: 100_000, cacheRead: 10_000, cacheWrite: 0, output: 500_000 },
+      zdrEligible: true,
+      retentionDays: 30,
+    },
+  ],
+  roles: [{ role: 'soc.researcher', model: 'gpt-6-luna', version: 'rolling' }],
+  agents: [
+    {
+      agent: 'claude-code',
+      grant: {
+        models: ['gpt-6-luna'],
+        tools: [],
+        readScopes: [],
+        workspaces: [],
+        classification: 'internal',
+      },
+      spend: [],
+    },
+  ],
+  otherSpend: [],
+  grantsTruncated: false,
+  spendTruncated: false,
+};
 
 function json(route: Route, body: unknown, status = 200): Promise<void> {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -190,6 +234,20 @@ async function mockBff(
       return json(route, {}, 404);
     }
     const method = route.request().method();
+    if (method === 'PUT' && path === '/api/model-access/grant') {
+      const body = route.request().postDataJSON() as { models: string[] };
+      posts.push({ url: path, body });
+      return json(route, {
+        kind: 'applied',
+        grant: {
+          models: body.models,
+          tools: [],
+          readScopes: [],
+          workspaces: [],
+          classification: 'internal',
+        },
+      });
+    }
     if (method === 'POST') {
       posts.push({ url: path, body: route.request().postDataJSON() as unknown });
       if (path.endsWith('/propose')) {
@@ -226,6 +284,7 @@ async function mockBff(
       });
     }
     if (path.includes('/reports')) return json(route, REPORTS);
+    if (path.startsWith('/api/model-access')) return json(route, MODEL_ACCESS);
     if (path.endsWith('/security-session')) {
       return json(route, { status: 'negotiated', group: 'X25519MLKEM768' });
     }
@@ -332,6 +391,7 @@ test('the no-stub sweep: every tab reads real routes, boot-bound identity is rea
     'RBAC',
     'Federation',
     'Changes',
+    'Model access',
     'Security',
     'KeyLock',
     'Observability',
@@ -347,6 +407,7 @@ test('the no-stub sweep: every tab reads real routes, boot-bound identity is rea
     RBAC: /sha512:ab12/,
     Federation: /soc-admins/,
     Changes: /soc-capstone/,
+    'Model access': /soc\.researcher/,
     Security: /Hybrid post-quantum \(X25519MLKEM768\)/,
     KeyLock: /1 d/,
     Observability: /0\.0\.0\.0:4317/,
@@ -468,4 +529,31 @@ test('the tier below Admin / SecurityAudit is an honest empty state on every eng
     await page.getByRole('tab', { name, exact: true }).click();
     await expect(page.getByText('Admin or SecurityAudit tier required').first()).toBeVisible();
   }
+});
+
+test('grant an agent a model within 3 clicks of the Overview (GW.10)', async ({ page }) => {
+  const bff = await mockBff(page);
+  await page.goto('/');
+  // Click 1: Settings. Click 2: Model access. Click 3: the agent's model cell.
+  await page
+    .getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: 'Settings' })
+    .click();
+  await page.getByRole('tab', { name: 'Model access', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'gpt-6-luna for claude-code' }).click();
+
+  await expect(page.getByRole('status')).toContainText('Saved');
+  expect(bff.posts).toEqual([
+    {
+      url: '/api/model-access/grant',
+      body: {
+        agent: 'claude-code',
+        models: [],
+        tools: [],
+        expectedModels: ['gpt-6-luna'],
+        expectedTools: [],
+      },
+    },
+  ]);
+  expect(bff.unknown).toEqual([]);
 });

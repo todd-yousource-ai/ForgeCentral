@@ -60,6 +60,8 @@ function engineWith(parts: {
     settingsRead: unused,
     settingsCommit: unused,
     settingsReports: unused,
+    modelAccessRead: unused,
+    agentGrantSet: unused,
     settingsPropose: unused,
     settingsApprovals: unused,
     settingsApprove: unused,

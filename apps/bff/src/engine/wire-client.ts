@@ -68,6 +68,8 @@ import type {
   WireSocSettingsCommitted,
   WireSettings,
   WireSettingsReports,
+  WireModelAccess,
+  WireAgentGrantReceipt,
   WireSettingsProposed,
   WireSettingsApprovals,
   WireSettingsHistory,
@@ -313,6 +315,22 @@ export function replyToSettingsReports(reply: WireReply): WireSettingsReports {
   if (typeof reply === 'object' && 'Refused' in reply)
     throw new EngineRefusedError(reply.Refused.error);
   throw new Error('engine returned an unexpected reply for a settings reports read');
+}
+
+/** Map an engine `WireReply` to `WireModelAccess` (MODEL_ACCESS_READ, crdb GW.10a). */
+export function replyToModelAccess(reply: WireReply): WireModelAccess {
+  if (typeof reply === 'object' && 'ModelAccess' in reply) return reply.ModelAccess;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for a model access read');
+}
+
+/** Map an engine `WireReply` to `WireAgentGrantReceipt` (AGENT_GRANT_SET, crdb GW.10a). */
+export function replyToAgentGrantReceipt(reply: WireReply): WireAgentGrantReceipt {
+  if (typeof reply === 'object' && 'AgentGrantReceipt' in reply) return reply.AgentGrantReceipt;
+  if (typeof reply === 'object' && 'Refused' in reply)
+    throw new EngineRefusedError(reply.Refused.error);
+  throw new Error('engine returned an unexpected reply for an agent grant set');
 }
 
 /** Map an engine `WireReply` to `WireSocSettings` (SOC_SETTINGS_READ, crdb C.9c). */
@@ -998,6 +1016,28 @@ export class WireCrucibleClient implements CrucibleClient {
     return this.call(
       async (transport) =>
         replyToSettingsReports(await dispatch(transport, { SettingsReports: request })),
+      opts,
+    );
+  }
+
+  async modelAccessRead(
+    request: Parameters<CrucibleClient['modelAccessRead']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireModelAccess> {
+    return this.call(
+      async (transport) =>
+        replyToModelAccess(await dispatch(transport, { ModelAccessRead: request })),
+      opts,
+    );
+  }
+
+  async agentGrantSet(
+    request: Parameters<CrucibleClient['agentGrantSet']>[0],
+    opts?: EngineCallOptions,
+  ): Promise<WireAgentGrantReceipt> {
+    return this.call(
+      async (transport) =>
+        replyToAgentGrantReceipt(await dispatch(transport, { AgentGrantSet: request })),
       opts,
     );
   }

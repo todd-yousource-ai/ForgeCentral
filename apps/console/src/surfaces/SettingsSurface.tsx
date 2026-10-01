@@ -63,6 +63,7 @@ import {
   useSocSettings,
 } from './useSettings.js';
 import { TierRequired } from './TierRequired.js';
+import { ModelAccessTab } from './SettingsModelAccessTab.js';
 
 function receiptLine(receipt: SocSettingsReceipt): string {
   if (!receipt.refused) {
@@ -598,6 +599,8 @@ export function SettingsSurface(): ReactElement {
         <FederationTab />
       ) : tab === 'changes' ? (
         <ChangesTab />
+      ) : tab === 'model-access' ? (
+        <ModelAccessTab />
       ) : tab === 'security' ? (
         <SecurityTab />
       ) : tab === 'keylock' ? (

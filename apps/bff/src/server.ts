@@ -26,6 +26,7 @@ import {
   toSocSettingsPatch,
   toSettingsCommitRequest,
   toSettingsReportNames,
+  toAgentGrantChange,
   toPositiveId,
   toHistoryLimit,
 } from '@forge/contracts';
@@ -116,6 +117,7 @@ import {
   resolveSettingsHistory,
   resolveSettingsRollback,
 } from './engine/settings.js';
+import { applyAgentGrant, MAX_SPEND_DAYS, resolveModelAccess } from './engine/model-access.js';
 import {
   resolveIdamConfigure,
   resolveIdamConnect,
@@ -2099,6 +2101,84 @@ async function commitGovernedSettings(
 }
 
 /**
+ * `GET /api/model-access?days=N` and `PUT /api/model-access/grant` (IP-FRONTIER-GATEWAY GW.10 over
+ * crdb GW.10a). The read is the catalog, the tenant's agent grants and its spend over the last N UTC
+ * days (1..31, default 7); the write replaces one agent's models and tools, the engine doing the
+ * read-modify-write and answering a stale write as a conflict (a 409 carrying what is stored now).
+ *
+ * Both are `global-admin` only, checked HERE before any engine call: the engine runs them at the
+ * Settings tier, which the BFF asserts for a global admin alone, so any other role would only be
+ * refused there. A bad parameter or body is a 400; the engine's tier refusal is a 403.
+ */
+async function handleModelAccess(
+  deps: ServerDeps,
+  req: IncomingMessage,
+  method: string,
+  path: string,
+  res: ServerResponse,
+): Promise<boolean> {
+  const isRead = path === '/api/model-access' && method === 'GET';
+  const isWrite = path === '/api/model-access/grant' && method === 'PUT';
+  if (!isRead && !isWrite) return false;
+  const session = deps.authRouter?.resolveSession(req);
+  if (!session) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (session.role !== 'global-admin') {
+    sendJson(res, 403, { error: 'refused', class: 'Role' });
+    return true;
+  }
+  if (!deps.operatorEngine) {
+    sendJson(res, 503, { error: 'engine_unavailable' });
+    return true;
+  }
+  const principal = principalFromSession(session, activeTenantOverride(req));
+  const opts = { timeoutMs: deps.config.requestTimeoutMs };
+  try {
+    if (isRead) {
+      const raw = new URL(req.url ?? '/', 'http://localhost').searchParams.get('days');
+      const days = raw === null ? 7 : Number(raw);
+      if (!Number.isInteger(days) || days < 1 || days > MAX_SPEND_DAYS) {
+        sendJson(res, 400, { error: 'bad_request' });
+        return true;
+      }
+      const view = await resolveModelAccess(deps.operatorEngine, principal, days, Date.now(), opts);
+      if (view === null) {
+        sendJson(res, 403, { error: 'refused', class: 'Tier' });
+        return true;
+      }
+      sendJson(res, 200, view);
+      return true;
+    }
+    let change: ReturnType<typeof toAgentGrantChange>;
+    try {
+      change = toAgentGrantChange(await readJsonBody(req, MAX_COMMAND_BODY_BYTES));
+    } catch {
+      change = null;
+    }
+    if (change === null) {
+      sendJson(res, 400, { error: 'bad_request' });
+      return true;
+    }
+    const outcome = await applyAgentGrant(deps.operatorEngine, principal, change, opts);
+    if (outcome === null) {
+      sendJson(res, 403, { error: 'refused', class: 'Tier' });
+      return true;
+    }
+    sendJson(res, outcome.kind === 'conflict' ? 409 : 200, outcome);
+  } catch (err) {
+    if (err instanceof EngineRefusedError) {
+      sendJson(res, 403, { error: 'refused', class: err.wireError.class });
+    } else {
+      deps.log.warn({ err: err instanceof Error ? err.name : 'unknown' }, 'model access failed');
+      sendJson(res, 502, { error: 'engine_error' });
+    }
+  }
+  return true;
+}
+
+/**
  * `GET /api/settings/console-rbac` (IP-CONSOLE-11 ST.3): the Console's own role map, read-only. It
  * names every tenant and subject the Console grants, so only a `global-admin` may read it; any other
  * role is refused (403) without the map. The map is the BFF's start configuration, not engine state.
@@ -2651,6 +2731,9 @@ async function route(
     return;
   }
   if (await handleSettingsReports(deps, req, method, path, res)) {
+    return;
+  }
+  if (await handleModelAccess(deps, req, method, path, res)) {
     return;
   }
   if (await handleSecuritySession(deps, req, method, path, res)) {
